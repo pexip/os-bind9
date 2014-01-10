@@ -1,3 +1,14 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.8) precise-security; urgency=low
+
+  * SECURITY UPDATE: denial of service when processing NSEC3-signed zone
+    queries
+    - debian/patches/CVE-2014-0591.patch: don't call memcpy with
+      overlapping ranges in bin/named/query.c.
+    - patch backported from 9.8.6-P2.
+    - CVE-2014-0591
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 10 Jan 2014 09:44:31 -0500
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.7) precise-security; urgency=low
 
   * SECURITY UPDATE: denial of service via incorrect bounds checking on

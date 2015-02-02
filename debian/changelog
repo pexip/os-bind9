@@ -1,3 +1,24 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.9pexip1) pexip; urgency=low
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 02 Feb 2015 19:09:11 +0000
+
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.9) precise-security; urgency=medium
+
+  * SECURITY UPDATE: denial of service via delegation handling defect
+    - limit max recursion in bin/named/config.c, bin/named/query.c,
+      bin/named/server.c, lib/dns/adb.c, lib/dns/include/dns/adb.h,
+      lib/dns/include/dns/resolver.h, lib/dns/resolver.c,
+      lib/export/isc/Makefile.in, lib/isc/Makefile.in, lib/isc/counter.c,
+      lib/isc/include/isc/counter.h, lib/isc/include/isc/Makefile.in,
+      lib/isc/include/isc/types.h, lib/isc/tests/counter_test.c,
+      lib/isccfg/namedconf.c.
+    - Patch provided by upstream.
+    - CVE-2014-8500
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Tue, 09 Dec 2014 09:20:13 -0500
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.8pexip1) pexip; urgency=low
 
   * Prepare Pexip packaging

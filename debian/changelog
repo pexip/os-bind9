@@ -1,3 +1,14 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.12) precise-security; urgency=medium
+
+  * SECURITY UPDATE: denial of service in TKEY record query handling
+    - lib/dns/tkey.c: clear out name before trying the answer section.
+    - CVE-2015-5477
+  * SECURITY UPDATE: denial of service via AAAA record query
+    - bin/named/query.c: arrange for RPZ rewriting of any A records.
+    - CVE-2012-5689
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 27 Jul 2015 11:42:05 -0400
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.11) precise-security; urgency=medium
 
   * SECURITY UPDATE: resolver DoS via specially crafted zone data

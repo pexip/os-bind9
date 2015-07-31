@@ -5358,6 +5358,7 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 			if (sigrdataset != NULL &&
 			    dns_rdataset_isassociated(sigrdataset))
 				dns_rdataset_disassociate(sigrdataset);
+			rpz_st->q.is_zone = is_zone;
 			is_zone = ISC_TRUE;
 			rpz_log(client);
 		}
@@ -5734,6 +5735,15 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 			rdataset = NULL;
 			sigrdataset = NULL;
 			type = qtype = dns_rdatatype_a;
+			rpz_st = client->query.rpz_st;
+			if (rpz_st != NULL) {
+				/*
+				 * Arrange for RPZ rewriting of any A records.
+				 */
+				if ((rpz_st->state & DNS_RPZ_REWRITTEN) != 0)
+					is_zone = rpz_st->q.is_zone;
+				rpz_st_clear(client);
+			}
 			dns64 = ISC_TRUE;
 			goto db_find;
 		}
@@ -5990,6 +6000,15 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 			sigrdataset = NULL;
 			fname = NULL;
 			type = qtype = dns_rdatatype_a;
+			rpz_st = client->query.rpz_st;
+			if (rpz_st != NULL) {
+				/*
+				 * Arrange for RPZ rewriting of any A records.
+				 */
+				if ((rpz_st->state & DNS_RPZ_REWRITTEN) != 0)
+					is_zone = rpz_st->q.is_zone;
+				rpz_st_clear(client);
+			}
 			dns64 = ISC_TRUE;
 			goto db_find;
 		}
@@ -6599,6 +6618,15 @@ query_find(ns_client_t *client, dns_fetchevent_t *event, dns_rdatatype_t qtype)
 			rdataset = NULL;
 			sigrdataset = NULL;
 			type = qtype = dns_rdatatype_a;
+			rpz_st = client->query.rpz_st;
+			if (rpz_st != NULL) {
+				/*
+				 * Arrange for RPZ rewriting of any A records.
+				 */
+				if ((rpz_st->state & DNS_RPZ_REWRITTEN) != 0)
+					is_zone = rpz_st->q.is_zone;
+				rpz_st_clear(client);
+			}
 			dns64_exclude = dns64 = ISC_TRUE;
 			goto db_find;
 		}

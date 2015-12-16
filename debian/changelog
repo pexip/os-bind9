@@ -1,3 +1,18 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.14pexip1) pexip; urgency=low
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Wed, 16 Dec 2015 15:54:12 +0000
+
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.14) precise-security; urgency=medium
+
+  * SECURITY UPDATE: REQUIRE failure via incorrect class
+    - properly handle class in lib/dns/include/dns/message.h,
+      lib/dns/message.c, lib/dns/resolver.c, lib/dns/xfrin.c.
+    - CVE-2015-8000
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 14 Dec 2015 13:48:33 -0500
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.13pexip1) pexip; urgency=low
 
   * New upstream release

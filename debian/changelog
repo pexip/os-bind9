@@ -1,3 +1,17 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.15pexip1) pexip; urgency=low
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 25 Jan 2016 09:39:42 +0000
+
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.15) precise-security; urgency=medium
+
+  * SECURITY UPDATE: denial of service via string formatting operations
+    - lib/dns/rdata/in_1/apl_42.c: use correct length.
+    - CVE-2015-8704
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 18 Jan 2016 07:56:11 -0500
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.14pexip1) pexip; urgency=low
 
   * New upstream release

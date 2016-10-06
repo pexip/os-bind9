@@ -1,3 +1,18 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17pexip1) pexip; urgency=low
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Thu, 06 Oct 2016 17:34:24 +0100
+
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17) precise-security; urgency=medium
+
+  * SECURITY UPDATE: denial of service via assertion failure
+    - lib/dns/message.c: properly handle lengths.
+    - backported from patch provided by upstream.
+    - CVE-2016-2776
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 26 Sep 2016 14:42:15 -0400
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.16pexip1) pexip; urgency=low
 
   * New upstream release

@@ -1,3 +1,9 @@
+bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17pexip2) pexip; urgency=low
+
+  * Rebuild against libssl1.0.2
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 11 Oct 2016 23:36:41 +0100
+
 bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17pexip1) pexip; urgency=low
 
   * New upstream release

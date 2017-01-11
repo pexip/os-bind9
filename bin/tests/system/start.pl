@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# Copyright (C) 2004-2008, 2010, 2011  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2004-2008, 2010-2013  Internet Systems Consortium, Inc. ("ISC")
 # Copyright (C) 2001  Internet Software Consortium.
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: start.pl,v 1.16.54.6 2011-05-05 22:58:59 smann Exp $
+# $Id$
 
 # Framework for starting test servers.
 # Based on the type of server specified, check for port availability, remove
@@ -23,6 +23,7 @@
 # If a server is specified, start it. Otherwise, start all servers for test.
 
 use strict;
+use Cwd;
 use Cwd 'abs_path';
 use Getopt::Long;
 
@@ -35,6 +36,12 @@ use Getopt::Long;
 #   options - alternate options for the server
 #             NOTE: options must be specified with '-- "<option list>"',
 #              for instance: start.pl . ns1 -- "-c n.conf -d 43"
+#             ALSO NOTE: this variable will be filled with the
+#		contents of the first non-commented/non-blank line of args
+#		in a file called "named.args" in an ns*/ subdirectory only
+#		the FIRST non-commented/non-blank line is used (everything
+#		else in the file is ignored. If "options" is already set,
+#		then "named.args" is ignored.
 
 my $usage = "usage: $0 [--noclean] [--restart] test-directory [server-directory [server-options]]";
 my $noclean = '';
@@ -81,14 +88,14 @@ if ($server) {
 	my @ns = grep /^ns[0-9]*$/, @files;
 	my @lwresd = grep /^lwresd[0-9]*$/, @files;
 	my @ans = grep /^ans[0-9]*$/, @files;
+	my $name;
 
 	# Start the servers we found.
 	&check_ports();
-	foreach (@ns, @lwresd, @ans) {
-		&start_server($_);
-	}
-	foreach (@ns) {
-		&verify_server($_);
+	foreach $name(@ns, @lwresd, @ans) {
+		&start_server($name);
+		&verify_server($name) if ($name =~ /^ns/);
+		
 	}
 }
 
@@ -125,11 +132,27 @@ sub start_server {
 	my $cleanup_files;
 	my $command;
 	my $pid_file;
+        my $cwd = getcwd();
+	my $args_file = $cwd . "/" . $test . "/" . $server . "/" . "named.args";
 
 	if ($server =~ /^ns/) {
 		$cleanup_files = "{*.jnl,*.bk,*.st,named.run}";
 		$command = "$NAMED ";
 		if ($options) {
+			$command .= "$options";
+		} elsif (-e $args_file) {
+			open(FH, "<", $args_file);
+			while(my $line=<FH>)
+			{
+				#$line =~ s/\R//g;
+				chomp $line;
+				next if ($line =~ /^\s*$/); #discard blank lines
+				next if ($line =~ /^\s*#/); #discard comment lines
+				$line =~ s/#.*$//g;
+				$options = $line;
+				last;
+			}
+			close FH;
 			$command .= "$options";
 		} else {
 			$command .= "-m record,size,mctx ";
@@ -138,7 +161,7 @@ sub start_server {
 				if (-e "$testdir/$server/named.nosoa");
 			$command .= "-T noaa " 
 				if (-e "$testdir/$server/named.noaa");
-			$command .= "-c named.conf -d 99 -g";
+			$command .= "-c named.conf -d 99 -g -U 4";
 		}
 		if ($restart) {
 			$command .= " >>named.run 2>&1 &";
@@ -154,7 +177,7 @@ sub start_server {
 		} else {
 			$command .= "-m record,size,mctx ";
 			$command .= "-T clienttest ";
-			$command .= "-C resolv.conf -d 99 -g ";
+			$command .= "-C resolv.conf -d 99 -g -U 4 ";
 			$command .= "-i lwresd.pid -P 9210 -p 5300";
 		}
 		if ($restart) {
@@ -188,7 +211,7 @@ sub start_server {
 		exit 1;
 	}
 
-	#               print "I:starting server $server\n";
+	# print "I:starting server %s\n",$server;
 
 	chdir "$testdir/$server";
 
@@ -201,22 +224,26 @@ sub start_server {
 
 	# start the server
 	my $child = `$command`;
-	chomp($child);
+	$child =~ s/\s+$//g;
 
 	# wait up to 14 seconds for the server to start and to write the
 	# pid file otherwise kill this server and any others that have
 	# already been started
 	my $tries = 0;
 	while (!-s $pid_file) {
-		if (++$tries > 14) {
+		if (++$tries > 140) {
 			print "I:Couldn't start server $server (pid=$child)\n";
 			print "R:FAIL\n";
 			system "kill -9 $child" if ("$child" ne "");
 			system "$PERL $topdir/stop.pl $testdir";
 			exit 1;
 		}
-		sleep 1;
+		# sleep for 0.1 seconds
+		select undef,undef,undef,0.1;
 	}
+
+        # go back to the top level directory
+	chdir $cwd;
 }
 
 sub verify_server {

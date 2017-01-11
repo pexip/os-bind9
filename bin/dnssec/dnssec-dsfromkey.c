@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2008-2012  Internet Systems Consortium, Inc. ("ISC")
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: dnssec-dsfromkey.c,v 1.19 2010-12-23 04:07:59 marka Exp $ */
+/* $Id: dnssec-dsfromkey.c,v 1.24 2011/10/25 01:54:18 marka Exp $ */
 
 /*! \file */
 
@@ -31,12 +31,13 @@
 #include <isc/string.h>
 #include <isc/util.h>
 
+#include <dns/callbacks.h>
 #include <dns/db.h>
 #include <dns/dbiterator.h>
 #include <dns/ds.h>
 #include <dns/fixedname.h>
-#include <dns/log.h>
 #include <dns/keyvalues.h>
+#include <dns/log.h>
 #include <dns/master.h>
 #include <dns/name.h>
 #include <dns/rdata.h>
@@ -61,6 +62,7 @@ static dns_rdataclass_t rdclass;
 static dns_fixedname_t	fixed;
 static dns_name_t	*name = NULL;
 static isc_mem_t	*mctx = NULL;
+static isc_uint32_t	ttl;
 
 static isc_result_t
 initname(char *setname) {
@@ -76,8 +78,28 @@ initname(char *setname) {
 	return (result);
 }
 
+static void
+db_load_from_stream(dns_db_t *db, FILE *fp) {
+	isc_result_t result;
+	dns_rdatacallbacks_t callbacks;
+
+	dns_rdatacallbacks_init(&callbacks);
+	result = dns_db_beginload(db, &callbacks.add, &callbacks.add_private);
+	if (result != ISC_R_SUCCESS)
+		fatal("dns_db_beginload failed: %s", isc_result_totext(result));
+
+	result = dns_master_loadstream(fp, name, name, rdclass, 0,
+				       &callbacks, mctx);
+	if (result != ISC_R_SUCCESS)
+		fatal("can't load from input: %s", isc_result_totext(result));
+
+	result = dns_db_endload(db, &callbacks.add_private);
+	if (result != ISC_R_SUCCESS)
+		fatal("dns_db_endload failed: %s", isc_result_totext(result));
+}
+
 static isc_result_t
-loadsetfromfile(char *filename, dns_rdataset_t *rdataset) {
+loadset(const char *filename, dns_rdataset_t *rdataset) {
 	isc_result_t	 result;
 	dns_db_t	 *db = NULL;
 	dns_dbnode_t	 *node = NULL;
@@ -90,9 +112,15 @@ loadsetfromfile(char *filename, dns_rdataset_t *rdataset) {
 	if (result != ISC_R_SUCCESS)
 		fatal("can't create database");
 
-	result = dns_db_load(db, filename);
-	if (result != ISC_R_SUCCESS && result != DNS_R_SEENINCLUDE)
-		fatal("can't load %s: %s", filename, isc_result_totext(result));
+	if (strcmp(filename, "-") == 0) {
+		db_load_from_stream(db, stdin);
+		filename = "input";
+	} else {
+		result = dns_db_load(db, filename);
+		if (result != ISC_R_SUCCESS && result != DNS_R_SEENINCLUDE)
+			fatal("can't load %s: %s", filename,
+			      isc_result_totext(result));
+	}
 
 	result = dns_db_findnode(db, name, ISC_FALSE, &node);
 	if (result != ISC_R_SUCCESS)
@@ -141,7 +169,7 @@ loadkeyset(char *dirname, dns_rdataset_t *rdataset) {
 		return (ISC_R_NOSPACE);
 	isc_buffer_putuint8(&buf, 0);
 
-	return (loadsetfromfile(filename, rdataset));
+	return (loadset(filename, rdataset));
 }
 
 static void
@@ -256,7 +284,9 @@ emit(unsigned int dtype, isc_boolean_t showall, char *lookaside,
 		}
 	}
 
-	result = dns_rdata_totext(&ds, (dns_name_t *) NULL, &textb);
+	result = dns_rdata_tofmttext(&ds, (dns_name_t *) NULL, 0, 0, 0, "",
+				     &textb);
+
 	if (result != ISC_R_SUCCESS)
 		fatal("can't print rdata");
 
@@ -265,12 +295,13 @@ emit(unsigned int dtype, isc_boolean_t showall, char *lookaside,
 		fatal("can't print class");
 
 	isc_buffer_usedregion(&nameb, &r);
-	isc_util_fwrite(r.base, 1, r.length, stdout);
+	printf("%.*s ", (int)r.length, r.base);
 
-	putchar(' ');
+	if (ttl != 0U)
+		printf("%u ", ttl);
 
 	isc_buffer_usedregion(&classb, &r);
-	isc_util_fwrite(r.base, 1, r.length, stdout);
+	printf("%.*s", (int)r.length, r.base);
 
 	if (lookaside == NULL)
 		printf(" DS ");
@@ -278,8 +309,7 @@ emit(unsigned int dtype, isc_boolean_t showall, char *lookaside,
 		printf(" DLV ");
 
 	isc_buffer_usedregion(&textb, &r);
-	isc_util_fwrite(r.base, 1, r.length, stdout);
-	putchar('\n');
+	printf("%.*s\n", (int)r.length, r.base);
 }
 
 ISC_PLATFORM_NORETURN_PRE static void
@@ -299,12 +329,13 @@ usage(void) {
 	fprintf(stderr, "    -K <directory>: directory in which to find "
 			"key file or keyset file\n");
 	fprintf(stderr, "    -a algorithm: digest algorithm "
-			"(SHA-1, SHA-256 or GOST)\n");
+			"(SHA-1, SHA-256, GOST or SHA-384)\n");
 	fprintf(stderr, "    -1: use SHA-1\n");
 	fprintf(stderr, "    -2: use SHA-256\n");
 	fprintf(stderr, "    -l: add lookaside zone and print DLV records\n");
 	fprintf(stderr, "    -s: read keyset from keyset-<dnsname> file\n");
 	fprintf(stderr, "    -c class: rdata class for DS set (default: IN)\n");
+	fprintf(stderr, "    -T TTL\n");
 	fprintf(stderr, "    -f file: read keyset from zone file\n");
 	fprintf(stderr, "    -A: when used with -f, "
 			"include all keys in DS set, not just KSKs\n");
@@ -344,7 +375,7 @@ main(int argc, char **argv) {
 	isc_commandline_errprint = ISC_FALSE;
 
 	while ((ch = isc_commandline_parse(argc, argv,
-					   "12Aa:c:d:Ff:K:l:sv:h")) != -1) {
+					   "12Aa:c:d:Ff:K:l:sT:v:h")) != -1) {
 		switch (ch) {
 		case '1':
 			dtype = DNS_DSDIGEST_SHA1;
@@ -384,6 +415,9 @@ main(int argc, char **argv) {
 		case 's':
 			usekeyset = ISC_TRUE;
 			break;
+		case 'T':
+			ttl = atol(isc_commandline_argument);
+			break;
 		case 'v':
 			verbose = strtol(isc_commandline_argument, &endp, 0);
 			if (*endp != '\0')
@@ -418,6 +452,9 @@ main(int argc, char **argv) {
 		else if (strcasecmp(algname, "GOST") == 0)
 			dtype = DNS_DSDIGEST_GOST;
 #endif
+		else if (strcasecmp(algname, "SHA384") == 0 ||
+			 strcasecmp(algname, "SHA-384") == 0)
+			dtype = DNS_DSDIGEST_SHA384;
 		else
 			fatal("unknown algorithm %s", algname);
 	}
@@ -466,7 +503,7 @@ main(int argc, char **argv) {
 		if (usekeyset)
 			result = loadkeyset(dir, &rdataset);
 		else
-			result = loadsetfromfile(filename, &rdataset);
+			result = loadset(filename, &rdataset);
 
 		if (result != ISC_R_SUCCESS)
 			fatal("could not load DNSKEY set: %s\n",

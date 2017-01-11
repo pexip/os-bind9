@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2009, 2013  Internet Systems Consortium, Inc. ("ISC")
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: backtrace_test.c,v 1.4 2009-09-02 23:48:01 tbox Exp $ */
+/* $Id: backtrace_test.c,v 1.4 2009/09/02 23:48:01 tbox Exp $ */
 
 #include <config.h>
 
@@ -72,8 +72,8 @@ func3() {
 			if (result == ISC_R_SUCCESS)
 				printf("  [%d] %s\n", i, fname);
 			else {
-				printf("  [%d] getsymbol failed: %s\n", i,
-				       isc_result_totext(result));
+				printf("  [%d] %p getsymbol failed: %s\n", i,
+				       tracebuf[i], isc_result_totext(result));
 			}
 		}
 	}

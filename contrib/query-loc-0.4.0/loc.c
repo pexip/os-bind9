@@ -1,6 +1,6 @@
 #include "loc.h"
 
-/* $Id: loc.c,v 1.1 2008-02-15 01:47:15 marka Exp $ */
+/* $Id: loc.c,v 1.1 2008/02/15 01:47:15 marka Exp $ */
 
 /* Global variables */
 
@@ -151,7 +151,8 @@ getlocbyaddr (addr, mask)
   struct in_addr netaddr;
   u_int32_t a;
   struct in_addr themask;
-  char *text_addr, *text_mask;
+  char text_addr[sizeof("255.255.255.255")],
+       text_mask[sizeof("255.255.255.255")];
 
   if (mask == NULL)
     {
@@ -162,13 +163,12 @@ getlocbyaddr (addr, mask)
       themask = *mask;
     }
 
-  text_addr = (char *) malloc (256);
-  text_mask = (char *) malloc (256);
   strcpy (text_addr, inet_ntoa (addr));
   strcpy (text_mask, inet_ntoa (themask));
 
   if (debug >= 2)
     printf ("Testing address %s/%s\n", text_addr, text_mask);
+
   if (mask == NULL)
     {
       a = ntohl (addr.s_addr);

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (C) 2011  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2011, 2012  Internet Systems Consortium, Inc. ("ISC")
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: tests.sh,v 1.2.2.2 2011-03-18 21:27:51 fdupont Exp $
+# $Id: tests.sh,v 1.2 2011/03/18 21:14:19 fdupont Exp $
 
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
@@ -60,6 +60,24 @@ echo "I:checking (too) long dname from recursive"
 ret=0
 $DIG 01234567890123456789012345678901234567890123456789.longlonglonglonglonglonglonglonglonglonglonglonglonglonglong.longlonglonglonglonglonglonglonglonglonglonglonglonglonglong.longlonglonglonglonglonglonglonglonglonglonglonglonglonglong.long-dname.example @10.53.0.4 a -p 5300 > dig.out.ns4.toolong || ret=1
 grep "status: YXDOMAIN" dig.out.ns4.toolong > /dev/null || ret=1
+if [ $ret != 0 ]; then echo "I:failed"; fi
+status=`expr $status + $ret`
+
+echo "I:checking cname to dname from authoritative"
+ret=0
+$DIG cname.example @10.53.0.2 a -p 5300 > dig.out.ns2.cname
+grep "status: NOERROR" dig.out.ns2.cname > /dev/null || ret=1
+if [ $ret != 0 ]; then echo "I:failed"; fi
+status=`expr $status + $ret`
+
+echo "I:checking cname to dname from recursive"
+ret=0
+$DIG cname.example @10.53.0.4 a -p 5300 > dig.out.ns4.cname
+grep "status: NOERROR" dig.out.ns4.cname > /dev/null || ret=1
+grep '^cname.example.' dig.out.ns4.cname > /dev/null || ret=1
+grep '^cnamedname.example.' dig.out.ns4.cname > /dev/null || ret=1
+grep '^a.cnamedname.example.' dig.out.ns4.cname > /dev/null || ret=1
+grep '^a.target.example.' dig.out.ns4.cname > /dev/null || ret=1
 if [ $ret != 0 ]; then echo "I:failed"; fi
 status=`expr $status + $ret`
 

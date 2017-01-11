@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004-2014  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2002  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -16,7 +16,7 @@
  */
 
 /*
- * $Id: tsig.c,v 1.147.10.1 2011-03-21 19:53:34 each Exp $
+ * $Id$
  */
 /*! \file */
 #include <config.h>
@@ -239,7 +239,9 @@ adjust_lru(dns_tsigkey_t *tkey) {
 		 * We may have been removed from the LRU list between
 		 * removing the read lock and aquiring the write lock.
 		 */
-		if (ISC_LINK_LINKED(tkey, link)) {
+		if (ISC_LINK_LINKED(tkey, link) &&
+		    tkey->ring->lru.tail != tkey)
+		{
 			ISC_LIST_UNLINK(tkey->ring->lru, tkey, link);
 			ISC_LIST_APPEND(tkey->ring->lru, tkey, link);
 		}
@@ -625,14 +627,16 @@ restore_key(dns_tsig_keyring_t *ring, isc_stdtime_t now, FILE *fp) {
 }
 
 static void
-dump_key(dns_tsigkey_t *tkey, FILE *fp)
-{
+dump_key(dns_tsigkey_t *tkey, FILE *fp) {
 	char *buffer = NULL;
 	int length = 0;
 	char namestr[DNS_NAME_FORMATSIZE];
 	char creatorstr[DNS_NAME_FORMATSIZE];
 	char algorithmstr[DNS_NAME_FORMATSIZE];
 	isc_result_t result;
+
+	REQUIRE(tkey != NULL);
+	REQUIRE(fp != NULL);
 
 	dns_name_format(&tkey->name, namestr, sizeof(namestr));
 	dns_name_format(tkey->creator, creatorstr, sizeof(creatorstr));
@@ -889,6 +893,7 @@ dns_tsig_sign(dns_message_t *msg) {
 	isc_result_t ret;
 	unsigned char badtimedata[BADTIMELEN];
 	unsigned int sigsize = 0;
+	isc_boolean_t response = is_response(msg);
 
 	REQUIRE(msg != NULL);
 	REQUIRE(VALID_TSIG_KEY(dns_message_gettsigkey(msg)));
@@ -896,7 +901,7 @@ dns_tsig_sign(dns_message_t *msg) {
 	/*
 	 * If this is a response, there should be a query tsig.
 	 */
-	if (is_response(msg) && msg->querytsig == NULL)
+	if (response && msg->querytsig == NULL)
 		return (DNS_R_EXPECTEDTSIG);
 
 	dynbuf = NULL;
@@ -919,7 +924,7 @@ dns_tsig_sign(dns_message_t *msg) {
 
 	isc_buffer_init(&databuf, data, sizeof(data));
 
-	if (is_response(msg))
+	if (response)
 		tsig.error = msg->querytsigstatus;
 	else
 		tsig.error = dns_rcode_noerror;
@@ -941,14 +946,15 @@ dns_tsig_sign(dns_message_t *msg) {
 		isc_buffer_t headerbuf;
 		isc_uint16_t digestbits;
 
-		ret = dst_context_create(key->key, mctx, &ctx);
+		ret = dst_context_create2(key->key, mctx,
+					  DNS_LOGCATEGORY_DNSSEC, &ctx);
 		if (ret != ISC_R_SUCCESS)
 			return (ret);
 
 		/*
 		 * If this is a response, digest the query signature.
 		 */
-		if (is_response(msg)) {
+		if (response) {
 			dns_rdata_t querytsigrdata = DNS_RDATA_INIT;
 
 			ret = dns_rdataset_first(msg->querytsig);
@@ -972,6 +978,13 @@ dns_tsig_sign(dns_message_t *msg) {
 			if (ret != ISC_R_SUCCESS)
 				goto cleanup_context;
 		}
+#if defined(__clang__)  && \
+       ( __clang_major__ < 3 || \
+	(__clang_major__ == 3 && __clang_minor__ < 2) || \
+	(__clang_major__ == 4 && __clang_minor__ < 2))
+	/* false positive: http://llvm.org/bugs/show_bug.cgi?id=14461 */
+		else memset(&querytsig, 0, sizeof(querytsig));
+#endif
 
 		/*
 		 * Digest the header.
@@ -1017,8 +1030,10 @@ dns_tsig_sign(dns_message_t *msg) {
 		}
 		/* Digest the timesigned and fudge */
 		isc_buffer_clear(&databuf);
-		if (tsig.error == dns_tsigerror_badtime)
+		if (tsig.error == dns_tsigerror_badtime) {
+			INSIST(response);
 			tsig.timesigned = querytsig.timesigned;
+		}
 		isc_buffer_putuint48(&databuf, tsig.timesigned);
 		isc_buffer_putuint16(&databuf, tsig.fudge);
 		isc_buffer_usedregion(&databuf, &r);
@@ -1040,7 +1055,7 @@ dns_tsig_sign(dns_message_t *msg) {
 				goto cleanup_context;
 
 			/*
-			 * Digest the error and other data.
+			 * Digest other data.
 			 */
 			if (tsig.otherlen > 0) {
 				r.length = tsig.otherlen;
@@ -1068,7 +1083,7 @@ dns_tsig_sign(dns_message_t *msg) {
 		digestbits = dst_key_getbits(key->key);
 		if (digestbits != 0) {
 			unsigned int bytes = (digestbits + 1) / 8;
-			if (is_response(msg) && bytes < querytsig.siglen)
+			if (response && bytes < querytsig.siglen)
 				bytes = querytsig.siglen;
 			if (bytes > isc_buffer_usedlength(&sigbuf))
 				bytes = isc_buffer_usedlength(&sigbuf);
@@ -1170,10 +1185,12 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 	isc_uint16_t addcount, id;
 	unsigned int siglen;
 	unsigned int alg;
+	isc_boolean_t response;
 
 	REQUIRE(source != NULL);
 	REQUIRE(DNS_MESSAGE_VALID(msg));
 	tsigkey = dns_message_gettsigkey(msg);
+	response = is_response(msg);
 
 	REQUIRE(tsigkey == NULL || VALID_TSIG_KEY(tsigkey));
 
@@ -1195,8 +1212,7 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 	 * If this is a response and there's no key or query TSIG, there
 	 * shouldn't be one on the response.
 	 */
-	if (is_response(msg) &&
-	    (tsigkey == NULL || msg->querytsig == NULL))
+	if (response && (tsigkey == NULL || msg->querytsig == NULL))
 		return (DNS_R_UNEXPECTEDTSIG);
 
 	mctx = msg->mctx;
@@ -1215,7 +1231,7 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 	if (ret != ISC_R_SUCCESS)
 		return (ret);
 	dns_rdata_reset(&rdata);
-	if (is_response(msg)) {
+	if (response) {
 		ret = dns_rdataset_first(msg->querytsig);
 		if (ret != ISC_R_SUCCESS)
 			return (ret);
@@ -1224,11 +1240,18 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 		if (ret != ISC_R_SUCCESS)
 			return (ret);
 	}
+#if defined(__clang__) && \
+       ( __clang_major__ < 3 || \
+	(__clang_major__ == 3 && __clang_minor__ < 2) || \
+	(__clang_major__ == 4 && __clang_minor__ < 2))
+	/* false positive: http://llvm.org/bugs/show_bug.cgi?id=14461 */
+		else memset(&querytsig, 0, sizeof(querytsig));
+#endif
 
 	/*
 	 * Do the key name and algorithm match that of the query?
 	 */
-	if (is_response(msg) &&
+	if (response &&
 	    (!dns_name_equal(keyname, &tsigkey->name) ||
 	     !dns_name_equal(&tsig.algorithm, &querytsig.algorithm))) {
 		msg->tsigstatus = dns_tsigerror_badkey;
@@ -1322,11 +1345,12 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 		sig_r.base = tsig.signature;
 		sig_r.length = tsig.siglen;
 
-		ret = dst_context_create(key, mctx, &ctx);
+		ret = dst_context_create2(key, mctx,
+					  DNS_LOGCATEGORY_DNSSEC, &ctx);
 		if (ret != ISC_R_SUCCESS)
 			return (ret);
 
-		if (is_response(msg)) {
+		if (response) {
 			isc_buffer_init(&databuf, data, sizeof(data));
 			isc_buffer_putuint16(&databuf, querytsig.siglen);
 			isc_buffer_usedregion(&databuf, &r);
@@ -1346,21 +1370,21 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
 		 * Extract the header.
 		 */
 		isc_buffer_usedregion(source, &r);
-		memcpy(header, r.base, DNS_MESSAGE_HEADERLEN);
+		memmove(header, r.base, DNS_MESSAGE_HEADERLEN);
 		isc_region_consume(&r, DNS_MESSAGE_HEADERLEN);
 
 		/*
 		 * Decrement the additional field counter.
 		 */
-		memcpy(&addcount, &header[DNS_MESSAGE_HEADERLEN - 2], 2);
+		memmove(&addcount, &header[DNS_MESSAGE_HEADERLEN - 2], 2);
 		addcount = htons((isc_uint16_t)(ntohs(addcount) - 1));
-		memcpy(&header[DNS_MESSAGE_HEADERLEN - 2], &addcount, 2);
+		memmove(&header[DNS_MESSAGE_HEADERLEN - 2], &addcount, 2);
 
 		/*
 		 * Put in the original id.
 		 */
 		id = htons(tsig.originalid);
-		memcpy(&header[0], &id, 2);
+		memmove(&header[0], &id, 2);
 
 		/*
 		 * Digest the modified header.
@@ -1553,7 +1577,9 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
 	key = tsigkey->key;
 
 	if (msg->tsigctx == NULL) {
-		ret = dst_context_create(key, mctx, &msg->tsigctx);
+		ret = dst_context_create2(key, mctx,
+					  DNS_LOGCATEGORY_DNSSEC,
+					  &msg->tsigctx);
 		if (ret != ISC_R_SUCCESS)
 			goto cleanup_querystruct;
 
@@ -1583,16 +1609,16 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
 	 * Extract the header.
 	 */
 	isc_buffer_usedregion(source, &r);
-	memcpy(header, r.base, DNS_MESSAGE_HEADERLEN);
+	memmove(header, r.base, DNS_MESSAGE_HEADERLEN);
 	isc_region_consume(&r, DNS_MESSAGE_HEADERLEN);
 
 	/*
 	 * Decrement the additional field counter if necessary.
 	 */
 	if (has_tsig) {
-		memcpy(&addcount, &header[DNS_MESSAGE_HEADERLEN - 2], 2);
+		memmove(&addcount, &header[DNS_MESSAGE_HEADERLEN - 2], 2);
 		addcount = htons((isc_uint16_t)(ntohs(addcount) - 1));
-		memcpy(&header[DNS_MESSAGE_HEADERLEN - 2], &addcount, 2);
+		memmove(&header[DNS_MESSAGE_HEADERLEN - 2], &addcount, 2);
 	}
 
 	/*
@@ -1601,7 +1627,7 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
 	/* XXX Can TCP transfers be forwarded?  How would that work? */
 	if (has_tsig) {
 		id = htons(tsig.originalid);
-		memcpy(&header[0], &id, 2);
+		memmove(&header[0], &id, 2);
 	}
 
 	/*
@@ -1742,11 +1768,15 @@ static void
 free_tsignode(void *node, void *_unused) {
 	dns_tsigkey_t *key;
 
-	UNUSED(_unused);
-
 	REQUIRE(node != NULL);
 
+	UNUSED(_unused);
+
 	key = node;
+	if (key->generated) {
+		if (ISC_LINK_LINKED(key, link))
+			ISC_LIST_UNLINK(key->ring->lru, key, link);
+	}
 	dns_tsigkey_detach(&key);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2007, 2013  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2001  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: stdtime.c,v 1.12 2007-06-19 23:47:19 tbox Exp $ */
+/* $Id: stdtime.c,v 1.12 2007/06/19 23:47:19 tbox Exp $ */
 
 #include <config.h>
 
@@ -33,5 +33,5 @@ isc_stdtime_get(isc_stdtime_t *t) {
 
 	REQUIRE(t != NULL);
 
-	(void)time(t);
+	(void)_time32(t);
 }

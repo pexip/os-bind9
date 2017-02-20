@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2010  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004-2010, 2013  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2002  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: ncache.h,v 1.29 2010-05-14 23:50:40 tbox Exp $ */
+/* $Id: ncache.h,v 1.29 2010/05/14 23:50:40 tbox Exp $ */
 
 #ifndef DNS_NCACHE_H
 #define DNS_NCACHE_H 1
@@ -72,6 +72,11 @@ dns_ncache_addoptout(dns_message_t *message, dns_db_t *cache,
  * Convert the authority data from 'message' into a negative cache
  * rdataset, and store it in 'cache' at 'node' with a TTL limited to
  * 'maxttl'.
+ *
+ * \li dns_ncache_add produces a negative cache entry with a trust of no
+ *     more than answer
+ * \li dns_ncache_addoptout produces a negative cache entry which will have
+ *     a trust of secure if all the records that make up the entry are secure.
  *
  * The 'covers' argument is the RR type whose nonexistence we are caching,
  * or dns_rdatatype_any when caching a NXDOMAIN response.

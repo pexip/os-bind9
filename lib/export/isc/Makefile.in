@@ -1,4 +1,4 @@
-# Copyright (C) 2009, 2010  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2009, 2010, 2012-2014  Internet Systems Consortium, Inc. ("ISC")
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -12,7 +12,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: Makefile.in,v 1.8 2010-06-09 23:50:58 tbox Exp $
+# $Id: Makefile.in,v 1.8 2010/06/09 23:50:58 tbox Exp $
 
 top_srcdir =	@top_srcdir@
 srcdir =	@top_srcdir@/lib/isc
@@ -67,13 +67,13 @@ OBJS =		@ISC_EXTRA_OBJS@ \
 		error.@O@ event.@O@ \
 		hash.@O@ hex.@O@ hmacmd5.@O@ hmacsha.@O@ \
 		inet_aton.@O@ iterated_hash.@O@ lex.@O@ lfsr.@O@ log.@O@ \
-		md5.@O@ mutexblock.@O@ \
-		netaddr.@O@ netscope.@O@ \
-		ondestroy.@O@ \
-		parseint.@O@ portset.@O@ radix.@O@ \
-		random.@O@ refcount.@O@ region.@O@ result.@O@ rwlock.@O@ \
-		serial.@O@ sha1.@O@ sha2.@O@ sockaddr.@O@ stats.@O@ string.@O@ \
+		md5.@O@ mutexblock.@O@ netaddr.@O@ netscope.@O@ \
+		ondestroy.@O@ parseint.@O@ portset.@O@ radix.@O@ \
+		random.@O@ refcount.@O@ region.@O@ regex.@O@ result.@O@ \
+		rwlock.@O@ safe.@O@ serial.@O@ sha1.@O@ sha2.@O@ \
+		sockaddr.@O@ stats.@O@ string.@O@ \
 		symtab.@O@ \
+		tm.@O@ \
 		version.@O@ \
 		${APIOBJS} ${ISCDRIVEROBJS} \
 		${UNIXOBJS} ${NLSOBJS} ${THREADOBJS}
@@ -94,13 +94,19 @@ SRCS =		@ISC_EXTRA_SRCS@ \
 		netaddr.c netscope.c \
 		ondestroy.c \
 		parseint.c portset.c radix.c \
-		random.c refcount.c region.c result.c rwlock.c \
-		serial.c sha1.c sha2.c sockaddr.c stats.c string.c symtab.c \
+		random.c refcount.c region.c regex.c result.c rwlock.c \
+		safe.c serial.c sha1.c sha2.c sockaddr.c \
+		stats.c string.c symtab.c \
+		tm.c \
 		version.c \
 		${APISRCS} ${ISCDRIVERSRCS}
 
 LIBS =		@LIBS@
 
+# Note: the order of SUBDIRS is important.
+# Attempt to disable parallel processing.
+.NOTPARALLEL:
+.NO_PARALLEL:
 SUBDIRS =	include unix nls @ISC_THREAD_DIR@
 TARGETS =	timestamp
 
@@ -114,26 +120,26 @@ version.@O@: ${srcdir}/version.c
 		-DLIBAGE=${LIBAGE} \
 		-c ${srcdir}/version.c
 
-libisc.@SA@: ${OBJS}
+libisc-export.@SA@: ${OBJS}
 	${AR} ${ARFLAGS} $@ ${OBJS}
 	${RANLIB} $@
 
-libisc.la: ${OBJS}
+libisc-export.la: ${OBJS}
 	${LIBTOOL_MODE_LINK} \
-		${CC} ${ALL_CFLAGS} ${LDFLAGS} -o libisc.la \
+		${CC} ${ALL_CFLAGS} ${LDFLAGS} -o libisc-export.la \
 		-rpath ${export_libdir} \
 		-version-info ${LIBINTERFACE}:${LIBREVISION}:${LIBAGE} \
 		${OBJS} ${LIBS}
 
-timestamp: libisc.@A@
+timestamp: libisc-export.@A@
 	touch timestamp
 
 installdirs:
 	$(SHELL) ${top_srcdir}/mkinstalldirs ${DESTDIR}${export_libdir}
 
 install:: timestamp installdirs
-	${LIBTOOL_MODE_INSTALL} ${INSTALL_DATA} libisc.@A@ \
+	${LIBTOOL_MODE_INSTALL} ${INSTALL_PROGRAM} libisc-export.@A@ \
 	${DESTDIR}${export_libdir}
 
 clean distclean::
-	rm -f libisc.@A@ libisc.la timestamp
+	rm -f libisc-export.@A@ libisc-export.la timestamp

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004-2012  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: resolver.h,v 1.67.86.2 2011-02-28 01:20:02 tbox Exp $ */
+/* $Id: resolver.h,v 1.72 2011/12/05 17:10:51 each Exp $ */
 
 #ifndef DNS_RESOLVER_H
 #define DNS_RESOLVER_H 1
@@ -126,7 +126,8 @@ typedef struct dns_fetchevent {
 
 isc_result_t
 dns_resolver_create(dns_view_t *view,
-		    isc_taskmgr_t *taskmgr, unsigned int ntasks,
+		    isc_taskmgr_t *taskmgr,
+		    unsigned int ntasks, unsigned int ndisp,
 		    isc_socketmgr_t *socketmgr,
 		    isc_timermgr_t *timermgr,
 		    unsigned int options,
@@ -155,9 +156,11 @@ dns_resolver_create(dns_view_t *view,
  *
  *\li	'timermgr' is a valid timer manager.
  *
- *\li	'dispatchv4' is a valid dispatcher with an IPv4 UDP socket, or is NULL.
+ *\li	'dispatchv4' is a dispatch with an IPv4 UDP socket, or is NULL.
+ *	If not NULL, 'ndisp' clones of it will be created by the resolver.
  *
- *\li	'dispatchv6' is a valid dispatcher with an IPv6 UDP socket, or is NULL.
+ *\li	'dispatchv6' is a dispatch with an IPv6 UDP socket, or is NULL.
+ *	If not NULL, 'ndisp' clones of it will be created by the resolver.
  *
  *\li	resp != NULL && *resp == NULL.
  *

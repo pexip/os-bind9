@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2005, 2007, 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1998-2001, 2003  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: mx_15.c,v 1.58 2009-12-04 22:06:37 tbox Exp $ */
+/* $Id: mx_15.c,v 1.58 2009/12/04 22:06:37 tbox Exp $ */
 
 /* reviewed: Wed Mar 15 18:05:46 PST 2000 by brister */
 
@@ -57,7 +57,6 @@ fromtext_mx(ARGS_FROMTEXT) {
 
 	UNUSED(type);
 	UNUSED(rdclass);
-	UNUSED(callbacks);
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      ISC_FALSE));

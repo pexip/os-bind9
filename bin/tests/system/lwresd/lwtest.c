@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2007, 2008, 2012  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 2000-2002  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: lwtest.c,v 1.32 2008-04-02 02:37:42 marka Exp $ */
+/* $Id: lwtest.c,v 1.32 2008/04/02 02:37:42 marka Exp $ */
 
 #include <config.h>
 
@@ -400,7 +400,7 @@ test_gethostbyaddr(const char *address, int af, const char *name) {
 			return;
 		}
 	} else {
-		if (strcmp(hp->h_name, name) != 0) {
+		if (name != NULL && strcmp(hp->h_name, name) != 0) {
 			printf("I:gethostbyname(%s) returned %s, "
 			       "expected %s\n", address, hp->h_name, name);
 			fails++;
@@ -440,7 +440,7 @@ test_getipnodebyaddr(const char *address, int af, const char *name) {
 			return;
 		}
 	} else {
-		if (strcmp(hp->h_name, name) != 0) {
+		if (name != NULL && strcmp(hp->h_name, name) != 0) {
 			printf("I:getipnodebyaddr(%s) returned %s, "
 			       "expected %s\n", address, hp->h_name, name);
 			freehostent(hp);
@@ -766,6 +766,14 @@ main(void) {
 	test_getrrsetbyname("e.example1.", 1, 255, 1, 1, 0);
 	test_getrrsetbyname("e.example1.", 1, 46, 2, 0, 1);
 	test_getrrsetbyname("", 1, 1, 0, 0, 0);
+
+	test_getrrsetbyname("123456789.123456789.123456789.123456789."
+			    "123456789.123456789.123456789.123456789."
+			    "123456789.123456789.123456789.123456789."
+			    "123456789.123456789.123456789.123456789."
+			    "123456789.123456789.123456789.123456789."
+			    "123456789.123456789.123456789.123456789."
+			    "123456789", 1, 1, 0, 0, 0);
 
 	if (fails == 0)
 		printf("I:ok\n");

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (C) 2010  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2010, 2012, 2013  Internet Systems Consortium, Inc. ("ISC")
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: tests.sh,v 1.2 2010-12-23 04:08:00 marka Exp $
+# $Id: tests.sh,v 1.2 2010/12/23 04:08:00 marka Exp $
 
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
@@ -28,7 +28,7 @@ DIGOPTS="+tcp +noadd +nosea +nostat +nocmd +dnssec -p 5300"
 
 # Check the example. domain
 
-echo "I:checking that positive validation works works ($n)"
+echo "I:checking that positive validation works ($n)"
 ret=0
 $DIG $DIGOPTS . @10.53.0.1 soa > dig.out.ns1.test$n || ret=1
 $DIG $DIGOPTS . @10.53.0.2 soa > dig.out.ns2.test$n || ret=1

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2006, 2007, 2009, 2013  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 2001  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: ntgroups.c,v 1.12 2009-09-29 23:48:04 tbox Exp $ */
+/* $Id: ntgroups.c,v 1.12 2009/09/29 23:48:04 tbox Exp $ */
 
 /*
  * The NT Groups have two groups that are not well documented and are
@@ -62,7 +62,6 @@ isc_ntsecurity_getaccountgroups(char *username, char **GroupList,
 	DWORD dwEntriesRead = 0;
 	DWORD dwTotalEntries = 0;
 	NET_API_STATUS nStatus;
-	DWORD dwTotalCount = 0;
 	size_t retlen;
 	wchar_t user[MAX_NAME_LENGTH];
 
@@ -97,7 +96,6 @@ isc_ntsecurity_getaccountgroups(char *username, char **GroupList,
 			dwEntriesRead = 0;
 	}
 
-	dwTotalCount = 0;
 	if (pBuf != NULL) {
 		pTmpLBuf = pBuf;
 		/*

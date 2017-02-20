@@ -1,236 +1,597 @@
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17pexip2) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u9pexip1) pexip; urgency=low
 
-  * Rebuild against libssl1.0.2
+  * Migrate to Jessie
 
- -- John-Mark Bell <jmb@pexip.com>  Tue, 11 Oct 2016 23:36:41 +0100
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 20 Feb 2017 19:37:36 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u9) jessie-security; urgency=medium
 
-  * New upstream release
+  * Apply patches from ISC.
+  * CVE-2016-9131: Assertion failure related to caching of TKEY records
+    in upstream DNS responses.
+  * CVE-2016-9147: Processing of RRSIG records in upstream DNS response
+    without corresponding signed data could lead to an assertion failure.
+  * CVE-2016-9444: Missing RRSIG records in the authority section of
+    upstream responses could lead to an assertion failure.
+  * RT #43779: Fix handling of CNAME/DNAME responses.  (Regression due
+    to the CVE-2016-8864 fix.)
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 06 Oct 2016 17:34:24 +0100
+ -- Florian Weimer <fw@deneb.enyo.de>  Wed, 11 Jan 2017 11:50:31 +0100
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.17) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-9+deb8u8) jessie-security; urgency=medium
 
-  * SECURITY UPDATE: denial of service via assertion failure
-    - lib/dns/message.c: properly handle lengths.
-    - backported from patch provided by upstream.
-    - CVE-2016-2776
+  * CVE-2016-8864: Fix assertion failure in DNAME processing with patch
+    provided by ISC.
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 26 Sep 2016 14:42:15 -0400
+ -- Florian Weimer <fw@deneb.enyo.de>  Tue, 01 Nov 2016 17:51:22 +0100
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.16pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u7) jessie-security; urgency=high
 
-  * New upstream release
+  * CVE-2016-2775: lwresd crash with long query name.
+    Backport of upstream commit 38cc2d14e218e536e0102fa70deef99461354232.
+    Closes: #831796.
+  * CVE-2016-2776: assertion failure due to unspecified crafted query.
+    Fix based on 43139-9-9.patch from ISC.  Closes: #839010.
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 10 Mar 2016 12:15:51 +0000
+ -- Florian Weimer <fw@deneb.enyo.de>  Tue, 27 Sep 2016 19:46:00 +0200
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.16) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-9+deb8u6) jessie-security; urgency=high
 
-  * SECURITY UPDATE: denial of service via rndc control channel input
-    parsing error
-    - properly check data in bin/named/control.c, bin/named/controlconf.c,
-      bin/rndc/rndc.c, lib/isccc/cc.c.
-    - CVE-2016-1285
-  * SECURITY UPDATE: denial of service via resource record signatures
-    parsing issue
-    - fix improper DNAME handling in lib/dns/resolver.c.
-    - CVE-2016-1286
+  * Fix CVE-2016-1285: error parsing control channel input.
+  * Fix CVE-2016-1286: error parsing DNAME resource records.
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Tue, 08 Mar 2016 08:35:01 -0500
+ -- Michael Gilbert <mgilbert@debian.org>  Tue, 08 Mar 2016 00:40:53 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.15pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u5) jessie-security; urgency=high
 
-  * New upstream release
+  * Non-maintainer upload by the Security Team.
+  * CVE-2015-8704: Specific APL data could trigger an INSIST in apl_42.c.
+    A buffer size check used to guard against overflow could cause named to
+    exit with an INSIST failure In apl_42.c.
 
- -- John-Mark Bell <jmb@pexip.com>  Mon, 25 Jan 2016 09:39:42 +0000
+ -- Salvatore Bonaccorso <carnil@debian.org>  Sat, 16 Jan 2016 10:51:37 +0100
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.15) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-9+deb8u4) jessie-security; urgency=high
 
-  * SECURITY UPDATE: denial of service via string formatting operations
-    - lib/dns/rdata/in_1/apl_42.c: use correct length.
-    - CVE-2015-8704
+  * Non-maintainer upload by the Security Team.
+  * Add patch to fix CVE-2015-8000.
+    CVE-2015-8000: Insufficient testing when parsing a message allowed
+    records with an incorrect class to be be accepted, triggering a REQUIRE
+    failure when those records were subsequently cached.
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 18 Jan 2016 07:56:11 -0500
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 14 Dec 2015 20:02:04 +0100
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.14pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u3) jessie-security; urgency=medium
 
-  * New upstream release
+  * CVE-2015-5722
 
- -- John-Mark Bell <jmb@pexip.com>  Wed, 16 Dec 2015 15:54:12 +0000
+ -- Moritz Muehlenhoff <jmm@debian.org>  Wed, 02 Sep 2015 13:11:02 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.14) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-9+deb8u2) jessie-security; urgency=high
 
-  * SECURITY UPDATE: REQUIRE failure via incorrect class
-    - properly handle class in lib/dns/include/dns/message.h,
-      lib/dns/message.c, lib/dns/resolver.c, lib/dns/xfrin.c.
-    - CVE-2015-8000
+  * Non-maintainer upload by the Security Team.
+  * CVE-2015-5477: A failure to reset a value to NULL in tkey.c could
+    result in an assertion failure.
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 14 Dec 2015 13:48:33 -0500
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 27 Jul 2015 21:06:05 +0200
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.13pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-9+deb8u1) jessie-security; urgency=high
 
-  * New upstream release
+  * Non-maintainer upload by the Security Team.
+  * CVE-2015-4620: Specially constructed zone data can cause a resolver to
+    crash when validating.
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 17 Sep 2015 15:50:47 +0100
+ -- Salvatore Bonaccorso <carnil@debian.org>  Tue, 30 Jun 2015 17:21:49 +0200
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.13) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-9) unstable; urgency=high
 
-  * SECURITY UPDATE: denial of service in DNSSEC-signed record validation
-    via malformed keys
-    - fix validation inlib/dns/hmac_link.c, lib/dns/include/dst/dst.h,
-      lib/dns/ncache.c, lib/dns/openssldh_link.c,
-      lib/dns/openssldsa_link.c, lib/dns/opensslrsa_link.c,
-      lib/dns/resolver.c.
-    - CVE-2015-5722
+  * Fix CVE-2015-1349: named crash due to managed key rollover, primarily only
+    affecting setups using DNSSEC (closes: #778733).
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Tue, 01 Sep 2015 14:07:19 -0400
+ -- Michael Gilbert <mgilbert@debian.org>  Thu, 19 Feb 2015 03:42:21 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.12pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-8) unstable; urgency=medium
 
-  * New upstream release
+  * Launch rndc command in the background in networking scripts to avoid a
+    hang in named from bringing down the entire network (closes: #760555).
 
- -- John-Mark Bell <jmb@pexip.com>  Fri, 31 Jul 2015 11:22:51 +0100
+ -- Michael Gilbert <mgilbert@debian.org>  Thu, 01 Jan 2015 17:51:52 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.12) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-7) unstable; urgency=medium
 
-  * SECURITY UPDATE: denial of service in TKEY record query handling
-    - lib/dns/tkey.c: clear out name before trying the answer section.
-    - CVE-2015-5477
-  * SECURITY UPDATE: denial of service via AAAA record query
-    - bin/named/query.c: arrange for RPZ rewriting of any A records.
-    - CVE-2012-5689
+  * Fix CVE-2014-8500: limit recursion in order to avoid memory consuption
+    issues that can lead to denial-of-service (closes: #772610).
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 27 Jul 2015 11:42:05 -0400
+ -- Michael Gilbert <mgilbert@debian.org>  Sun, 14 Dec 2014 05:05:48 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.11pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-6) unstable; urgency=medium
 
-  * New upstream release
+  * Include dlz_dlopen.h in libbind-dev (closes: #769117).
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 09 Jul 2015 11:26:34 +0100
+ -- Michael Gilbert <mgilbert@debian.org>  Sun, 30 Nov 2014 22:53:50 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.11) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-5) unstable; urgency=medium
 
-  * SECURITY UPDATE: resolver DoS via specially crafted zone data
-    - lib/dns/validator.c: don't use uninitialized fixedname.
-    - CVE-2015-4620
+  * Avoid libnsl dependency on non-linux architectures.  Closes: #766430
+  * Install export libraries to /lib instead of /usr/lib.  Closes: #766544
+  * Add myself to the maintainer team with approval from LaMont and Bdale.
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 29 Jun 2015 15:02:08 -0400
+ -- Michael Gilbert <mgilbert@debian.org>  Thu, 30 Oct 2014 02:42:17 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.10pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-4.3) unstable; urgency=medium
 
-  * New upstream release
+  * Non-maintainer upload.
+  * Mark critical section as not parallel in the makefile.  Closes: #762766
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 19 Feb 2015 00:32:37 +0000
+ -- Michael Gilbert <mgilbert@debian.org>  Mon, 13 Oct 2014 04:37:55 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.10) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-4.2) unstable; urgency=low
 
-  * SECURITY UPDATE: denial of service via revoking a managed trust anchor
-    and supplying an untrusted replacement
-    - lib/dns/zone.c: avoid crash due to managed-key rollover
-    - Based on patch supplied by Evan Hunt <each@isc.org>
-    - CVE-2015-1349
+  * Non-maintainer upload.
+  * Fix intermittent parallel build failure.  Closes: #762766
+  * Set -fno-delete-null-pointer-checks.  Closes: #750760
+  * Use separate packages for the udebs.  Closes: #762762
+  * Don't install configuration files to /usr.  Closes: #762948
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Wed, 18 Feb 2015 07:41:24 -0500
+ -- Michael Gilbert <mgilbert@debian.org>  Mon, 06 Oct 2014 01:23:57 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.9pexip1) pexip; urgency=low
+bind9 (1:9.9.5.dfsg-4.1) unstable; urgency=low
 
-  * New upstream release
+  * Non-maintainer upload.
+  * Add support for hurd.  Closes: #746540
+  * Provide shared libraries for isc-dhcp.  Closes: #656150
 
- -- John-Mark Bell <jmb@pexip.com>  Mon, 02 Feb 2015 19:09:11 +0000
+ -- Michael Gilbert <mgilbert@debian.org>  Sun, 14 Sep 2014 00:58:06 +0000
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.9) precise-security; urgency=medium
+bind9 (1:9.9.5.dfsg-4) unstable; urgency=low
 
-  * SECURITY UPDATE: denial of service via delegation handling defect
-    - limit max recursion in bin/named/config.c, bin/named/query.c,
-      bin/named/server.c, lib/dns/adb.c, lib/dns/include/dns/adb.h,
-      lib/dns/include/dns/resolver.h, lib/dns/resolver.c,
-      lib/export/isc/Makefile.in, lib/isc/Makefile.in, lib/isc/counter.c,
-      lib/isc/include/isc/counter.h, lib/isc/include/isc/Makefile.in,
-      lib/isc/include/isc/types.h, lib/isc/tests/counter_test.c,
-      lib/isccfg/namedconf.c.
-    - Patch provided by upstream.
-    - CVE-2014-8500
+  [Julien Cristau]
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Tue, 09 Dec 2014 09:20:13 -0500
+  * FTBFS on kfreebsd.  Closes: #741285
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.8pexip1) pexip; urgency=low
+  [LaMont Jones]
 
-  * Prepare Pexip packaging
+  * revert aclocal.m4 expansion from earlier merge
 
- -- John-Mark Bell <jmb@pexip.com>  Thu, 06 Mar 2014 01:47:32 +0000
+ -- LaMont Jones <lamont@debian.org>  Tue, 29 Apr 2014 14:48:50 -0600
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.8) precise-security; urgency=low
+bind9 (1:9.9.5.dfsg-3) unstable; urgency=low
+
+  * Re-enable rrl (now a configure option).  Closes: #741059 LP: #1288823
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 24 Mar 2014 06:55:55 -0600
+
+bind9 (1:9.9.5.dfsg-2) unstable; urgency=low
+
+  * merge in ubuntu 1:9.9.3.dfsg.P2-4ubuntu3
+  * move dnssec-coverage to bind9utils.  Closes: #739994
+  * dnssec-{checkds,verify} manpages in wrong package.  Closes: #739995
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 26 Feb 2014 09:30:31 -0700
+
+bind9 (1:9.9.5.dfsg-1) experimental; urgency=low
+
+  [Internet Software Consortium, Inc]
+
+  * New upstream version: 9.9.5  Closes: #735190
+
+  [Martin Nagy]
+
+  * dynamic loading of database backends. See:
+    http://pkgs.fedoraproject.org/cgit/bind.git/tree/bind-96-dyndb.patch. 
+    Closes: #722669
+
+  [LaMont Jones]
+
+  * fix sonames
+  * merge ubuntu changes
+  * Deliver dns/rrl.h.  Closes: #724844
+  * rules tweak to make backports to pre-dh-systemd releases easier
+
+ -- LaMont Jones <lamont@debian.org>  Tue, 11 Feb 2014 09:16:05 -0700
+
+bind9 (1:9.9.4.dfsg-0.3) experimental; urgency=low
+
+  [Internet Software Consortium, Inc]
+
+  * Upstream version 9.9.4
+
+  [LaMont Jones]
+
+  * fix sonames
+  * merge ubuntu change
+  * Deliver dns/rrl.h.  Closes: #724844
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 06 Nov 2013 13:27:37 -0700
+
+bind9 (1:9.9.3.dfsg.P2-4ubuntu3) trusty; urgency=low
 
   * SECURITY UPDATE: denial of service when processing NSEC3-signed zone
     queries
     - debian/patches/CVE-2014-0591.patch: don't call memcpy with
       overlapping ranges in bin/named/query.c.
-    - patch backported from 9.8.6-P2.
+    - patch backported from 9.9.4-P2.
     - CVE-2014-0591
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 10 Jan 2014 09:44:31 -0500
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 10 Jan 2014 09:36:55 -0500
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.7) precise-security; urgency=low
+bind9 (1:9.9.3.dfsg.P2-4ubuntu2) trusty; urgency=medium
+
+  * Use dh-autoreconf to update libtool and configure for new ports.
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Wed, 18 Dec 2013 04:42:22 -0700
+
+bind9 (1:9.9.3.dfsg.P2-4ubuntu1) saucy; urgency=low
+
+  * Use dh_autotools-dev to update config.{sub,guess} for new ports.
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Mon, 07 Oct 2013 23:09:45 -0600
+
+bind9 (1:9.9.3.dfsg.P2-4) unstable; urgency=low
+
+  [Peter Marschall]
+
+  * If rndc.conf exists, skip creation of rndc.key.  Closes: #620394
+
+  [Al Tarakanoff]
+
+  * properly quote check of pid in bind9 init.d.  LP: #1092243
+
+  [LaMont Jones]
+
+  * include distro and package version in version string
+  * apparmor: allow GeoIP data file access.  LP: #834901
+  * enable filter-aaaa.  Closes: #701704  LP: #1115168
+
+ -- LaMont Jones <lamont@debian.org>  Thu, 29 Aug 2013 16:22:29 -0600
+
+bind9 (1:9.9.3.dfsg.P2-3) unstable; urgency=low
+
+  [Michael Stapelberg]
+
+  * add systemd service file.  Closes: #718212
+
+  [LaMont Jones]
+
+  * deliver more dnssec-* tools in bind9utils.  Closes: #713026
+  * support parallel=N DEB_BUILD_OPTIONS, fix -j build. Closes: #713025
+  * deliver rrl.h and stat.h Closes: #692483, #720813
+
+ -- LaMont Jones <lamont@debian.org>  Tue, 27 Aug 2013 10:06:37 -0600
+
+bind9 (1:9.9.3.dfsg.P2-2build1) saucy; urgency=low
+
+  [Marc Deslauriers]
+
+  * 9.9.2.dfsg.P1-2ubuntu1: fixed in 9.9.3b1
+  * 9.9.2.dfsg.P1-2ubuntu3: fixed in 9.9.3-P2
+
+  [Robie Basak]
+
+  * 9.9.2.dfsg.P1-2ubuntu2: fixed in 9.9.3b1
+
+  [LaMont Jones]
+
+  * Merge ubuntu changes, except: autoconf files are generated as part
+    of the source packagee creation, not on the build host.  NAK
+  * deliver more dnssec-* tools in bind9utils.  Closes: #713026
+  * support parallel=N DEB_BUILD_OPTIONS, fix -j build
+
+  [Michael Stapelberg]
+
+  * add systemd service file.  Closes: #718212
+
+ -- LaMont Jones <lamont@debian.org>  Thu, 22 Aug 2013 10:57:17 -0600
+
+bind9 (1:9.9.3.dfsg.P2-2) unstable; urgency=low
+
+  * ack NMUs of 9.8.4
+    - upstream 9.9.3-P2 fixes: CVE-2013-4854, CVE-2012-5689,
+      CVE-2013-2266
+    - deliver rrl.h
+
+  [LaMont Jones]
+
+  * Use ISC's bin/tests
+  * Diff cleanup and rationalization to 9.9.3 upstream
+
+ -- LaMont Jones <lamont@debian.org>  Sat, 17 Aug 2013 07:09:54 -0600
+
+bind9 (1:9.9.3.dfsg.P2-1) unstable; urgency=low
+
+
+  [Internet Software Consortium, Inc]
+
+  * 9.9.3-P2
+
+  [Ben Hutchings]
+
+  * Initialise OpenSSL before calling chroot().  Closes: #696661
+
+  [LaMont Jones]
+
+  * soname changes
+
+  [Paul Vixie]
+
+  * Reapply rpz/rrl patches from http://www.redbarn.org/dns/ratelimits
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 14 Aug 2013 10:38:59 -0600
+
+bind9 (1:9.9.2.dfsg.P1-3) experimental; urgency=low
+
+  [LaMont Jones]
+  
+  * Merge 1:9.8.4.dfsg.P1-6
+
+  [Ben Hutchings]
+
+  * Initialise OpenSSL before calling chroot().  Closes: #696661
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 04 Mar 2013 09:30:50 -0700
+
+bind9 (1:9.9.2.dfsg.P1-2ubuntu3) saucy; urgency=low
 
   * SECURITY UPDATE: denial of service via incorrect bounds checking on
     private type 'keydata'
     - lib/dns/rdata/generic/keydata_65533.c: check for correct length.
-    - Patch backported from 9.8.5-P2
+    - Patch backported from 9.9.3-P2
     - CVE-2013-4854
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 26 Jul 2013 22:56:08 -0400
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Sun, 28 Jul 2013 10:13:06 -0400
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.6) precise-security; urgency=low
+bind9 (1:9.9.2.dfsg.P1-2ubuntu2) raring; urgency=low
+
+  * configure.in: detect libxml 2.9 as well as 2.[678] (LP: #1164475). 
+  * debian/control: add Build-Depends on dh-autoreconf.
+  * debian/rules: use dh_autoreconf and dh_autoreconf_clean.
+
+ -- Robie Basak <robie.basak@canonical.com>  Wed, 10 Apr 2013 16:50:28 +0000
+
+bind9 (1:9.9.2.dfsg.P1-2ubuntu1) raring; urgency=low
 
   * SECURITY UPDATE: denial of service via regex syntax checking
     - configure,configure.in,config.h.in: remove check for regex.h to
       disable regex syntax checking.
     - CVE-2013-2266
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Thu, 28 Mar 2013 15:31:46 -0400
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Thu, 28 Mar 2013 15:04:57 -0400
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.5) precise-security; urgency=low
+bind9 (1:9.9.2.dfsg.P1-2) experimental; urgency=low
+
+  [Michael Gilbert]
+
+  * Use /var/lib/bind for state file.  Closes: #689332
+
+  [LaMont Jones]
+
+  * zone transfers now involve link(), update the apparmor profile
+  * Update db.root with new IP for D.root-servers.net.  Closes: #697352
+  * re-drop dlzexternal test
+  * Reduce log level for "sucessfully validated after lower casing" dnssec
+    based on mail from Mark Andrews.  Closes: #697681
+  * remove /var/lib/bind/bind9-default.md5sum in postrm
+  * remove /etc/bind/named.conf.options on purge.  Closes: #668801
+
+  [Sebastian Wiesinger]
+
+  * Build and deliver dnssec-checkds and dnssec-verify in bind9utils
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 09 Jan 2013 10:09:40 -0700
+
+bind9 (1:9.8.4.dfsg.P1-6+nmu3) unstable; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * CVE-2013-4854: A specially crafted query that includes malformed rdata can
+    cause named to terminate with an assertion failure while rejecting the
+    malformed query. (Closes: #717936).
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Sat, 27 Jul 2013 10:24:07 +0200
+
+bind9 (1:9.8.4.dfsg.P1-6+nmu2) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Install /usr/include/dns/rrl.h (closes: #699834).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Tue, 16 Apr 2013 01:59:05 +0000
+
+bind9 (1:9.8.4.dfsg.P1-6+nmu1) unstable; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Fix cve-2012-5689: issue in nameservers using DNS64 to perform a AAAA
+    lookup for a record with an A record overwrite rule in a Response Policy
+    Zone (closes: #699145).
+  * Fix cve-2013-2266: issues in regular expression handling (closes: #704174).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Fri, 29 Mar 2013 00:47:25 +0000
+
+bind9 (1:9.8.4.dfsg.P1-6) unstable; urgency=low
+
+  [Ben Hutchings]
+
+  * Initialise OpenSSL before calling chroot().  Closes: #696661
+
+ -- LaMont Jones <lamont@debian.org>  Fri, 01 Mar 2013 08:23:27 -0700
+
+bind9 (1:9.8.4.dfsg.P1-5) unstable; urgency=low
+
+  [LaMont Jones]
+
+  * Properly acknowledge 1:9.8.1.dfsg.P1-4.4: [Philipp Kern]
+    - Fix CVE-2012-4244. Thanks to Moritz Mühlenhoff for providing the patch.
+
+  [Paul Vixie]
+
+  * Include rpz/rrl patches from http://www.redbarn.org/dns/ratelimits. 
+    Closes: #698641
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 30 Jan 2013 14:04:35 -0700
+
+bind9 (1:9.8.4.dfsg.P1-4) unstable; urgency=high
+
+  * The rest of the dnssec validation logspam removal.  Closes: #697681
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 21 Jan 2013 13:18:53 -0700
+
+bind9 (1:9.8.4.dfsg.P1-3) unstable; urgency=low
+
+  [Marc Deslauriers]
+
+  * debian/bind9.apport: Add AppArmor info and logs to apport hook.
+
+  [LaMont Jones]
+
+  * Reduce log level for "sucessfully validated after lower casing" dnssec
+    based on mail from Mark Andrews.  Closes: #697681
+  * remove /var/lib/bind/bind9-default.md5sum in postrm
+  * remove /etc/bind/named.conf.options on purge.  Closes: #668801
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 09 Jan 2013 09:47:24 -0700
+
+bind9 (1:9.9.2.dfsg.P1-1) experimental; urgency=low
+
+  * Named could die on specific queries with dns64 enabled.
+    [Addressed in change #3388 for BIND 9.8.5 and 9.9.3.]
+    CVE-2012-5688  Closes: #695192
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 05 Dec 2012 05:27:18 -0700
+
+bind9 (1:9.8.4.dfsg.P1-2) unstable; urgency=low
+
+  [Michael Gilbert]
+
+  * Use /var/lib/bind for state file.  Closes: #689332
+
+  [LaMont Jones]
+
+  * Re-enable dlopen, do not build the test that fails.  Closes: #692416
+  * Update db.root with new IP for D.root-servers.net.  Closes: #697352
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 07 Jan 2013 06:50:25 -0700
+
+bind9 (1:9.8.4.dfsg.P1-1) unstable; urgency=low
+
+  * Named could die on specific queries with dns64 enabled.
+    [Addressed in change #3388 for BIND 9.8.5 and 9.9.3.]
+    CVE-2012-5688  Closes: #695192
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 05 Dec 2012 05:22:06 -0700
+
+bind9 (1:9.9.2.dfsg-1) experimental; urgency=low
+
+  [Matthew Grant]
+
+  * Turn off dlopen as it was causing test compile failures.
+  * Add missing library .postrm files for debhelper
+
+  [LaMont Jones]
+
+  * New upstream version 9.9.2
+  * soname fixes
+
+ -- LaMont Jones <lamont@debian.org>  Thu, 01 Nov 2012 08:59:57 -0600
+
+bind9 (1:9.9.1.dfsg.P1-1) unstable; urgency=low
+
+  [LaMont Jones]
+
+  * New upstream 9.9.1-P1
+
+ -- LaMont Jones <lamont@debian.org>  Wed, 13 Jun 2012 08:22:15 -0600
+
+bind9 (1:9.9.0.dfsg-1) unstable; urgency=low
+
+  [Internet Software Consortium, Inc]
+
+  * 9.9.0 release
+
+  [Christoph Egger]
+
+  * define _GNU_SOURCE on kfreebsd et al.  Closes: #658201
+
+  [LaMont Jones]
+
+  * chmod typo in postinst.  LP: #980798
+  * Correctly order debhelper bits in postrm.  Closes: #661040
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 23 Apr 2012 09:52:51 -0600
+
+bind9 (1:9.9.0.dfsg~rc4-1) unstable; urgency=low
+
+  [Internet Software Consortium, Inc]
+
+  * New upstream release
+
+  [LaMont Jones]
+
+  * soname changes for new release
+
+ -- LaMont Jones <lamont@debian.org>  Fri, 17 Feb 2012 17:51:39 -0700
+
+bind9 (1:9.8.4.dfsg-1ubuntu2) raring; urgency=low
 
   * SECURITY UPDATE: denial of service via DNS64 and crafted query
     - bin/named/query.c: init rdataset before cleanup.
     - Patch backported from 9.8.4-P1
     - CVE-2012-5688
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Wed, 05 Dec 2012 15:48:39 -0500
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Wed, 05 Dec 2012 15:42:08 -0500
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.4) precise-security; urgency=low
+bind9 (1:9.8.4.dfsg-1ubuntu1) raring; urgency=low
 
+  * Merge from Debian unstable. Remaining changes:
+    - debian/bind9.apport: Add AppArmor info and logs to apport hook.
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 23 Nov 2012 08:13:50 -0500
+
+bind9 (1:9.8.4.dfsg-1) unstable; urgency=low
+
+  [Matthew Grant]
+
+  * Turn off dlopen as it was causing test compile failures.
+  * Add missing library .postrm files for debhelper
+
+  [LaMont Jones]
+
+  * New upstream version
+  * soname fixup
+  * Ack NMUs
+
+ -- LaMont Jones <lamont@debian.org>  Mon, 29 Oct 2012 08:37:49 -0600
+
+bind9 (1:9.8.1.dfsg.P1-4.4) testing-proposed-updates; urgency=low
+
+  * Non-maintainer upload.
+  * Fix CVE-2012-4244. Thanks to Moritz Mühlenhoff for providing
+    the patch.
+
+ -- Philipp Kern <pkern@debian.org>  Sat, 03 Nov 2012 20:43:43 +0100
+
+bind9 (1:9.8.1.dfsg.P1-4.3) unstable; urgency=medium
+
+  [ Philipp Kern ]
+  * Non-maintainer upload.
+
+  [ Marc Deslauriers ]
   * SECURITY UPDATE: denial of service via specific combinations of RDATA
     - bin/named/query.c: fix logic
     - Patch backported from 9.8.3-P4
     - CVE-2012-5166
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 05 Oct 2012 10:54:15 -0400
+ -- Philipp Kern <pkern@debian.org>  Sun, 28 Oct 2012 20:28:11 +0100
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.3) precise-security; urgency=low
+bind9 (1:9.8.1.dfsg.P1-4.2) unstable; urgency=high
 
-  * SECURITY UPDATE: denial of service via large crafted resource record
-    - check length in lib/dns/include/dns/rdata.h,
-      lib/dns/{master,rdata,rdataslab}.c. Added tests to
-      lib/dns/tests/Makefile.in, lib/dns/tests/{master,rdata}_test.c,
-      lib/dns/tests/testdata/master/master1{5,6}.data.
-    - Patch backported from 9.8.3-P3
-    - CVE-2012-4244
+  * Non-maintainer upload by the Security Team.
+  * Fix denial of service vulnerability triggered
+    through an assert because of using bad cache
+    (CVE-2012-3817; Closes: #683259).
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Wed, 12 Sep 2012 16:12:28 -0400
+ -- Nico Golde <nion@debian.org>  Mon, 30 Jul 2012 20:56:10 +0200
 
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.2) precise-security; urgency=low
+bind9 (1:9.8.1.dfsg.P1-4.1) unstable; urgency=high
 
-  * SECURITY UPDATE: denial of service via dnssec validation load
-    - lib/dns/resolver.c: don't use bad->expire before it has been set.
-    - Patch backported from 9.8.3-P2.
-    - CVE-2012-3817
-
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Wed, 25 Jul 2012 16:21:36 -0400
-
-bind9 (1:9.8.1.dfsg.P1-4ubuntu0.1) precise-security; urgency=low
-
+  * Non-maintainer upload by the Security Team.
   * SECURITY UPDATE: ghost domain names attack
     - lib/dns/rbtdb.c: Restrict the TTL of NS RRset to no more than that
       of the old NS RRset when replacing it.
@@ -242,7 +603,7 @@ bind9 (1:9.8.1.dfsg.P1-4ubuntu0.1) precise-security; urgency=low
     - Patch backported from 9.8.3-P1.
     - CVE-2012-1667
 
- -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Mon, 04 Jun 2012 13:12:43 -0400
+ -- Luk Claes <luk@debian.org>  Wed, 20 Jun 2012 15:26:09 -0400
 
 bind9 (1:9.8.1.dfsg.P1-4) unstable; urgency=low
 

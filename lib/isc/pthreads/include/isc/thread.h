@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2007  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2005, 2007, 2013  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1998-2001  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: thread.h,v 1.26 2007-06-19 23:47:18 tbox Exp $ */
+/* $Id: thread.h,v 1.26 2007/06/19 23:47:18 tbox Exp $ */
 
 #ifndef ISC_THREAD_H
 #define ISC_THREAD_H 1
@@ -40,6 +40,9 @@ isc_thread_create(isc_threadfunc_t, isc_threadarg_t, isc_thread_t *);
 
 void
 isc_thread_setconcurrency(unsigned int level);
+
+void
+isc_thread_yield(void);
 
 /* XXX We could do fancier error handling... */
 

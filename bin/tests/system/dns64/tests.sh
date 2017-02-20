@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (C) 2010, 2011  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2010-2013  Internet Systems Consortium, Inc. ("ISC")
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: tests.sh,v 1.4.14.1 2011-02-03 07:39:02 marka Exp $
+# $Id: tests.sh,v 1.5 2011/02/03 07:35:55 marka Exp $
 
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
@@ -1264,6 +1264,23 @@ do
 	status=`expr $status + $ret`
 done
 
+rev=`$ARPANAME 2001:aaaa::10.0.0.1`
+regex='..\(.*.IP6.ARPA\)'
+rev=`expr "${rev}" : "${regex}"`
+fin=`expr "${rev}" : "............${regex}"`
+while test "${rev}" != "${fin}"
+do
+	ret=0
+	echo "I: checking $rev ($n)"
+	$DIG $DIGOPTS $rev ptr @10.53.0.2 > dig.out.ns2.test$n || ret=1
+	grep -i "status: NOERROR" dig.out.ns2.test$n > /dev/null || ret=1
+	grep -i "ANSWER: 0," dig.out.ns2.test$n > /dev/null || ret=1
+	n=`expr $n + 1`
+	if [ $ret != 0 ]; then echo "I:failed"; fi
+	status=`expr $status + $ret`
+	rev=`expr "${rev}" : "${regex}"`
+done
+
 echo "I: checking dns64-server and dns64-contact ($n)"
 $DIG $DIGOPTS soa 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.a.a.a.a.1.0.0.2.ip6.arpa @10.53.0.2 > dig.out.ns2.test$n || ret=1
 grep "SOA.dns64.example.net..hostmaster.example.net." dig.out.ns2.test$n > /dev/null || ret=1
@@ -1331,6 +1348,13 @@ echo "I: checking TTL limited to minimum via cache ($n)"
 #expect 1200
 $DIG $DIGOPTS aaaa ttl-more-than-minimum.example +rec -b 10.53.0.2 @10.53.0.2 > dig.out.ns2.test$n || ret=1
 grep -i "ttl-more-than-minimum.example..1200.IN.AAAA" dig.out.ns2.test$n >/dev/null || ret=1
+n=`expr $n + 1`
+if [ $ret != 0 ]; then echo "I:failed"; fi
+status=`expr $status + $ret`
+
+echo "I: checking synthesis of AAAA from RPZ-remapped A ($n)"
+$DIG $DIGOPTS aaaa rpz.example +rec -b 10.53.0.7 @10.53.0.2 > dig.out.ns2.test$n || ret=1
+grep -i 'rpz.example.*IN.AAAA.2001:96::a0a:a0a' dig.out.ns2.test$n >/dev/null || ret=1
 n=`expr $n + 1`
 if [ $ret != 0 ]; then echo "I:failed"; fi
 status=`expr $status + $ret`

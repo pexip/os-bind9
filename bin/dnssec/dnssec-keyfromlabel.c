@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2007-2012  Internet Systems Consortium, Inc. ("ISC")
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: dnssec-keyfromlabel.c,v 1.32.14.2 2011-03-12 04:59:14 tbox Exp $ */
+/* $Id: dnssec-keyfromlabel.c,v 1.38 2011/11/30 00:48:51 marka Exp $ */
 
 /*! \file */
 
@@ -55,7 +55,8 @@ int verbose;
 
 static const char *algs = "RSA | RSAMD5 | DH | DSA | RSASHA1 |"
 			  " NSEC3DSA | NSEC3RSASHA1 |"
-			  " RSASHA256 | RSASHA512 | ECCGOST";
+			  " RSASHA256 | RSASHA512 | ECCGOST |"
+			  " ECDSAP256SHA256 | ECDSAP384SHA384";
 
 ISC_PLATFORM_NORETURN_PRE static void
 usage(void) ISC_PLATFORM_NORETURN_POST;
@@ -84,6 +85,7 @@ usage(void) {
 	fprintf(stderr, "    -K directory: directory in which to place "
 			"key files\n");
 	fprintf(stderr, "    -k: generate a TYPE=KEY key\n");
+	fprintf(stderr, "    -L ttl: default key TTL\n");
 	fprintf(stderr, "    -n nametype: ZONE | HOST | ENTITY | USER | OTHER\n");
 	fprintf(stderr, "        (DNSKEY generation defaults to ZONE\n");
 	fprintf(stderr, "    -p protocol: default: 3 [dnssec]\n");
@@ -110,7 +112,8 @@ usage(void) {
 
 int
 main(int argc, char **argv) {
-	char		*algname = NULL, *nametype = NULL, *type = NULL;
+	char		*algname = NULL, *freeit = NULL;
+	char		*nametype = NULL, *type = NULL;
 	const char	*directory = NULL;
 #ifdef USE_PKCS11
 	const char	*engine = "pkcs11";
@@ -137,12 +140,13 @@ main(int argc, char **argv) {
 	dns_rdataclass_t rdclass;
 	int		options = DST_TYPE_PRIVATE | DST_TYPE_PUBLIC;
 	char		*label = NULL;
+	dns_ttl_t	ttl = 0;
 	isc_stdtime_t	publish = 0, activate = 0, revoke = 0;
 	isc_stdtime_t	inactive = 0, delete = 0;
 	isc_stdtime_t	now;
 	isc_boolean_t	setpub = ISC_FALSE, setact = ISC_FALSE;
 	isc_boolean_t	setrev = ISC_FALSE, setinact = ISC_FALSE;
-	isc_boolean_t	setdel = ISC_FALSE;
+	isc_boolean_t	setdel = ISC_FALSE, setttl = ISC_FALSE;
 	isc_boolean_t	unsetpub = ISC_FALSE, unsetact = ISC_FALSE;
 	isc_boolean_t	unsetrev = ISC_FALSE, unsetinact = ISC_FALSE;
 	isc_boolean_t	unsetdel = ISC_FALSE;
@@ -164,7 +168,7 @@ main(int argc, char **argv) {
 	isc_stdtime_get(&now);
 
 	while ((ch = isc_commandline_parse(argc, argv,
-				"3a:Cc:E:f:K:kl:n:p:t:v:yFhGP:A:R:I:D:")) != -1)
+			"3a:Cc:E:f:K:kl:L:n:p:t:v:yFhGP:A:R:I:D:")) != -1)
 	{
 	    switch (ch) {
 		case '3':
@@ -201,6 +205,13 @@ main(int argc, char **argv) {
 			break;
 		case 'k':
 			options |= DST_TYPE_KEY;
+			break;
+		case 'L':
+			if (strcmp(isc_commandline_argument, "none") == 0)
+				ttl = 0;
+			else
+				ttl = strtottl(isc_commandline_argument);
+			setttl = ISC_TRUE;
 			break;
 		case 'l':
 			label = isc_mem_strdup(mctx, isc_commandline_argument);
@@ -342,6 +353,9 @@ main(int argc, char **argv) {
 			algname = strdup(DEFAULT_NSEC3_ALGORITHM);
 		else
 			algname = strdup(DEFAULT_ALGORITHM);
+		if (algname == NULL)
+			fatal("strdup failed");
+		freeit = algname;
 		if (verbose > 0)
 			fprintf(stderr, "no algorithm specified; "
 				"defaulting to %s\n", algname);
@@ -351,6 +365,8 @@ main(int argc, char **argv) {
 		fprintf(stderr, "The use of RSA (RSAMD5) is not recommended.\n"
 				"If you still wish to use RSA (RSAMD5) please "
 				"specify \"-a RSAMD5\"\n");
+		if (freeit != NULL)
+			free(freeit);
 		return (1);
 	} else {
 		r.base = algname;
@@ -365,7 +381,8 @@ main(int argc, char **argv) {
 	if (use_nsec3 &&
 	    alg != DST_ALG_NSEC3DSA && alg != DST_ALG_NSEC3RSASHA1 &&
 	    alg != DST_ALG_RSASHA256 && alg != DST_ALG_RSASHA512 &&
-	    alg != DST_ALG_ECCGOST) {
+	    alg != DST_ALG_ECCGOST &&
+	    alg != DST_ALG_ECDSA256 && alg != DST_ALG_ECDSA384) {
 		fatal("%s is incompatible with NSEC3; "
 		      "do not use the -3 option", algname);
 	}
@@ -509,13 +526,16 @@ main(int argc, char **argv) {
 		dst_key_setprivateformat(key, 1, 2);
 	}
 
+	/* Set default key TTL */
+	if (setttl)
+		dst_key_setttl(key, ttl);
+
 	/*
 	 * Do not overwrite an existing key.  Warn LOUDLY if there
 	 * is a risk of ID collision due to this key or another key
 	 * being revoked.
 	 */
-	if (key_collision(dst_key_id(key), name, directory, alg, mctx, &exact))
-	{
+	if (key_collision(key, name, directory, mctx, &exact)) {
 		isc_buffer_clear(&buf);
 		ret = dst_key_buildfilename(key, 0, directory, &buf);
 		if (ret != ISC_R_SUCCESS)
@@ -559,6 +579,9 @@ main(int argc, char **argv) {
 		isc_mem_stats(mctx, stdout);
 	isc_mem_free(mctx, label);
 	isc_mem_destroy(&mctx);
+
+	if (freeit != NULL)
+		free(freeit);
 
 	return (0);
 }

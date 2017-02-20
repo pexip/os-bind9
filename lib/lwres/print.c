@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2005, 2007, 2011, 2012  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: print.c,v 1.10.814.2 2011-03-12 04:59:19 tbox Exp $ */
+/* $Id$ */
 
 #include <config.h>
 
@@ -470,12 +470,16 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 				pad--;
 			}
 			break;
+
 		case 'D':	/*deprecated*/
 			INSIST("use %ld instead of %D" == NULL);
+			break;
 		case 'O':	/*deprecated*/
 			INSIST("use %lo instead of %O" == NULL);
+			break;
 		case 'U':	/*deprecated*/
 			INSIST("use %lu instead of %U" == NULL);
+			break;
 
 		case 'L':
 #ifdef HAVE_LONG_DOUBLE

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007-2009, 2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2007-2009, 2011-2013  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2001  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: dir.c,v 1.18.424.2 2011-03-12 04:59:19 tbox Exp $ */
+/* $Id$ */
 
 /* Principal Authors: DCL */
 
@@ -267,7 +267,8 @@ isc_dir_createunique(char *templet) {
 
 	do {
 		i = mkdir(templet);
-		i = chmod(templet, 0700);
+		if (i == 0)
+			i = chmod(templet, 0700);
 
 		if (i == 0 || errno != EEXIST)
 			break;

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright (C) 2004, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) 2004, 2007, 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
 # Copyright (C) 2000, 2001  Internet Software Consortium.
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
 # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 # PERFORMANCE OF THIS SOFTWARE.
 
-# $Id: ans.pl,v 1.12 2009-11-04 02:15:30 marka Exp $
+# $Id: ans.pl,v 1.12 2009/11/04 02:15:30 marka Exp $
 
 #
 # Ad hoc name server
@@ -42,8 +42,16 @@ for (;;) {
 
 	print "**** request from " , $sock->peerhost, " port ", $sock->peerport, "\n";
 
-	my ($packet, $err) = new Net::DNS::Packet(\$buf, 0);
-	$err and die $err;
+	my $packet;
+
+	if ($Net::DNS::VERSION > 0.68) {
+		$packet = new Net::DNS::Packet(\$buf, 0);
+		$@ and die $@;
+	} else {
+		my $err;
+		($packet, $err) = new Net::DNS::Packet(\$buf, 0);
+		$err and die $err;
+	}
 
 	print "REQUEST:\n";
 	$packet->print;

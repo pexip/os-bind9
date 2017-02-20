@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2011  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004-2012  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2002  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -15,7 +15,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: aclconf.c,v 1.29.72.2 2011-06-17 23:47:11 tbox Exp $ */
+/* $Id$ */
 
 #include <config.h>
 
@@ -74,13 +74,11 @@ void
 cfg_aclconfctx_detach(cfg_aclconfctx_t **actxp) {
 	cfg_aclconfctx_t *actx;
 	dns_acl_t *dacl, *next;
-	isc_mem_t *mctx;
 	unsigned int refs;
 
 	REQUIRE(actxp != NULL && *actxp != NULL);
 
 	actx = *actxp;
-	mctx = actx->mctx;
 
 	isc_refcount_decrement(&actx->references, &refs);
 	if (refs == 0) {
@@ -194,7 +192,7 @@ convert_keyname(const cfg_obj_t *keyobj, isc_log_t *lctx, isc_mem_t *mctx,
 	const char *txtname = cfg_obj_asstring(keyobj);
 
 	keylen = strlen(txtname);
-	isc_buffer_init(&buf, txtname, keylen);
+	isc_buffer_constinit(&buf, txtname, keylen);
 	isc_buffer_add(&buf, keylen);
 	dns_fixedname_init(&fixname);
 	result = dns_name_fromtext(dns_fixedname_name(&fixname), &buf,

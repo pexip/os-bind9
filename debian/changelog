@@ -1,3 +1,11 @@
+bind9 (1:9.9.5.dfsg-9+deb8u10) jessie-security; urgency=medium
+
+  * Fix regression caused by the fix for CVE-2016-8864 (closes: #855540).
+  * Fix CVE-2017-3135: a malicously crafted query can cause named to crash if
+    both DNS64 and RPZ are being used (closes: #855520).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Sun, 26 Feb 2017 00:03:04 +0000
+
 bind9 (1:9.9.5.dfsg-9+deb8u9) jessie-security; urgency=medium
 
   * Apply patches from ISC.

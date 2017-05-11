@@ -1,3 +1,22 @@
+bind9 (1:9.9.5.dfsg-9+deb8u11) jessie-security; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Dns64 with "break-dnssec yes;" can result in a assertion failure.
+    (CVE-2017-3136) (Closes: #860224)
+  * Prerequisite for CVE-2017-3137 cherry-picked from upstream change #4190.
+    If not cherry-picking this change the fix for CVE-2017-3137 can cause an
+    assertion failure to appear in name.c.
+  * Some chaining (CNAME or DNAME) responses to upstream queries could trigger
+    assertion failures (CVE-2017-3137) (Closes: #860225)
+  * Reimplement: Some chaining (CNAME or DNAME) responses to upstream queries
+    could trigger assertion failures. (CVE-2017-3137)
+  * Fix regression introduced when handling CNAME to referral below the
+    current domain
+  * 'rndc ""' could trigger a assertion failure in named. (CVE-2017-3138)
+    (Closes: #860226)
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Thu, 11 May 2017 08:39:19 +0200
+
 bind9 (1:9.9.5.dfsg-9+deb8u10) jessie-security; urgency=medium
 
   * Fix regression caused by the fix for CVE-2016-8864 (closes: #855540).

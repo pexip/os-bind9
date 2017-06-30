@@ -1,3 +1,16 @@
+bind9 (1:9.9.5.dfsg-9+deb8u12) jessie-security; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Add patch to fix CVE-2017-3042 and CVE-2017-3043
+    CVE-2017-3042: error in TSIG authentication can permit unauthorized zone
+    transfers. An attacker may be able to circumvent TSIG authentication of
+    AXFR and Notify requests.
+    CVE-2017-3043: error in TSIG authentication can permit unauthorized
+    dynamic updates. An attacker may be able to forge a valid TSIG or SIG(0)
+    signature for a dynamic update.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 30 Jun 2017 18:10:30 +0200
+
 bind9 (1:9.9.5.dfsg-9+deb8u11) jessie-security; urgency=high
 
   * Non-maintainer upload by the Security Team.

@@ -2,46 +2,90 @@
 # Sample debian/rules that uses debhelper.
 # GNU copyright 1997 to 1999 by Joey Hess.
 
-export DEB_BUILD_HARDENING=1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+
+export DEB_CFLAGS_MAINT_APPEND = -fno-strict-aliasing -fno-delete-null-pointer-checks -DNO_VERSION_DATE -DDIG_SIGCHASE
+
+include /usr/share/dpkg/buildflags.mk
+
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-ifndef DEB_HOST_ARCH
-DEB_BUILD_ARCH := $(shell dpkg --print-architecture)
+COMMA = ,
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
 endif
+
+DEB_BUILD_ARCH		?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_ARCH		?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_MULTIARCH	?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
 export arch = $(DEB_HOST_ARCH)
-
-DEB_HOST_MULTIARCH := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
-
-ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
-DEBUG = -g
-endif
-
-ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-OPT = 
-else
-OPT = -O2
-endif
-
-ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-export MAKEFLAGS += -j$(NUMJOBS)
-endif
-
-export CFLAGS=-fno-strict-aliasing -fno-delete-null-pointer-checks -DDIG_SIGCHASE $(DEBUG) $(OPT)
 
 ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
 EXTRA_FEATURES=--disable-linux-caps --disable-threads
 endif
 
-configure: configure-stamp
-configure-stamp:
+stamps/prepare:
 	dh_testdir
+	if [ ! -d autoreconf-bck ]; then \
+	    mkdir autoreconf-bck; \
+	    cp -pr config.h.in configure libtool.m4 ltmain.sh autoreconf-bck; \
+	fi
+	cp -r bin/named bin/named-pkcs11
+	cp -r bin/dnssec bin/dnssec-pkcs11
+	cp -r lib/isc lib/isc-pkcs11
+	cp -r lib/dns lib/dns-pkcs11
+	patch -p1 < debian/patches/extra-add_native_pkcs11.diff
+	# disable GOST, can't use openssl with native pkcs11 anyway
+	sed -i 's/HAVE_OPENSSL_GOST/GOSTBUSTERS/' lib/dns-pkcs11/*.[ch]
 	dh_autotools-dev_updateconfig
 	dh_autoreconf
-	test -e export || mkdir export && cp -r * export || true
-	cd export && ./configure \
+	@mkdir -p stamps
+	touch $@
+
+stamps/configure: stamps/prepare
+	dh_testdir
+	rm -rf build
+	mkdir -p build
+	cd build && ../configure --prefix=/usr \
+		--mandir=\$${prefix}/share/man \
+		--libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
+		--infodir=\$${prefix}/share/info \
+		--sysconfdir=/etc/bind \
+		--with-python=python3 \
+		--localstatedir=/ \
+		--enable-threads \
+		--enable-largefile \
+		--with-libtool \
+		--enable-shared \
+		--enable-static \
+		--with-gost=no \
+		--with-openssl=/usr \
+		--with-gssapi=/usr \
+		--with-gnu-ld \
+		--with-geoip=/usr \
+		--with-atf=no \
+		--enable-ipv6 \
+		--enable-rrl \
+		--enable-filter-aaaa \
+		--enable-native-pkcs11 \
+		--with-pkcs11=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)/softhsm/libsofthsm2.so \
+		--with-randomdev=/dev/urandom \
+		$(EXTRA_FEATURES)
+
+	touch $@
+
+stamps/configure-udeb: stamps/prepare
+	dh_testdir
+	rm -rf build-udeb
+	mkdir -p build-udeb
+	cd build-udeb && ../configure \
 		--prefix=/usr \
+		--sysconfdir=/etc/bind \
+		--with-python=python3 \
+		--localstatedir=/ \
 		--disable-epoll \
 		--disable-kqueue \
 		--disable-devpoll \
@@ -51,38 +95,29 @@ configure-stamp:
 		--without-libxml2 \
 		--enable-ipv6 \
 		--enable-shared \
-		--enable-exportlib \
 		--with-libtool \
 		--with-gssapi=no \
-		--with-export-libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
-		--with-export-includedir=\$${prefix}/include/bind-export
-	./configure --prefix=/usr \
-		--mandir=\$${prefix}/share/man \
-		--infodir=\$${prefix}/share/info \
-		--sysconfdir=/etc/bind \
-		--localstatedir=/var \
-		--enable-threads \
-		--enable-largefile \
-		--with-libtool \
-		--enable-shared \
-		--enable-static \
-		--with-openssl=/usr \
-		--with-gssapi=/usr \
-		--with-gnu-ld \
-		--with-geoip=/usr \
-		--with-atf=no \
-		--enable-ipv6 \
-		--enable-rrl \
-		--enable-filter-aaaa \
-		$(EXTRA_FEATURES)
+		--libdir=/lib/$(DEB_HOST_MULTIARCH) \
+		--includedir=/usr/include/bind-export
+	sh debian/apply-export-patch
 
+	# no need to build these targets here
+	sed -i 's/dnssec-pkcs11//;s/named-pkcs11//' build-udeb/bin/Makefile
+	sed -i 's/dns-pkcs11//;s/isc-pkcs11//' build-udeb/lib/Makefile
 	touch $@
 
-build: build-stamp
-build-stamp: configure-stamp
+build-arch: build
+build-indep: build
+build: stamps/build
+stamps/build: stamps/configure stamps/configure-udeb
 	dh_testdir
-	$(MAKE) -C export
-	LD_LIBRARY_PATH=$$(pwd)/lib/isc/.libs:$$(pwd)/lib/isccc/.libs:$$(pwd)/isccfg/.libs:$${LD_LIBRARY_PATH} $(MAKE)
+	LD_LIBRARY_PATH=$(CURDIR)/build/lib/isc/.libs:$(CURDIR)/build/lib/isccc/.libs:$(CURDIR)/build/isccfg/.libs:$${LD_LIBRARY_PATH} \
+	  $(MAKE) -C build $(NJOBS)
+	touch $@
+
+stamps/build-udeb: stamps/configure-udeb
+	dh_testdir
+	$(MAKE) -C build-udeb $(NJOBS)
 	touch $@
 
 autofiles:
@@ -97,16 +132,16 @@ autofiles:
 clean:
 	dh_testdir
 	dh_testroot
-	-$(MAKE) distclean
-	find . -name \*.o -exec rm {} \;
-	rm -f build-stamp configure-stamp
-	rm -f debian/substvars lib/bind/include/isc/platform.h
-	rm -f contrib/dlz/bin/dlzbdb/Makefile contrib/dlz/drivers/rules
+	rm -rf bin/dnssec-pkcs11 bin/named-pkcs11 lib/isc-pkcs11 lib/dns-pkcs11
+	rm -rf build build-udeb stamps debian/tmp-udeb
+	rm -f debian/substvars
 	rm -f doc/arm/Bv9ARM.pdf
-	rm -rf export
 	dh_autoreconf_clean
 	dh_autotools-dev_restoreconfig
 	dh_clean
+	if [ -d autoreconf-bck ]; then \
+	    mv autoreconf-bck/* .; rmdir autoreconf-bck; \
+	fi
 
 newtemplate:
 	debconf-updatepo
@@ -117,23 +152,19 @@ msgstats:
 msg-email:
 	@podebconf-report-po
 
+INSTDIR=debian/tmp
 ETCBIND=debian/bind9/etc/bind
 ETCAPP=debian/bind9/etc/apparmor.d
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_prep
 	dh_installdirs
-	$(MAKE) -C export install DESTDIR=`pwd`/debian/bind9
-	$(MAKE) install DESTDIR=`pwd`/debian/bind9
-	rm -rf debian/bind9/usr/etc
-	find debian/bind9 -name \*.la -execdir rm -f {} \;
-	mkdir -p debian/bind9/lib/$(DEB_HOST_MULTIARCH)
-	mv debian/bind9/usr/lib/$(DEB_HOST_MULTIARCH)/*-export.so.* debian/bind9/lib/$(DEB_HOST_MULTIARCH)
-	cd debian/bind9/usr/lib/$(DEB_HOST_MULTIARCH) && for link in *.so; do \
-	    file=$$(readlink $$link); \
-	    ln -sf ../../../lib/$(DEB_HOST_MULTIARCH)/$$file $$link; \
-	    done
+
+	: # regular install
+	$(MAKE) -C build install DESTDIR=$(CURDIR)/${INSTDIR}
+	rm -rf ${INSTDIR}/usr/etc
+	find ${INSTDIR} -name \*.la -execdir rm -f {} \;
 	install -c -o bin -g bin -m 444 debian/db.0 ${ETCBIND}/db.0
 	install -c -o bin -g bin -m 444 debian/db.0 ${ETCBIND}/db.255
 	install -c -o bin -g bin -m 444 debian/db.empty ${ETCBIND}
@@ -146,16 +177,19 @@ install: build
 	install -c -o bin -g bin -m 440 debian/named.conf.default-zones ${ETCBIND}
 	install -c -o bin -g bin -m 440 bind.keys ${ETCBIND}
 	install -c -o bin -g bin -m 440 debian/named.conf.options debian/bind9/usr/share/bind9/
-	cp doc/arm/*.html debian/bind9-doc/usr/share/doc/bind9-doc/arm
 	install -m 644 -o root -g root debian/apparmor-profile ${ETCAPP}/usr.sbin.named
 	install -m 644 -o root -g root debian/apparmor-profile.local ${ETCAPP}/local/usr.sbin.named
-	rmdir debian/bind9/var/run/named debian/lwresd/var/run/named || true
 
 	install debian/ip-up.d debian/bind9/etc/ppp/ip-up.d/bind9
 	install debian/ip-down.d debian/bind9/etc/ppp/ip-down.d/bind9
 	install debian/ip-up.d debian/bind9/etc/network/if-up.d/bind9
 	install debian/ip-down.d debian/bind9/etc/network/if-down.d/bind9
 	install -m644 debian/bind9.ufw.profile debian/bind9/etc/ufw/applications.d/bind9
+
+	cp doc/arm/*.html debian/bind9-doc/usr/share/doc/bind9-doc/arm
+
+	: # udeb install
+	$(MAKE) -C build-udeb install DESTDIR=$(CURDIR)/debian/tmp-udeb
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -185,19 +219,22 @@ binary-arch: build install
 	dh_installdocs -a
 	dh_installexamples -a
 	dh_installmenu -a
-	dh_systemd_enable -pbind9 --no-enable bind9-resolvconf.service
+	dh_systemd_enable -pbind9 --no-enable --name=bind9-resolvconf bind9-resolvconf.service
+	dh_systemd_enable -pbind9 --no-enable --name=bind9-pkcs11 bind9-pkcs11.service
 	dh_systemd_enable -pbind9 bind9.service
 	dh_systemd_enable -plwresd lwresd.service
 	dh_installinit -a --no-start -- defaults 15 85
-	# Ship the extra service file for resolvconf integration manually.
-	if [ -d debian/bind9/lib/systemd/system ]; then cp debian/bind9-resolvconf.service debian/bind9/lib/systemd/system; fi
 	dh_installcron -a
 	dh_installdebconf -pbind9
 	dh_installinfo -a
 	dh_installchangelogs -a # CHANGES # upstream changelog only in bind9-doc
-	dh_install --sourcedir=debian/bind9 -a
-	(cd debian/bind9/ && rm -rf $$(cat ../*.install) )
-	rm -f debian/bind9/usr/share/man/man1/query-loc.1
+	dh_install --sourcedir=debian/tmp -a --fail-missing
+	for lib in `find debian/tmp-udeb/lib/$(DEB_HOST_MULTIARCH)/ -type l -name 'lib*-export.so.*'`; do \
+	  lib=$$(basename $$lib); \
+	  dev=$$(echo $$lib | sed 's/\.so\..*/.so/'); \
+	  dh_link -plibbind-export-dev /lib/$(DEB_HOST_MULTIARCH)/$$lib \
+	    /usr/lib/$(DEB_HOST_MULTIARCH)/$$dev; \
+	done
 	# install apport hook on Ubuntu
 	if dpkg-vendor --is ubuntu; then \
 	    install -m 644 -D debian/bind9.apport debian/bind9/usr/share/apport/package-hooks/bind9.py; \
@@ -207,10 +244,11 @@ binary-arch: build install
 	dh_compress -a
 	dh_fixperms -a
 	dh_makeshlibs -a
-	dh_makeshlibs -plibirs-export91 --add-udeb=libirs-export91-udeb
-	dh_makeshlibs -plibisc-export95 --add-udeb=libisc-export95-udeb
-	dh_makeshlibs -plibdns-export100 --add-udeb=libdns-export100-udeb
-	dh_makeshlibs -plibisccfg-export90 --add-udeb=libisccfg-export90-udeb
+	dh_makeshlibs -plibirs-export141 --add-udeb=libirs-export141-udeb
+	dh_makeshlibs -plibisc-export160 --add-udeb=libisc-export160-udeb
+	dh_makeshlibs -plibdns-export162 --add-udeb=libdns-export162-udeb
+	dh_makeshlibs -plibisccc-export140 --add-udeb=libisccc-export140-udeb
+	dh_makeshlibs -plibisccfg-export140 --add-udeb=libisccfg-export140-udeb
 	dh_installdeb -a
 	dh_shlibdeps -a
 	for i in $$(sed -n '/^Package:/s/^.* //p' debian/control); do cat debian/vars.in >> debian/$$i.substvars; done

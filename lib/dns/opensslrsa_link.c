@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004-2009, 2011-2015  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 2000-2003  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -33,9 +33,10 @@
 
 #include <isc/entropy.h>
 #include <isc/md5.h>
+#include <isc/mem.h>
+#include <isc/safe.h>
 #include <isc/sha1.h>
 #include <isc/sha2.h>
-#include <isc/mem.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -69,7 +70,9 @@
 #ifdef WIN32
 #if !((OPENSSL_VERSION_NUMBER >= 0x009070cfL && \
        OPENSSL_VERSION_NUMBER < 0x00908000L) || \
-      OPENSSL_VERSION_NUMBER >= 0x0090804fL)
+      (OPENSSL_VERSION_NUMBER >= 0x0090804fL && \
+       OPENSSL_VERSION_NUMBER < 0x10002000L) || \
+      OPENSSL_VERSION_NUMBER >= 0x1000205fL)
 #error Please upgrade OpenSSL to 0.9.8d/0.9.7l or greater.
 #endif
 #endif
@@ -650,9 +653,10 @@ opensslrsa_verify2(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
 						DST_R_VERIFYFAILURE));
 			if (status != (int)(prefixlen + digestlen))
 				return (DST_R_VERIFYFAILURE);
-			if (memcmp(original, prefix, prefixlen))
+			if (!isc_safe_memequal(original, prefix, prefixlen))
 				return (DST_R_VERIFYFAILURE);
-			if (memcmp(original + prefixlen, digest, digestlen))
+			if (!isc_safe_memequal(original + prefixlen,
+					    digest, digestlen))
 				return (DST_R_VERIFYFAILURE);
 			status = 1;
 		}
@@ -744,8 +748,7 @@ opensslrsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 
 #if OPENSSL_VERSION_NUMBER > 0x00908000L
 static int
-progress_cb(int p, int n, BN_GENCB *cb)
-{
+progress_cb(int p, int n, BN_GENCB *cb) {
 	union {
 		void *dptr;
 		void (*fptr)(int);
@@ -753,7 +756,7 @@ progress_cb(int p, int n, BN_GENCB *cb)
 
 	UNUSED(n);
 
-	u.dptr = cb->arg;
+	u.dptr = BN_GENCB_get_arg(cb);
 	if (u.fptr != NULL)
 		u.fptr(p);
 	return (1);
@@ -764,18 +767,21 @@ static isc_result_t
 opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 #if OPENSSL_VERSION_NUMBER > 0x00908000L
 	isc_result_t ret = DST_R_OPENSSLFAILURE;
-	BN_GENCB cb;
 	union {
 		void *dptr;
 		void (*fptr)(int);
 	} u;
 	RSA *rsa = RSA_new();
 	BIGNUM *e = BN_new();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	BN_GENCB _cb;
+#endif
+	BN_GENCB *cb = BN_GENCB_new();
 #if USE_EVP
 	EVP_PKEY *pkey = EVP_PKEY_new();
 #endif
 
-	if (rsa == NULL || e == NULL)
+	if (rsa == NULL || e == NULL || cb == NULL)
 		goto err;
 #if USE_EVP
 	if (pkey == NULL)
@@ -795,14 +801,15 @@ opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 	}
 
 	if (callback == NULL) {
-		BN_GENCB_set_old(&cb, NULL, NULL);
+		BN_GENCB_set_old(cb, NULL, NULL);
 	} else {
 		u.fptr = callback;
-		BN_GENCB_set(&cb, &progress_cb, u.dptr);
+		BN_GENCB_set(cb, &progress_cb, u.dptr);
 	}
 
-	if (RSA_generate_key_ex(rsa, key->key_size, e, &cb)) {
+	if (RSA_generate_key_ex(rsa, key->key_size, e, cb)) {
 		BN_free(e);
+		BN_GENCB_free(cb);
 		SET_FLAGS(rsa);
 #if USE_EVP
 		key->keydata.pkey = pkey;
@@ -813,6 +820,7 @@ opensslrsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 #endif
 		return (ISC_R_SUCCESS);
 	}
+	BN_GENCB_free(cb);
 	ret = dst__openssl_toresult2("RSA_generate_key_ex",
 				     DST_R_OPENSSLFAILURE);
 
@@ -825,6 +833,8 @@ err:
 		BN_free(e);
 	if (rsa != NULL)
 		RSA_free(rsa);
+	if (cb != NULL)
+		BN_GENCB_free(cb);
 	return (dst__openssl_toresult(ret));
 #else
 	RSA *rsa;
@@ -1198,6 +1208,24 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	EVP_PKEY *pkey = NULL;
 #endif
 
+	/* read private key file */
+	ret = dst__privstruct_parse(key, DST_ALG_RSA, lexer, mctx, &priv);
+	if (ret != ISC_R_SUCCESS)
+		goto err;
+
+	if (key->external) {
+		if (priv.nelements != 0)
+			DST_RET(DST_R_INVALIDPRIVATEKEY);
+		if (pub == NULL)
+			DST_RET(DST_R_INVALIDPRIVATEKEY);
+		key->keydata.pkey = pub->keydata.pkey;
+		pub->keydata.pkey = NULL;
+		key->key_size = pub->key_size;
+		dst__privstruct_free(&priv, mctx);
+		memset(&priv, 0, sizeof(priv));
+		return (ISC_R_SUCCESS);
+	}
+
 #if USE_EVP
 	if (pub != NULL && pub->keydata.pkey != NULL)
 		pubrsa = EVP_PKEY_get1_RSA(pub->keydata.pkey);
@@ -1207,14 +1235,6 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		pub->keydata.rsa = NULL;
 	}
 #endif
-
-	/* read private key file */
-	ret = dst__privstruct_parse(key, DST_ALG_RSA, lexer, mctx, &priv);
-	if (ret != ISC_R_SUCCESS)
-		goto err;
-
-	if (key->external && priv.nelements != 0)
-		DST_RET(DST_R_INVALIDPRIVATEKEY);
 
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
@@ -1299,8 +1319,6 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 			continue;
 		case TAG_RSA_LABEL:
 			continue;
-		case TAG_RSA_PIN:
-			continue;
 		default:
 			bn = BN_bin2bn(priv.elements[i].data,
 				       priv.elements[i].length, NULL);
@@ -1340,10 +1358,8 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	if (rsa_check(rsa, pubrsa) != ISC_R_SUCCESS)
 		DST_RET(DST_R_INVALIDPRIVATEKEY);
-	if (!key->external) {
-		if (BN_num_bits(rsa->e) > RSA_MAX_PUBEXP_BITS)
-			DST_RET(ISC_R_RANGE);
-	}
+	if (BN_num_bits(rsa->e) > RSA_MAX_PUBEXP_BITS)
+		DST_RET(ISC_R_RANGE);
 	key->key_size = BN_num_bits(rsa->n);
 	if (pubrsa != NULL)
 		RSA_free(pubrsa);
@@ -1377,12 +1393,21 @@ opensslrsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
 	RSA *rsa = NULL, *pubrsa = NULL;
-	char *colon;
+	char *colon, *tmpengine = NULL;
 
 	UNUSED(pin);
 
-	if (engine == NULL)
-		DST_RET(DST_R_NOENGINE);
+	if (engine == NULL) {
+		colon = strchr(label, ':');
+		if (colon == NULL)
+			DST_RET(DST_R_NOENGINE);
+		tmpengine = isc_mem_strdup(key->mctx, label);
+		if (tmpengine == NULL)
+			DST_RET(ISC_R_NOMEMORY);
+		colon = strchr(tmpengine, ':');
+		INSIST(colon != NULL);
+		*colon = '\0';
+	}
 	e = dst__openssl_getengine(engine);
 	if (e == NULL)
 		DST_RET(DST_R_NOENGINE);
@@ -1397,17 +1422,13 @@ opensslrsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 	if (pkey == NULL)
 		DST_RET(dst__openssl_toresult2("ENGINE_load_private_key",
 					       ISC_R_NOTFOUND));
-	if (engine != NULL) {
+	if (tmpengine != NULL) {
+		key->engine = tmpengine;
+		tmpengine = NULL;
+	} else {
 		key->engine = isc_mem_strdup(key->mctx, engine);
 		if (key->engine == NULL)
 			DST_RET(ISC_R_NOMEMORY);
-	} else {
-		key->engine = isc_mem_strdup(key->mctx, label);
-		if (key->engine == NULL)
-			DST_RET(ISC_R_NOMEMORY);
-		colon = strchr(key->engine, ':');
-		if (colon != NULL)
-			*colon = '\0';
 	}
 	key->label = isc_mem_strdup(key->mctx, label);
 	if (key->label == NULL)
@@ -1432,6 +1453,8 @@ opensslrsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 	return (ISC_R_SUCCESS);
 
  err:
+	if (tmpengine != NULL)
+		isc_mem_free(key->mctx, tmpengine);
 	if (rsa != NULL)
 		RSA_free(rsa);
 	if (pubrsa != NULL)
@@ -1450,6 +1473,7 @@ opensslrsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 
 static dst_func_t opensslrsa_functions = {
 	opensslrsa_createctx,
+	NULL, /*%< createctx2 */
 	opensslrsa_destroyctx,
 	opensslrsa_adddata,
 	opensslrsa_sign,

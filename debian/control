@@ -9,7 +9,7 @@ Build-Conflicts: libdb4.2-dev
 Standards-Version: 3.7.3.0
 XS-Vcs-Browser: http://git.debian.org/?p=users/lamont/bind9.git
 XS-Vcs-Git: git://git.debian.org/~lamont/bind9.git
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ jessie
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
 
 Package: bind9
 Architecture: any

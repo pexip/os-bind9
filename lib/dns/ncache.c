@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2008, 2010-2013  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2004, 2005, 2007, 2008, 2010-2015  Internet Systems Consortium, Inc. ("ISC")
  * Copyright (C) 1999-2003  Internet Software Consortium.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -49,7 +49,7 @@
 
 static isc_result_t
 addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
-	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
+	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
 	  isc_boolean_t optout, isc_boolean_t secure,
 	  dns_rdataset_t *addedrdataset);
 
@@ -99,26 +99,26 @@ copy_rdataset(dns_rdataset_t *rdataset, isc_buffer_t *buffer) {
 
 isc_result_t
 dns_ncache_add(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
-	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
+	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
 	       dns_rdataset_t *addedrdataset)
 {
-	return (addoptout(message, cache, node, covers, now, minttl, maxttl,
+	return (addoptout(message, cache, node, covers, now, maxttl,
 			  ISC_FALSE, ISC_FALSE, addedrdataset));
 }
 
 isc_result_t
 dns_ncache_addoptout(dns_message_t *message, dns_db_t *cache,
 		     dns_dbnode_t *node, dns_rdatatype_t covers,
-		     isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
+		     isc_stdtime_t now, dns_ttl_t maxttl,
 		     isc_boolean_t optout, dns_rdataset_t *addedrdataset)
 {
-	return (addoptout(message, cache, node, covers, now, minttl, maxttl,
+	return (addoptout(message, cache, node, covers, now, maxttl,
 			  optout, ISC_TRUE, addedrdataset));
 }
 
 static isc_result_t
 addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
-	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
+	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
 	  isc_boolean_t optout, isc_boolean_t secure,
 	  dns_rdataset_t *addedrdataset)
 {
@@ -151,12 +151,10 @@ addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 	/*
 	 * Initialize the list.
 	 */
+	dns_rdatalist_init(&ncrdatalist);
 	ncrdatalist.rdclass = dns_db_class(cache);
-	ncrdatalist.type = 0;
 	ncrdatalist.covers = covers;
 	ncrdatalist.ttl = maxttl;
-	ISC_LIST_INIT(ncrdatalist.rdata);
-	ISC_LINK_INIT(&ncrdatalist, link);
 
 	/*
 	 * Build an ncache rdatas into buffer.
@@ -187,8 +185,6 @@ addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 				    type == dns_rdatatype_nsec3) {
 					if (ttl > rdataset->ttl)
 						ttl = rdataset->ttl;
-					if (ttl < minttl)
-						ttl = minttl;
 					if (trust > rdataset->trust)
 						trust = rdataset->trust;
 					/*
@@ -505,6 +501,7 @@ static dns_rdatasetmethods_t rdataset_methods = {
 	NULL,
 	NULL,
 	rdataset_settrust,
+	NULL,
 	NULL
 };
 

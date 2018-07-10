@@ -1,0 +1,93 @@
+Description: Replace MIPS atomics assembly with calls to C11 atomic functions
+ This fixes various hangs and crashes on MIPS.
+Author: James Cowgill <jcowgill@debian.org>
+Forwarded: no
+Bug-Debian: https://bugs.debian.org/778720
+
+--- a/lib/isc/mips/include/isc/atomic.h
++++ b/lib/isc/mips/include/isc/atomic.h
+@@ -19,32 +19,19 @@
+ #ifndef ISC_ATOMIC_H
+ #define ISC_ATOMIC_H 1
+ 
++#include <stdatomic.h>
++
+ #include <isc/platform.h>
+ #include <isc/types.h>
+ 
+-#ifdef ISC_PLATFORM_USEGCCASM
+ /*
+  * This routine atomically increments the value stored in 'p' by 'val', and
+  * returns the previous value.
+  */
+ static inline isc_int32_t
+ isc_atomic_xadd(isc_int32_t *p, int val) {
+-	isc_int32_t orig;
+-
+-	/* add is a cheat, since MIPS has no mov instruction */
+-	__asm__ volatile (
+-	    "1:"
+-	    "ll $3, %1\n"
+-	    "add %0, $0, $3\n"
+-	    "add $3, $3, %2\n"
+-	    "sc $3, %1\n"
+-	    "beq $3, 0, 1b"
+-	    : "=&r"(orig)
+-	    : "m"(*p), "r"(val)
+-	    : "memory", "$3"
+-		);
+ 
+-	return (orig);
++	return atomic_fetch_add(p, val);
+ }
+ 
+ /*
+@@ -52,16 +39,7 @@ isc_atomic_xadd(isc_int32_t *p, int val)
+  */
+ static inline void
+ isc_atomic_store(isc_int32_t *p, isc_int32_t val) {
+-	__asm__ volatile (
+-	    "1:"
+-	    "ll $3, %0\n"
+-	    "add $3, $0, %1\n"
+-	    "sc $3, %0\n"
+-	    "beq $3, 0, 1b"
+-	    :
+-	    : "m"(*p), "r"(val)
+-	    : "memory", "$3"
+-		);
++	atomic_store(p, val);
+ }
+ 
+ /*
+@@ -71,28 +49,8 @@ isc_atomic_store(isc_int32_t *p, isc_int
+  */
+ static inline isc_int32_t
+ isc_atomic_cmpxchg(isc_int32_t *p, int cmpval, int val) {
+-	isc_int32_t orig;
+-
+-	__asm__ volatile(
+-	    "1:"
+-	    "ll $3, %1\n"
+-	    "add %0, $0, $3\n"
+-	    "bne $3, %2, 2f\n"
+-	    "add $3, $0, %3\n"
+-	    "sc $3, %1\n"
+-	    "beq $3, 0, 1b\n"
+-	    "2:"
+-	    : "=&r"(orig)
+-	    : "m"(*p), "r"(cmpval), "r"(val)
+-	    : "memory", "$3"
+-		);
+-
+-	return (orig);
++	atomic_compare_exchange_strong(p, &cmpval, val);
++	return cmpval;
+ }
+ 
+-#else /* !ISC_PLATFORM_USEGCCASM */
+-
+-#error "unsupported compiler.  disable atomic ops by --disable-atomic"
+-
+-#endif
+ #endif /* ISC_ATOMIC_H */

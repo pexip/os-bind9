@@ -403,18 +403,14 @@ start_lookup(ns_lwdclient_t *client) {
 	INSIST(client->lookup == NULL);
 
 	dns_fixedname_init(&absname);
-
+	result = ns_lwsearchctx_current(&client->searchctx,
+					dns_fixedname_name(&absname));
 	/*
-	 * Perform search across all search domains until success
-	 * is returned. Return in case of failure.
+	 * This will return failure if relative name + suffix is too long.
+	 * In this case, just go on to the next entry in the search path.
 	 */
-	while (ns_lwsearchctx_current(&client->searchctx,
-			dns_fixedname_name(&absname)) != ISC_R_SUCCESS) {
-		if (ns_lwsearchctx_next(&client->searchctx) != ISC_R_SUCCESS) {
-			ns_lwdclient_errorpktsend(client, LWRES_R_FAILURE);
-			return;
-		}
-	}
+	if (result != ISC_R_SUCCESS)
+		start_lookup(client);
 
 	result = dns_lookup_create(cm->mctx,
 				   dns_fixedname_name(&absname),

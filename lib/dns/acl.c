@@ -21,18 +21,14 @@
 
 #include <config.h>
 
-#ifdef SUPPORT_GEOIP
-#include <GeoIP.h>
-#endif
-
 #include <isc/mem.h>
 #include <isc/once.h>
 #include <isc/string.h>
 #include <isc/util.h>
-#include <dns/log.h>
 
 #include <dns/acl.h>
 #include <dns/iptable.h>
+
 
 /*
  * Create a new ACL, including an IP table and an array with room
@@ -295,6 +291,9 @@ dns_acl_merge(dns_acl_t *dest, dns_acl_t *source, isc_boolean_t pos)
 		if (newmem == NULL)
 			return (ISC_R_NOMEMORY);
 
+		/* Zero. */
+		memset(newmem, 0, newalloc * sizeof(dns_aclelement_t));
+
 		/* Copy in the original elements */
 		memmove(newmem, dest->elements,
 			dest->length * sizeof(dns_aclelement_t));
@@ -325,13 +324,6 @@ dns_acl_merge(dns_acl_t *dest, dns_acl_t *source, isc_boolean_t pos)
 		dest->elements[nelem + i].node_num =
 			source->elements[i].node_num + dest->node_count;
 
-#ifdef SUPPORT_GEOIP
-		/* Country */
-		if (source->elements[i].type == dns_aclelementtype_ipcountry &&
-		   source->elements[i].country != NULL) {
-			strncpy(dest->elements[nelem + i].country, source->elements[i].country, 3);
-		}
-#endif
 		/* Duplicate nested acl. */
 		if (source->elements[i].type == dns_aclelementtype_nestedacl &&
 		   source->elements[i].nestedacl != NULL)
@@ -347,6 +339,14 @@ dns_acl_merge(dns_acl_t *dest, dns_acl_t *source, isc_boolean_t pos)
 			if (result != ISC_R_SUCCESS)
 				return result;
 		}
+
+#ifdef HAVE_GEOIP
+		/* Duplicate GeoIP data */
+		if (source->elements[i].type == dns_aclelementtype_geoip) {
+			dest->elements[nelem + i].geoip_elem =
+				source->elements[i].geoip_elem;
+		}
+#endif
 
 		/* reverse sense of positives if this is a negative acl */
 		if (!pos && source->elements[i].negative == ISC_FALSE) {
@@ -391,77 +391,15 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr,
 	int indirectmatch;
 	isc_result_t result;
 
-	#ifdef SUPPORT_GEOIP
-	static GeoIP *geoip = NULL;
-	static isc_boolean_t geoip_init_tried = ISC_FALSE;
-	#ifdef GEOIP_V6
-	static GeoIP *geoip6 = NULL;
-	static isc_boolean_t geoip6_init_tried = ISC_FALSE;
-	#endif
-	#endif
-
 	switch (e->type) {
-#ifdef SUPPORT_GEOIP
-	case dns_aclelementtype_ipcountry:
-		/* Country match */
-		if (NULL == geoip && !geoip_init_tried) {
-			geoip_init_tried = ISC_TRUE;
-			if (GeoIP_db_avail(GEOIP_COUNTRY_EDITION)) {
-				geoip = GeoIP_open_type(GEOIP_COUNTRY_EDITION, GEOIP_MEMORY_CACHE);
-				if (NULL == geoip)
-					isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
-						      DNS_LOGMODULE_ACL, ISC_LOG_NOTICE,
-						      "Failed to open geoip database for ipv4");
-			} else {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
-					      DNS_LOGMODULE_ACL, ISC_LOG_NOTICE,
-					      "geoip database for ipv4 is not available");
-			}
-		}
-#ifdef GEOIP_V6
-		if (NULL == geoip6 && !geoip6_init_tried) {
-			geoip6_init_tried = ISC_TRUE;
-			if (GeoIP_db_avail(GEOIP_COUNTRY_EDITION_V6)) {
-				geoip6 = GeoIP_open_type(GEOIP_COUNTRY_EDITION_V6, GEOIP_MEMORY_CACHE);
-				if (NULL == geoip6)
-					isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
-						      DNS_LOGMODULE_ACL, ISC_LOG_NOTICE,
-						      "Failed to open geoip database for ipv6");
-			} else {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
-					      DNS_LOGMODULE_ACL, ISC_LOG_NOTICE,
-					      "geoip database for ipv6 is not available");
-			}
-		}
-#endif
-
-                const char *value = NULL;
-
-		if (reqaddr->family == AF_INET && geoip) {
-			value = GeoIP_country_code_by_addr(geoip,inet_ntoa(reqaddr->type.in));
-#ifdef GEOIP_V6
-		} else if (reqaddr->family == AF_INET6 && geoip6) {
-			value = GeoIP_country_code_by_ipnum_v6(geoip6, (geoipv6_t)reqaddr->type.in6);
-#endif
-		}
-                
-		if ((NULL != value) && (2 == strlen(value))) {
-			if ((e->country[0] == value[0]) && (e->country[1] == value[1])) {
-				return (ISC_TRUE);
-			}
-		}
-		return (ISC_FALSE);
-#endif
-
 	case dns_aclelementtype_keyname:
 		if (reqsigner != NULL &&
 		    dns_name_equal(reqsigner, &e->keyname)) {
 			if (matchelt != NULL)
 				*matchelt = e;
 			return (ISC_TRUE);
-		} else {
+		} else
 			return (ISC_FALSE);
-		}
 
 	case dns_aclelementtype_nestedacl:
 		inner = e->nestedacl;
@@ -479,6 +417,12 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr,
 		inner = env->localnets;
 		break;
 
+#ifdef HAVE_GEOIP
+	case dns_aclelementtype_geoip:
+		if (env == NULL || env->geoip == NULL)
+			return (ISC_FALSE);
+		return (dns_geoip_match(reqaddr, env->geoip, &e->geoip_elem));
+#endif
 	default:
 		/* Should be impossible. */
 		INSIST(0);
@@ -633,7 +577,7 @@ dns_acl_isinsecure(const dns_acl_t *a) {
 	insecure = insecure_prefix_found;
 	UNLOCK(&insecure_prefix_lock);
 	if (insecure)
-		return(ISC_TRUE);
+		return (ISC_TRUE);
 
 	/* Now check non-radix elements */
 	for (i = 0; i < a->length; i++) {
@@ -682,6 +626,9 @@ dns_aclenv_init(isc_mem_t *mctx, dns_aclenv_t *env) {
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_localhost;
 	env->match_mapped = ISC_FALSE;
+#ifdef HAVE_GEOIP
+	env->geoip = NULL;
+#endif
 	return (ISC_R_SUCCESS);
 
  cleanup_localhost:

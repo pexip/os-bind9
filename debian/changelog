@@ -1,3 +1,9 @@
+bind9 (1:9.10.3.dfsg.P4-12.3+deb9u4pexip1) pexip; urgency=medium
+
+  * Migrate to Stretch
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 10 Jul 2018 00:45:12 +0000
+
 bind9 (1:9.10.3.dfsg.P4-12.3+deb9u4) stretch-security; urgency=high
 
   * Non-maintainer upload by the Security Team.

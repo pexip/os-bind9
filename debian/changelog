@@ -1,3 +1,25 @@
+bind9 (1:9.10.3.dfsg.P4-12.3+deb9u5pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Fri, 24 May 2019 13:21:47 +0100
+
+bind9 (1:9.10.3.dfsg.P4-12.3+deb9u5) stretch-security; urgency=high
+
+  [ Marc Deslauriers (Ubuntu) ]
+  * CVE-2018-5743: limiting simultaneous TCP clients is ineffective.
+    Thanks to Marc Deslauriers of Ubuntu (Closes: #927932)
+
+  [ Ondřej Surý ]
+  * Sync Maintainer and Uploaders with unstable
+  * [CVE-2019-6465]: Zone transfer for DLZs are executed though not
+    permitted by ACLs. (Closes: #922955)
+  * [CVE-2018-5745]: Avoid assertion and thus causing named to
+    deliberately exit when a trust anchor's key is replaced with a key
+    which uses an unsupported algorithm. (Closes: #922954)
+
+ -- Bernhard Schmidt <berni@debian.org>  Fri, 03 May 2019 22:34:35 +0200
+
 bind9 (1:9.10.3.dfsg.P4-12.3+deb9u4pexip1) pexip; urgency=medium
 
   * Migrate to Stretch

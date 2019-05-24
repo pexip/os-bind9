@@ -2,8 +2,8 @@ Source: bind9
 Section: net
 Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
-XSBC-Pexip-Original-Maintainer: LaMont Jones <lamont@debian.org>
-XSBC-Pexip-Original-Uploaders: Michael Gilbert <mgilbert@debian.org>, Robie Basak <robie.basak@canonical.com>
+XSBC-Pexip-Original-Maintainer: Debian DNS Packaging <pkg-dns-devel@lists.alioth.debian.org>
+XSBC-Pexip-Original-Uploaders: LaMont Jones <lamont@debian.org>, Michael Gilbert <mgilbert@debian.org>, Robie Basak <robie.basak@canonical.com>, Ondřej Surý <ondrej@debian.org>
 Build-Depends: debhelper (>= 9), 
   dh-exec,
   libkrb5-dev,

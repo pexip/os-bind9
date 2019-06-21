@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2008-2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
 #include <config.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include <isc/buffer.h>
@@ -64,16 +61,15 @@ static dns_rdataclass_t rdclass;
 static dns_fixedname_t	fixed;
 static dns_name_t	*name = NULL;
 static isc_mem_t	*mctx = NULL;
-static isc_uint32_t	ttl;
-static isc_boolean_t	emitttl = ISC_FALSE;
+static uint32_t	ttl;
+static bool	emitttl = false;
 
 static isc_result_t
 initname(char *setname) {
 	isc_result_t result;
 	isc_buffer_t buf;
 
-	dns_fixedname_init(&fixed);
-	name = dns_fixedname_name(&fixed);
+	name = dns_fixedname_initname(&fixed);
 
 	isc_buffer_init(&buf, setname, strlen(setname));
 	isc_buffer_add(&buf, strlen(setname));
@@ -125,7 +121,7 @@ loadset(const char *filename, dns_rdataset_t *rdataset) {
 			      isc_result_totext(result));
 	}
 
-	result = dns_db_findnode(db, name, ISC_FALSE, &node);
+	result = dns_db_findnode(db, name, false, &node);
 	if (result != ISC_R_SUCCESS)
 		fatal("can't find %s node in %s", setname, filename);
 
@@ -166,7 +162,7 @@ loadkeyset(char *dirname, dns_rdataset_t *rdataset) {
 		return (ISC_R_NOSPACE);
 	isc_buffer_putstr(&buf, "keyset-");
 
-	result = dns_name_tofilenametext(name, ISC_FALSE, &buf);
+	result = dns_name_tofilenametext(name, false, &buf);
 	check_result(result, "dns_name_tofilenametext()");
 	if (isc_buffer_availablelength(&buf) == 0)
 		return (ISC_R_NOSPACE);
@@ -191,7 +187,7 @@ loadkey(char *filename, unsigned char *key_buf, unsigned int key_buf_size,
 	result = dst_key_fromnamedfile(filename, NULL, DST_TYPE_PUBLIC,
 				       mctx, &key);
 	if (result != ISC_R_SUCCESS)
-		fatal("invalid keyfile name %s: %s",
+		fatal("can't load %s.key: %s",
 		      filename, isc_result_totext(result));
 
 	if (verbose > 2) {
@@ -211,8 +207,7 @@ loadkey(char *filename, unsigned char *key_buf, unsigned int key_buf_size,
 
 	rdclass = dst_key_class(key);
 
-	dns_fixedname_init(&fixed);
-	name = dns_fixedname_name(&fixed);
+	name = dns_fixedname_initname(&fixed);
 	result = dns_name_copy(dst_key_name(key), name, NULL);
 	if (result != ISC_R_SUCCESS)
 		fatal("can't copy name");
@@ -241,8 +236,8 @@ logkey(dns_rdata_t *rdata)
 }
 
 static void
-emit(unsigned int dtype, isc_boolean_t showall, char *lookaside,
-     isc_boolean_t cds, dns_rdata_t *rdata)
+emit(unsigned int dtype, bool showall, char *lookaside,
+     bool cds, dns_rdata_t *rdata)
 {
 	isc_result_t result;
 	unsigned char buf[DNS_DS_BUFFERSIZE];
@@ -271,7 +266,7 @@ emit(unsigned int dtype, isc_boolean_t showall, char *lookaside,
 	if (result != ISC_R_SUCCESS)
 		fatal("can't build record");
 
-	result = dns_name_totext(name, ISC_FALSE, &nameb);
+	result = dns_name_totext(name, false, &nameb);
 	if (result != ISC_R_SUCCESS)
 		fatal("can't print name");
 
@@ -360,10 +355,10 @@ main(int argc, char **argv) {
 	char		*endp;
 	int		ch;
 	unsigned int	dtype = DNS_DSDIGEST_SHA1;
-	isc_boolean_t	cds = ISC_FALSE;
-	isc_boolean_t	both = ISC_TRUE;
-	isc_boolean_t	usekeyset = ISC_FALSE;
-	isc_boolean_t	showall = ISC_FALSE;
+	bool	cds = false;
+	bool	both = true;
+	bool	usekeyset = false;
+	bool	showall = false;
 	isc_result_t	result;
 	isc_log_t	*log = NULL;
 	isc_entropy_t	*ectx = NULL;
@@ -384,31 +379,31 @@ main(int argc, char **argv) {
 #endif
 	dns_result_register();
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 #define OPTIONS "12Aa:Cc:d:Ff:K:l:sT:v:hV"
 	while ((ch = isc_commandline_parse(argc, argv, OPTIONS)) != -1) {
 		switch (ch) {
 		case '1':
 			dtype = DNS_DSDIGEST_SHA1;
-			both = ISC_FALSE;
+			both = false;
 			break;
 		case '2':
 			dtype = DNS_DSDIGEST_SHA256;
-			both = ISC_FALSE;
+			both = false;
 			break;
 		case 'A':
-			showall = ISC_TRUE;
+			showall = true;
 			break;
 		case 'a':
 			algname = isc_commandline_argument;
-			both = ISC_FALSE;
+			both = false;
 			break;
 		case 'C':
 			if (lookaside != NULL)
 				fatal("lookaside and CDS are mutually"
 				      " exclusive");
-			cds = ISC_TRUE;
+			cds = true;
 			break;
 		case 'c':
 			classname = isc_commandline_argument;
@@ -434,10 +429,10 @@ main(int argc, char **argv) {
 				fatal("lookaside must be a non-empty string");
 			break;
 		case 's':
-			usekeyset = ISC_TRUE;
+			usekeyset = true;
 			break;
 		case 'T':
-			emitttl = ISC_TRUE;
+			emitttl = true;
 			ttl = atol(isc_commandline_argument);
 			break;
 		case 'v':
@@ -493,7 +488,7 @@ main(int argc, char **argv) {
 
 	/* When not using -f, -A is implicit */
 	if (filename == NULL)
-		showall = ISC_TRUE;
+		showall = true;
 
 	if (argc < isc_commandline_index + 1 && filename == NULL)
 		fatal("the key file name was not specified");

@@ -1,26 +1,393 @@
-bind9 (1:9.10.3.dfsg.P4-12.3+deb9u5) stretch-security; urgency=high
+bind9 (1:9.11.5.P4+dfsg-5.1) unstable; urgency=high
 
-  [ Marc Deslauriers (Ubuntu) ]
-  * CVE-2018-5743: limiting simultaneous TCP clients is ineffective.
-    Thanks to Marc Deslauriers of Ubuntu (Closes: #927932)
+  * Non-maintainer upload.
+  * move item_out test inside lock in dns_dispatch_getnext() (CVE-2019-6471)
+    (Closes: #930746)
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Fri, 21 Jun 2019 11:24:31 +0200
+
+bind9 (1:9.11.5.P4+dfsg-5) unstable; urgency=medium
+
+  * AppArmor: Allow /var/tmp/krb5_* (owner-only) for Samba AD DLZ.
+    Thanks to Steven Monai (Closes: 928398)
+
+ -- Bernhard Schmidt <berni@debian.org>  Fri, 03 May 2019 19:44:57 +0200
+
+bind9 (1:9.11.5.P4+dfsg-4) unstable; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * AppArmor: Also add /var/lib/samba/bind-dns/dns/** (Closes: #927827)
 
   [ Ondřej Surý ]
-  * Sync Maintainer and Uploaders with unstable
-  * [CVE-2019-6465]: Zone transfer for DLZs are executed though not
-    permitted by ACLs. (Closes: #922955)
-  * [CVE-2018-5745]: Avoid assertion and thus causing named to
-    deliberately exit when a trust anchor's key is replaced with a key
-    which uses an unsupported algorithm. (Closes: #922954)
+  * [CVE-2018-5743]: Limiting simultaneous TCP clients is ineffective
+    (Closes: #927932)
+  * Update symbols file for new symbol in libisc
+  * Enable EDDSA again, but disable broken Ed448 support (Closes: #927962)
 
- -- Bernhard Schmidt <berni@debian.org>  Fri, 03 May 2019 22:34:35 +0200
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 26 Apr 2019 08:33:13 +0000
 
-bind9 (1:9.10.3.dfsg.P4-12.3+deb9u4) stretch-security; urgency=high
+bind9 (1:9.11.5.P4+dfsg-3) unstable; urgency=medium
 
-  * Non-maintainer upload by the Security Team.
-  * Addresses could be referenced after being freed in resolver.c, causing an
-    assertion failure. (CVE-2017-3145)
+  * More fixes to the AppArmor policy for Samba AD DLZ
+    - allow access to /dev/urandom
+    - allow locking for dns.keytab
+    - fix path to smb.conf
 
- -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 15 Jan 2018 22:40:17 +0100
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 22 Apr 2019 22:31:06 +0200
+
+bind9 (1:9.11.5.P4+dfsg-2) unstable; urgency=medium
+
+  [ Ondřej Surý ]
+  * Update d/gbp.conf for Debian Buster
+
+  [ Bernhard Schmidt ]
+  * Cherry-Pick upstream commit to prevent dnssec-keymgr from immediately
+    expiring and deleting old DNSSEC keys when being run for the first
+    time (Closes: #923984)
+  * Update AppArmor policy for Samba AD DLZ
+    - Add changed default location for named.conf
+    - Allow read/mmap on some Samba libraries
+    Thanks to Steven Monai (Closes: #920530)
+
+  [ Andreas Beckmann ]
+  * bind9.preinst: cope with ancient conffile named.conf.options
+    (Closes: #905177)
+
+ -- Bernhard Schmidt <berni@debian.org>  Tue, 02 Apr 2019 21:12:50 +0200
+
+bind9 (1:9.11.5.P4+dfsg-1) unstable; urgency=high
+
+  [ Bernhard Schmidt ]
+  * New upstream version 9.11.5.P4+dfsg
+    - CVE-2018-5744: A specially crafted packet can cause named to leak memory
+    - CVE-2018-5745: An assertion failure can occur if a trust anchor rolls over
+      to an unsupported key algorithm when using managed-keys
+    - CVE-2019-6465: Controls for zone transfers might not be properly applied
+      to Dynamically Loadable Zones (DLZs) if the zones are writable.
+  * d/watch: Do not use beta or RC versions
+  * d/libdns1104.symbols: fix symbols-file-contains-debian-revision for dnstap
+    symbols
+
+  [ Ondřej Surý ]
+  * Add new upstream GPG signing-key
+
+ -- Bernhard Schmidt <berni@debian.org>  Fri, 22 Feb 2019 17:54:10 +0100
+
+bind9 (1:9.11.5.P1+dfsg-2) unstable; urgency=medium
+
+  [ Dominik George ]
+  * Support dyndb modules with apparmor. (Closes: #900879)
+
+  [ Bernhard Schmidt ]
+  * apparmor-policy: permit locking of the allow-new-zones database
+    (Closes: #922065)
+  * apparmor-policy: allow access to Samba DLZ files (Closes: #920530)
+
+ -- Bernhard Schmidt <berni@debian.org>  Tue, 12 Feb 2019 00:34:21 +0100
+
+bind9 (1:9.11.5.P1+dfsg-1) unstable; urgency=medium
+
+  * New upstream version 9.11.5.P1+dfsg
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 18 Dec 2018 13:59:25 +0000
+
+bind9 (1:9.11.5+dfsg-1) unstable; urgency=medium
+
+  * Use team+dns@tracker.debian.org as Maintainer address
+  * New upstream version 9.11.5+dfsg
+  * Add EXTENSIONS= to version file programmatically, not with the patch
+  * Rebase patches for BIND 9.11.5
+  * Adjust package names for new SONAMEs
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 22 Oct 2018 10:30:28 +0000
+
+bind9 (1:9.11.4.P2+dfsg-3) unstable; urgency=medium
+
+  * Also avoid OpenSSL 1.1.1 in udebs.
+    Thanks to KiBi for the hint
+  * autopkgtest: Make an external query and check for DNSSEC
+
+ -- Bernhard Schmidt <berni@debian.org>  Wed, 26 Sep 2018 11:21:35 +0200
+
+bind9 (1:9.11.4.P2+dfsg-2) unstable; urgency=medium
+
+  * Temporarily disable EDDSA to relax OpenSSL version requirement
+
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 24 Sep 2018 11:08:15 +0200
+
+bind9 (1:9.11.4.P2+dfsg-1) unstable; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * Add a very simple autopkgtest (dig @127.0.0.1)
+
+  [ Ondřej Surý ]
+  * New upstream version 9.11.4.P2+dfsg
+  * Rebase patches for BIND 9.11.4-P2
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 10 Sep 2018 08:36:06 +0000
+
+bind9 (1:9.11.4.P1+dfsg-1) unstable; urgency=medium
+
+  [ Timo Aaltonen ]
+  * skip-rtld-deepbind-for-dyndb.diff: Add a patch to fix named-pkcs11
+    crashing on startup. (LP: #1769440)
+
+  [ Bernhard Schmidt ]
+  * Add gbp.conf for pristine-tar usage
+  * d/watch: Properly deal with -P patch releases
+
+  [ Ondřej Surý ]
+  * Don't fail to start if /etc/default/bind9 doesn't exist
+  * New upstream version 9.11.4.P1+dfsg
+  * Rebase patches for BIND 9.11.4-P1
+  * Add new dst__openssleddsa_init optional symbol (it depends on OpenSSL version) (Closes: #897643)
+  * Put aside named.conf.option from stretch when upgrading (Closes: #905177)
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 31 Aug 2018 09:53:27 +0000
+
+bind9 (1:9.11.4+dfsg-4) unstable; urgency=medium
+
+  * Brown-paper-bag release :-(
+  * Fix missing colon in AppArmor profile (Closes: #904983)
+
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 30 Jul 2018 16:28:21 +0200
+
+bind9 (1:9.11.4+dfsg-3) unstable; urgency=medium
+
+  * Enable IDN support for dig+host using libidn2 (Closes: #459010)
+  * Use root.hints from dns-root-data (Closes: #888491)
+
+ -- Bernhard Schmidt <berni@debian.org>  Sun, 29 Jul 2018 23:26:09 +0200
+
+bind9 (1:9.11.4+dfsg-2) unstable; urgency=medium
+
+  * Enable dnstap support (Courtesy of Richard James Salts) (Closes: #890483)
+  * Remove auth-nxdomain no; from named.conf.options (Closes: #896889)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 16 Jul 2018 18:49:50 +0000
+
+bind9 (1:9.11.4+dfsg-1) unstable; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * Use systemd Type=forking to signal daemon init.
+    Thanks to Elie Roudninski (Closes: #900788)
+
+  [ Ondřej Surý ]
+  * New upstream version 9.11.4+dfsg
+  * Rebase patches for 9.11.4+dfsg release
+  * Bump libdns SONAME to libdns.so.1102
+  * Add a SONAME version check early in a build process
+  * Use debian/getapi to dynamically pick soversions for dh_makeshlibs
+  * Update the symbols in libdns and libisccfg packages
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 14 Jul 2018 12:27:56 +0000
+
+bind9 (1:9.11.3+dfsg-2) unstable; urgency=medium
+
+  * [CVE-2018-5738]: Add upstream fix to close the default open recursion
+    (Closes: #901483)
+  * Change the maintainer address (Closes: #899959)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 14 Jun 2018 13:01:47 +0000
+
+bind9 (1:9.11.3+dfsg-1) unstable; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * New upstream version 9.11.3+dfsg
+    (Closes: #867570, #888463)
+    - Refresh patches
+    - Drop stdatomic.h patches applied upstream
+  * Follow SONAME bump of libdns
+  * Follow SONAME bump of libisc
+  * Add missing symbols for libisccfg160
+  * Add python3-distutils Build-Dependency
+  * Drop Priority: standard for library packages
+  * Fix apparmor profile name (Closes: #893005)
+    Thanks to Andreas Hasenack
+  * Update bind9-host description (Closes: #729561)
+  * Add flags=(attach_disconnected) to AppArmor profile to prepare
+    to use more systemd hardening options, see #863841
+  * Add myself to Uploaders
+
+  [ Ondřej Surý ]
+  * Update Vcs-* links to salsa.d.o
+
+ -- Bernhard Schmidt <berni@debian.org>  Fri, 23 Mar 2018 00:09:58 +0100
+
+bind9 (1:9.11.2.P1-1) unstable; urgency=medium
+
+  * New upstream version 9.11.2-P1
+  * Refresh patches for new release
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 17 Jan 2018 06:06:04 +0000
+
+bind9 (1:9.11.2+dfsg-10) unstable; urgency=medium
+
+  * Disable lmdb usage in export version of libraries (Closes: #887407)
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 16 Jan 2018 05:59:31 +0000
+
+bind9 (1:9.11.2+dfsg-9) unstable; urgency=medium
+
+  * Fix various mistakes in bind9 conffiles (Closes: #887398)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 15 Jan 2018 23:12:43 +0000
+
+bind9 (1:9.11.2+dfsg-8) unstable; urgency=medium
+
+  * Pull more stdatomic patch to fix builds on 32-bit architectures
+  * Remove extra native pkcs11 patch (it has been replaced by sed rules)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 15 Jan 2018 21:02:30 +0000
+
+bind9 (1:9.11.2+dfsg-7) unstable; urgency=medium
+
+  * Pull upstream patch to use C11 stdatomic where available (Closes: #778720)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 15 Jan 2018 15:59:48 +0000
+
+bind9 (1:9.11.2+dfsg-6) unstable; urgency=medium
+
+  * Add named-nzd2nzf to bind9 package
+  * Simplify installation rules
+  * Enable lmdb (to actually build named-nzd2nzf)
+  * Move delv from bind9 to dnsutils package (Closes: #887326)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 15 Jan 2018 14:19:31 +0000
+
+bind9 (1:9.11.2+dfsg-5) unstable; urgency=medium
+
+  * Remove duplicate invoke-rc.d start invocation (Closes: #883575)
+  * Don't fail in postrm when /var/lib/bind cannot be removed (Closes: #882999)
+  * Use dh-apparmor for profile management
+  * apparmor-profile: allow changing thread name (Closes: #883228)
+  * Bump debhelper compat level to 10
+  * Bump Standards-Version to 4.1.2, no changes necessary
+
+ -- Bernhard Schmidt <berni@debian.org>  Sun, 10 Dec 2017 20:23:12 +0100
+
+bind9 (1:9.11.2+dfsg-4) unstable; urgency=medium
+
+  * Team upload.
+  * Fix symlinks in libbind-export-dev to point to /lib (Closes: #883536)
+
+ -- Bernhard Schmidt <berni@debian.org>  Tue, 05 Dec 2017 00:09:25 +0100
+
+bind9 (1:9.11.2+dfsg-3) unstable; urgency=medium
+
+  * Team upload.
+  * Only install files into bind9:any on arch-any builds (Closes: #883448)
+  * Adjust dependencies for udeb packages (Closes: #883449)
+
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 04 Dec 2017 10:56:58 +0100
+
+bind9 (1:9.11.2+dfsg-2) unstable; urgency=medium
+
+  * Team upload.
+  * Workaround for FTBFS on binary-any builds (Closes: #883159)
+
+ -- Bernhard Schmidt <berni@debian.org>  Sun, 03 Dec 2017 20:36:32 +0100
+
+bind9 (1:9.11.2+dfsg-1) unstable; urgency=low
+
+  * d/watch: Bump the BIND version to 9.11.x
+  * Remove 'order random_1' patch, it was a horrible deviation from standards
+  * Modernize d/rules using debhelper
+  * New upstream version 9.11.2+dfsg
+  * Delete dyndb patch, as dyndb is now included in upstream sources
+  * Rebase patches for new upstream release.
+  * Add python3-ply to Build-Depends
+  * Restore the native pkcs11 patch
+  * Fix the Debian version parsing
+  * Remove lwresd as it has been deprecated by upstream anyway
+  * Add new tools: mdig to dnsutils and dnssec-keymgr to bind9utils
+  * Update the SONAMEs of BIND libraries
+  * Fix python3 packaging errors
+  * Bump the standards version to 4.1.1.1 (no change)
+  * Add support for dh_missing
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 28 Nov 2017 22:59:30 +0000
+
+bind9 (1:9.10.6+dfsg-5) unstable; urgency=medium
+
+  [ Chris Lamb ]
+  * Make the build reproducible (Closes: #828012)
+
+  [ Micah Cowan ]
+  * Try not to be fragile to varying value of LIBS make var. (Closes: #833307)
+
+  [ Ondřej Surý ]
+  * Update the softhsm2.so non-MA path (Closes: #860722)
+  * Enable JSON output in the statistics channel (Closes: #860722)
+  * Merge NMUs' changelogs (Closes: #880077)
+  * Use /dev/urandom to avoid blocking in the server process. (Closes: #854243)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 02 Nov 2017 10:31:01 +0000
+
+bind9 (1:9.10.6+dfsg-4) unstable; urgency=medium
+
+  [ Michael Biebl ]
+  * Improve bind9-resolvconf.service (Closes: #826353)
+
+  [ Ondřej Surý ]
+  * Add insserv.conf.d configuration (Closes: #650538)
+  * Change bind9-resolvconf.server to Type=oneshot + RemainAfterExit=yes (Closes: #832040)
+  * Only add static and development symlinks for *-export.{a,so} libraries (Closes: #857522)
+  * Update Vcs-* fields to standard variants
+  * Rebuild with newer debhelper (Closes: #879542)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 23 Oct 2017 07:02:50 +0000
+
+bind9 (1:9.10.6+dfsg-3) unstable; urgency=medium
+
+  * Make lwresd hard depend on bind9 package (Closes: #879127)
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 22 Oct 2017 11:08:20 +0000
+
+bind9 (1:9.10.6+dfsg-2) unstable; urgency=medium
+
+  [ Timo Aaltonen ]
+  * d/copyright: Add Bv9ARM.pdf to Files-Excluded.
+
+  [ Ondřej Surý ]
+  * Replace lwresd with symlink instead of hard copy (Closes: #868538)
+  * Fix the symbols file to compensate for missing bsdcompat symbol on kFreeBSD (Closes: #879017)
+  * Re-enable threading support on kFreeBSD (Closes: #879018)
+  * Drop Multi-Arch: same header from libbind-dev (Closes: #874232)
+  * Remove transitional host package (Closes: #645437, #878228)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 19 Oct 2017 09:35:03 +0000
+
+bind9 (1:9.10.6+dfsg-1) unstable; urgency=medium
+
+  * New upstream version 9.10.6+dfsg
+  * Use OpenSSL 1.1.0 for crypto
+  * Add support for downloading upstream sources using d/watch
+    + Make d/copyright machine readable for Files-Excluded: support
+    + Update Files-Exclude: * to remove obsolete software dropped in
+      contrib/, but not really used
+  * Add initial README.source
+  * Limit the d/watch to 9.10.x (aka stable) for now
+  * Update patches for BIND 9.10.6 release
+  * Update PKCS11 patch
+  * Move under pkg-dns umbrella
+  * Reformat files in debian/ with wrap-and-sort -a for better maintainability
+  * Update the d/export.diff for BIND 9.10.6
+  * Remove FAQ from d/bind9.docs
+  * Bump SONAME versions for BIND libraries
+  * Add symbols files for libraries and enable strict symbol checks
+  * arpaname and named-rrchecker has been moved to /usr/bin
+  * Install required python library into bind9utils to accompany
+    dnssec-checkds and dnssec-coverage
+  * Change Vcs-* to pkg-dns/bind9
+  * Also exclude idnkit from upstream tarball
+  * Finish the debian/copyright update into machine readable format
+  * Enable Multi-Arch on libirs-export189
+  * Cleanup maintainer scripts
+  * Add lintian override for false positive on full-path command
+  * Remove unnecessary complexity when generating ${Description} to d/control
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 06 Oct 2017 06:18:21 +0000
 
 bind9 (1:9.10.3.dfsg.P4-12.3+deb9u3) stretch; urgency=medium
 

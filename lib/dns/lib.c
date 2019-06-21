@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: lib.c,v 1.19 2009/09/03 00:12:23 each Exp $ */
@@ -21,6 +15,7 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include <isc/hash.h>
@@ -76,7 +71,7 @@ dns_lib_initmsgcat(void) {
 static isc_once_t init_once = ISC_ONCE_INIT;
 static isc_mem_t *dns_g_mctx = NULL;
 static dns_dbimplementation_t *dbimp = NULL;
-static isc_boolean_t initialize_done = ISC_FALSE;
+static bool initialize_done = false;
 static isc_mutex_t reflock;
 static unsigned int references = 0;
 
@@ -84,7 +79,7 @@ static void
 initialize(void) {
 	isc_result_t result;
 
-	REQUIRE(initialize_done == ISC_FALSE);
+	REQUIRE(initialize_done == false);
 
 	result = isc_mem_create(0, 0, &dns_g_mctx);
 	if (result != ISC_R_SUCCESS)
@@ -105,7 +100,7 @@ initialize(void) {
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_dst;
 
-	initialize_done = ISC_TRUE;
+	initialize_done = true;
 	return;
 
   cleanup_dst:
@@ -145,18 +140,20 @@ dns_lib_init(void) {
 
 void
 dns_lib_shutdown(void) {
-	isc_boolean_t cleanup_ok = ISC_FALSE;
+	bool cleanup_ok = false;
 
 	LOCK(&reflock);
 	if (--references == 0)
-		cleanup_ok = ISC_TRUE;
+		cleanup_ok = true;
 	UNLOCK(&reflock);
 
 	if (!cleanup_ok)
 		return;
 
 	dst_lib_destroy();
-	isc_hash_destroy();
+
+	if (isc_hashctx != NULL)
+		isc_hash_destroy();
 	if (dbimp != NULL)
 		dns_ecdb_unregister(&dbimp);
 	if (dns_g_mctx != NULL)

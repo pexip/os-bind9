@@ -1,20 +1,14 @@
 /*
- * Portions Copyright (C) 2004, 2005, 2007, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Portions Copyright (C) 2001  Internet Software Consortium.
+ * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC AND NOMINUM DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY
- * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  *
- * Portions Copyright (C) 2001  Nominum, Inc.
+ * Portions Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,12 +23,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: alist.c,v 1.8 2007/08/28 07:20:43 tbox Exp $ */
 
 /*! \file */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -71,29 +65,29 @@ isccc_alist_create(void)
 	return (alist);
 }
 
-isc_boolean_t
+bool
 isccc_alist_alistp(isccc_sexpr_t *alist)
 {
 	isccc_sexpr_t *car;
 
 	if (alist == NULL || alist->type != ISCCC_SEXPRTYPE_DOTTEDPAIR)
-		return (ISC_FALSE);
+		return (false);
 	car = CAR(alist);
 	if (car == NULL || car->type != ISCCC_SEXPRTYPE_STRING)
-		return (ISC_FALSE);
+		return (false);
 	if (strcmp(car->value.as_string, ALIST_TAG) != 0)
-		return (ISC_FALSE);
-	return (ISC_TRUE);
+		return (false);
+	return (true);
 }
 
-isc_boolean_t
+bool
 isccc_alist_emptyp(isccc_sexpr_t *alist)
 {
 	REQUIRE(isccc_alist_alistp(alist));
 
 	if (CDR(alist) == NULL)
-		return (ISC_TRUE);
-	return (ISC_FALSE);
+		return (true);
+	return (false);
 }
 
 isccc_sexpr_t *

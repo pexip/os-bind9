@@ -20,10 +20,10 @@
  */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <stdint.h>
 
 #include "../modules/include/dlz_minimal.h"
 
@@ -60,7 +60,7 @@ struct dlz_example_data {
 	struct record adds[MAX_RECORDS];
 	struct record deletes[MAX_RECORDS];
 
-	isc_boolean_t transaction_started;
+	bool transaction_started;
 
 	/* Helper functions from the dlz_dlopen driver */
 	log_t *log;
@@ -69,17 +69,17 @@ struct dlz_example_data {
 	dns_dlz_writeablezone_t *writeable_zone;
 };
 
-static isc_boolean_t
+static bool
 single_valued(const char *type) {
 	const char *single[] = { "soa", "cname", NULL };
 	int i;
 
 	for (i = 0; single[i]; i++) {
 		if (strcasecmp(single[i], type) == 0) {
-			return (ISC_TRUE);
+			return (true);
 		}
 	}
-	return (ISC_FALSE);
+	return (false);
 }
 
 /*
@@ -90,7 +90,7 @@ add_name(struct dlz_example_data *state, struct record *list,
 	 const char *name, const char *type, dns_ttl_t ttl, const char *data)
 {
 	int i;
-	isc_boolean_t single = single_valued(type);
+	bool single = single_valued(type);
 	int first_empty = -1;
 
 	for (i = 0; i < MAX_RECORDS; i++) {
@@ -333,7 +333,7 @@ dlz_findzonedb(void *dbdata, const char *name,
 		fmt_address(src, addrbuf, sizeof(addrbuf));
 	}
 	state->log(ISC_LOG_INFO,
-		   "dlz_example: findzonedb connection from: %s\n", addrbuf);
+		   "dlz_example: findzonedb connection from: %s", addrbuf);
 
 	state->log(ISC_LOG_INFO,
 		   "dlz_example: dlz_findzonedb called with name '%s' "
@@ -384,7 +384,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 {
 	isc_result_t result;
 	struct dlz_example_data *state = (struct dlz_example_data *)dbdata;
-	isc_boolean_t found = ISC_FALSE;
+	bool found = false;
+	void *dbversion = NULL;
 	isc_sockaddr_t *src;
 	char full_name[256];
 	char buf[512];
@@ -401,6 +402,30 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	} else
 		snprintf(full_name, 255, "%s.%s", name, state->zone_name);
 
+	/*
+	 * If we need to know the database version (as set in
+	 * the 'newversion' dlz function) we can pick it up from the
+	 * clientinfo.
+	 *
+	 * This allows a lookup to query the correct version of the DNS
+	 * data, if the DLZ can differentiate between versions.
+	 *
+	 * For example, if a new database transaction is created by
+	 * 'newversion', the lookup should query within the same
+	 * transaction scope if it can.
+	 *
+	 * If the DLZ only operates on 'live' data, then version
+	 * wouldn't necessarily be needed.
+	 */
+	if (clientinfo != NULL &&
+	    clientinfo->version >= DNS_CLIENTINFO_VERSION) {
+		dbversion = clientinfo->dbversion;
+		if (dbversion != NULL && *(bool *)dbversion)
+			state->log(ISC_LOG_INFO,
+				   "dlz_example: lookup against live "
+				   "transaction\n");
+	}
+
 	if (strcmp(name, "source-addr") == 0) {
 		strcpy(buf, "unknown");
 		if (methods != NULL &&
@@ -414,9 +439,9 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		}
 
 		state->log(ISC_LOG_INFO,
-			   "dlz_example: lookup connection from: %s\n", buf);
+			   "dlz_example: lookup connection from: %s", buf);
 
-		found = ISC_TRUE;
+		found = true;
 		result = state->putrr(lookup, "TXT", 0, buf);
 		if (result != ISC_R_SUCCESS)
 			return (result);
@@ -426,7 +451,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		for (i = 0; i < 511; i++)
 			buf[i] = 'x';
 		buf[i] = '\0';
-		found = ISC_TRUE;
+		found = true;
 		result = state->putrr(lookup, "TXT", 0, buf);
 		if (result != ISC_R_SUCCESS)
 			return (result);
@@ -434,7 +459,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 
 	for (i = 0; i < MAX_RECORDS; i++) {
 		if (strcasecmp(state->current[i].name, full_name) == 0) {
-			found = ISC_TRUE;
+			found = true;
 			result = state->putrr(lookup, state->current[i].type,
 					      state->current[i].ttl,
 					      state->current[i].data);
@@ -506,7 +531,7 @@ dlz_newversion(const char *zone, void *dbdata, void **versionp) {
 		return (ISC_R_FAILURE);
 	}
 
-	state->transaction_started = ISC_TRUE;
+	state->transaction_started = true;
 	*versionp = (void *) &state->transaction_started;
 
 	return (ISC_R_SUCCESS);
@@ -516,7 +541,7 @@ dlz_newversion(const char *zone, void *dbdata, void **versionp) {
  * End a transaction
  */
 void
-dlz_closeversion(const char *zone, isc_boolean_t commit,
+dlz_closeversion(const char *zone, bool commit,
 		 void *dbdata, void **versionp)
 {
 	struct dlz_example_data *state = (struct dlz_example_data *)dbdata;
@@ -529,7 +554,7 @@ dlz_closeversion(const char *zone, isc_boolean_t commit,
 		return;
 	}
 
-	state->transaction_started = ISC_FALSE;
+	state->transaction_started = false;
 
 	*versionp = NULL;
 
@@ -601,7 +626,7 @@ dlz_configure(dns_view_t *view, dns_dlzdb_t *dlzdb, void *dbdata) {
 /*
  * Authorize a zone update
  */
-isc_boolean_t
+bool
 dlz_ssumatch(const char *signer, const char *name, const char *tcpaddr,
 	     const char *type, const char *key, uint32_t keydatalen,
 	     unsigned char *keydata, void *dbdata)
@@ -618,12 +643,12 @@ dlz_ssumatch(const char *signer, const char *name, const char *tcpaddr,
 		if (state->log != NULL)
 			state->log(ISC_LOG_INFO, "dlz_example: denying update "
 				   "of name=%s by %s", name, signer);
-		return (ISC_FALSE);
+		return (false);
 	}
 	if (state->log != NULL)
 		state->log(ISC_LOG_INFO, "dlz_example: allowing update of "
 			   "name=%s by %s", name, signer);
-	return (ISC_TRUE);
+	return (true);
 }
 
 

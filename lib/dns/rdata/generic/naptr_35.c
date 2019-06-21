@@ -1,23 +1,13 @@
 /*
- * Copyright (C) 2004, 2005, 2007-2009, 2011-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
-
-/* Reviewed: Thu Mar 16 16:52:50 PST 2000 by bwelling */
 
 /* RFC2915 */
 
@@ -37,8 +27,8 @@ txt_valid_regex(const unsigned char *txt) {
 	unsigned int nsub = 0;
 	char regex[256];
 	char *cp;
-	isc_boolean_t flags = ISC_FALSE;
-	isc_boolean_t replace = ISC_FALSE;
+	bool flags = false;
+	bool replace = false;
 	unsigned char c;
 	unsigned char delim;
 	unsigned int len;
@@ -67,10 +57,10 @@ txt_valid_regex(const unsigned char *txt) {
 		if (c == 0)
 			return (DNS_R_SYNTAX);
 		if (c == delim && !replace) {
-			replace = ISC_TRUE;
+			replace = true;
 			continue;
 		} else if (c == delim && !flags) {
-			flags = ISC_TRUE;
+			flags = true;
 			continue;
 		} else if (c == delim)
 			return (DNS_R_SYNTAX);
@@ -137,7 +127,7 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	 * Order.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
@@ -146,7 +136,7 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	 * Preference.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
@@ -155,14 +145,14 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	 * Flags.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_qstring,
-				      ISC_FALSE));
+				      false));
 	RETTOK(txt_fromtext(&token.value.as_textregion, target));
 
 	/*
 	 * Service.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_qstring,
-				      ISC_FALSE));
+				      false));
 	RETTOK(txt_fromtext(&token.value.as_textregion, target));
 
 	/*
@@ -170,7 +160,7 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	 */
 	regex = isc_buffer_used(target);
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_qstring,
-				      ISC_FALSE));
+				      false));
 	RETTOK(txt_fromtext(&token.value.as_textregion, target));
 	RETTOK(txt_valid_regex(regex));
 
@@ -178,10 +168,11 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	 * Replacement.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	origin = (origin != NULL) ? origin : dns_rootname;
+	if (origin == NULL)
+		origin = dns_rootname;
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 	return (ISC_R_SUCCESS);
 }
@@ -191,7 +182,7 @@ totext_naptr(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	isc_boolean_t sub;
+	bool sub;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -208,7 +199,7 @@ totext_naptr(ARGS_TOTEXT) {
 	 */
 	num = uint16_fromregion(&region);
 	isc_region_consume(&region, 2);
-	sprintf(buf, "%u", num);
+	snprintf(buf, sizeof(buf), "%u", num);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 
@@ -217,26 +208,26 @@ totext_naptr(ARGS_TOTEXT) {
 	 */
 	num = uint16_fromregion(&region);
 	isc_region_consume(&region, 2);
-	sprintf(buf, "%u", num);
+	snprintf(buf, sizeof(buf), "%u", num);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 
 	/*
 	 * Flags.
 	 */
-	RETERR(txt_totext(&region, ISC_TRUE, target));
+	RETERR(txt_totext(&region, true, target));
 	RETERR(str_totext(" ", target));
 
 	/*
 	 * Service.
 	 */
-	RETERR(txt_totext(&region, ISC_TRUE, target));
+	RETERR(txt_totext(&region, true, target));
 	RETERR(str_totext(" ", target));
 
 	/*
 	 * Regexp.
 	 */
-	RETERR(txt_totext(&region, ISC_TRUE, target));
+	RETERR(txt_totext(&region, true, target));
 	RETERR(str_totext(" ", target));
 
 	/*
@@ -638,7 +629,7 @@ digest_naptr(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_naptr(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_naptr);
@@ -648,10 +639,10 @@ checkowner_naptr(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_naptr(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
@@ -660,7 +651,7 @@ checknames_naptr(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

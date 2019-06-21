@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2010, 2012-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef DNS_MESSAGE_H
@@ -21,6 +15,9 @@
 /***
  ***	Imports
  ***/
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/magic.h>
@@ -36,7 +33,7 @@
  *
  * How this beast works:
  *
- * When a dns message is received in a buffer, dns_message_fromwire() is called
+ * When a dns message is received in a buffer, dns_message_parse() is called
  * on the memory region.  Various items are checked including the format
  * of the message (if counts are right, if counts consume the entire sections,
  * and if sections consume the entire message) and known pseudo-RRs in the
@@ -102,18 +99,22 @@
 #define DNS_MESSAGEEXTFLAG_DO		0x8000U
 
 /*%< EDNS0 extended OPT codes */
-#define DNS_OPT_NSID		0x0003		/*%< NSID opt code */
-#define DNS_OPT_CLIENT_SUBNET	0x0008		/*%< client subnet opt code */
-#define DNS_OPT_EXPIRE		0x0009		/*%< EXPIRE opt code */
-#define DNS_OPT_COOKIE		0x000a		/*%< COOKIE opt code */
+#define DNS_OPT_NSID		3		/*%< NSID opt code */
+#define DNS_OPT_CLIENT_SUBNET	8		/*%< client subnet opt code */
+#define DNS_OPT_EXPIRE		9		/*%< EXPIRE opt code */
+#define DNS_OPT_COOKIE		10		/*%< COOKIE opt code */
+#define DNS_OPT_PAD		12		/*%< PAD opt code */
+#define DNS_OPT_KEY_TAG		14		/*%< Key tag opt code */
+
+/*%< Experimental options [65001...65534] as per RFC6891 */
 
 /*%< The number of EDNS options we know about. */
-#define DNS_EDNSOPTIONS	4
+#define DNS_EDNSOPTIONS	5
 
 #define DNS_MESSAGE_REPLYPRESERVE	(DNS_MESSAGEFLAG_RD|DNS_MESSAGEFLAG_CD)
 #define DNS_MESSAGEEXTFLAG_REPLYPRESERVE (DNS_MESSAGEEXTFLAG_DO)
 
-#define DNS_MESSAGE_HEADERLEN		12 /*%< 6 isc_uint16_t's */
+#define DNS_MESSAGE_HEADERLEN		12 /*%< 6 uint16_t's */
 
 #define DNS_MESSAGE_MAGIC		ISC_MAGIC('M','S','G','@')
 #define DNS_MESSAGE_VALID(msg)		ISC_MAGIC_VALID(msg, DNS_MESSAGE_MAGIC)
@@ -142,7 +143,6 @@ typedef int dns_messagetextflag_t;
 #define DNS_MESSAGETEXTFLAG_NOHEADERS	0x0002
 #define DNS_MESSAGETEXTFLAG_ONESOA	0x0004
 #define DNS_MESSAGETEXTFLAG_OMITSOA	0x0008
-#define DNS_MESSAGETEXTFLAG_COMMENTDATA	0x0010
 
 /*
  * Dynamic update names for these sections.
@@ -215,8 +215,8 @@ struct dns_message {
 	unsigned int			verify_attempted : 1;
 	unsigned int			free_query : 1;
 	unsigned int			free_saved : 1;
-	unsigned int			sitok : 1;
-	unsigned int			sitbad : 1;
+	unsigned int			cc_ok : 1;
+	unsigned int			cc_bad : 1;
 	unsigned int			tkey : 1;
 	unsigned int			rdclass_set : 1;
 
@@ -261,8 +261,8 @@ struct dns_message {
 };
 
 struct dns_ednsopt {
-	isc_uint16_t			code;
-	isc_uint16_t			length;
+	uint16_t			code;
+	uint16_t			length;
 	unsigned char			*value;
 };
 
@@ -380,21 +380,20 @@ dns_message_totext(dns_message_t *msg, const dns_master_style_t *style,
 /*%<
  * Convert all sections of message 'msg' to a cleartext representation
  *
- * Notes:
- * \li     In flags, If #DNS_MESSAGETEXTFLAG_OMITDOT is set, then the
- *      final '.' in absolute names will not be emitted.  If
- *      #DNS_MESSAGETEXTFLAG_NOCOMMENTS is cleared, lines beginning
- *      with ";;" will be emitted indicating section name.  If
- *      #DNS_MESSAGETEXTFLAG_NOHEADERS is cleared, header lines will
- *      be emitted.
+ * Notes on flags:
+ *\li	If #DNS_MESSAGETEXTFLAG_NOCOMMENTS is cleared, lines beginning with
+ * 	";;" will be emitted indicating section name.
+ *\li	If #DNS_MESSAGETEXTFLAG_NOHEADERS is cleared, header lines will be
+ * 	emitted.
+ *\li   If #DNS_MESSAGETEXTFLAG_ONESOA is set then only print the first
+ *	SOA record in the answer section.
+ *\li	If *#DNS_MESSAGETEXTFLAG_OMITSOA is set don't print any SOA records
+ *	in the answer section.
  *
- *	If #DNS_MESSAGETEXTFLAG_ONESOA is set then only print the
- *	first SOA record in the answer section.  If
- *	#DNS_MESSAGETEXTFLAG_OMITSOA is set don't print any SOA records
- *	in the answer section.  These are useful for suppressing the
- *	display of the second SOA record in a AXFR by setting
- *	#DNS_MESSAGETEXTFLAG_ONESOA on the first message in a AXFR stream
- *	and #DNS_MESSAGETEXTFLAG_OMITSOA on subsequent messages.
+ * The SOA flags are useful for suppressing the display of the second
+ * SOA record in an AXFR by setting #DNS_MESSAGETEXTFLAG_ONESOA on the
+ * first message in an AXFR stream and #DNS_MESSAGETEXTFLAG_OMITSOA on
+ * subsequent messages.
  *
  * Requires:
  *
@@ -1001,7 +1000,7 @@ dns_message_peekheader(isc_buffer_t *source, dns_messageid_t *idp,
  */
 
 isc_result_t
-dns_message_reply(dns_message_t *msg, isc_boolean_t want_question_section);
+dns_message_reply(dns_message_t *msg, bool want_question_section);
 /*%<
  * Start formatting a reply to the query in 'msg'.
  *
@@ -1025,7 +1024,7 @@ dns_message_reply(dns_message_t *msg, isc_boolean_t want_question_section);
  *\li	#DNS_R_FORMERR		-- the header or question section of the
  *				   message is invalid, replying is impossible.
  *				   If DNS_R_FORMERR is returned when
- *				   want_question_section is ISC_FALSE, then
+ *				   want_question_section is false, then
  *				   it's the header section that's bad;
  *				   otherwise either of the header or question
  *				   sections may be bad.
@@ -1370,19 +1369,44 @@ dns_message_logpacket(dns_message_t *message, const char *description,
 		      isc_logcategory_t *category, isc_logmodule_t *module,
 		      int level, isc_mem_t *mctx);
 void
+dns_message_logpacket2(dns_message_t *message,
+		       const char *description, isc_sockaddr_t *address,
+		       isc_logcategory_t *category, isc_logmodule_t *module,
+		       int level, isc_mem_t *mctx);
+void
 dns_message_logfmtpacket(dns_message_t *message, const char *description,
 			 isc_logcategory_t *category, isc_logmodule_t *module,
 			 const dns_master_style_t *style, int level,
 			 isc_mem_t *mctx);
+void
+dns_message_logfmtpacket2(dns_message_t *message,
+			  const char *description, isc_sockaddr_t *address,
+			  isc_logcategory_t *category, isc_logmodule_t *module,
+			  const dns_master_style_t *style, int level,
+			  isc_mem_t *mctx);
 /*%<
  * Log 'message' at the specified logging parameters.
- * 'description' will be emitted at the start of the message and will
- * normally end with a newline.
+ *
+ * For dns_message_logpacket and dns_message_logfmtpacket expect the
+ * 'description' to end in a newline.
+ *
+ * For dns_message_logpacket2 and dns_message_logfmtpacket2
+ * 'description' will be emitted at the start of the message followed
+ * by the formatted address and a newline.
+ *
+ * Requires:
+ * \li   message be a valid.
+ * \li   description to be non NULL.
+ * \li   address to be non NULL.
+ * \li   category to be valid.
+ * \li   module to be valid.
+ * \li   style to be valid.
+ * \li   mctx to be a valid.
  */
 
 isc_result_t
 dns_message_buildopt(dns_message_t *msg, dns_rdataset_t **opt,
-		     unsigned int version, isc_uint16_t udpsize,
+		     unsigned int version, uint16_t udpsize,
 		     unsigned int flags, dns_ednsopt_t *ednsopts, size_t count);
 /*%<
  * Built a opt record.

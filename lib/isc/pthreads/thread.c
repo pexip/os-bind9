@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: thread.c,v 1.17 2007/06/19 23:47:18 tbox Exp $ */
 
 /*! \file */
 
@@ -37,7 +30,10 @@ isc_thread_create(isc_threadfunc_t func, isc_threadarg_t arg,
 		  isc_thread_t *thread)
 {
 	pthread_attr_t attr;
+#if defined(HAVE_PTHREAD_ATTR_GETSTACKSIZE) && \
+    defined(HAVE_PTHREAD_ATTR_SETSTACKSIZE)
 	size_t stacksize;
+#endif
 	int ret;
 
 	pthread_attr_init(&attr);
@@ -76,6 +72,22 @@ isc_thread_setconcurrency(unsigned int level) {
 	(void)pthread_setconcurrency(level);
 #else
 	UNUSED(level);
+#endif
+}
+
+void
+isc_thread_setname(isc_thread_t thread, const char *name) {
+#if defined(HAVE_PTHREAD_SETNAME_NP) && defined(_GNU_SOURCE)
+	/*
+	 * macOS has pthread_setname_np but only works on the
+	 * current thread so it's not used here
+	*/
+	(void)pthread_setname_np(thread, name);
+#elif defined(HAVE_PTHREAD_SET_NAME_NP)
+	(void)pthread_set_name_np(thread, name);
+#else
+	UNUSED(thread);
+	UNUSED(name);
 #endif
 }
 

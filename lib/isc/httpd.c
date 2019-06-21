@@ -1,24 +1,22 @@
 /*
- * Copyright (C) 2006-2008, 2010-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
+
+#include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
 
 #include <isc/buffer.h>
 #include <isc/httpd.h>
@@ -30,7 +28,9 @@
 #include <isc/time.h>
 #include <isc/util.h>
 
-#include <string.h>
+#ifdef HAVE_ZLIB
+#include <zlib.h>
+#endif
 
 /*%
  * TODO:
@@ -63,6 +63,7 @@
 #define HTTPD_CLOSE		0x0001 /* Got a Connection: close header */
 #define HTTPD_FOUNDHOST		0x0002 /* Got a Host: header */
 #define HTTPD_KEEPALIVE		0x0004 /* Got a Connection: Keep-Alive */
+#define HTTPD_ACCEPT_DEFLATE   0x0008
 
 /*% http client */
 struct isc_httpd {
@@ -75,7 +76,7 @@ struct isc_httpd {
 	 * Received data state.
 	 */
 	char			recvbuf[HTTP_RECVLEN]; /*%< receive buffer */
-	isc_uint32_t		recvlen;	/*%< length recv'd */
+	uint32_t		recvlen;	/*%< length recv'd */
 	char		       *headers;	/*%< set in process_request() */
 	unsigned int		method;
 	char		       *url;
@@ -97,23 +98,25 @@ struct isc_httpd {
 	 * to the client.
 	 *
 	 * The bufflist is the list of buffers we are currently transmitting.
-	 * The headerdata is where we render our headers to.  If we run out of
+	 * The headerbuffer is where we render our headers to.  If we run out of
 	 * space when rendering a header, we will change the size of our
 	 * buffer.  We will not free it until we are finished, and will
 	 * allocate an additional HTTP_SENDGROW bytes per header space grow.
 	 *
-	 * We currently use two buffers total, one for the headers (which
-	 * we manage) and another for the client to fill in (which it manages,
+	 * We currently use three buffers total, one for the headers (which
+	 * we manage), another for the client to fill in (which it manages,
 	 * it provides the space for it, etc) -- we will pass that buffer
 	 * structure back to the caller, who is responsible for managing the
 	 * space it may have allocated as backing store for it.  This second
 	 * buffer is bodybuffer, and we only allocate the buffer itself, not
 	 * the backing store.
+	 * The third buffer is compbuffer, managed by us, that contains the
+	 * compressed HTTP data, if compression is used.
+	 *
 	 */
 	isc_bufferlist_t	bufflist;
-	char		       *headerdata; /*%< send header buf */
-	unsigned int		headerlen;  /*%< current header buffer size */
 	isc_buffer_t		headerbuffer;
+	isc_buffer_t		compbuffer;
 
 	const char	       *mimetype;
 	unsigned int		retcode;
@@ -211,10 +214,13 @@ static void reset_client(isc_httpd_t *httpd);
 static isc_httpdaction_t render_404;
 static isc_httpdaction_t render_500;
 
+static void (*finishhook)(void) = NULL;
+
 static void
 destroy_client(isc_httpd_t **httpdp) {
 	isc_httpd_t *httpd = *httpdp;
 	isc_httpdmgr_t *httpdmgr = httpd->mgr;
+	isc_region_t r;
 
 	*httpdp = NULL;
 
@@ -223,13 +229,22 @@ destroy_client(isc_httpd_t **httpdp) {
 	isc_socket_detach(&httpd->sock);
 	ISC_LIST_UNLINK(httpdmgr->running, httpd, link);
 
-	if (httpd->headerlen > 0)
-		isc_mem_put(httpdmgr->mctx, httpd->headerdata,
-			    httpd->headerlen);
+	isc_buffer_region(&httpd->headerbuffer, &r);
+	if (r.length > 0) {
+		isc_mem_put(httpdmgr->mctx, r.base, r.length);
+	}
+
+	isc_buffer_region(&httpd->compbuffer, &r);
+	if (r.length > 0) {
+		isc_mem_put(httpdmgr->mctx, r.base, r.length);
+	}
 
 	isc_mem_put(httpdmgr->mctx, httpd, sizeof(isc_httpd_t));
 
 	UNLOCK(&httpdmgr->lock);
+
+	if (finishhook != NULL)
+		finishhook();
 
 	httpdmgr_destroy(httpdmgr);
 }
@@ -360,6 +375,73 @@ httpdmgr_destroy(isc_httpdmgr_t *httpdmgr) {
 #define LENGTHOK(s) (httpd->recvbuf - (s) < (int)httpd->recvlen)
 #define BUFLENOK(s) (httpd->recvbuf - (s) < HTTP_RECVLEN)
 
+/*
+ * Look for the given header in headers.
+ * If value is specified look for it terminated with a character in eov.
+ */
+static bool
+have_header(isc_httpd_t *httpd, const char *header, const char *value,
+	    const char *eov)
+{
+	char *cr, *nl, *h;
+	size_t hlen, vlen = 0;
+
+	h = httpd->headers;
+	hlen = strlen(header);
+	if (value != NULL) {
+		INSIST(eov != NULL);
+		vlen = strlen(value);
+	}
+
+	for (;;) {
+		if (strncasecmp(h, header, hlen) != 0) {
+			/*
+			 * Skip to next line;
+			 */
+			cr = strchr(h, '\r');
+			if (cr != NULL && cr[1] == '\n')
+				cr++;
+			nl = strchr(h, '\n');
+
+			/* last header? */
+			h = cr;
+			if (h == NULL || (nl != NULL && nl < h))
+				h = nl;
+			if (h == NULL)
+				return (false);
+			h++;
+			continue;
+		}
+
+		if (value == NULL)
+			return (true);
+
+		/*
+		 * Skip optional leading white space.
+		 */
+		h += hlen;
+		while (*h == ' ' || *h == '\t')
+			h++;
+		/*
+		 * Terminate token search on NULL or EOL.
+		 */
+		while (*h != 0 && *h != '\r' && *h != '\n') {
+			if (strncasecmp(h, value, vlen) == 0)
+				if (strchr(eov, h[vlen]) != NULL)
+					return (true);
+			/*
+			 * Skip to next token.
+			 */
+			h += strcspn(h, eov);
+			if (h[0] == '\r' && h[1] == '\n')
+				h++;
+			if (h[0] != 0)
+				h++;
+		}
+		return (false);
+	}
+}
+
 static isc_result_t
 process_request(isc_httpd_t *httpd, int length) {
 	char *s;
@@ -378,13 +460,18 @@ process_request(isc_httpd_t *httpd, int length) {
 	 * more data.
 	 */
 	s = strstr(httpd->recvbuf, "\r\n\r\n");
-	delim = 1;
+	delim = 2;
 	if (s == NULL) {
 		s = strstr(httpd->recvbuf, "\n\n");
-		delim = 2;
+		delim = 1;
 	}
 	if (s == NULL)
 		return (ISC_R_NOTFOUND);
+
+	/*
+	 * NUL terminate request at the blank line.
+	 */
+	s[delim] = 0;
 
 	/*
 	 * Determine if this is a POST or GET method.  Any other values will
@@ -444,7 +531,7 @@ process_request(isc_httpd_t *httpd, int length) {
 	}
 
 	httpd->url = p;
-	p = s + delim;
+	p = s + 1;
 	s = p;
 
 	/*
@@ -459,7 +546,7 @@ process_request(isc_httpd_t *httpd, int length) {
 
 	/*
 	 * Extract the HTTP/1.X protocol.  We will bounce on anything but
-	 * HTTP/1.1 for now.
+	 * HTTP/1.0 or HTTP/1.1 for now.
 	 */
 	while (LENGTHOK(s) && BUFLENOK(s) &&
 	       (*s != '\n' && *s != '\r' && *s != '\0'))
@@ -468,28 +555,42 @@ process_request(isc_httpd_t *httpd, int length) {
 		return (ISC_R_NOTFOUND);
 	if (!BUFLENOK(s))
 		return (ISC_R_NOMEMORY);
+	/*
+	 * Check that we have the expected eol delimiter.
+	 */
+	if (strncmp(s, delim == 1 ? "\n" : "\r\n", delim) != 0)
+		return (ISC_R_RANGE);
 	*s = 0;
 	if ((strncmp(p, "HTTP/1.0", 8) != 0)
 	    && (strncmp(p, "HTTP/1.1", 8) != 0))
 		return (ISC_R_RANGE);
 	httpd->protocol = p;
-	p = s + 1;
+	p = s + delim;	/* skip past eol */
 	s = p;
 
 	httpd->headers = s;
 
-	if (strstr(s, "Connection: close") != NULL)
+	if (have_header(httpd, "Connection:", "close", ", \t\r\n"))
 		httpd->flags |= HTTPD_CLOSE;
 
-	if (strstr(s, "Host: ") != NULL)
+	if (have_header(httpd, "Host:", NULL, NULL))
 		httpd->flags |= HTTPD_FOUNDHOST;
 
 	if (strncmp(httpd->protocol, "HTTP/1.0", 8) == 0) {
-		if (strcasestr(s, "Connection: Keep-Alive") != NULL)
+		if (have_header(httpd, "Connection:", "Keep-Alive",
+				", \t\r\n"))
 			httpd->flags |= HTTPD_KEEPALIVE;
 		else
 			httpd->flags |= HTTPD_CLOSE;
 	}
+
+	/*
+	 * Check for Accept-Encoding:
+	 */
+#ifdef HAVE_ZLIB
+	if (have_header(httpd, "Accept-Encoding:", "deflate", ";, \t\r\n"))
+		httpd->flags |= HTTPD_ACCEPT_DEFLATE;
+#endif
 
 	/*
 	 * Standards compliance hooks here.
@@ -511,6 +612,7 @@ isc_httpd_accept(isc_task_t *task, isc_event_t *ev) {
 	isc_region_t r;
 	isc_socket_newconnev_t *nev = (isc_socket_newconnev_t *)ev;
 	isc_sockaddr_t peeraddr;
+	char *headerdata;
 
 	ENTER("accept");
 
@@ -557,18 +659,17 @@ isc_httpd_accept(isc_task_t *task, isc_event_t *ev) {
 	/*
 	 * Initialize the buffer for our headers.
 	 */
-	httpd->headerdata = isc_mem_get(httpdmgr->mctx, HTTP_SENDGROW);
-	if (httpd->headerdata == NULL) {
+	headerdata = isc_mem_get(httpdmgr->mctx, HTTP_SENDGROW);
+	if (headerdata == NULL) {
 		isc_mem_put(httpdmgr->mctx, httpd, sizeof(isc_httpd_t));
 		isc_socket_detach(&nev->newsocket);
 		goto requeue;
 	}
-	httpd->headerlen = HTTP_SENDGROW;
-	isc_buffer_init(&httpd->headerbuffer, httpd->headerdata,
-			httpd->headerlen);
+	isc_buffer_init(&httpd->headerbuffer, headerdata, HTTP_SENDGROW);
 
 	ISC_LIST_INIT(httpd->bufflist);
 
+	isc_buffer_initnull(&httpd->compbuffer);
 	isc_buffer_initnull(&httpd->bodybuffer);
 	reset_client(httpd);
 
@@ -650,6 +751,93 @@ render_500(const char *url, isc_httpdurl_t *urlinfo,
 	return (ISC_R_SUCCESS);
 }
 
+#ifdef HAVE_ZLIB
+/*%<
+ * Reallocates compbuffer to size, does nothing if compbuffer is already
+ * larger than size.
+ *
+ * Requires:
+ *\li	httpd a valid isc_httpd_t object
+ *
+ * Returns:
+ *\li	#ISC_R_SUCCESS		-- all is well.
+ *\li	#ISC_R_NOMEMORY		-- not enough memory to extend buffer
+ */
+static isc_result_t
+alloc_compspace(isc_httpd_t *httpd, unsigned int size) {
+	char *newspace;
+	isc_region_t r;
+
+	isc_buffer_region(&httpd->compbuffer, &r);
+	if (size < r.length) {
+		return (ISC_R_SUCCESS);
+	}
+
+	newspace = isc_mem_get(httpd->mgr->mctx, size);
+	if (newspace == NULL)
+		return (ISC_R_NOMEMORY);
+	isc_buffer_reinit(&httpd->compbuffer, newspace, size);
+
+	if (r.base != NULL) {
+		isc_mem_put(httpd->mgr->mctx, r.base, r.length);
+	}
+
+	return (ISC_R_SUCCESS);
+}
+
+/*%<
+ * Tries to compress httpd->bodybuffer to httpd->compbuffer, extending it
+ * if necessary.
+ *
+ * Requires:
+ *\li	httpd a valid isc_httpd_t object
+ *
+ * Returns:
+ *\li	#ISC_R_SUCCESS	  -- all is well.
+ *\li	#ISC_R_NOMEMORY	  -- not enough memory to compress data
+ *\li	#ISC_R_FAILURE	  -- error during compression or compressed
+ *			     data would be larger than input data
+ */
+static isc_result_t
+isc_httpd_compress(isc_httpd_t *httpd) {
+	z_stream zstr;
+	isc_region_t r;
+	isc_result_t result;
+	int ret;
+	int inputlen;
+
+	inputlen = isc_buffer_usedlength(&httpd->bodybuffer);
+	result = alloc_compspace(httpd, inputlen);
+	if (result != ISC_R_SUCCESS) {
+		return result;
+	}
+	isc_buffer_region(&httpd->compbuffer, &r);
+
+	/*
+	 * We're setting output buffer size to input size so it fails if the
+	 * compressed data size would be bigger than the input size.
+	 */
+	memset(&zstr, 0, sizeof(zstr));
+	zstr.total_in = zstr.avail_in =
+			zstr.total_out = zstr.avail_out = inputlen;
+
+	zstr.next_in = isc_buffer_base(&httpd->bodybuffer);
+	zstr.next_out = r.base;
+
+	ret = deflateInit(&zstr, Z_DEFAULT_COMPRESSION);
+	if (ret == Z_OK) {
+		ret = deflate(&zstr, Z_FINISH);
+	}
+	deflateEnd(&zstr);
+	if (ret == Z_STREAM_END) {
+		isc_buffer_add(&httpd->compbuffer, inputlen - zstr.avail_out);
+		return (ISC_R_SUCCESS);
+	} else {
+		return (ISC_R_FAILURE);
+	}
+}
+#endif
+
 static void
 isc_httpd_recvdone(isc_task_t *task, isc_event_t *ev) {
 	isc_region_t r;
@@ -658,6 +846,7 @@ isc_httpd_recvdone(isc_task_t *task, isc_event_t *ev) {
 	isc_socketevent_t *sev = (isc_socketevent_t *)ev;
 	isc_httpdurl_t *url;
 	isc_time_t now;
+	bool is_compressed = false;
 	char datebuf[ISC_FORMATHTTPTIMESTAMP_SIZE];
 
 	ENTER("recv");
@@ -733,6 +922,15 @@ isc_httpd_recvdone(isc_task_t *task, isc_event_t *ev) {
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	}
 
+#ifdef HAVE_ZLIB
+	if (httpd->flags & HTTPD_ACCEPT_DEFLATE) {
+			result = isc_httpd_compress(httpd);
+			if (result == ISC_R_SUCCESS) {
+				is_compressed = true;
+			}
+	}
+#endif
+
 	isc_httpd_response(httpd);
 	if ((httpd->flags & HTTPD_KEEPALIVE) != 0)
 		isc_httpd_addheader(httpd, "Connection", "Keep-Alive");
@@ -753,8 +951,16 @@ isc_httpd_recvdone(isc_task_t *task, isc_event_t *ev) {
 	}
 
 	isc_httpd_addheader(httpd, "Server: libisc", NULL);
-	isc_httpd_addheaderuint(httpd, "Content-Length",
-				isc_buffer_usedlength(&httpd->bodybuffer));
+
+	if (is_compressed == true) {
+		isc_httpd_addheader(httpd, "Content-Encoding", "deflate");
+		isc_httpd_addheaderuint(httpd, "Content-Length",
+					isc_buffer_usedlength(&httpd->compbuffer));
+	} else {
+		isc_httpd_addheaderuint(httpd, "Content-Length",
+		isc_buffer_usedlength(&httpd->bodybuffer));
+	}
+
 	isc_httpd_endheaders(httpd);  /* done */
 
 	ISC_LIST_APPEND(httpd->bufflist, &httpd->headerbuffer, link);
@@ -763,8 +969,13 @@ isc_httpd_recvdone(isc_task_t *task, isc_event_t *ev) {
 	 * rendered into it.  If no data is present, we won't do anything
 	 * with the buffer.
 	 */
-	if (isc_buffer_length(&httpd->bodybuffer) > 0)
-		ISC_LIST_APPEND(httpd->bufflist, &httpd->bodybuffer, link);
+	if (is_compressed == true) {
+		ISC_LIST_APPEND(httpd->bufflist, &httpd->compbuffer, link);
+	} else {
+		if (isc_buffer_length(&httpd->bodybuffer) > 0) {
+				ISC_LIST_APPEND(httpd->bufflist, &httpd->bodybuffer, link);
+		}
+	}
 
 	/* check return code? */
 	(void)isc_socket_sendv(httpd->sock, &httpd->bufflist, task,
@@ -808,14 +1019,15 @@ grow_headerspace(isc_httpd_t *httpd) {
 	unsigned int newlen;
 	isc_region_t r;
 
-	newlen = httpd->headerlen + HTTP_SENDGROW;
+	isc_buffer_region(&httpd->headerbuffer, &r);
+	newlen = r.length + HTTP_SENDGROW;
 	if (newlen > HTTP_SEND_MAXLEN)
 		return (ISC_R_NOSPACE);
 
 	newspace = isc_mem_get(httpd->mgr->mctx, newlen);
 	if (newspace == NULL)
 		return (ISC_R_NOMEMORY);
-	isc_buffer_region(&httpd->headerbuffer, &r);
+
 	isc_buffer_reinit(&httpd->headerbuffer, newspace, newlen);
 
 	isc_mem_put(httpd->mgr->mctx, r.base, r.length);
@@ -838,8 +1050,10 @@ isc_httpd_response(isc_httpd_t *httpd) {
 			return (result);
 	}
 
-	sprintf(isc_buffer_used(&httpd->headerbuffer), "%s %03d %s\r\n",
-		httpd->protocol, httpd->retcode, httpd->retmsg);
+	snprintf(isc_buffer_used(&httpd->headerbuffer),
+		 (int)isc_buffer_availablelength(&httpd->headerbuffer),
+		 "%s %03u %s\r\n", httpd->protocol, httpd->retcode,
+		 httpd->retmsg);
 	isc_buffer_add(&httpd->headerbuffer, needlen);
 
 	return (ISC_R_SUCCESS);
@@ -864,11 +1078,13 @@ isc_httpd_addheader(isc_httpd_t *httpd, const char *name,
 	}
 
 	if (val != NULL)
-		sprintf(isc_buffer_used(&httpd->headerbuffer),
-			"%s: %s\r\n", name, val);
+		snprintf(isc_buffer_used(&httpd->headerbuffer),
+			 isc_buffer_availablelength(&httpd->headerbuffer),
+			 "%s: %s\r\n", name, val);
 	else
-		sprintf(isc_buffer_used(&httpd->headerbuffer),
-			"%s\r\n", name);
+		snprintf(isc_buffer_used(&httpd->headerbuffer),
+			 isc_buffer_availablelength(&httpd->headerbuffer),
+			 "%s\r\n", name);
 
 	isc_buffer_add(&httpd->headerbuffer, needlen);
 
@@ -885,7 +1101,8 @@ isc_httpd_endheaders(isc_httpd_t *httpd) {
 			return (result);
 	}
 
-	sprintf(isc_buffer_used(&httpd->headerbuffer), "\r\n");
+	snprintf(isc_buffer_used(&httpd->headerbuffer),
+		 isc_buffer_availablelength(&httpd->headerbuffer), "\r\n");
 	isc_buffer_add(&httpd->headerbuffer, 2);
 
 	return (ISC_R_SUCCESS);
@@ -897,7 +1114,7 @@ isc_httpd_addheaderuint(isc_httpd_t *httpd, const char *name, int val) {
 	unsigned int needlen;
 	char buf[sizeof "18446744073709551616"];
 
-	sprintf(buf, "%d", val);
+	snprintf(buf, sizeof(buf), "%d", val);
 
 	needlen = strlen(name); /* name itself */
 	needlen += 2 + strlen(buf); /* :<space> and val */
@@ -909,8 +1126,9 @@ isc_httpd_addheaderuint(isc_httpd_t *httpd, const char *name, int val) {
 			return (result);
 	}
 
-	sprintf(isc_buffer_used(&httpd->headerbuffer),
-		"%s: %s\r\n", name, buf);
+	snprintf(isc_buffer_used(&httpd->headerbuffer),
+		 isc_buffer_availablelength(&httpd->headerbuffer),
+		 "%s: %s\r\n", name, buf);
 
 	isc_buffer_add(&httpd->headerbuffer, needlen);
 
@@ -952,6 +1170,9 @@ isc_httpd_senddone(isc_task_t *task, isc_event_t *ev) {
 	if (ISC_LINK_LINKED(&httpd->bodybuffer, link)) {
 		ISC_LIST_UNLINK(sev->bufferlist, &httpd->bodybuffer, link);
 		NOTICE("senddone body buffer unlinked");
+	} else if (ISC_LINK_LINKED(&httpd->compbuffer, link)) {
+		ISC_LIST_UNLINK(sev->bufferlist, &httpd->compbuffer, link);
+		NOTICE("senddone compressed data unlinked and freed");
 	}
 
 	if (sev->result != ISC_R_SUCCESS) {
@@ -1001,6 +1222,7 @@ reset_client(isc_httpd_t *httpd) {
 	httpd->flags = 0;
 
 	isc_buffer_clear(&httpd->headerbuffer);
+	isc_buffer_clear(&httpd->compbuffer);
 	isc_buffer_invalidate(&httpd->bodybuffer);
 }
 
@@ -1008,12 +1230,12 @@ isc_result_t
 isc_httpdmgr_addurl(isc_httpdmgr_t *httpdmgr, const char *url,
 		    isc_httpdaction_t *func, void *arg)
 {
-	return (isc_httpdmgr_addurl2(httpdmgr, url, ISC_FALSE, func, arg));
+	return (isc_httpdmgr_addurl2(httpdmgr, url, false, func, arg));
 }
 
 isc_result_t
 isc_httpdmgr_addurl2(isc_httpdmgr_t *httpdmgr, const char *url,
-		     isc_boolean_t isstatic,
+		     bool isstatic,
 		     isc_httpdaction_t *func, void *arg)
 {
 	isc_httpdurl_t *item;
@@ -1042,4 +1264,10 @@ isc_httpdmgr_addurl2(isc_httpdmgr_t *httpdmgr, const char *url,
 	ISC_LIST_APPEND(httpdmgr->urls, item, link);
 
 	return (ISC_R_SUCCESS);
+}
+
+void
+isc_httpd_setfinishhook(void (*fn)(void))
+{
+	finishhook = fn;
 }

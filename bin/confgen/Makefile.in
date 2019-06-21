@@ -1,16 +1,11 @@
-# Copyright (C) 2009, 2012, 2014  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 # $Id: Makefile.in,v 1.8 2009/12/05 23:31:40 each Exp $
 
@@ -18,7 +13,11 @@ srcdir =	@srcdir@
 VPATH =		@srcdir@
 top_srcdir =	@top_srcdir@
 
-@BIND9_VERSION@
+# Attempt to disable parallel processing.
+.NOTPARALLEL:
+.NO_PARALLEL:
+
+VERSION=@BIND9_VERSION@
 
 @BIND9_MAKE_INCLUDES@
 
@@ -74,11 +73,11 @@ rndc-confgen.@O@: rndc-confgen.c
 ddns-confgen.@O@: ddns-confgen.c
 	${LIBTOOL_MODE_COMPILE} ${CC} ${ALL_CFLAGS} -c ${srcdir}/ddns-confgen.c
 
-rndc-confgen@EXEEXT@: rndc-confgen.@O@ util.@O@ keygen.@O@ ${UOBJS} ${CONFDEPLIBS} 
+rndc-confgen@EXEEXT@: rndc-confgen.@O@ util.@O@ keygen.@O@ ${CONFDEPLIBS}
 	export BASEOBJS="rndc-confgen.@O@ util.@O@ keygen.@O@ ${UOBJS}"; \
 	${FINALBUILDCMD}
 
-ddns-confgen@EXEEXT@: ddns-confgen.@O@ util.@O@ keygen.@O@ ${UOBJS} ${CONFDEPLIBS} 
+ddns-confgen@EXEEXT@: ddns-confgen.@O@ util.@O@ keygen.@O@ ${CONFDEPLIBS}
 	export BASEOBJS="ddns-confgen.@O@ util.@O@ keygen.@O@ ${UOBJS}"; \
 	${FINALBUILDCMD}
 
@@ -103,6 +102,14 @@ install:: rndc-confgen@EXEEXT@ ddns-confgen@EXEEXT@ installdirs
 	${INSTALL_DATA} ${srcdir}/ddns-confgen.8 ${DESTDIR}${mandir}/man8
 	(cd ${DESTDIR}${sbindir}; rm -f tsig-keygen@EXEEXT@; ${LINK_PROGRAM} ddns-confgen@EXEEXT@ tsig-keygen@EXEEXT@)
 	(cd ${DESTDIR}${mandir}/man8; rm -f tsig-keygen.8; ${LINK_PROGRAM} ddns-confgen.8 tsig-keygen.8)
+
+uninstall::
+	rm -f ${DESTDIR}${mandir}/man8/tsig-keygen.8
+	rm -f ${DESTDIR}${sbindir}/tsig-keygen@EXEEXT@
+	rm -f ${DESTDIR}${mandir}/man8/ddns-confgen.8
+	rm -f ${DESTDIR}${mandir}/man8/rndc-confgen.8
+	${LIBTOOL_MODE_UNINSTALL} rm -f ${DESTDIR}${sbindir}/ddns-confgen@EXEEXT@
+	${LIBTOOL_MODE_UNINSTALL} rm -f ${DESTDIR}${sbindir}/rndc-confgen@EXEEXT@
 
 clean distclean maintainer-clean::
 	rm -f ${TARGETS}

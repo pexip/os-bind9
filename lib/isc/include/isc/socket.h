@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 #ifndef ISC_SOCKET_H
 #define ISC_SOCKET_H 1
@@ -56,6 +48,9 @@
 /***
  *** Imports
  ***/
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/event.h>
 #include <isc/eventclass.h>
@@ -230,7 +225,7 @@ struct isc_socketevent {
 	isc_sockaddr_t		address;	/*%< source address */
 	isc_time_t		timestamp;	/*%< timestamp of packet recv */
 	struct in6_pktinfo	pktinfo;	/*%< ipv6 pktinfo */
-	isc_uint32_t		attributes;	/*%< see below */
+	uint32_t		attributes;	/*%< see below */
 	isc_eventdestructor_t   destroy;	/*%< original destructor */
 	unsigned int		dscp;		/*%< UDP dscp value */
 };
@@ -260,14 +255,16 @@ struct isc_socket_connev {
  * _PKTINFO:	The pktinfo member is valid.
  * _MULTICAST:	The UDP packet was received via a multicast transmission.
  * _DSCP:	The UDP DSCP value is valid.
+ * _USEMINMTU:	Set the per packet IPV6_USE_MIN_MTU flag.
  */
-#define ISC_SOCKEVENTATTR_ATTACHED		0x80000000U /* internal */
+#define ISC_SOCKEVENTATTR_ATTACHED		0x10000000U /* internal */
 #define ISC_SOCKEVENTATTR_TRUNC			0x00800000U /* public */
 #define ISC_SOCKEVENTATTR_CTRUNC		0x00400000U /* public */
 #define ISC_SOCKEVENTATTR_TIMESTAMP		0x00200000U /* public */
 #define ISC_SOCKEVENTATTR_PKTINFO		0x00100000U /* public */
 #define ISC_SOCKEVENTATTR_MULTICAST		0x00080000U /* public */
 #define ISC_SOCKEVENTATTR_DSCP			0x00040000U /* public */
+#define ISC_SOCKEVENTATTR_USEMINMTU		0x00020000U /* public */
 /*@}*/
 
 #define ISC_SOCKEVENT_ANYEVENT  (0)
@@ -368,7 +365,7 @@ typedef struct isc_socketmethods {
 	isc_result_t	(*getsockname)(isc_socket_t *sock,
 				       isc_sockaddr_t *addressp);
 	isc_sockettype_t (*gettype)(isc_socket_t *sock);
-	void		(*ipv6only)(isc_socket_t *sock, isc_boolean_t yes);
+	void		(*ipv6only)(isc_socket_t *sock, bool yes);
 	isc_result_t    (*fdwatchpoke)(isc_socket_t *sock, int flags);
 	isc_result_t		(*dup)(isc_socket_t *socket,
 				  isc_socket_t **socketp);
@@ -437,7 +434,8 @@ isc_socket_fdwatchcreate(isc_socketmgr_t *manager,
  *
  * Note:
  *
- *\li   'fd' is the already-opened file descriptor.
+ *\li   'fd' is the already-opened file descriptor (must be less
+ * 	than maxsockets).
  *\li	This function is not available on Windows.
  *\li	The callback function is called "in-line" - this means the function
  *	needs to return as fast as possible, as all other I/O will be suspended
@@ -461,6 +459,7 @@ isc_socket_fdwatchcreate(isc_socketmgr_t *manager,
  *\li	#ISC_R_NOMEMORY
  *\li	#ISC_R_NORESOURCES
  *\li	#ISC_R_UNEXPECTED
+ *\li	#ISC_R_RANGE
  */
 
 isc_result_t
@@ -1124,14 +1123,14 @@ isc_socket_gettype(isc_socket_t *sock);
  */
 
 /*@{*/
-isc_boolean_t
+bool
 isc__socket_isbound(isc_socket_t *sock);
 /*%
  * Intended for internal use in BIND9 only
  */
 
 void
-isc_socket_ipv6only(isc_socket_t *sock, isc_boolean_t yes);
+isc_socket_ipv6only(isc_socket_t *sock, bool yes);
 /*%<
  * If the socket is an IPv6 socket set/clear the IPV6_IPV6ONLY socket
  * option if the host OS supports this option.
@@ -1160,7 +1159,7 @@ isc_socket_socketevent(isc_mem_t *mctx, void *sender,
  */
 
 void
-isc_socket_cleanunix(isc_sockaddr_t *addr, isc_boolean_t active);
+isc_socket_cleanunix(isc_sockaddr_t *addr, bool active);
 
 /*%<
  * Cleanup UNIX domain sockets in the file-system.  If 'active' is true
@@ -1178,8 +1177,8 @@ isc_socket_cleanunix(isc_sockaddr_t *addr, isc_boolean_t active);
  */
 
 isc_result_t
-isc_socket_permunix(isc_sockaddr_t *sockaddr, isc_uint32_t perm,
-		    isc_uint32_t owner, isc_uint32_t group);
+isc_socket_permunix(isc_sockaddr_t *sockaddr, uint32_t perm,
+		    uint32_t owner, uint32_t group);
 /*%<
  * Set ownership and file permissions on the UNIX domain socket.
  *
@@ -1218,7 +1217,7 @@ int isc_socket_getfd(isc_socket_t *socket);
  */
 
 void
-isc__socketmgr_setreserved(isc_socketmgr_t *mgr, isc_uint32_t);
+isc__socketmgr_setreserved(isc_socketmgr_t *mgr, uint32_t);
 /*%<
  * Temporary.  For use by named only.
  */

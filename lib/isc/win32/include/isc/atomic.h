@@ -1,25 +1,20 @@
 /*
- * Copyright (C) 2013  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #ifndef ISC_ATOMIC_H
 #define ISC_ATOMIC_H 1
 
-#include <config.h>
+#include <inttypes.h>
+
 #include <isc/platform.h>
 #include <isc/types.h>
 
@@ -28,27 +23,37 @@
  * returns the previous value.
  */
 #ifdef ISC_PLATFORM_HAVEXADD
-static __inline isc_int32_t
-isc_atomic_xadd(isc_int32_t *p, isc_int32_t val) {
-	return (isc_int32_t) _InterlockedExchangeAdd((long *)p, (long)val);
+static __inline int32_t
+isc_atomic_xadd(int32_t *p, int32_t val) {
+	return (int32_t) _InterlockedExchangeAdd((long *)p, (long)val);
 }
 #endif
 
 #ifdef ISC_PLATFORM_HAVEXADDQ
-static __inline isc_int64_t
-isc_atomic_xaddq(isc_int64_t *p, isc_int64_t val) {
-	return (isc_int64_t) _InterlockedExchangeAdd64((__int64 *)p,
+static __inline int64_t
+isc_atomic_xaddq(int64_t *p, int64_t val) {
+	return (int64_t) _InterlockedExchangeAdd64((__int64 *)p,
 						       (__int64) val);
 }
 #endif
 
 /*
- * This routine atomically stores the value 'val' in 'p'.
+ * This routine atomically stores the value 'val' in 'p' (32-bit version).
  */
 #ifdef ISC_PLATFORM_HAVEATOMICSTORE
 static __inline void
-isc_atomic_store(isc_int32_t *p, isc_int32_t val) {
+isc_atomic_store(int32_t *p, int32_t val) {
 	(void) _InterlockedExchange((long *)p, (long)val);
+}
+#endif
+
+/*
+ * This routine atomically stores the value 'val' in 'p' (64-bit version).
+ */
+#ifdef ISC_PLATFORM_HAVEATOMICSTOREQ
+static __inline void
+isc_atomic_storeq(int64_t *p, int64_t val) {
+	(void) _InterlockedExchange64((__int64 *)p, (__int64)val);
 }
 #endif
 
@@ -58,10 +63,10 @@ isc_atomic_store(isc_int32_t *p, isc_int32_t val) {
  * case.
  */
 #ifdef ISC_PLATFORM_HAVECMPXCHG
-static __inline isc_int32_t
-isc_atomic_cmpxchg(isc_int32_t *p, isc_int32_t cmpval, isc_int32_t val) {
+static __inline int32_t
+isc_atomic_cmpxchg(int32_t *p, int32_t cmpval, int32_t val) {
 	/* beware: swap arguments */
-	return (isc_int32_t) _InterlockedCompareExchange((long *)p,
+	return (int32_t) _InterlockedCompareExchange((long *)p,
 							 (long)val,
 							 (long)cmpval);
 }

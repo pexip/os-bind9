@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2008, 2012-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #ifndef ISC_NET_H
 #define ISC_NET_H 1
@@ -47,7 +40,7 @@
  * It declares inet_aton(), inet_ntop(), and inet_pton().
  *
  * It ensures that #INADDR_LOOPBACK, #INADDR_ANY, #IN6ADDR_ANY_INIT,
- * in6addr_any, and in6addr_loopback are available.
+ * IN6ADDR_V4MAPPED_INIT, in6addr_any, and in6addr_loopback are available.
  *
  * It ensures that IN_MULTICAST() is available to check for multicast
  * addresses.
@@ -73,6 +66,8 @@
  *** Imports.
  ***/
 #include <isc/platform.h>
+
+#include <inttypes.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>		/* Contractual promise. */
@@ -121,6 +116,15 @@
 #define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 #else
 #define IN6ADDR_LOOPBACK_INIT { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } }
+#endif
+#endif
+
+#ifndef IN6ADDR_V4MAPPED_INIT
+#ifdef s6_addr
+/*% IPv6 v4mapped prefix init */
+#define IN6ADDR_V4MAPPED_INIT { { { 0,0,0,0,0,0,0,0,0,0,0xff,0xff,0,0,0,0 } } }
+#else
+#define IN6ADDR_V4MAPPED_INIT { { 0,0,0,0,0,0,0,0,0,0,0xff,0xff,0,0,0,0 } }
 #endif
 #endif
 
@@ -175,6 +179,11 @@
 #define PF_INET6 AF_INET6
 #endif
 
+#ifndef INADDR_ANY
+/*% inaddr any */
+#define INADDR_ANY 0x00000000UL
+#endif
+
 #ifndef INADDR_LOOPBACK
 /*% inaddr loopback */
 #define INADDR_LOOPBACK 0x7f000001UL
@@ -191,26 +200,26 @@ struct in6_pktinfo {
 
 #ifndef ISC_PLATFORM_HAVESOCKADDRSTORAGE
 #define _SS_MAXSIZE 128
-#define _SS_ALIGNSIZE  (sizeof (isc_uint64_t))
+#define _SS_ALIGNSIZE  (sizeof (uint64_t))
 #ifdef ISC_PLATFORM_HAVESALEN
-#define _SS_PAD1SIZE (_SS_ALIGNSIZE - (2 * sizeof(isc_uint8_t)))
+#define _SS_PAD1SIZE (_SS_ALIGNSIZE - (2 * sizeof(uint8_t)))
 #define _SS_PAD2SIZE (_SS_MAXSIZE - (_SS_ALIGNSIZE + _SS_PAD1SIZE \
-		       + 2 * sizeof(isc_uint8_t)))
+		       + 2 * sizeof(uint8_t)))
 #else
-#define _SS_PAD1SIZE (_SS_ALIGNSIZE - sizeof(isc_uint16_t))
+#define _SS_PAD1SIZE (_SS_ALIGNSIZE - sizeof(uint16_t))
 #define _SS_PAD2SIZE (_SS_MAXSIZE - (_SS_ALIGNSIZE + _SS_PAD1SIZE \
-			+ sizeof(isc_uint16_t)))
+			+ sizeof(uint16_t)))
 #endif
 
 struct sockaddr_storage {
 #ifdef ISC_PLATFORM_HAVESALEN
-       isc_uint8_t             ss_len;
-       isc_uint8_t             ss_family;
+       uint8_t             ss_len;
+       uint8_t             ss_family;
 #else
-       isc_uint16_t            ss_family;
+       uint16_t            ss_family;
 #endif
        char                    __ss_pad1[_SS_PAD1SIZE];
-       isc_uint64_t            __ss_align;  /* field to force desired structure */
+       uint64_t            __ss_align;  /* field to force desired structure */
        char                    __ss_pad2[_SS_PAD2SIZE];
 };
 #endif
@@ -253,7 +262,7 @@ extern const struct in6_addr isc_net_in6addrloop;
 /*%
  * Ensure type in_port_t is defined.
  */
-typedef isc_uint16_t in_port_t;
+typedef uint16_t in_port_t;
 #endif
 
 #ifndef MSG_TRUNC
@@ -266,15 +275,15 @@ typedef isc_uint16_t in_port_t;
 #endif
 
 /*% IP address. */
-#define ISC__IPADDR(x)	((isc_uint32_t)htonl((isc_uint32_t)(x)))
+#define ISC__IPADDR(x)	((uint32_t)htonl((uint32_t)(x)))
 
 /*% Is IP address multicast? */
 #define ISC_IPADDR_ISMULTICAST(i) \
-		(((isc_uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
+		(((uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
 		 == ISC__IPADDR(0xe0000000))
 
 #define ISC_IPADDR_ISEXPERIMENTAL(i) \
-		(((isc_uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
+		(((uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
 		 == ISC__IPADDR(0xf0000000))
 
 /***
@@ -387,6 +396,7 @@ isc_net_getudpportrange(int af, in_port_t *low, in_port_t *high);
 #ifdef ISC_PLATFORM_NEEDNTOP
 const char *
 isc_net_ntop(int af, const void *src, char *dst, size_t size);
+#undef inet_ntop
 #define inet_ntop isc_net_ntop
 #endif
 

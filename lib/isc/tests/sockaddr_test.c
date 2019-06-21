@@ -1,20 +1,13 @@
 /*
- * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 /*! \file */
 
@@ -22,8 +15,10 @@
 
 #include <atf-c.h>
 
+#include <stdbool.h>
 #include <unistd.h>
 
+#include <isc/netaddr.h>
 #include <isc/sockaddr.h>
 #include <isc/print.h>
 
@@ -47,24 +42,116 @@ ATF_TC_BODY(sockaddr_hash, tc) {
 
 	UNUSED(tc);
 
-	result = isc_test_begin(NULL, ISC_TRUE);
+	result = isc_test_begin(NULL, true, 0);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	in.s_addr = inet_addr("127.0.0.1");
 	isc_sockaddr_fromin(&addr, &in, 1);
-	h1 = isc_sockaddr_hash(&addr, ISC_TRUE);
-	h2 = isc_sockaddr_hash(&addr, ISC_FALSE);
+	h1 = isc_sockaddr_hash(&addr, true);
+	h2 = isc_sockaddr_hash(&addr, false);
 	ATF_CHECK(h1 != h2);
 
 	ret = inet_pton(AF_INET6, "::ffff:127.0.0.1", &in6);
 	ATF_CHECK(ret == 1);
 	isc_sockaddr_fromin6(&addr, &in6, 1);
-	h3 = isc_sockaddr_hash(&addr, ISC_TRUE);
-	h4 = isc_sockaddr_hash(&addr, ISC_FALSE);
+	h3 = isc_sockaddr_hash(&addr, true);
+	h4 = isc_sockaddr_hash(&addr, false);
 	ATF_CHECK(h1 == h3);
 	ATF_CHECK(h2 == h4);
 
 	isc_test_end();
+}
+
+ATF_TC(sockaddr_isnetzero);
+ATF_TC_HEAD(sockaddr_isnetzero, tc) {
+	atf_tc_set_md_var(tc, "descr", "sockaddr is net zero");
+}
+ATF_TC_BODY(sockaddr_isnetzero, tc) {
+	isc_sockaddr_t addr;
+	struct in_addr in;
+	struct in6_addr in6;
+	bool r;
+	int ret;
+	size_t i;
+	struct {
+		const char *string;
+		bool expect;
+	} data4[] = {
+		{ "0.0.0.0", true },
+		{ "0.0.0.1", true },
+		{ "0.0.1.0", true },
+		{ "0.1.0.0", true },
+		{ "1.0.0.0", false },
+		{ "0.0.0.127", true },
+		{ "0.0.0.255", true },
+		{ "127.0.0.1", false },
+		{ "255.255.255.255", false },
+	};
+	/*
+	 * Mapped addresses are currently not netzero.
+	 */
+	struct {
+		const char *string;
+		bool expect;
+	} data6[] = {
+		{ "::ffff:0.0.0.0", false },
+		{ "::ffff:0.0.0.1", false },
+		{ "::ffff:0.0.0.127", false },
+		{ "::ffff:0.0.0.255", false },
+		{ "::ffff:127.0.0.1", false },
+		{ "::ffff:255.255.255.255", false },
+	};
+
+	UNUSED(tc);
+
+	for (i = 0; i < sizeof(data4)/sizeof(data4[0]); i++) {
+		in.s_addr = inet_addr(data4[i].string);
+		isc_sockaddr_fromin(&addr, &in, 1);
+		r = isc_sockaddr_isnetzero(&addr);
+		ATF_CHECK_EQ_MSG(r, data4[i].expect, "%s", data4[i].string);
+	}
+
+	for (i = 0; i < sizeof(data6)/sizeof(data6[0]); i++) {
+		ret = inet_pton(AF_INET6, data6[i].string, &in6);
+		ATF_CHECK_EQ(ret, 1);
+		isc_sockaddr_fromin6(&addr, &in6, 1);
+		r = isc_sockaddr_isnetzero(&addr);
+		ATF_CHECK_EQ_MSG(r, data6[i].expect, "%s", data6[i].string);
+	}
+}
+
+ATF_TC(sockaddr_eqaddrprefix);
+ATF_TC_HEAD(sockaddr_eqaddrprefix, tc) {
+	atf_tc_set_md_var(tc, "descr",
+			  "isc_sockaddr_eqaddrprefix() returns true when "
+			  "prefixes of a and b are equal, and false when "
+			  "they are not equal");
+}
+ATF_TC_BODY(sockaddr_eqaddrprefix, tc) {
+	struct in_addr ina_a;
+	struct in_addr ina_b;
+	struct in_addr ina_c;
+	isc_sockaddr_t isa_a;
+	isc_sockaddr_t isa_b;
+	isc_sockaddr_t isa_c;
+
+	UNUSED(tc);
+
+	ATF_CHECK(inet_pton(AF_INET, "194.100.32.87", &ina_a) >= 0);
+	ATF_CHECK(inet_pton(AF_INET, "194.100.32.80", &ina_b) >= 0);
+	ATF_CHECK(inet_pton(AF_INET, "194.101.32.87", &ina_c) >= 0);
+
+	isc_sockaddr_fromin(&isa_a, &ina_a, 0);
+	isc_sockaddr_fromin(&isa_b, &ina_b, 42);
+	isc_sockaddr_fromin(&isa_c, &ina_c, 0);
+
+	ATF_CHECK(isc_sockaddr_eqaddrprefix(&isa_a, &isa_b, 0));
+	ATF_CHECK(isc_sockaddr_eqaddrprefix(&isa_a, &isa_b, 29));
+	ATF_CHECK(isc_sockaddr_eqaddrprefix(&isa_a, &isa_c, 8));
+
+	ATF_CHECK(! isc_sockaddr_eqaddrprefix(&isa_a, &isa_b, 30));
+	ATF_CHECK(! isc_sockaddr_eqaddrprefix(&isa_a, &isa_b, 32));
+	ATF_CHECK(! isc_sockaddr_eqaddrprefix(&isa_a, &isa_c, 16));
 }
 
 /*
@@ -72,7 +159,8 @@ ATF_TC_BODY(sockaddr_hash, tc) {
  */
 ATF_TP_ADD_TCS(tp) {
 	ATF_TP_ADD_TC(tp, sockaddr_hash);
+	ATF_TP_ADD_TC(tp, sockaddr_isnetzero);
+	ATF_TP_ADD_TC(tp, sockaddr_eqaddrprefix);
 
 	return (atf_no_error());
 }
-

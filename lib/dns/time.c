@@ -1,27 +1,21 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009-2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <isc/string.h>		/* Required for HP/UX (and others?) */
 #include <time.h>
 #include <ctype.h>
@@ -38,9 +32,9 @@
 static const int days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 isc_result_t
-dns_time64_totext(isc_int64_t t, isc_buffer_t *target) {
+dns_time64_totext(int64_t t, isc_buffer_t *target) {
 	struct tm tm;
-	char buf[sizeof("YYYYMMDDHHMMSS")];
+	char buf[sizeof("!!!!!!YYYY!!!!!!!!MM!!!!!!!!DD!!!!!!!!HH!!!!!!!!MM!!!!!!!!SS")];
 	int secs;
 	unsigned int l;
 	isc_region_t region;
@@ -103,11 +97,11 @@ dns_time64_totext(isc_int64_t t, isc_buffer_t *target) {
 	return (ISC_R_SUCCESS);
 }
 
-isc_int64_t
-dns_time64_from32(isc_uint32_t value) {
+int64_t
+dns_time64_from32(uint32_t value) {
 	isc_stdtime_t now;
-	isc_int64_t start;
-	isc_int64_t t;
+	int64_t start;
+	int64_t t;
 
 	/*
 	 * Adjust the time to the closest epoch.  This should be changed
@@ -116,7 +110,7 @@ dns_time64_from32(isc_uint32_t value) {
 	 * 2106.
 	 */
 	isc_stdtime_get(&now);
-	start = (isc_int64_t) now;
+	start = (int64_t) now;
 	if (isc_serial_gt(value, now))
 		t = start + (value - now);
 	else
@@ -126,14 +120,14 @@ dns_time64_from32(isc_uint32_t value) {
 }
 
 isc_result_t
-dns_time32_totext(isc_uint32_t value, isc_buffer_t *target) {
+dns_time32_totext(uint32_t value, isc_buffer_t *target) {
 	return (dns_time64_totext(dns_time64_from32(value), target));
 }
 
 isc_result_t
-dns_time64_fromtext(const char *source, isc_int64_t *target) {
+dns_time64_fromtext(const char *source, int64_t *target) {
 	int year, month, day, hour, minute, second;
-	isc_int64_t value;
+	int64_t value;
 	int secs;
 	int i;
 
@@ -199,13 +193,13 @@ dns_time64_fromtext(const char *source, isc_int64_t *target) {
 }
 
 isc_result_t
-dns_time32_fromtext(const char *source, isc_uint32_t *target) {
-	isc_int64_t value64;
+dns_time32_fromtext(const char *source, uint32_t *target) {
+	int64_t value64;
 	isc_result_t result;
 	result = dns_time64_fromtext(source, &value64);
 	if (result != ISC_R_SUCCESS)
 		return (result);
-	*target = (isc_uint32_t)value64;
+	*target = (uint32_t)value64;
 
 	return (ISC_R_SUCCESS);
 }

@@ -1,20 +1,13 @@
 #!/bin/sh
 #
-# Copyright (C) 2010, 2012, 2014  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
-
-# $Id: tests.sh,v 1.3 2010/06/08 23:50:24 tbox Exp $
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
@@ -24,13 +17,19 @@ DIGOPTS="+tcp +noadd +nosea +nostat +nocmd +dnssec -p 5300"
 status=0
 ret=0
 
-supported=`cat supported`
-case $supported in
-    rsaonly) algs="rsa" ;;
-    ecconly) algs="ecc" ;;
-    both) algs="rsa ecc" ;;
-esac
-
+algs=""
+have_rsa=`grep rsa supported`
+if [ "x$have_rsa" != "x" ]; then
+    algs="rsa "
+fi
+have_ecc=`grep ecc supported`
+if [ "x$have_ecc" != "x" ]; then
+    algs=$algs"ecc "
+fi
+have_ecx=`grep ecc supported`
+if [ "x$have_ecx" != "x" ]; then
+    algs=$algs"ecx "
+fi
 
 for alg in $algs; do
     zonefile=ns1/$alg.example.db 
@@ -45,7 +44,12 @@ for alg in $algs; do
 
     echo "I:testing inline signing with PKCS#11 keys ($alg)"
 
-    $NSUPDATE > /dev/null <<END || status=1
+    $DIG $DIGOPTS ns.$alg.example. @10.53.0.1 a > dig.out.$alg.0 || ret=1
+    if [ $ret != 0 ]; then echo "I:failed"; fi
+    status=`expr $status + $ret`
+    count0=`grep RRSIG dig.out.$alg.0 | wc -l`
+
+    $NSUPDATE -v > upd.log.$alg <<END || status=1
 server 10.53.0.1 5300
 ttl 300
 zone $alg.example.
@@ -56,11 +60,11 @@ END
     echo "I:waiting 20 seconds for key changes to take effect"
     sleep 20
 
-    $DIG $DIGOPTS ns.$alg.example. @10.53.0.1 a > dig.out || ret=1
+    $DIG $DIGOPTS ns.$alg.example. @10.53.0.1 a > dig.out.$alg || ret=1
     if [ $ret != 0 ]; then echo "I:failed"; fi
     status=`expr $status + $ret`
-    count=`grep RRSIG dig.out | wc -l`
-    if [ $count != 4 ]; then echo "I:failed"; status=1; fi
+    count=`grep RRSIG dig.out.$alg | wc -l`
+    if [ $count -le $count0 ]; then echo "I:failed"; status=1; fi
 
     echo "I:testing PKCS#11 key destroy ($alg)"
     ret=0
@@ -69,6 +73,7 @@ END
     case $alg in
         rsa) id=02 ;;
         ecc) id=04 ;;
+	ecx) id=06 ;;
     esac
     $PK11DEL -i $id -w0 > /dev/null 2>&1 || ret=1
     if [ $ret != 0 ]; then echo "I:failed"; fi
@@ -79,4 +84,4 @@ END
 done
 
 echo "I:exit status: $status"
-exit $status
+[ $status -eq 0 ] || exit 1

@@ -1,29 +1,25 @@
 /*
- * Copyright (C) 2004-2011, 2013-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2002, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: grammar.h,v 1.24 2011/01/04 23:47:14 tbox Exp $ */
 
 #ifndef ISCCFG_GRAMMAR_H
 #define ISCCFG_GRAMMAR_H 1
 
 /*! \file isccfg/grammar.h */
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <isc/lex.h>
 #include <isc/netaddr.h>
+#include <isc/refcount.h>
 #include <isc/sockaddr.h>
 #include <isc/region.h>
 #include <isc/types.h>
@@ -55,6 +51,28 @@
 #define CFG_CLAUSEFLAG_TESTONLY		0x00000040
 /*% A configuration option that was not configured at compile time. */
 #define CFG_CLAUSEFLAG_NOTCONFIGURED	0x00000080
+/*% A option for a experimental feature. */
+#define CFG_CLAUSEFLAG_EXPERIMENTAL	0x00000100
+/*% A configuration option that is ineffective due to
+ * compile time options, but is harmless. */
+#define CFG_CLAUSEFLAG_NOOP		0x00000200
+/*% Clause is obsolete in a future release */
+#define CFG_CLAUSEFLAG_DEPRECATED	0x00000400
+
+/*%
+ * Zone types for which a clause is valid:
+ * These share space with CFG_CLAUSEFLAG values, but count
+ * down from the top.
+ */
+#define CFG_ZONE_MASTER			0x80000000
+#define CFG_ZONE_SLAVE			0x40000000
+#define CFG_ZONE_STUB			0x20000000
+#define CFG_ZONE_HINT			0x10000000
+#define CFG_ZONE_FORWARD		0x08000000
+#define CFG_ZONE_STATICSTUB		0x04000000
+#define CFG_ZONE_REDIRECT		0x02000000
+#define CFG_ZONE_DELEGATION		0x01000000
+#define CFG_ZONE_INVIEW			0x00800000
 
 typedef struct cfg_clausedef cfg_clausedef_t;
 typedef struct cfg_tuplefielddef cfg_tuplefielddef_t;
@@ -150,10 +168,10 @@ struct cfg_rep {
 struct cfg_obj {
 	const cfg_type_t *type;
 	union {
-		isc_uint32_t  	uint32;
-		isc_uint64_t  	uint64;
+		uint32_t  	uint32;
+		uint64_t  	uint64;
 		isc_textregion_t string; /*%< null terminated, too */
-		isc_boolean_t 	boolean;
+		bool 	boolean;
 		cfg_map_t	map;
 		cfg_list_t	list;
 		cfg_obj_t **	tuple;
@@ -167,6 +185,7 @@ struct cfg_obj {
 	isc_refcount_t  references;     /*%< reference counter */
 	const char *	file;
 	unsigned int    line;
+	cfg_parser_t *	pctx;
 };
 
 
@@ -186,10 +205,10 @@ struct cfg_parser {
 	isc_token_t     token;
 
 	/*% We are at the end of all input. */
-	isc_boolean_t	seen_eof;
+	bool	seen_eof;
 
 	/*% The current token has been pushed back. */
-	isc_boolean_t	ungotten;
+	bool	ungotten;
 
 	/*%
 	 * The stack of currently active files, represented
@@ -210,6 +229,12 @@ struct cfg_parser {
 	 * parsing is complete.
 	 */
 	cfg_obj_t *	closed_files;
+
+	/*%
+	 * Name of a buffer being parsed; used only for
+	 * logging.
+	 */
+	char const *	buf_name;
 
 	/*%
 	 * Current line number.  We maintain our own
@@ -233,6 +258,7 @@ struct cfg_parser {
 
 /* Parser context flags */
 #define CFG_PCTX_SKIP		0x1
+#define CFG_PCTX_NODEPRECATED	0x2
 
 /*@{*/
 /*%
@@ -261,6 +287,7 @@ LIBISCCFG_EXTERNAL_DATA extern cfg_rep_t cfg_rep_sockaddr;
 LIBISCCFG_EXTERNAL_DATA extern cfg_rep_t cfg_rep_netprefix;
 LIBISCCFG_EXTERNAL_DATA extern cfg_rep_t cfg_rep_void;
 LIBISCCFG_EXTERNAL_DATA extern cfg_rep_t cfg_rep_fixedpoint;
+LIBISCCFG_EXTERNAL_DATA extern cfg_rep_t cfg_rep_percentage;
 /*@}*/
 
 /*@{*/
@@ -274,6 +301,7 @@ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_qstring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_astring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_ustring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sstring;
+LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_bracketed_text;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sockaddr;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sockaddrdscp;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_netaddr;
@@ -286,6 +314,7 @@ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_void;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_token;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_unsupported;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_fixedpoint;
+LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_percentage;
 /*@}*/
 
 isc_result_t
@@ -332,7 +361,7 @@ cfg_parse_rawaddr(cfg_parser_t *pctx, unsigned int flags, isc_netaddr_t *na);
 void
 cfg_print_rawaddr(cfg_printer_t *pctx, const isc_netaddr_t *na);
 
-isc_boolean_t
+bool
 cfg_lookingat_netaddr(cfg_parser_t *pctx, unsigned int flags);
 
 isc_result_t
@@ -449,10 +478,18 @@ void
 cfg_doc_void(cfg_printer_t *pctx, const cfg_type_t *type);
 
 isc_result_t
-cfg_parse_fixedpoint(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret);
+cfg_parse_fixedpoint(cfg_parser_t *pctx, const cfg_type_t *type,
+		     cfg_obj_t **ret);
 
 void
 cfg_print_fixedpoint(cfg_printer_t *pctx, const cfg_obj_t *obj);
+
+isc_result_t
+cfg_parse_percentage(cfg_parser_t *pctx, const cfg_type_t *type,
+		     cfg_obj_t **ret);
+
+void
+cfg_print_percentage(cfg_printer_t *pctx, const cfg_obj_t *obj);
 
 isc_result_t
 cfg_parse_obj(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret);
@@ -489,8 +526,36 @@ void
 cfg_parser_warning(cfg_parser_t *pctx, unsigned int flags,
 		   const char *fmt, ...) ISC_FORMAT_PRINTF(3, 4);
 
-isc_boolean_t
+bool
 cfg_is_enum(const char *s, const char *const *enums);
 /*%< Return true iff the string 's' is one of the strings in 'enums' */
+
+bool
+cfg_clause_validforzone(const char *name, unsigned int ztype);
+/*%<
+ * Check whether an option is legal for the specified zone type.
+ */
+
+void
+cfg_print_zonegrammar(const unsigned int zonetype,
+		      void (*f)(void *closure, const char *text, int textlen),
+		      void *closure);
+/*%<
+ * Print a summary of the grammar of the zone type represented by
+ * 'zonetype'.
+ */
+
+void
+cfg_print_clauseflags(cfg_printer_t *pctx, unsigned int flags);
+/*%<
+ * Print clause flags (e.g. "obsolete", "not implemented", etc) in
+ * human readable form
+ */
+
+void
+cfg_print_indent(cfg_printer_t *pctx);
+/*%<
+ * Print the necessary indent required by the current settings of 'pctx'.
+ */
 
 #endif /* ISCCFG_GRAMMAR_H */

@@ -1,27 +1,21 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2008, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: hex.c,v 1.20 2008/09/25 04:02:39 tbox Exp $ */
 
 /*! \file */
 
 #include <config.h>
 
 #include <ctype.h>
+#include <stdbool.h>
 
 #include <isc/buffer.h>
 #include <isc/hex.h>
@@ -95,7 +89,7 @@ hex_decode_init(hex_decode_ctx_t *ctx, int length, isc_buffer_t *target)
 
 static inline isc_result_t
 hex_decode_char(hex_decode_ctx_t *ctx, int c) {
-	char *s;
+	const char *s;
 
 	if ((s = strchr(hex, toupper(c))) == NULL)
 		return (ISC_R_BADHEX);
@@ -130,7 +124,7 @@ isc_hex_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length) {
 	hex_decode_ctx_t ctx;
 	isc_textregion_t *tr;
 	isc_token_t token;
-	isc_boolean_t eol;
+	bool eol;
 
 	hex_decode_init(&ctx, length, target);
 
@@ -138,9 +132,9 @@ isc_hex_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length) {
 		unsigned int i;
 
 		if (length > 0)
-			eol = ISC_FALSE;
+			eol = false;
 		else
-			eol = ISC_TRUE;
+			eol = true;
 		RETERR(isc_lex_getmastertoken(lexer, &token,
 					      isc_tokentype_string, eol));
 		if (token.type != isc_tokentype_string)

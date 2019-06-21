@@ -1,21 +1,17 @@
 /*
- * Copyright (C) 2004-2009, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: ifiter_ioctl.c,v 1.62 2009/01/18 23:48:14 tbox Exp $ */
+#include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/print.h>
 
@@ -70,11 +66,11 @@ struct isc_interfaceiter {
 	unsigned int		pos6;		/* Current offset in
 						   SIOCGLIFCONF data */
 	isc_result_t		result6;	/* Last result code. */
-	isc_boolean_t		first6;
+	bool		first6;
 #endif
 #ifdef HAVE_TRUCLUSTER
 	int			clua_context;	/* Cluster alias context */
-	isc_boolean_t		clua_done;
+	bool		clua_done;
 	struct sockaddr		clua_sa;
 #endif
 #ifdef	__linux
@@ -310,7 +306,7 @@ isc_interfaceiter_create(isc_mem_t *mctx, isc_interfaceiter_t **iterp) {
 	iter->pos6 = (unsigned int) -1;
 	iter->result6 = ISC_R_NOMORE;
 	iter->socket6 = -1;
-	iter->first6 = ISC_FALSE;
+	iter->first6 = false;
 #endif
 
 	/*
@@ -365,7 +361,7 @@ isc_interfaceiter_create(isc_mem_t *mctx, isc_interfaceiter_t **iterp) {
 	 */
 #ifdef HAVE_TRUCLUSTER
 	iter->clua_context = -1;
-	iter->clua_done = ISC_TRUE;
+	iter->clua_done = true;
 #endif
 #ifdef __linux
 	iter->proc = fopen("/proc/net/if_inet6", "r");
@@ -411,7 +407,8 @@ internal_current_clusteralias(isc_interfaceiter_t *iter) {
 	memset(&iter->current, 0, sizeof(iter->current));
 	iter->current.af = iter->clua_sa.sa_family;
 	memset(iter->current.name, 0, sizeof(iter->current.name));
-	sprintf(iter->current.name, "clua%d", ci.aliasid);
+	snprintf(iter->current.name, sizeof(iter->current.name),
+		 "clua%d", ci.aliasid);
 	iter->current.flags = INTERFACE_F_UP;
 	get_inaddr(&iter->current.address, &ci.addr);
 	get_inaddr(&iter->current.netmask, &ci.netmask);
@@ -563,7 +560,8 @@ internal_current4(isc_interfaceiter_t *iter) {
 			bits = 8 - prefixlen;
 			prefixlen = 0;
 		}
-		iter->current.netmask.type.in6.s6_addr[i] = (~0 << bits) & 0xff;
+		iter->current.netmask.type.in6.s6_addr[i] =
+			(~0U << bits) & 0xff;
 	}
 	return (ISC_R_SUCCESS);
 
@@ -757,7 +755,7 @@ internal_current6(isc_interfaceiter_t *iter) {
 			bits = lifreq.lifr_addrlen - i;
 			bits = (bits < 8) ? (8 - bits) : 0;
 			iter->current.netmask.type.in6.s6_addr[i / 8] =
-				(~0 << bits) & 0xff;
+				(~0U << bits) & 0xff;
 		}
 
 		return (ISC_R_SUCCESS);
@@ -876,7 +874,7 @@ internal_next(isc_interfaceiter_t *iter) {
 		if (iter->result6 != ISC_R_NOMORE)
 			return (iter->result6);
 		if (iter->first6) {
-			iter->first6 = ISC_FALSE;
+			iter->first6 = false;
 			return (ISC_R_SUCCESS);
 		}
 	}
@@ -886,7 +884,7 @@ internal_next(isc_interfaceiter_t *iter) {
 		clua_result = clua_getaliasaddress(&iter->clua_sa,
 						   &iter->clua_context);
 		if (clua_result != CLUA_SUCCESS)
-			iter->clua_done = ISC_TRUE;
+			iter->clua_done = true;
 		return (ISC_R_SUCCESS);
 	}
 #endif
@@ -919,13 +917,13 @@ void internal_first(isc_interfaceiter_t *iter) {
 	iter->pos6 = 0;
 	if (iter->result6 == ISC_R_NOMORE)
 		iter->result6 = ISC_R_SUCCESS;
-	iter->first6 = ISC_TRUE;
+	iter->first6 = true;
 #endif
 #ifdef HAVE_TRUCLUSTER
 	iter->clua_context = 0;
 	clua_result = clua_getaliasaddress(&iter->clua_sa,
 					   &iter->clua_context);
-	iter->clua_done = ISC_TF(clua_result != CLUA_SUCCESS);
+	iter->clua_done = (clua_result != CLUA_SUCCESS);
 #endif
 #ifdef __linux
 	linux_if_inet6_first(iter);

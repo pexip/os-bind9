@@ -1,18 +1,12 @@
 /*
- * Portions Copyright (C) 2005-2007, 2009-2012  Internet Systems Consortium, Inc. ("ISC")
- * Portions Copyright (C) 1999-2001  Internet Software Consortium.
+ * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -50,12 +44,14 @@
  * USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id$ */
 
 /*! \file dns/sdlz.h */
 
 #ifndef SDLZ_H
 #define SDLZ_H 1
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <dns/clientinfo.h>
 #include <dns/dlz.h>
@@ -216,14 +212,14 @@ typedef isc_result_t (*dns_sdlznewversion_t)(const char *zone,
  * closeversion function will be called to close the transaction.
  */
 
-typedef void (*dns_sdlzcloseversion_t)(const char *zone, isc_boolean_t commit,
+typedef void (*dns_sdlzcloseversion_t)(const char *zone, bool commit,
 				       void *driverarg, void *dbdata,
 				       void **versionp);
 /*%<
  * Method prototype.  Drivers implementing the SDLZ interface must
  * supply a closeversion method if they supply a newversion method.
  * When implemented, the driver should close the given transaction,
- * committing changes if 'commit' is ISC_TRUE. If 'commit' is not true
+ * committing changes if 'commit' is true. If 'commit' is not true
  * then all changes should be discarded and the database rolled back.
  * If the call is successful then *versionp should be set to NULL
  */
@@ -239,12 +235,12 @@ typedef isc_result_t (*dns_sdlzconfigure_t)(dns_view_t *view,
  */
 
 
-typedef isc_boolean_t (*dns_sdlzssumatch_t)(const char *signer,
+typedef bool (*dns_sdlzssumatch_t)(const char *signer,
 					    const char *name,
 					    const char *tcpaddr,
 					    const char *type,
 					    const char *key,
-					    isc_uint32_t keydatalen,
+					    uint32_t keydatalen,
 					    unsigned char *keydata,
 					    void *driverarg,
 					    void *dbdata);
@@ -253,7 +249,7 @@ typedef isc_boolean_t (*dns_sdlzssumatch_t)(const char *signer,
  * Method prototype.  Drivers implementing the SDLZ interface may
  * supply a ssumatch method. If supplied, then ssumatch will be
  * called to authorize any zone updates. The driver should return
- * ISC_TRUE to allow the update, and ISC_FALSE to deny it. For a DLZ
+ * true to allow the update, and false to deny it. For a DLZ
  * controlled zone, this is the only access control on updates.
  */
 
@@ -350,7 +346,7 @@ dns_sdlz_putrr_t dns_sdlz_putrr;
 typedef isc_result_t dns_sdlz_putsoa_t(dns_sdlzlookup_t *lookup,
 				       const char *mname,
 				       const char *rname,
-				       isc_uint32_t serial);
+				       uint32_t serial);
 dns_sdlz_putsoa_t dns_sdlz_putsoa;
 /*%<
  * This function may optionally be called from the 'authority'

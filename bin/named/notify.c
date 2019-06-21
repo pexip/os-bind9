@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: notify.c,v 1.37 2007/06/19 23:46:59 tbox Exp $ */
@@ -57,9 +51,9 @@ respond(ns_client_t *client, isc_result_t result) {
 	message = client->message;
 	rcode = dns_result_torcode(result);
 
-	msg_result = dns_message_reply(message, ISC_TRUE);
+	msg_result = dns_message_reply(message, true);
 	if (msg_result != ISC_R_SUCCESS)
-		msg_result = dns_message_reply(message, ISC_FALSE);
+		msg_result = dns_message_reply(message, false);
 	if (msg_result != ISC_R_SUCCESS) {
 		ns_client_next(client, msg_result);
 		return;
@@ -80,7 +74,7 @@ ns_notify_start(ns_client_t *client) {
 	dns_rdataset_t *zone_rdataset;
 	dns_zone_t *zone = NULL;
 	char namebuf[DNS_NAME_FORMATSIZE];
-	char tsigbuf[DNS_NAME_FORMATSIZE + sizeof(": TSIG ''")];
+	char tsigbuf[DNS_NAME_FORMATSIZE * 2 + sizeof(": TSIG '' ()")];
 	dns_tsigkey_t *tsigkey;
 
 	/*
@@ -90,7 +84,8 @@ ns_notify_start(ns_client_t *client) {
 	if (result != ISC_R_SUCCESS) {
 		notify_log(client, ISC_LOG_NOTICE,
 			   "notify question section empty");
-		goto formerr;
+		result = DNS_R_FORMERR;
+		goto done;
 	}
 
 	/*
@@ -102,7 +97,8 @@ ns_notify_start(ns_client_t *client) {
 	if (ISC_LIST_NEXT(zone_rdataset, link) != NULL) {
 		notify_log(client, ISC_LOG_NOTICE,
 			   "notify question section contains multiple RRs");
-		goto formerr;
+		result = DNS_R_FORMERR;
+		goto done;
 	}
 
 	/* The zone section must have exactly one name. */
@@ -110,14 +106,16 @@ ns_notify_start(ns_client_t *client) {
 	if (result != ISC_R_NOMORE) {
 		notify_log(client, ISC_LOG_NOTICE,
 			   "notify question section contains multiple RRs");
-		goto formerr;
+		result = DNS_R_FORMERR;
+		goto done;
 	}
 
 	/* The one rdataset must be an SOA. */
 	if (zone_rdataset->type != dns_rdatatype_soa) {
 		notify_log(client, ISC_LOG_NOTICE,
 			   "notify question section contains no SOA");
-		goto formerr;
+		result = DNS_R_FORMERR;
+		goto done;
 	}
 
 	tsigkey = dns_message_gettsigkey(request);
@@ -136,38 +134,33 @@ ns_notify_start(ns_client_t *client) {
 		}
 	} else
 		tsigbuf[0] = '\0';
+
 	dns_name_format(zonename, namebuf, sizeof(namebuf));
-	result = dns_zt_find(client->view->zonetable, zonename, 0, NULL,
-			     &zone);
-	if (result != ISC_R_SUCCESS)
-		goto notauth;
+	result = dns_zt_find(client->view->zonetable, zonename, 0, NULL, &zone);
+	if (result == ISC_R_SUCCESS) {
+		dns_zonetype_t zonetype = dns_zone_gettype(zone);
 
-	switch (dns_zone_gettype(zone)) {
-	case dns_zone_master:
-	case dns_zone_slave:
-	case dns_zone_stub:	/* Allow dialup passive to work. */
-		notify_log(client, ISC_LOG_INFO,
-			   "received notify for zone '%s'%s", namebuf, tsigbuf);
-		respond(client, dns_zone_notifyreceive(zone,
-			ns_client_getsockaddr(client), request));
-		break;
-	default:
-		goto notauth;
+		if ((zonetype == dns_zone_master) ||
+		    (zonetype == dns_zone_slave) ||
+		    (zonetype == dns_zone_stub))
+		{
+			isc_sockaddr_t *from = ns_client_getsockaddr(client);
+			isc_sockaddr_t *to = ns_client_getdestaddr(client);
+			notify_log(client, ISC_LOG_INFO,
+				   "received notify for zone '%s'%s",
+				   namebuf, tsigbuf);
+			result = dns_zone_notifyreceive2(zone, from, to,
+							 request);
+			goto done;
+		}
 	}
-	dns_zone_detach(&zone);
-	return;
 
- notauth:
 	notify_log(client, ISC_LOG_NOTICE,
 		   "received notify for zone '%s'%s: not authoritative",
 		   namebuf, tsigbuf);
 	result = DNS_R_NOTAUTH;
-	goto failure;
 
- formerr:
-	result = DNS_R_FORMERR;
-
- failure:
+ done:
 	if (zone != NULL)
 		dns_zone_detach(&zone);
 	respond(client, result);

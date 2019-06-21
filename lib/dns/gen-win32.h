@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2007, 2009, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -44,13 +38,6 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: gen-win32.h,v 1.25 2009/01/17 23:47:42 tbox Exp $ */
-
-/*! \file
- * \author Principal Authors: Computer Systems Research Group at UC Berkeley
- * \author Principal ISC caretaker: DCL
- */
-
 /*
  * \note This file was adapted from the NetBSD project's source tree, RCS ID:
  *    NetBSD: getopt.c,v 1.15 1999/09/20 04:39:37 lukem Exp
@@ -72,11 +59,11 @@
 #ifndef DNS_GEN_WIN32_H
 #define DNS_GEN_WIN32_H 1
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
 
-#include <isc/boolean.h>
 #include <isc/lang.h>
 
 int isc_commandline_index = 1;		/* Index into parent argv vector. */
@@ -85,8 +72,8 @@ int isc_commandline_option;		/* Character checked for validity. */
 char *isc_commandline_argument;		/* Argument associated with option. */
 char *isc_commandline_progname;		/* For printing error messages. */
 
-isc_boolean_t isc_commandline_errprint = ISC_TRUE; /* Print error messages. */
-isc_boolean_t isc_commandline_reset = ISC_TRUE; /* Reset processing. */
+bool isc_commandline_errprint = true; /* Print error messages. */
+bool isc_commandline_reset = true; /* Reset processing. */
 
 #define BADOPT	'?'
 #define BADARG	':'
@@ -108,7 +95,7 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 	 * the previous argv was finished.
 	 */
 	if (isc_commandline_reset || *place == '\0') {
-		isc_commandline_reset = ISC_FALSE;
+		isc_commandline_reset = false;
 
 		if (isc_commandline_progname == NULL)
 			isc_commandline_progname = argv[0];
@@ -217,11 +204,11 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 typedef struct {
 	HANDLE handle;
 	WIN32_FIND_DATA	find_data;
-	isc_boolean_t first_file;
+	bool first_file;
 	char *filename;
 } isc_dir_t;
 
-isc_boolean_t
+bool
 start_directory(const char *path, isc_dir_t *dir) {
 	char pattern[_MAX_PATH], *p;
 
@@ -229,7 +216,7 @@ start_directory(const char *path, isc_dir_t *dir) {
 	 * Need space for slash-splat and final NUL.
 	 */
 	if (strlen(path) + 3 > sizeof(pattern))
-		return (ISC_FALSE);
+		return (false);
 
 	strcpy(pattern, path);
 
@@ -242,23 +229,23 @@ start_directory(const char *path, isc_dir_t *dir) {
 	*p++ = '*';
 	*p++ = '\0';
 
-	dir->first_file = ISC_TRUE;
+	dir->first_file = true;
 
 	dir->handle = FindFirstFile(pattern, &dir->find_data);
 
 	if (dir->handle == INVALID_HANDLE_VALUE) {
 		dir->filename = NULL;
-		return (ISC_FALSE);
+		return (false);
 	} else {
 		dir->filename = dir->find_data.cFileName;
-		return (ISC_TRUE);
+		return (true);
 	}
 }
 
-isc_boolean_t
+bool
 next_file(isc_dir_t *dir) {
 	if (dir->first_file)
-		dir->first_file = ISC_FALSE;
+		dir->first_file = false;
 
 	else if (dir->handle != INVALID_HANDLE_VALUE) {
 		if (FindNextFile(dir->handle, &dir->find_data) == TRUE)
@@ -270,9 +257,9 @@ next_file(isc_dir_t *dir) {
 		dir->filename = NULL;
 
 	if (dir->filename != NULL)
-		return (ISC_TRUE);
+		return (true);
 	else
-		return (ISC_FALSE);
+		return (false);
 }
 
 void

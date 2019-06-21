@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef GENERIC_CAA_257_C
@@ -42,7 +37,7 @@ static inline isc_result_t
 fromtext_caa(ARGS_FROMTEXT) {
 	isc_token_t token;
 	isc_textregion_t tr;
-	isc_uint8_t flags;
+	uint8_t flags;
 	unsigned int i;
 
 	REQUIRE(type == dns_rdatatype_caa);
@@ -55,17 +50,17 @@ fromtext_caa(ARGS_FROMTEXT) {
 
 	/* Flags. */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 255U)
 		RETTOK(ISC_R_RANGE);
-	flags = token.value.as_ulong;
+	flags = (uint8_t)(token.value.as_ulong & 255U);
 	RETERR(uint8_tobuffer(flags, target));
 
 	/*
 	 * Tag
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	tr = token.value.as_textregion;
 	for (i = 0; i < tr.length; i++)
 		if (!alphanumeric[(unsigned char) tr.base[i]])
@@ -77,7 +72,7 @@ fromtext_caa(ARGS_FROMTEXT) {
 	 * Value
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token,
-				      isc_tokentype_qstring, ISC_FALSE));
+				      isc_tokentype_qstring, false));
 	if (token.type != isc_tokentype_qstring &&
 	    token.type != isc_tokentype_string)
 		RETERR(DNS_R_SYNTAX);
@@ -88,7 +83,7 @@ fromtext_caa(ARGS_FROMTEXT) {
 static inline isc_result_t
 totext_caa(ARGS_TOTEXT) {
 	isc_region_t region;
-	isc_uint8_t flags;
+	uint8_t flags;
 	char buf[256];
 
 	UNUSED(tctx);
@@ -103,13 +98,13 @@ totext_caa(ARGS_TOTEXT) {
 	 * Flags
 	 */
 	flags = uint8_consume_fromregion(&region);
-	sprintf(buf, "%u ", flags);
+	snprintf(buf, sizeof(buf), "%u ", flags);
 	RETERR(str_totext(buf, target));
 
 	/*
 	 * Tag
 	 */
-	RETERR(txt_totext(&region, ISC_FALSE, target));
+	RETERR(txt_totext(&region, false, target));
 	RETERR(str_totext(" ", target));
 
 	/*
@@ -335,7 +330,7 @@ digest_caa(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_caa(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_caa);
@@ -345,10 +340,10 @@ checkowner_caa(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_caa(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_caa);
@@ -359,7 +354,7 @@ checknames_caa(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

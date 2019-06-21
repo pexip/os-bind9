@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004, 2006, 2007, 2009, 2011, 2013-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: ntservice.c,v 1.16 2011/01/13 08:50:29 tbox Exp $ */
 
 #include <config.h>
 #include <stdio.h>
@@ -24,6 +16,7 @@
 #include <isc/commandline.h>
 #include <isc/log.h>
 #include <isc/print.h>
+#include <isc/string.h>
 
 #include <named/globals.h>
 #include <named/ntservice.h>
@@ -53,13 +46,11 @@ ntservice_init(void) {
 		if (!hServiceStatus) {
 			ns_main_earlyfatal(
 				"could not register service control handler");
-			UpdateSCM(SERVICE_STOPPED);
-			exit(1);
 		}
 		UpdateSCM(SERVICE_RUNNING);
 	} else {
-		strcpy(ConsoleTitle, "BIND Version ");
-		strcat(ConsoleTitle, VERSION);
+		strlcpy(ConsoleTitle, "BIND Version ", sizeof(ConsoleTitle));
+		strlcat(ConsoleTitle, VERSION, sizeof(ConsoleTitle));
 		SetConsoleTitle(ConsoleTitle);
 	}
 }
@@ -89,7 +80,7 @@ ServiceControl(DWORD dwCtrlCode) {
 
 	case SERVICE_CONTROL_SHUTDOWN:
 	case SERVICE_CONTROL_STOP:
-		ns_server_flushonshutdown(ns_g_server, ISC_TRUE);
+		ns_server_flushonshutdown(ns_g_server, true);
 		isc_app_shutdown();
 		UpdateSCM(SERVICE_STOPPED);
 		break;
@@ -140,7 +131,7 @@ int main(int argc, char *argv[])
 	int rc, ch;
 
 	/* Command line users should put -f in the options. */
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 	while ((ch = isc_commandline_parse(argc, argv, NS_MAIN_ARGS)) != -1) {
 		switch (ch) {
 		case 'f':
@@ -153,7 +144,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
-	isc_commandline_reset = ISC_TRUE;
+	isc_commandline_reset = true;
 
 	if (foreground) {
 		/* run in console window */

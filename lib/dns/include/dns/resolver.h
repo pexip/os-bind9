@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef DNS_RESOLVER_H
@@ -49,6 +43,9 @@
  *\li	RFCs:	1034, 1035, 2181, TBS
  *\li	Drafts:	TBS
  */
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/socket.h>
@@ -94,17 +91,23 @@ typedef enum {
 /*
  * Options that modify how a 'fetch' is done.
  */
-#define DNS_FETCHOPT_TCP		0x001	     /*%< Use TCP. */
-#define DNS_FETCHOPT_UNSHARED		0x002	     /*%< See below. */
-#define DNS_FETCHOPT_RECURSIVE		0x004	     /*%< Set RD? */
-#define DNS_FETCHOPT_NOEDNS0		0x008	     /*%< Do not use EDNS. */
-#define DNS_FETCHOPT_FORWARDONLY	0x010	     /*%< Only use forwarders. */
-#define DNS_FETCHOPT_NOVALIDATE		0x020	     /*%< Disable validation. */
-#define DNS_FETCHOPT_EDNS512		0x040	     /*%< Advertise a 512 byte
+#define DNS_FETCHOPT_TCP		0x0001	     /*%< Use TCP. */
+#define DNS_FETCHOPT_UNSHARED		0x0002	     /*%< See below. */
+#define DNS_FETCHOPT_RECURSIVE		0x0004	     /*%< Set RD? */
+#define DNS_FETCHOPT_NOEDNS0		0x0008	     /*%< Do not use EDNS. */
+#define DNS_FETCHOPT_FORWARDONLY	0x0010	     /*%< Only use forwarders. */
+#define DNS_FETCHOPT_NOVALIDATE		0x0020	     /*%< Disable validation. */
+#define DNS_FETCHOPT_EDNS512		0x0040	     /*%< Advertise a 512 byte
 							  UDP buffer. */
-#define DNS_FETCHOPT_WANTNSID		0x080	     /*%< Request NSID */
-#define DNS_FETCHOPT_PREFETCH		0x100	     /*%< Do prefetch */
-#define DNS_FETCHOPT_NOCDFLAG		0x200	     /*%< Don't set CD flag. */
+#define DNS_FETCHOPT_WANTNSID		0x0080	     /*%< Request NSID */
+#define DNS_FETCHOPT_PREFETCH		0x0100	     /*%< Do prefetch */
+#define DNS_FETCHOPT_NOCDFLAG		0x0200	     /*%< Don't set CD flag. */
+#define DNS_FETCHOPT_NONTA		0x0400	     /*%< Ignore NTA table. */
+/* RESERVED ECS				0x0000 */
+/* RESERVED ECS				0x1000 */
+/* RESERVED ECS				0x2000 */
+/* RESERVED TCPCLIENT			0x4000 */
+#define DNS_FETCHOPT_NOCACHED		0x8000	     /*%< Force cache update. */
 
 /* Reserved in use by adb.c		0x00400000 */
 #define	DNS_FETCHOPT_EDNSVERSIONSET	0x00800000
@@ -278,7 +281,7 @@ dns_resolver_createfetch2(dns_resolver_t *res, dns_name_t *name,
 			  dns_rdatatype_t type,
 			  dns_name_t *domain, dns_rdataset_t *nameservers,
 			  dns_forwarders_t *forwarders,
-			  isc_sockaddr_t *client, isc_uint16_t id,
+			  isc_sockaddr_t *client, uint16_t id,
 			  unsigned int options, isc_task_t *task,
 			  isc_taskaction_t action, void *arg,
 			  dns_rdataset_t *rdataset,
@@ -289,7 +292,7 @@ dns_resolver_createfetch3(dns_resolver_t *res, dns_name_t *name,
 			  dns_rdatatype_t type,
 			  dns_name_t *domain, dns_rdataset_t *nameservers,
 			  dns_forwarders_t *forwarders,
-			  isc_sockaddr_t *client, isc_uint16_t id,
+			  isc_sockaddr_t *client, uint16_t id,
 			  unsigned int options, unsigned int depth,
 			  isc_counter_t *qc, isc_task_t *task,
 			  isc_taskaction_t action, void *arg,
@@ -391,7 +394,7 @@ dns_resolver_destroyfetch(dns_fetch_t **fetchp);
 void
 dns_resolver_logfetch(dns_fetch_t *fetch, isc_log_t *lctx,
 		      isc_logcategory_t *category, isc_logmodule_t *module,
-		      int level, isc_boolean_t duplicateok);
+		      int level, bool duplicateok);
 /*%<
  * Dump a log message on internal state at the completion of given 'fetch'.
  * 'lctx', 'category', 'module', and 'level' are used to write the log message.
@@ -420,7 +423,7 @@ dns_resolver_socketmgr(dns_resolver_t *resolver);
 isc_taskmgr_t *
 dns_resolver_taskmgr(dns_resolver_t *resolver);
 
-isc_uint32_t
+uint32_t
 dns_resolver_getlamettl(dns_resolver_t *resolver);
 /*%<
  * Get the resolver's lame-ttl.  zero => no lame processing.
@@ -430,7 +433,7 @@ dns_resolver_getlamettl(dns_resolver_t *resolver);
  */
 
 void
-dns_resolver_setlamettl(dns_resolver_t *resolver, isc_uint32_t lame_ttl);
+dns_resolver_setlamettl(dns_resolver_t *resolver, uint32_t lame_ttl);
 /*%<
  * Set the resolver's lame-ttl.  zero => no lame processing.
  *
@@ -461,12 +464,12 @@ dns_resolver_addalternate(dns_resolver_t *resolver, isc_sockaddr_t *alt,
  */
 
 void
-dns_resolver_setudpsize(dns_resolver_t *resolver, isc_uint16_t udpsize);
+dns_resolver_setudpsize(dns_resolver_t *resolver, uint16_t udpsize);
 /*%<
  * Set the EDNS UDP buffer size advertised by the server.
  */
 
-isc_uint16_t
+uint16_t
 dns_resolver_getudpsize(dns_resolver_t *resolver);
 /*%<
  * Get the current EDNS UDP buffer size.
@@ -510,7 +513,7 @@ dns_resolver_disable_ds_digest(dns_resolver_t *resolver, dns_name_t *name,
  *\li	#ISC_R_NOMEMORY
  */
 
-isc_boolean_t
+bool
 dns_resolver_algorithm_supported(dns_resolver_t *resolver, dns_name_t *name,
 				 unsigned int alg);
 /*%<
@@ -520,7 +523,7 @@ dns_resolver_algorithm_supported(dns_resolver_t *resolver, dns_name_t *name,
  * crypto libraries if it was not specifically disabled.
  */
 
-isc_boolean_t
+bool
 dns_resolver_ds_digest_supported(dns_resolver_t *resolver, dns_name_t *name,
 				 unsigned int digest_type);
 /*%<
@@ -535,9 +538,9 @@ dns_resolver_resetmustbesecure(dns_resolver_t *resolver);
 
 isc_result_t
 dns_resolver_setmustbesecure(dns_resolver_t *resolver, dns_name_t *name,
-			     isc_boolean_t value);
+			     bool value);
 
-isc_boolean_t
+bool
 dns_resolver_getmustbesecure(dns_resolver_t *resolver, dns_name_t *name);
 
 
@@ -563,19 +566,19 @@ dns_resolver_gettimeout(dns_resolver_t *resolver);
 
 void
 dns_resolver_setclientsperquery(dns_resolver_t *resolver,
-				isc_uint32_t min, isc_uint32_t max);
+				uint32_t min, uint32_t max);
 void
-dns_resolver_setfetchesperzone(dns_resolver_t *resolver, isc_uint32_t clients);
+dns_resolver_setfetchesperzone(dns_resolver_t *resolver, uint32_t clients);
 
 void
-dns_resolver_getclientsperquery(dns_resolver_t *resolver, isc_uint32_t *cur,
-				isc_uint32_t *min, isc_uint32_t *max);
+dns_resolver_getclientsperquery(dns_resolver_t *resolver, uint32_t *cur,
+				uint32_t *min, uint32_t *max);
 
-isc_boolean_t
+bool
 dns_resolver_getzeronosoattl(dns_resolver_t *resolver);
 
 void
-dns_resolver_setzeronosoattl(dns_resolver_t *resolver, isc_boolean_t state);
+dns_resolver_setzeronosoattl(dns_resolver_t *resolver, bool state);
 
 unsigned int
 dns_resolver_getoptions(dns_resolver_t *resolver);
@@ -591,7 +594,7 @@ dns_resolver_addbadcache(dns_resolver_t *resolver, dns_name_t *name,
  * \li	name to be valid.
  */
 
-isc_boolean_t
+bool
 dns_resolver_getbadcache(dns_resolver_t *resolver, dns_name_t *name,
 			 dns_rdatatype_t type, isc_time_t *now);
 /*%<
@@ -697,6 +700,14 @@ dns_resolver_getquotaresponse(dns_resolver_t *resolver, dns_quotatype_t which);
 void
 dns_resolver_dumpfetches(dns_resolver_t *resolver,
 			 isc_statsformat_t format, FILE *fp);
+
+
+#ifdef ENABLE_AFL
+/*%
+ * Enable fuzzing of resolver, changes behaviour and eliminates retries
+ */
+void dns_resolver_setfuzzing(void);
+#endif
 
 ISC_LANG_ENDDECLS
 

@@ -73,6 +73,7 @@
 #define WANT_DH_PRIMES
 #define WANT_ECC_CURVES
 #include <pk11/constants.h>
+#include <pkcs11/eddsa.h>
 
 #if !(defined(HAVE_GETPASSPHRASE) || (defined (__SVR4) && defined (__sun)))
 #define getpassphrase(x)	getpass(x)
@@ -82,13 +83,14 @@
 static CK_BBOOL truevalue = TRUE;
 static CK_BBOOL falsevalue = FALSE;
 
-/* Key class: RSA, ECC, DSA, DH, or unknown */
+/* Key class: RSA, ECC, ECX, DSA, DH, or unknown */
 typedef enum {
 	key_unknown,
 	key_rsa,
 	key_dsa,
 	key_dh,
-	key_ecc
+	key_ecc,
+	key_ecx
 } key_class_t;
 
 /*
@@ -136,7 +138,7 @@ static CK_ATTRIBUTE rsa_template[] = {
 };
 
 /*
- * Public key template for ECC keys
+ * Public key template for ECC/ECX keys
  */
 #define ECC_LABEL 0
 #define ECC_VERIFY 1
@@ -247,6 +249,9 @@ keyclass_fromtext(const char *name) {
 	else if (strncasecmp(name, "ecc", 3) == 0 ||
 		 strncasecmp(name, "ecdsa", 5) == 0)
 		return (key_ecc);
+	else if (strncasecmp(name, "ecx", 3) == 0 ||
+		 strncasecmp(name, "ed", 2) == 0)
+		return (key_ecx);
 	else
 		return (key_unknown);
 }
@@ -426,6 +431,39 @@ main(int argc, char *argv[]) {
 		}
 
 		break;
+	case key_ecx:
+#ifndef CKM_EDDSA_KEY_PAIR_GEN
+		fprintf(stderr, "CKM_EDDSA_KEY_PAIR_GEN is not defined\n");
+		usage();
+#endif
+		op_type = OP_EC;
+		if (bits == 0)
+			bits = 256;
+		else if (bits != 256 && bits != 456) {
+			fprintf(stderr, "ECX keys only support bit sizes of "
+					"256 and 456\n");
+			exit(2);
+		}
+
+		mech.mechanism = CKM_EDDSA_KEY_PAIR_GEN;
+		mech.pParameter = NULL;
+		mech.ulParameterLen = 0;
+
+		public_template = ecc_template;
+		public_attrcnt = ECC_ATTRS;
+		id_offset = ECC_ID;
+
+		if (bits == 256) {
+			public_template[4].pValue = pk11_ecc_ed25519;
+			public_template[4].ulValueLen =
+				sizeof(pk11_ecc_ed25519);
+		} else {
+			public_template[4].pValue = pk11_ecc_ed448;
+			public_template[4].ulValueLen =
+				sizeof(pk11_ecc_ed448);
+		}
+
+		break;
 	case key_dsa:
 		op_type = OP_DSA;
 		if (bits == 0)
@@ -527,8 +565,8 @@ main(int argc, char *argv[]) {
 	if (pin == NULL)
 		pin = getpassphrase("Enter Pin: ");
 
-	result = pk11_get_session(&pctx, op_type, ISC_FALSE, ISC_TRUE,
-				  ISC_TRUE, (const char *) pin, slot);
+	result = pk11_get_session(&pctx, op_type, false, true,
+				  true, (const char *) pin, slot);
 	if (result == PK11_R_NORANDOMSERVICE ||
 	    result == PK11_R_NODIGESTSERVICE ||
 	    result == PK11_R_NOAESSERVICE) {
@@ -570,7 +608,7 @@ main(int argc, char *argv[]) {
 		private_template[5].pValue = &truevalue;
 	}
 
-	if (keyclass == key_rsa || keyclass == key_ecc)
+	if (keyclass == key_rsa || keyclass == key_ecc || keyclass == key_ecx)
 		goto generate_keys;
 
 	/*
@@ -619,8 +657,18 @@ main(int argc, char *argv[]) {
 	}
 
 	/* Allocate space for parameter attributes */
-	for (i = 0; i < param_attrcnt; i++)
+	for (i = 0; i < param_attrcnt; i++) {
+		param_template[i].pValue = NULL;
+	}
+
+	for (i = 0; i < param_attrcnt; i++) {
 		param_template[i].pValue = malloc(param_template[i].ulValueLen);
+		if (param_template[i].pValue == NULL) {
+			fprintf(stderr, "malloc failed\n");
+			error = 1;
+			goto exit_params;
+		}
+	}
 
 	rv = pkcs_C_GetAttributeValue(hSession, domainparams,
 				 dsa_param_template, DSA_PARAM_ATTRS);
@@ -675,9 +723,13 @@ main(int argc, char *argv[]) {
 	
  exit_params:
 	/* Free parameter attributes */
-	if (keyclass == key_dsa || keyclass == key_dh)
-		for (i = 0; i < param_attrcnt; i++)
-			free(param_template[i].pValue);
+	if (keyclass == key_dsa || keyclass == key_dh) {
+		for (i = 0; i < param_attrcnt; i++) {
+			if (param_template[i].pValue != NULL) {
+				free(param_template[i].pValue);
+			}
+		}
+	}
 
  exit_domain:
 	/* Destroy domain parameters */

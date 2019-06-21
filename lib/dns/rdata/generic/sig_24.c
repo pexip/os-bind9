@@ -1,23 +1,13 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2011, 2012, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
-
-/* Reviewed: Fri Mar 17 09:05:02 PST 2000 by gson */
 
 /* RFC2535 */
 
@@ -36,7 +26,7 @@ fromtext_sig(ARGS_FROMTEXT) {
 	isc_result_t result;
 	dns_name_t name;
 	isc_buffer_t buffer;
-	isc_uint32_t time_signed, time_expire;
+	uint32_t time_signed, time_expire;
 
 	REQUIRE(type == dns_rdatatype_sig);
 
@@ -48,7 +38,7 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Type covered.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	result = dns_rdatatype_fromtext(&covered, &token.value.as_textregion);
 	if (result != ISC_R_SUCCESS && result != ISC_R_NOTIMPLEMENTED) {
 		i = strtol(DNS_AS_STR(token), &e, 10);
@@ -64,7 +54,7 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Algorithm.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secalg_fromtext(&c, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &c, 1));
 
@@ -72,7 +62,7 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Labels.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffU)
 		RETTOK(ISC_R_RANGE);
 	c = (unsigned char)token.value.as_ulong;
@@ -82,14 +72,14 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Original ttl.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	RETERR(uint32_tobuffer(token.value.as_ulong, target));
 
 	/*
 	 * Signature expiration.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_time32_fromtext(DNS_AS_STR(token), &time_expire));
 	RETERR(uint32_tobuffer(time_expire, target));
 
@@ -97,7 +87,7 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Time signed.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_time32_fromtext(DNS_AS_STR(token), &time_signed));
 	RETERR(uint32_tobuffer(time_signed, target));
 
@@ -105,17 +95,18 @@ fromtext_sig(ARGS_FROMTEXT) {
 	 * Key footprint.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
 
 	/*
 	 * Signer.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	origin = (origin != NULL) ? origin : dns_rootname;
+	if (origin == NULL)
+		origin = dns_rootname;
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 
 	/*
@@ -135,7 +126,7 @@ totext_sig(ARGS_TOTEXT) {
 	unsigned long foot;
 	dns_name_t name;
 	dns_name_t prefix;
-	isc_boolean_t sub;
+	bool sub;
 
 	REQUIRE(rdata->type == dns_rdatatype_sig);
 	REQUIRE(rdata->length != 0);
@@ -154,7 +145,7 @@ totext_sig(ARGS_TOTEXT) {
 	if (dns_rdatatype_isknown(covered) && covered != 0) {
 		RETERR(dns_rdatatype_totext(covered, target));
 	} else {
-		sprintf(buf, "%u", covered);
+		snprintf(buf, sizeof(buf), "%u", covered);
 		RETERR(str_totext(buf, target));
 	}
 	RETERR(str_totext(" ", target));
@@ -162,7 +153,7 @@ totext_sig(ARGS_TOTEXT) {
 	/*
 	 * Algorithm.
 	 */
-	sprintf(buf, "%u", sr.base[0]);
+	snprintf(buf, sizeof(buf), "%u", sr.base[0]);
 	isc_region_consume(&sr, 1);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
@@ -170,7 +161,7 @@ totext_sig(ARGS_TOTEXT) {
 	/*
 	 * Labels.
 	 */
-	sprintf(buf, "%u", sr.base[0]);
+	snprintf(buf, sizeof(buf), "%u", sr.base[0]);
 	isc_region_consume(&sr, 1);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
@@ -180,7 +171,7 @@ totext_sig(ARGS_TOTEXT) {
 	 */
 	ttl = uint32_fromregion(&sr);
 	isc_region_consume(&sr, 4);
-	sprintf(buf, "%lu", ttl);
+	snprintf(buf, sizeof(buf), "%lu", ttl);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 
@@ -208,7 +199,7 @@ totext_sig(ARGS_TOTEXT) {
 	 */
 	foot = uint16_fromregion(&sr);
 	isc_region_consume(&sr, 2);
-	sprintf(buf, "%lu", foot);
+	snprintf(buf, sizeof(buf), "%lu", foot);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 
@@ -552,7 +543,7 @@ covers_sig(dns_rdata_t *rdata) {
 	return (type);
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_sig(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_sig);
@@ -562,10 +553,10 @@ checkowner_sig(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_sig(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_sig);
@@ -574,7 +565,7 @@ checknames_sig(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

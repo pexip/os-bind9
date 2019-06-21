@@ -1,27 +1,19 @@
 /*
- * Copyright (C) 2004-2009, 2011-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * $Id: gssapi_link.c,v 1.17 2011/03/28 05:32:16 marka Exp $
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
 
 #ifdef GSSAPI
+
+#include <stdbool.h>
 
 #include <isc/base64.h>
 #include <isc/buffer.h>
@@ -252,13 +244,13 @@ gssapi_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	return (ISC_R_SUCCESS);
 }
 
-static isc_boolean_t
+static bool
 gssapi_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	gss_ctx_id_t gsskey1 = key1->keydata.gssctx;
 	gss_ctx_id_t gsskey2 = key2->keydata.gssctx;
 
 	/* No idea */
-	return (ISC_TF(gsskey1 == gsskey2));
+	return (gsskey1 == gsskey2);
 }
 
 static isc_result_t
@@ -271,10 +263,10 @@ gssapi_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	return (ISC_R_FAILURE);
 }
 
-static isc_boolean_t
+static bool
 gssapi_isprivate(const dst_key_t *key) {
 	UNUSED(key);
-	return (ISC_TRUE);
+	return (true);
 }
 
 static void

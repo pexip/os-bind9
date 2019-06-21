@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2009, 2012-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: sample-request.c,v 1.5 2009/09/29 15:06:07 fdupont Exp $ */
 
 #include <config.h>
 
@@ -89,11 +83,10 @@ make_querymessage(dns_message_t *message, const char *namestr,
 	namelen = strlen(namestr);
 	isc_buffer_constinit(&b, namestr, namelen);
 	isc_buffer_add(&b, namelen);
-	dns_fixedname_init(&fixedqname);
-	qname0 = dns_fixedname_name(&fixedqname);
+	qname0 = dns_fixedname_initname(&fixedqname);
 	result = dns_name_fromtext(qname0, &b, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS) {
-		fprintf(stderr, "failed to convert qname: %d\n", result);
+		fprintf(stderr, "failed to convert qname: %u\n", result);
 		return (result);
 	}
 
@@ -147,7 +140,7 @@ print_section(dns_message_t *message, int section, isc_buffer_t *buf) {
 
 int
 main(int argc, char *argv[]) {
-	int ch, i, gai_error;
+	int ch, i, gaierror;
 	struct addrinfo hints, *res;
 	isc_textregion_t tr;
 	dns_client_t *client = NULL;
@@ -183,13 +176,13 @@ main(int argc, char *argv[]) {
 	isc_lib_register();
 	result = dns_lib_init();
 	if (result != ISC_R_SUCCESS) {
-		fprintf(stderr, "dns_lib_init failed: %d\n", result);
+		fprintf(stderr, "dns_lib_init failed: %u\n", result);
 		exit(1);
 	}
 
 	result = dns_client_create(&client, 0);
 	if (result != ISC_R_SUCCESS) {
-		fprintf(stderr, "dns_client_create failed: %d\n", result);
+		fprintf(stderr, "dns_client_create failed: %u\n", result);
 		exit(1);
 	}
 
@@ -221,10 +214,10 @@ main(int argc, char *argv[]) {
 #ifdef AI_NUMERICHOST
 	hints.ai_flags = AI_NUMERICHOST;
 #endif
-	gai_error = getaddrinfo(argv[0], "53", &hints, &res);
-	if (gai_error != 0) {
+	gaierror = getaddrinfo(argv[0], "53", &hints, &res);
+	if (gaierror != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n",
-			gai_strerror(gai_error));
+			gai_strerror(gaierror));
 		exit(1);
 	}
 	INSIST(res->ai_addrlen <= sizeof(sa.type));

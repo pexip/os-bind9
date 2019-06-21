@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2008  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: lex.h,v 1.37 2008/05/30 23:47:01 tbox Exp $ */
 
 #ifndef ISC_LEX_H
 #define ISC_LEX_H 1
@@ -51,6 +44,7 @@
  *** Imports
  ***/
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/lang.h>
@@ -90,6 +84,7 @@ ISC_LANG_BEGINDECLS
 #define ISC_LEXOPT_ESCAPE		0x100	/*%< Recognize escapes. */
 #define ISC_LEXOPT_QSTRINGMULTILINE	0x200	/*%< Allow multiline "" strings */
 #define ISC_LEXOPT_OCTAL		0x400	/*%< Expect a octal number. */
+#define ISC_LEXOPT_BTEXT		0x800	/*%< Bracketed text. */
 /*@}*/
 /*@{*/
 /*!
@@ -122,7 +117,8 @@ typedef enum {
 	isc_tokentype_eof = 5,
 	isc_tokentype_initialws = 6,
 	isc_tokentype_special = 7,
-	isc_tokentype_nomore = 8
+	isc_tokentype_nomore = 8,
+	isc_tokentype_btext = 8
 } isc_tokentype_t;
 
 typedef union {
@@ -151,8 +147,6 @@ isc_lex_create(isc_mem_t *mctx, size_t max_token, isc_lex_t **lexp);
  *
  * Requires:
  *\li	'*lexp' is a valid lexer.
- *
- *\li	max_token > 0.
  *
  * Ensures:
  *\li	On success, *lexp is attached to the newly created lexer.
@@ -307,7 +301,7 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp);
 
 isc_result_t
 isc_lex_getmastertoken(isc_lex_t *lex, isc_token_t *token,
-		       isc_tokentype_t expect, isc_boolean_t eol);
+		       isc_tokentype_t expect, bool eol);
 /*%<
  * Get the next token from a DNS master file type stream.  This is a
  * convenience function that sets appropriate options and handles quoted
@@ -325,7 +319,7 @@ isc_lex_getmastertoken(isc_lex_t *lex, isc_token_t *token,
  */
 
 isc_result_t
-isc_lex_getoctaltoken(isc_lex_t *lex, isc_token_t *token, isc_boolean_t eol);
+isc_lex_getoctaltoken(isc_lex_t *lex, isc_token_t *token, bool eol);
 /*%<
  * Get the next token from a DNS master file type stream.  This is a
  * convenience function that sets appropriate options and handles end
@@ -412,7 +406,24 @@ isc_lex_setsourcename(isc_lex_t *lex, const char *name);
  * \li	#ISC_R_NOTFOUND - there are no sources.
  */
 
-isc_boolean_t
+isc_result_t
+isc_lex_setsourceline(isc_lex_t *lex, unsigned long line);
+/*%<
+ * Assigns a new line number to the input source. This can be used
+ * when parsing a buffer that's been excerpted from the middle a file,
+ * allowing logged messages to display the correct line number,
+ * rather than the line number within the buffer.
+ *
+ * Requires:
+ *
+ * \li	'lex' is a valid lexer.
+ *
+ * Returns:
+ * \li	#ISC_R_SUCCESS
+ * \li	#ISC_R_NOTFOUND - there are no sources.
+ */
+
+bool
 isc_lex_isfile(isc_lex_t *lex);
 /*%<
  * Return whether the current input source is a file.
@@ -421,8 +432,8 @@ isc_lex_isfile(isc_lex_t *lex);
  *\li	'lex' is a valid lexer.
  *
  * Returns:
- * \li	#ISC_TRUE if the current input is a file,
- *\li	#ISC_FALSE otherwise.
+ * \li	#true if the current input is a file,
+ *\li	#false otherwise.
  */
 
 

@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2013, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1997-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef ISC_MEM_H
@@ -20,6 +14,7 @@
 
 /*! \file isc/mem.h */
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/json.h>
@@ -215,14 +210,14 @@ typedef struct isc_memmethods {
 			       size_t size _ISC_MEM_FLARG);
 	char *(*memstrdup)(isc_mem_t *mctx, const char *s _ISC_MEM_FLARG);
 	void (*memfree)(isc_mem_t *mctx, void *ptr _ISC_MEM_FLARG);
-	void (*setdestroycheck)(isc_mem_t *mctx, isc_boolean_t flag);
+	void (*setdestroycheck)(isc_mem_t *mctx, bool flag);
 	void (*setwater)(isc_mem_t *ctx, isc_mem_water_t water,
 			 void *water_arg, size_t hiwater, size_t lowater);
 	void (*waterack)(isc_mem_t *ctx, int flag);
 	size_t (*inuse)(isc_mem_t *mctx);
 	size_t (*maxinuse)(isc_mem_t *mctx);
 	size_t (*total)(isc_mem_t *mctx);
-	isc_boolean_t (*isovermem)(isc_mem_t *mctx);
+	bool (*isovermem)(isc_mem_t *mctx);
 	isc_result_t (*mpcreate)(isc_mem_t *mctx, size_t size,
 				 isc_mempool_t **mpctxp);
 } isc_memmethods_t;
@@ -385,9 +380,9 @@ isc_mem_stats(isc_mem_t *mctx, FILE *out);
 
 void
 isc_mem_setdestroycheck(isc_mem_t *mctx,
-			isc_boolean_t on);
+			bool on);
 /*%<
- * If 'on' is ISC_TRUE, 'mctx' will check for memory leaks when
+ * If 'on' is true, 'mctx' will check for memory leaks when
  * destroyed and abort the program if any are present.
  */
 
@@ -425,7 +420,7 @@ isc_mem_total(isc_mem_t *mctx);
  * not yet used.
  */
 
-isc_boolean_t
+bool
 isc_mem_isovermem(isc_mem_t *mctx);
 /*%<
  * Return true iff the memory context is in "over memory" state, i.e.,

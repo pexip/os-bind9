@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2008, 2012, 2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id$ */
@@ -78,6 +72,8 @@
 /***
  *** Imports.
  ***/
+#include <inttypes.h>
+
 #include <isc/platform.h>
 
 /*
@@ -106,6 +102,10 @@
  */
 #undef interface
 
+#ifndef INADDR_ANY
+#define INADDR_ANY 0x00000000UL
+#endif
+
 #ifndef INADDR_LOOPBACK
 #define INADDR_LOOPBACK 0x7f000001UL
 #endif
@@ -126,7 +126,7 @@ struct in6_pktinfo {
  * Ensure type in_port_t is defined.
  */
 #ifdef ISC_PLATFORM_NEEDPORTT
-typedef isc_uint16_t in_port_t;
+typedef uint16_t in_port_t;
 #endif
 
 /*
@@ -138,14 +138,14 @@ typedef isc_uint16_t in_port_t;
 #define ISC_PLATFORM_RECVOVERFLOW
 #endif
 
-#define ISC__IPADDR(x)	((isc_uint32_t)htonl((isc_uint32_t)(x)))
+#define ISC__IPADDR(x)	((uint32_t)htonl((uint32_t)(x)))
 
 #define ISC_IPADDR_ISMULTICAST(i) \
-		(((isc_uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
+		(((uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
 		 == ISC__IPADDR(0xe0000000))
 
 #define ISC_IPADDR_ISEXPERIMENTAL(i) \
-		(((isc_uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
+		(((uint32_t)(i) & ISC__IPADDR(0xf0000000)) \
 		 == ISC__IPADDR(0xf0000000))
 
 /*
@@ -412,6 +412,7 @@ isc_net_getudpportrange(int af, in_port_t *low, in_port_t *high);
 #ifdef ISC_PLATFORM_NEEDNTOP
 const char *
 isc_net_ntop(int af, const void *src, char *dst, size_t size);
+#undef inet_ntop
 #define inet_ntop isc_net_ntop
 #endif
 

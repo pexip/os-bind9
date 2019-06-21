@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef NAMED_SECCOMP_H
@@ -34,6 +29,8 @@
 int scmp_syscalls[] = {
 	SCMP_SYS(access),
 	SCMP_SYS(open),
+	SCMP_SYS(openat),
+	SCMP_SYS(lseek),
 	SCMP_SYS(clock_gettime),
 	SCMP_SYS(time),
 	SCMP_SYS(read),
@@ -58,6 +55,11 @@ int scmp_syscalls[] = {
 	SCMP_SYS(fstat),
 	SCMP_SYS(epoll_ctl),
 	SCMP_SYS(gettimeofday),
+	SCMP_SYS(getpid),
+#ifdef HAVE_GETRANDOM
+	SCMP_SYS(getrandom),
+#endif
+	SCMP_SYS(rename),
 	SCMP_SYS(unlink),
 	SCMP_SYS(socket),
 	SCMP_SYS(sendto),
@@ -76,7 +78,6 @@ int scmp_syscalls[] = {
 	SCMP_SYS(getsockopt),
 	SCMP_SYS(getsockname),
 	SCMP_SYS(lstat),
-	SCMP_SYS(lseek),
 	SCMP_SYS(getgid),
 	SCMP_SYS(getegid),
 	SCMP_SYS(getuid),
@@ -87,9 +88,7 @@ int scmp_syscalls[] = {
 	SCMP_SYS(setuid),
 	SCMP_SYS(prctl),
 	SCMP_SYS(epoll_wait),
-	SCMP_SYS(openat),
 	SCMP_SYS(getdents),
-	SCMP_SYS(rename),
 	SCMP_SYS(utimes),
 	SCMP_SYS(dup),
 #endif
@@ -97,6 +96,8 @@ int scmp_syscalls[] = {
 const char *scmp_syscall_names[] = {
 	"access",
 	"open",
+	"openat",
+	"lseek",
 	"clock_gettime",
 	"time",
 	"read",
@@ -121,6 +122,11 @@ const char *scmp_syscall_names[] = {
 	"fstat",
 	"epoll_ctl",
 	"gettimeofday",
+	"getpid",
+#ifdef HAVE_GETRANDOM
+	"getrandom",
+#endif
+	"rename",
 	"unlink",
 	"socket",
 	"sendto",
@@ -139,7 +145,6 @@ const char *scmp_syscall_names[] = {
 	"getsockopt",
 	"getsockname",
 	"lstat",
-	"lseek",
 	"getgid",
 	"getegid",
 	"getuid",
@@ -150,9 +155,7 @@ const char *scmp_syscall_names[] = {
 	"setuid",
 	"prctl",
 	"epoll_wait",
-	"openat",
 	"getdents",
-	"rename",
 	"utimes",
 	"dup",
 #endif
@@ -190,6 +193,10 @@ int scmp_syscalls[] = {
 	SCMP_SYS(fstat64),
 	SCMP_SYS(epoll_ctl),
 	SCMP_SYS(gettimeofday),
+	SCMP_SYS(getpid),
+#ifdef HAVE_GETRANDOM
+	SCMP_SYS(getrandom),
+#endif
 	SCMP_SYS(unlink),
 #ifndef ISC_PLATFORM_USETHREADS
 	SCMP_SYS(fcntl64),
@@ -226,6 +233,10 @@ const char *scmp_syscall_names[] = {
 	"fstat64",
 	"epoll_ctl",
 	"gettimeofday",
+	"getpid",
+#ifdef HAVE_GETRANDOM
+	"getrandom",
+#endif
 	"unlink",
 #ifndef ISC_PLATFORM_USETHREADS
 	"fcntl64",

@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2005, 2007, 2009, 2011, 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #ifndef RDATA_GENERIC_IPSECKEY_45_C
 #define RDATA_GENERIC_IPSECKEY_45_C
@@ -45,7 +39,7 @@ fromtext_ipseckey(ARGS_FROMTEXT) {
 	 * Precedence.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
@@ -54,7 +48,7 @@ fromtext_ipseckey(ARGS_FROMTEXT) {
 	 * Gateway type.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0x3U)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
@@ -64,7 +58,7 @@ fromtext_ipseckey(ARGS_FROMTEXT) {
 	 * Algorithm.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
@@ -73,7 +67,7 @@ fromtext_ipseckey(ARGS_FROMTEXT) {
 	 * Gateway.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 
 	switch (gateway) {
 	case 0:
@@ -104,7 +98,8 @@ fromtext_ipseckey(ARGS_FROMTEXT) {
 	case 3:
 		dns_name_init(&name, NULL);
 		buffer_fromregion(&buffer, &token.value.as_region);
-		origin = (origin != NULL) ? origin : dns_rootname;
+		if (origin == NULL)
+			origin = dns_rootname;
 		RETTOK(dns_name_fromtext(&name, &buffer, origin,
 					 options, target));
 		break;
@@ -141,7 +136,7 @@ totext_ipseckey(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &region);
 	num = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
-	sprintf(buf, "%u ", num);
+	snprintf(buf, sizeof(buf), "%u ", num);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -149,7 +144,7 @@ totext_ipseckey(ARGS_TOTEXT) {
 	 */
 	gateway = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
-	sprintf(buf, "%u ", gateway);
+	snprintf(buf, sizeof(buf), "%u ", gateway);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -157,7 +152,7 @@ totext_ipseckey(ARGS_TOTEXT) {
 	 */
 	num = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
-	sprintf(buf, "%u ", num);
+	snprintf(buf, sizeof(buf), "%u ", num);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -180,7 +175,7 @@ totext_ipseckey(ARGS_TOTEXT) {
 
 	case 3:
 		dns_name_fromregion(&name, &region);
-		RETERR(dns_name_totext(&name, ISC_FALSE, target));
+		RETERR(dns_name_totext(&name, false, target));
 		isc_region_consume(&region, name_length(&name));
 		break;
 	}
@@ -284,7 +279,7 @@ static inline isc_result_t
 fromstruct_ipseckey(ARGS_FROMSTRUCT) {
 	dns_rdata_ipseckey_t *ipseckey = source;
 	isc_region_t region;
-	isc_uint32_t n;
+	uint32_t n;
 
 	REQUIRE(type == dns_rdatatype_ipseckey);
 	REQUIRE(source != NULL);
@@ -328,7 +323,7 @@ tostruct_ipseckey(ARGS_TOSTRUCT) {
 	isc_region_t region;
 	dns_rdata_ipseckey_t *ipseckey = target;
 	dns_name_t name;
-	isc_uint32_t n;
+	uint32_t n;
 
 	REQUIRE(rdata->type == dns_rdatatype_ipseckey);
 	REQUIRE(target != NULL);
@@ -434,7 +429,7 @@ digest_ipseckey(ARGS_DIGEST) {
 	return ((digest)(arg, &region));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_ipseckey(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_ipseckey);
@@ -444,10 +439,10 @@ checkowner_ipseckey(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_ipseckey(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_ipseckey);
@@ -456,7 +451,7 @@ checknames_ipseckey(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

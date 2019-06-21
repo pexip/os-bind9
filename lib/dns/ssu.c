@@ -1,27 +1,19 @@
 /*
- * Copyright (C) 2004-2008, 2010, 2011, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
-/*
- * $Id: ssu.c,v 1.38 2011/01/06 23:47:00 tbox Exp $
- * Principal Author: Brian Wellington
- */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/magic.h>
 #include <isc/mem.h>
@@ -46,7 +38,7 @@
 
 struct dns_ssurule {
 	unsigned int magic;
-	isc_boolean_t grant;	/*%< is this a grant or a deny? */
+	bool grant;	/*%< is this a grant or a deny? */
 	unsigned int matchtype;	/*%< which type of pattern match? */
 	dns_name_t *identity;	/*%< the identity to match */
 	dns_name_t *name;	/*%< the name being updated */
@@ -138,7 +130,7 @@ dns_ssutable_attach(dns_ssutable_t *source, dns_ssutable_t **targetp) {
 void
 dns_ssutable_detach(dns_ssutable_t **tablep) {
 	dns_ssutable_t *table;
-	isc_boolean_t done = ISC_FALSE;
+	bool done = false;
 
 	REQUIRE(tablep != NULL);
 	table = *tablep;
@@ -148,7 +140,7 @@ dns_ssutable_detach(dns_ssutable_t **tablep) {
 
 	INSIST(table->references > 0);
 	if (--table->references == 0)
-		done = ISC_TRUE;
+		done = true;
 	UNLOCK(&table->lock);
 
 	*tablep = NULL;
@@ -158,7 +150,7 @@ dns_ssutable_detach(dns_ssutable_t **tablep) {
 }
 
 isc_result_t
-dns_ssutable_addrule(dns_ssutable_t *table, isc_boolean_t grant,
+dns_ssutable_addrule(dns_ssutable_t *table, bool grant,
 		     dns_name_t *identity, unsigned int matchtype,
 		     dns_name_t *name, unsigned int ntypes,
 		     dns_rdatatype_t *types)
@@ -245,11 +237,11 @@ dns_ssutable_addrule(dns_ssutable_t *table, isc_boolean_t grant,
 	return (result);
 }
 
-static inline isc_boolean_t
+static inline bool
 isusertype(dns_rdatatype_t type) {
-	return (ISC_TF(type != dns_rdatatype_ns &&
-		       type != dns_rdatatype_soa &&
-		       type != dns_rdatatype_rrsig));
+	return (type != dns_rdatatype_ns &&
+		type != dns_rdatatype_soa &&
+		type != dns_rdatatype_rrsig);
 }
 
 static void
@@ -346,11 +338,22 @@ stf_from_address(dns_name_t *stfself, isc_netaddr_t *tcpaddr) {
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 }
 
-isc_boolean_t
+bool
 dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
-			dns_name_t *name, isc_netaddr_t *tcpaddr,
-			dns_rdatatype_t type,
-			const dst_key_t *key)
+			dns_name_t *name, isc_netaddr_t *addr,
+			dns_rdatatype_t type, const dst_key_t *key)
+{
+	return (dns_ssutable_checkrules2
+		(table, signer, name, addr,
+		 addr == NULL ? false : true,
+		 NULL, type, key));
+}
+
+bool
+dns_ssutable_checkrules2(dns_ssutable_t *table, dns_name_t *signer,
+			 dns_name_t *name, isc_netaddr_t *addr,
+			 bool tcp, const dns_aclenv_t *env,
+			 dns_rdatatype_t type, const dst_key_t *key)
 {
 	dns_ssurule_t *rule;
 	unsigned int i;
@@ -359,13 +362,15 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 	dns_name_t *tcpself;
 	dns_name_t *stfself;
 	isc_result_t result;
+	int match;
 
 	REQUIRE(VALID_SSUTABLE(table));
 	REQUIRE(signer == NULL || dns_name_isabsolute(signer));
 	REQUIRE(dns_name_isabsolute(name));
+	REQUIRE(addr == NULL || env != NULL);
 
-	if (signer == NULL && tcpaddr == NULL)
-		return (ISC_FALSE);
+	if (signer == NULL && addr == NULL)
+		return (false);
 
 	for (rule = ISC_LIST_HEAD(table->rules);
 	     rule != NULL;
@@ -373,6 +378,7 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 	{
 		switch (rule->matchtype) {
 		case DNS_SSUMATCHTYPE_NAME:
+		case DNS_SSUMATCHTYPE_LOCAL:
 		case DNS_SSUMATCHTYPE_SUBDOMAIN:
 		case DNS_SSUMATCHTYPE_WILDCARD:
 		case DNS_SSUMATCHTYPE_SELF:
@@ -389,16 +395,18 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 					continue;
 			}
 			break;
-		case DNS_SSUMATCHTYPE_SELFKRB5:
-		case DNS_SSUMATCHTYPE_SELFMS:
-		case DNS_SSUMATCHTYPE_SUBDOMAINKRB5:
-		case DNS_SSUMATCHTYPE_SUBDOMAINMS:
+		case dns_ssumatchtype_selfkrb5:
+		case dns_ssumatchtype_selfms:
+		case dns_ssumatchtype_selfsubkrb5:
+		case dns_ssumatchtype_selfsubms:
+		case dns_ssumatchtype_subdomainkrb5:
+		case dns_ssumatchtype_subdomainms:
 			if (signer == NULL)
 				continue;
 			break;
 		case DNS_SSUMATCHTYPE_TCPSELF:
 		case DNS_SSUMATCHTYPE_6TO4SELF:
-			if (tcpaddr == NULL)
+			if (!tcp || addr == NULL)
 				continue;
 			break;
 		}
@@ -411,6 +419,29 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 		case DNS_SSUMATCHTYPE_SUBDOMAIN:
 			if (!dns_name_issubdomain(name, rule->name))
 				continue;
+			break;
+		case DNS_SSUMATCHTYPE_LOCAL:
+			if (addr == NULL) {
+				continue;
+			}
+			if (!dns_name_issubdomain(name, rule->name)) {
+				continue;
+			}
+			dns_acl_match(addr, NULL, env->localhost,
+				      NULL, &match, NULL);
+			if (match == 0) {
+				if (signer != NULL) {
+					isc_log_write(dns_lctx,
+						      DNS_LOGCATEGORY_GENERAL,
+						      DNS_LOGMODULE_SSU,
+						      ISC_LOG_WARNING,
+						      "update-policy local: "
+						      "match on session "
+						      "key not from "
+						      "localhost");
+				}
+				continue;
+			}
 			break;
 		case DNS_SSUMATCHTYPE_WILDCARD:
 			if (!dns_name_matcheswildcard(name, rule->name))
@@ -425,8 +456,7 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 				continue;
 			break;
 		case DNS_SSUMATCHTYPE_SELFWILD:
-			dns_fixedname_init(&fixed);
-			wildcard = dns_fixedname_name(&fixed);
+			wildcard = dns_fixedname_initname(&fixed);
 			result = dns_name_concatenate(dns_wildcardname, signer,
 						      wildcard, NULL);
 			if (result != ISC_R_SUCCESS)
@@ -434,34 +464,59 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 			if (!dns_name_matcheswildcard(name, wildcard))
 				continue;
 			break;
-		case DNS_SSUMATCHTYPE_SELFKRB5:
-			if (!dst_gssapi_identitymatchesrealmkrb5(signer, name,
-							       rule->identity))
-				continue;
-			break;
-		case DNS_SSUMATCHTYPE_SELFMS:
-			if (!dst_gssapi_identitymatchesrealmms(signer, name,
-							       rule->identity))
-				continue;
-			break;
-		case DNS_SSUMATCHTYPE_SUBDOMAINKRB5:
+		case dns_ssumatchtype_selfkrb5:
+			if (dst_gssapi_identitymatchesrealmkrb5(signer, name,
+								rule->identity,
+								false))
+			{
+				break;
+			}
+			continue;
+		case dns_ssumatchtype_selfms:
+			if (dst_gssapi_identitymatchesrealmms(signer, name,
+							      rule->identity,
+							      false))
+			{
+				break;
+			}
+			continue;
+		case dns_ssumatchtype_selfsubkrb5:
+			if (dst_gssapi_identitymatchesrealmkrb5(signer, name,
+								rule->identity,
+								true))
+			{
+				break;
+			}
+			continue;
+		case dns_ssumatchtype_selfsubms:
+			if (dst_gssapi_identitymatchesrealmms(signer, name,
+							      rule->identity,
+							      true))
+				break;
+			continue;
+		case dns_ssumatchtype_subdomainkrb5:
 			if (!dns_name_issubdomain(name, rule->name))
 				continue;
-			if (!dst_gssapi_identitymatchesrealmkrb5(signer, NULL,
-							       rule->identity))
-				continue;
-			break;
-		case DNS_SSUMATCHTYPE_SUBDOMAINMS:
+			if (dst_gssapi_identitymatchesrealmkrb5(signer, NULL,
+								rule->identity,
+								false))
+			{
+				break;
+			}
+			continue;
+		case dns_ssumatchtype_subdomainms:
 			if (!dns_name_issubdomain(name, rule->name))
 				continue;
-			if (!dst_gssapi_identitymatchesrealmms(signer, NULL,
-							       rule->identity))
-				continue;
-			break;
+			if (dst_gssapi_identitymatchesrealmms(signer, NULL,
+							      rule->identity,
+							      false))
+			{
+				break;
+			}
+			continue;
 		case DNS_SSUMATCHTYPE_TCPSELF:
-			dns_fixedname_init(&fixed);
-			tcpself = dns_fixedname_name(&fixed);
-			reverse_from_address(tcpself, tcpaddr);
+			tcpself = dns_fixedname_initname(&fixed);
+			reverse_from_address(tcpself, addr);
 			if (dns_name_iswildcard(rule->identity)) {
 				if (!dns_name_matcheswildcard(tcpself,
 							      rule->identity))
@@ -474,9 +529,8 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 				continue;
 			break;
 		case DNS_SSUMATCHTYPE_6TO4SELF:
-			dns_fixedname_init(&fixed);
-			stfself = dns_fixedname_name(&fixed);
-			stf_from_address(stfself, tcpaddr);
+			stfself = dns_fixedname_initname(&fixed);
+			stf_from_address(stfself, addr);
 			if (dns_name_iswildcard(rule->identity)) {
 				if (!dns_name_matcheswildcard(stfself,
 							      rule->identity))
@@ -490,13 +544,13 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 			break;
 		case DNS_SSUMATCHTYPE_EXTERNAL:
 			if (!dns_ssu_external_match(rule->identity, signer,
-						    name, tcpaddr, type, key,
+						    name, addr, type, key,
 						    table->mctx))
 				continue;
 			break;
 		case DNS_SSUMATCHTYPE_DLZ:
 			if (!dns_dlz_ssumatch(table->dlzdatabase, signer,
-					      name, tcpaddr, type, key))
+					      name, addr, type, key))
 				continue;
 			break;
 		}
@@ -522,10 +576,10 @@ dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
 		return (rule->grant);
 	}
 
-	return (ISC_FALSE);
+	return (false);
 }
 
-isc_boolean_t
+bool
 dns_ssurule_isgrant(const dns_ssurule_t *rule) {
 	REQUIRE(VALID_SSURULE(rule));
 	return (rule->grant);
@@ -601,7 +655,7 @@ dns_ssutable_createdlz(isc_mem_t *mctx, dns_ssutable_t **tablep,
 	rule->identity = NULL;
 	rule->name = NULL;
 	rule->types = NULL;
-	rule->grant = ISC_TRUE;
+	rule->grant = true;
 	rule->matchtype = DNS_SSUMATCHTYPE_DLZ;
 	rule->ntypes = 0;
 	rule->types = NULL;
@@ -609,5 +663,49 @@ dns_ssutable_createdlz(isc_mem_t *mctx, dns_ssutable_t **tablep,
 
 	ISC_LIST_INITANDAPPEND(table->rules, rule, link);
 	*tablep = table;
+	return (ISC_R_SUCCESS);
+}
+
+isc_result_t
+dns_ssu_mtypefromstring(const char *str, dns_ssumatchtype_t *mtype) {
+
+	REQUIRE(str != NULL);
+	REQUIRE(mtype != NULL);
+
+	if (strcasecmp(str, "name") == 0) {
+		*mtype = dns_ssumatchtype_name;
+	} else if (strcasecmp(str, "subdomain") == 0) {
+		*mtype = dns_ssumatchtype_subdomain;
+	} else if (strcasecmp(str, "wildcard") == 0) {
+		*mtype = dns_ssumatchtype_wildcard;
+	} else if (strcasecmp(str, "self") == 0) {
+		*mtype = dns_ssumatchtype_self;
+	} else if (strcasecmp(str, "selfsub") == 0) {
+		*mtype = dns_ssumatchtype_selfsub;
+	} else if (strcasecmp(str, "selfwild") == 0) {
+		*mtype = dns_ssumatchtype_selfwild;
+	} else if (strcasecmp(str, "ms-self") == 0) {
+		*mtype = dns_ssumatchtype_selfms;
+	} else if (strcasecmp(str, "ms-selfsub") == 0) {
+		*mtype = dns_ssumatchtype_selfsubms;
+	} else if (strcasecmp(str, "krb5-self") == 0) {
+		*mtype = dns_ssumatchtype_selfkrb5;
+	} else if (strcasecmp(str, "krb5-selfsub") == 0) {
+		*mtype = dns_ssumatchtype_selfsubkrb5;
+	} else if (strcasecmp(str, "ms-subdomain") == 0) {
+		*mtype = dns_ssumatchtype_subdomainms;
+	} else if (strcasecmp(str, "krb5-subdomain") == 0) {
+		*mtype = dns_ssumatchtype_subdomainkrb5;
+	} else if (strcasecmp(str, "tcp-self") == 0) {
+		*mtype = dns_ssumatchtype_tcpself;
+	} else if (strcasecmp(str, "6to4-self") == 0) {
+		*mtype = dns_ssumatchtype_6to4self;
+	} else if (strcasecmp(str, "zonesub") == 0) {
+		*mtype = dns_ssumatchtype_subdomain;
+	} else if (strcasecmp(str, "external") == 0) {
+		*mtype = dns_ssumatchtype_external;
+	} else {
+		return (ISC_R_NOTFOUND);
+	}
 	return (ISC_R_SUCCESS);
 }

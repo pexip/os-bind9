@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2013  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef DNS_GEOIP_H
@@ -30,10 +25,11 @@
  *** Imports
  ***/
 
+#include <stdbool.h>
+
 #include <isc/lang.h>
 #include <isc/magic.h>
 #include <isc/netaddr.h>
-#include <isc/refcount.h>
 
 #include <dns/name.h>
 #include <dns/types.h>
@@ -107,8 +103,8 @@ typedef struct dns_geoip_databases {
 
 ISC_LANG_BEGINDECLS
 
-isc_boolean_t
-dns_geoip_match(const isc_netaddr_t *reqaddr,
+bool
+dns_geoip_match(const isc_netaddr_t *reqaddr, uint8_t *scope,
 		const dns_geoip_databases_t *geoip,
 		const dns_geoip_elem_t *elt);
 

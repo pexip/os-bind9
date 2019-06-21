@@ -1,30 +1,26 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 #ifdef PKCS11CRYPTO
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/entropy.h>
 #include <isc/md5.h>
 #include <isc/sha1.h>
 #include <isc/sha2.h>
 #include <isc/mem.h>
+#include <isc/safe.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -35,6 +31,7 @@
 #include "dst_pkcs11.h"
 
 #include <pk11/internal.h>
+#include <pk11/site.h>
 
 /*
  * Limit the size of public exponents.
@@ -52,6 +49,8 @@ static isc_result_t pkcs11rsa_todns(const dst_key_t *key, isc_buffer_t *data);
 static void pkcs11rsa_destroy(dst_key_t *key);
 static isc_result_t pkcs11rsa_fetch(dst_key_t *key, const char *engine,
 				    const char *label, dst_key_t *pub);
+
+#ifndef PK11_RSA_PKCS_REPLACE
 
 static isc_result_t
 pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
@@ -83,11 +82,45 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
 	isc_result_t ret;
 	unsigned int i;
 
+#ifndef PK11_MD5_DISABLE
 	REQUIRE(key->key_alg == DST_ALG_RSAMD5 ||
 		key->key_alg == DST_ALG_RSASHA1 ||
 		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
 		key->key_alg == DST_ALG_RSASHA256 ||
 		key->key_alg == DST_ALG_RSASHA512);
+#else
+	REQUIRE(key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#endif
+
+	/*
+	 * Reject incorrect RSA key lengths.
+	 */
+	switch (dctx->key->key_alg) {
+	case DST_ALG_RSAMD5:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		/* From RFC 3110 */
+		if (dctx->key->key_size > 4096)
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA256:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 512) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA512:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 1024) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	default:
+		INSIST(0);
+	}
 
 	rsa = key->keydata.pkey;
 
@@ -100,7 +133,7 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
 		slotid = rsa->slot;
 	else
 		slotid = pk11_get_best_token(OP_RSA);
-	ret = pk11_get_session(pk11_ctx, OP_RSA, ISC_TRUE, ISC_FALSE,
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
 			       rsa->reqlogon, NULL, slotid);
 	if (ret != ISC_R_SUCCESS)
 		goto err;
@@ -197,7 +230,7 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
 			break;
 		}
 	pk11_ctx->object = CK_INVALID_HANDLE;
-	pk11_ctx->ontoken = ISC_FALSE;
+	pk11_ctx->ontoken = false;
 	PK11_RET(pkcs_C_CreateObject,
 		 (pk11_ctx->session,
 		  keyTemplate, (CK_ULONG) 14,
@@ -207,9 +240,11 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
     token_key:
 
 	switch (dctx->key->key_alg) {
+#ifndef PK11_MD5_DISABLE
 	case DST_ALG_RSAMD5:
 		mech.mechanism = CKM_MD5_RSA_PKCS;
 		break;
+#endif
 	case DST_ALG_RSASHA1:
 	case DST_ALG_NSEC3RSASHA1:
 		mech.mechanism = CKM_SHA1_RSA_PKCS;
@@ -232,8 +267,8 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
 
 	for (i = 6; i <= 13; i++)
 		if (keyTemplate[i].pValue != NULL) {
-			memset(keyTemplate[i].pValue, 0,
-			       keyTemplate[i].ulValueLen);
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
 			isc_mem_put(dctx->mctx,
 				    keyTemplate[i].pValue,
 				    keyTemplate[i].ulValueLen);
@@ -247,14 +282,14 @@ pkcs11rsa_createctx_sign(dst_key_t *key, dst_context_t *dctx) {
 					    pk11_ctx->object);
 	for (i = 6; i <= 13; i++)
 		if (keyTemplate[i].pValue != NULL) {
-			memset(keyTemplate[i].pValue, 0,
-			       keyTemplate[i].ulValueLen);
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
 			isc_mem_put(dctx->mctx,
 				    keyTemplate[i].pValue,
 				    keyTemplate[i].ulValueLen);
 		}
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ret);
@@ -283,11 +318,45 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 	isc_result_t ret;
 	unsigned int i;
 
+#ifndef PK11_MD5_DISABLE
 	REQUIRE(key->key_alg == DST_ALG_RSAMD5 ||
 		key->key_alg == DST_ALG_RSASHA1 ||
 		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
 		key->key_alg == DST_ALG_RSASHA256 ||
 		key->key_alg == DST_ALG_RSASHA512);
+#else
+	REQUIRE(key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#endif
+
+	/*
+	 * Reject incorrect RSA key lengths.
+	 */
+	switch (dctx->key->key_alg) {
+	case DST_ALG_RSAMD5:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		/* From RFC 3110 */
+		if (dctx->key->key_size > 4096)
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA256:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 512) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA512:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 1024) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	default:
+		INSIST(0);
+	}
 
 	rsa = key->keydata.pkey;
 
@@ -295,7 +364,7 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 						  sizeof(*pk11_ctx));
 	if (pk11_ctx == NULL)
 		return (ISC_R_NOMEMORY);
-	ret = pk11_get_session(pk11_ctx, OP_RSA, ISC_TRUE, ISC_FALSE,
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
 			       rsa->reqlogon, NULL,
 			       pk11_get_best_token(OP_RSA));
 	if (ret != ISC_R_SUCCESS)
@@ -331,7 +400,7 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 			break;
 		}
 	pk11_ctx->object = CK_INVALID_HANDLE;
-	pk11_ctx->ontoken = ISC_FALSE;
+	pk11_ctx->ontoken = false;
 	PK11_RET(pkcs_C_CreateObject,
 		 (pk11_ctx->session,
 		  keyTemplate, (CK_ULONG) 7,
@@ -339,9 +408,11 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 		 ISC_R_FAILURE);
 
 	switch (dctx->key->key_alg) {
+#ifndef PK11_MD5_DISABLE
 	case DST_ALG_RSAMD5:
 		mech.mechanism = CKM_MD5_RSA_PKCS;
 		break;
+#endif
 	case DST_ALG_RSASHA1:
 	case DST_ALG_NSEC3RSASHA1:
 		mech.mechanism = CKM_SHA1_RSA_PKCS;
@@ -364,8 +435,8 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 
 	for (i = 5; i <= 6; i++)
 		if (keyTemplate[i].pValue != NULL) {
-			memset(keyTemplate[i].pValue, 0,
-			       keyTemplate[i].ulValueLen);
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
 			isc_mem_put(dctx->mctx,
 				    keyTemplate[i].pValue,
 				    keyTemplate[i].ulValueLen);
@@ -379,14 +450,14 @@ pkcs11rsa_createctx_verify(dst_key_t *key, unsigned int maxbits,
 					    pk11_ctx->object);
 	for (i = 5; i <= 6; i++)
 		if (keyTemplate[i].pValue != NULL) {
-			memset(keyTemplate[i].pValue, 0,
-			       keyTemplate[i].ulValueLen);
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
 			isc_mem_put(dctx->mctx,
 				    keyTemplate[i].pValue,
 				    keyTemplate[i].ulValueLen);
 		}
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ret);
@@ -419,7 +490,7 @@ pkcs11rsa_destroyctx(dst_context_t *dctx) {
 			(void) pkcs_C_DestroyObject(pk11_ctx->session,
 						    pk11_ctx->object);
 		pk11_return_session(pk11_ctx);
-		memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+		isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 		isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
 		dctx->ctxdata.pk11_ctx = NULL;
 	}
@@ -487,7 +558,564 @@ pkcs11rsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	return (ret);
 }
 
-static isc_boolean_t
+#else
+
+/*
+ * CKM_<hash>_RSA_PKCS mechanisms are not available so fall back
+ * to CKM_RSA_PKCS and do the EMSA-PKCS#1-v1.5 encapsulation by hand.
+ */
+
+CK_BYTE md5_der[] =
+	{ 0x30, 0x20, 0x30, 0x0c, 0x06, 0x08, 0x2a, 0x86,
+	  0x48, 0x86, 0xf7, 0x0d, 0x02, 0x05, 0x05, 0x00,
+	  0x04, 0x10 };
+CK_BYTE sha1_der[] =
+	{ 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e,
+	  0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14 };
+CK_BYTE sha256_der[] =
+	{ 0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
+	  0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
+	  0x00, 0x04, 0x20 };
+CK_BYTE sha512_der[] =
+	{ 0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
+	  0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05,
+	  0x00, 0x04, 0x40 };
+#define MAX_DER_SIZE 19
+#define MIN_PKCS1_PADLEN 11
+
+static isc_result_t
+pkcs11rsa_createctx(dst_key_t *key, dst_context_t *dctx) {
+	CK_RV rv;
+	CK_MECHANISM mech = { 0, NULL, 0 };
+	CK_SLOT_ID slotid;
+	pk11_object_t *rsa = key->keydata.pkey;
+	pk11_context_t *pk11_ctx;
+	isc_result_t ret;
+
+#ifndef PK11_MD5_DISABLE
+	REQUIRE(key->key_alg == DST_ALG_RSAMD5 ||
+		key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#else
+	REQUIRE(key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#endif
+	REQUIRE(rsa != NULL);
+
+	/*
+	 * Reject incorrect RSA key lengths.
+	 */
+	switch (dctx->key->key_alg) {
+	case DST_ALG_RSAMD5:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		/* From RFC 3110 */
+		if (dctx->key->key_size > 4096)
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA256:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 512) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA512:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 1024) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	default:
+		INSIST(0);
+	}
+
+	switch (key->key_alg) {
+#ifndef PK11_MD5_DISABLE
+	case DST_ALG_RSAMD5:
+		mech.mechanism = CKM_MD5;
+		break;
+#endif
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		mech.mechanism = CKM_SHA_1;
+		break;
+	case DST_ALG_RSASHA256:
+		mech.mechanism = CKM_SHA256;
+		break;
+	case DST_ALG_RSASHA512:
+		mech.mechanism = CKM_SHA512;
+		break;
+	default:
+		INSIST(0);
+	}
+
+	pk11_ctx = (pk11_context_t *) isc_mem_get(dctx->mctx,
+						  sizeof(*pk11_ctx));
+	if (pk11_ctx == NULL)
+		return (ISC_R_NOMEMORY);
+	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	if (rsa->ontoken)
+		slotid = rsa->slot;
+	else
+		slotid = pk11_get_best_token(OP_RSA);
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
+			       rsa->reqlogon, NULL, slotid);
+	if (ret != ISC_R_SUCCESS)
+		goto err;
+
+	PK11_RET(pkcs_C_DigestInit, (pk11_ctx->session, &mech), ISC_R_FAILURE);
+	dctx->ctxdata.pk11_ctx = pk11_ctx;
+	return (ISC_R_SUCCESS);
+
+    err:
+	pk11_return_session(pk11_ctx);
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
+	isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
+
+	return (ret);
+}
+
+static void
+pkcs11rsa_destroyctx(dst_context_t *dctx) {
+	CK_BYTE garbage[ISC_SHA512_DIGESTLENGTH];
+	CK_ULONG len = ISC_SHA512_DIGESTLENGTH;
+	pk11_context_t *pk11_ctx = dctx->ctxdata.pk11_ctx;
+
+	if (pk11_ctx != NULL) {
+		(void) pkcs_C_DigestFinal(pk11_ctx->session, garbage, &len);
+		isc_safe_memwipe(garbage, sizeof(garbage));
+		pk11_return_session(pk11_ctx);
+		isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
+		isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
+		dctx->ctxdata.pk11_ctx = NULL;
+	}
+}
+
+static isc_result_t
+pkcs11rsa_adddata(dst_context_t *dctx, const isc_region_t *data) {
+	CK_RV rv;
+	pk11_context_t *pk11_ctx = dctx->ctxdata.pk11_ctx;
+	isc_result_t ret = ISC_R_SUCCESS;
+
+	PK11_CALL(pkcs_C_DigestUpdate,
+		  (pk11_ctx->session,
+		   (CK_BYTE_PTR) data->base,
+		   (CK_ULONG) data->length),
+		  ISC_R_FAILURE);
+
+	return (ret);
+}
+
+static isc_result_t
+pkcs11rsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+	CK_RV rv;
+	CK_MECHANISM mech = { CKM_RSA_PKCS, NULL, 0 };
+	CK_OBJECT_HANDLE hKey = CK_INVALID_HANDLE;
+	CK_OBJECT_CLASS keyClass = CKO_PRIVATE_KEY;
+	CK_KEY_TYPE keyType = CKK_RSA;
+	CK_ATTRIBUTE keyTemplate[] =
+	{
+		{ CKA_CLASS, &keyClass, (CK_ULONG) sizeof(keyClass) },
+		{ CKA_KEY_TYPE, &keyType, (CK_ULONG) sizeof(keyType) },
+		{ CKA_TOKEN, &falsevalue, (CK_ULONG) sizeof(falsevalue) },
+		{ CKA_PRIVATE, &falsevalue, (CK_ULONG) sizeof(falsevalue) },
+		{ CKA_SENSITIVE, &falsevalue, (CK_ULONG) sizeof(falsevalue) },
+		{ CKA_SIGN, &truevalue, (CK_ULONG) sizeof(truevalue) },
+		{ CKA_MODULUS, NULL, 0 },
+		{ CKA_PUBLIC_EXPONENT, NULL, 0 },
+		{ CKA_PRIVATE_EXPONENT, NULL, 0 },
+		{ CKA_PRIME_1, NULL, 0 },
+		{ CKA_PRIME_2, NULL, 0 },
+		{ CKA_EXPONENT_1, NULL, 0 },
+		{ CKA_EXPONENT_2, NULL, 0 },
+		{ CKA_COEFFICIENT, NULL, 0 }
+	};
+	CK_ATTRIBUTE *attr;
+	CK_BYTE digest[MAX_DER_SIZE + ISC_SHA512_DIGESTLENGTH];
+	CK_BYTE *der;
+	CK_ULONG derlen;
+	CK_ULONG hashlen;
+	CK_ULONG dgstlen;
+	CK_ULONG siglen = 0;
+	pk11_context_t *pk11_ctx = dctx->ctxdata.pk11_ctx;
+	dst_key_t *key = dctx->key;
+	pk11_object_t *rsa = key->keydata.pkey;
+	isc_region_t r;
+	isc_result_t ret = ISC_R_SUCCESS;
+	unsigned int i;
+
+#ifndef PK11_MD5_DISABLE
+	REQUIRE(key->key_alg == DST_ALG_RSAMD5 ||
+		key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#else
+	REQUIRE(key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#endif
+	REQUIRE(rsa != NULL);
+
+	/*
+	 * Reject incorrect RSA key lengths.
+	 */
+	switch (dctx->key->key_alg) {
+	case DST_ALG_RSAMD5:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		/* From RFC 3110 */
+		if (dctx->key->key_size > 4096)
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA256:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 512) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA512:
+		/* From RFC 5702 */
+		if ((dctx->key->key_size < 1024) ||
+		    (dctx->key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	default:
+		INSIST(0);
+	}
+
+	switch (key->key_alg) {
+#ifndef PK11_MD5_DISABLE
+	case DST_ALG_RSAMD5:
+		der = md5_der;
+		derlen = sizeof(md5_der);
+		hashlen = ISC_MD5_DIGESTLENGTH;
+		break;
+#endif
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		der = sha1_der;
+		derlen = sizeof(sha1_der);
+		hashlen = ISC_SHA1_DIGESTLENGTH;
+		break;
+	case DST_ALG_RSASHA256:
+		der = sha256_der;
+		derlen = sizeof(sha256_der);
+		hashlen = ISC_SHA256_DIGESTLENGTH;
+		break;
+	case DST_ALG_RSASHA512:
+		der = sha512_der;
+		derlen = sizeof(sha512_der);
+		hashlen = ISC_SHA512_DIGESTLENGTH;
+		break;
+	default:
+		INSIST(0);
+	}
+	dgstlen = derlen + hashlen;
+	INSIST(dgstlen <= sizeof(digest));
+	memmove(digest, der, derlen);
+
+	PK11_RET(pkcs_C_DigestFinal,
+		 (pk11_ctx->session, digest + derlen, &hashlen),
+		 DST_R_SIGNFAILURE);
+
+	isc_buffer_availableregion(sig, &r);
+	if (r.length < (unsigned int) dgstlen + MIN_PKCS1_PADLEN)
+		return (ISC_R_NOSPACE);
+
+	if (rsa->ontoken && (rsa->object != CK_INVALID_HANDLE)) {
+		pk11_ctx->ontoken = rsa->ontoken;
+		pk11_ctx->object = rsa->object;
+		goto token_key;
+	}
+
+	for (attr = pk11_attribute_first(rsa);
+	     attr != NULL;
+	     attr = pk11_attribute_next(rsa, attr))
+		switch (attr->type) {
+		case CKA_MODULUS:
+			INSIST(keyTemplate[6].type == attr->type);
+			keyTemplate[6].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[6].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[6].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[6].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_PUBLIC_EXPONENT:
+			INSIST(keyTemplate[7].type == attr->type);
+			keyTemplate[7].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[7].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[7].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[7].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_PRIVATE_EXPONENT:
+			INSIST(keyTemplate[8].type == attr->type);
+			keyTemplate[8].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[8].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[8].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[8].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_PRIME_1:
+			INSIST(keyTemplate[9].type == attr->type);
+			keyTemplate[9].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[9].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[9].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[9].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_PRIME_2:
+			INSIST(keyTemplate[10].type == attr->type);
+			keyTemplate[10].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[10].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[10].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[10].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_EXPONENT_1:
+			INSIST(keyTemplate[11].type == attr->type);
+			keyTemplate[11].pValue = isc_mem_get(dctx->mctx,
+							     attr->ulValueLen);
+			if (keyTemplate[11].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[11].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[11].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_EXPONENT_2:
+			INSIST(keyTemplate[12].type == attr->type);
+			keyTemplate[12].pValue = isc_mem_get(dctx->mctx,
+							     attr->ulValueLen);
+			if (keyTemplate[12].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[12].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[12].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_COEFFICIENT:
+			INSIST(keyTemplate[13].type == attr->type);
+			keyTemplate[13].pValue = isc_mem_get(dctx->mctx,
+							     attr->ulValueLen);
+			if (keyTemplate[13].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[13].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[13].ulValueLen = attr->ulValueLen;
+			break;
+		}
+	pk11_ctx->object = CK_INVALID_HANDLE;
+	pk11_ctx->ontoken = false;
+	PK11_RET(pkcs_C_CreateObject,
+		 (pk11_ctx->session,
+		  keyTemplate, (CK_ULONG) 14,
+		  &hKey),
+		 ISC_R_FAILURE);
+
+    token_key:
+
+	PK11_RET(pkcs_C_SignInit,
+		 (pk11_ctx->session, &mech,
+		  pk11_ctx->ontoken ? pk11_ctx->object : hKey),
+		 ISC_R_FAILURE);
+
+	PK11_RET(pkcs_C_Sign,
+		 (pk11_ctx->session,
+		  digest, dgstlen,
+		  NULL, &siglen),
+		 DST_R_SIGNFAILURE);
+
+	if (r.length < (unsigned int) siglen)
+		return (ISC_R_NOSPACE);
+
+	PK11_RET(pkcs_C_Sign,
+		 (pk11_ctx->session,
+		  digest, dgstlen,
+		  (CK_BYTE_PTR) r.base, &siglen),
+		 DST_R_SIGNFAILURE);
+
+	isc_buffer_add(sig, (unsigned int) siglen);
+
+    err:
+	if (hKey != CK_INVALID_HANDLE)
+		(void) pkcs_C_DestroyObject(pk11_ctx->session, hKey);
+	for (i = 6; i <= 13; i++)
+		if (keyTemplate[i].pValue != NULL) {
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
+			isc_mem_put(dctx->mctx,
+				    keyTemplate[i].pValue,
+				    keyTemplate[i].ulValueLen);
+		}
+	pk11_return_session(pk11_ctx);
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
+	isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
+	dctx->ctxdata.pk11_ctx = NULL;
+
+	return (ret);
+}
+
+static isc_result_t
+pkcs11rsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
+	CK_RV rv;
+	CK_MECHANISM mech = { CKM_RSA_PKCS, NULL, 0 };
+	CK_OBJECT_HANDLE hKey = CK_INVALID_HANDLE;
+	CK_OBJECT_CLASS keyClass = CKO_PUBLIC_KEY;
+	CK_KEY_TYPE keyType = CKK_RSA;
+	CK_ATTRIBUTE keyTemplate[] =
+	{
+		{ CKA_CLASS, &keyClass, (CK_ULONG) sizeof(keyClass) },
+		{ CKA_KEY_TYPE, &keyType, (CK_ULONG) sizeof(keyType) },
+		{ CKA_TOKEN, &falsevalue, (CK_ULONG) sizeof(falsevalue) },
+		{ CKA_PRIVATE, &falsevalue, (CK_ULONG) sizeof(falsevalue) },
+		{ CKA_VERIFY, &truevalue, (CK_ULONG) sizeof(truevalue) },
+		{ CKA_MODULUS, NULL, 0 },
+		{ CKA_PUBLIC_EXPONENT, NULL, 0 },
+	};
+	CK_ATTRIBUTE *attr;
+	CK_BYTE digest[MAX_DER_SIZE + ISC_SHA512_DIGESTLENGTH];
+	CK_BYTE *der;
+	CK_ULONG derlen;
+	CK_ULONG hashlen;
+	CK_ULONG dgstlen;
+	pk11_context_t *pk11_ctx = dctx->ctxdata.pk11_ctx;
+	dst_key_t *key = dctx->key;
+	pk11_object_t *rsa = key->keydata.pkey;
+	isc_result_t ret = ISC_R_SUCCESS;
+	unsigned int i;
+
+#ifndef PK11_MD5_DISABLE
+	REQUIRE(key->key_alg == DST_ALG_RSAMD5 ||
+		key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#else
+	REQUIRE(key->key_alg == DST_ALG_RSASHA1 ||
+		key->key_alg == DST_ALG_NSEC3RSASHA1 ||
+		key->key_alg == DST_ALG_RSASHA256 ||
+		key->key_alg == DST_ALG_RSASHA512);
+#endif
+	REQUIRE(rsa != NULL);
+
+	switch (key->key_alg) {
+#ifndef PK11_MD5_DISABLE
+	case DST_ALG_RSAMD5:
+		der = md5_der;
+		derlen = sizeof(md5_der);
+		hashlen = ISC_MD5_DIGESTLENGTH;
+		break;
+#endif
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		der = sha1_der;
+		derlen = sizeof(sha1_der);
+		hashlen = ISC_SHA1_DIGESTLENGTH;
+		break;
+	case DST_ALG_RSASHA256:
+		der = sha256_der;
+		derlen = sizeof(sha256_der);
+		hashlen = ISC_SHA256_DIGESTLENGTH;
+		break;
+	case DST_ALG_RSASHA512:
+		der = sha512_der;
+		derlen = sizeof(sha512_der);
+		hashlen = ISC_SHA512_DIGESTLENGTH;
+		break;
+	default:
+		INSIST(0);
+	}
+	dgstlen = derlen + hashlen;
+	INSIST(dgstlen <= sizeof(digest));
+	memmove(digest, der, derlen);
+
+	PK11_RET(pkcs_C_DigestFinal,
+		 (pk11_ctx->session, digest + derlen, &hashlen),
+		 DST_R_SIGNFAILURE);
+
+	for (attr = pk11_attribute_first(rsa);
+	     attr != NULL;
+	     attr = pk11_attribute_next(rsa, attr))
+		switch (attr->type) {
+		case CKA_MODULUS:
+			INSIST(keyTemplate[5].type == attr->type);
+			keyTemplate[5].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[5].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[5].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[5].ulValueLen = attr->ulValueLen;
+			break;
+		case CKA_PUBLIC_EXPONENT:
+			INSIST(keyTemplate[6].type == attr->type);
+			keyTemplate[6].pValue = isc_mem_get(dctx->mctx,
+							    attr->ulValueLen);
+			if (keyTemplate[6].pValue == NULL)
+				DST_RET(ISC_R_NOMEMORY);
+			memmove(keyTemplate[6].pValue, attr->pValue,
+				attr->ulValueLen);
+			keyTemplate[6].ulValueLen = attr->ulValueLen;
+			if (pk11_numbits(attr->pValue,
+					 attr->ulValueLen)
+				> RSA_MAX_PUBEXP_BITS)
+				DST_RET(DST_R_VERIFYFAILURE);
+			break;
+		}
+	pk11_ctx->object = CK_INVALID_HANDLE;
+	pk11_ctx->ontoken = false;
+	PK11_RET(pkcs_C_CreateObject,
+		 (pk11_ctx->session,
+		  keyTemplate, (CK_ULONG) 7,
+		  &hKey),
+		 ISC_R_FAILURE);
+
+	PK11_RET(pkcs_C_VerifyInit,
+		 (pk11_ctx->session, &mech, hKey),
+		 ISC_R_FAILURE);
+
+	PK11_RET(pkcs_C_Verify,
+		 (pk11_ctx->session,
+		  digest, dgstlen,
+		  (CK_BYTE_PTR) sig->base, (CK_ULONG) sig->length),
+		 DST_R_VERIFYFAILURE);
+
+    err:
+	if (hKey != CK_INVALID_HANDLE)
+		(void) pkcs_C_DestroyObject(pk11_ctx->session, hKey);
+	for (i = 5; i <= 6; i++)
+		if (keyTemplate[i].pValue != NULL) {
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
+			isc_mem_put(dctx->mctx,
+				    keyTemplate[i].pValue,
+				    keyTemplate[i].ulValueLen);
+		}
+	pk11_return_session(pk11_ctx);
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
+	isc_mem_put(dctx->mctx, pk11_ctx, sizeof(*pk11_ctx));
+	dctx->ctxdata.pk11_ctx = NULL;
+
+	return (ret);
+}
+#endif
+
+static bool
 pkcs11rsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	pk11_object_t *rsa1, *rsa2;
 	CK_ATTRIBUTE *attr1, *attr2;
@@ -496,29 +1124,29 @@ pkcs11rsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	rsa2 = key2->keydata.pkey;
 
 	if ((rsa1 == NULL) && (rsa2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((rsa1 == NULL) || (rsa2 == NULL))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(rsa1, CKA_MODULUS);
 	attr2 = pk11_attribute_bytype(rsa2, CKA_MODULUS);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(rsa1, CKA_PUBLIC_EXPONENT);
 	attr2 = pk11_attribute_bytype(rsa2, CKA_PUBLIC_EXPONENT);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(rsa1, CKA_PRIVATE_EXPONENT);
 	attr2 = pk11_attribute_bytype(rsa2, CKA_PRIVATE_EXPONENT);
@@ -527,15 +1155,15 @@ pkcs11rsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	     (attr1->ulValueLen != attr2->ulValueLen) ||
 	     !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				attr1->ulValueLen)))
-		return (ISC_FALSE);
+		return (false);
 
 	if (!rsa1->ontoken && !rsa2->ontoken)
-		return (ISC_TRUE);
+		return (true);
 	else if (rsa1->ontoken || rsa2->ontoken ||
 		 (rsa1->object != rsa2->object))
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static isc_result_t
@@ -577,12 +1205,39 @@ pkcs11rsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 
 	UNUSED(callback);
 
+	/*
+	 * Reject incorrect RSA key lengths.
+	 */
+	switch (key->key_alg) {
+	case DST_ALG_RSAMD5:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		/* From RFC 3110 */
+		if (key->key_size > 4096)
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA256:
+		/* From RFC 5702 */
+		if ((key->key_size < 512) ||
+		    (key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	case DST_ALG_RSASHA512:
+		/* From RFC 5702 */
+		if ((key->key_size < 1024) ||
+		    (key->key_size > 4096))
+			return (ISC_R_FAILURE);
+		break;
+	default:
+		INSIST(0);
+	}
+
 	pk11_ctx = (pk11_context_t *) isc_mem_get(key->mctx,
 						  sizeof(*pk11_ctx));
 	if (pk11_ctx == NULL)
 		return (ISC_R_NOMEMORY);
-	ret = pk11_get_session(pk11_ctx, OP_RSA, ISC_TRUE, ISC_FALSE,
-			       ISC_FALSE, NULL, pk11_get_best_token(OP_RSA));
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
+			       false, NULL, pk11_get_best_token(OP_RSA));
 	if (ret != ISC_R_SUCCESS)
 		goto err;
 
@@ -661,7 +1316,7 @@ pkcs11rsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 	(void) pkcs_C_DestroyObject(pk11_ctx->session, priv);
 	(void) pkcs_C_DestroyObject(pk11_ctx->session, pub);
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ISC_R_SUCCESS);
@@ -673,21 +1328,21 @@ pkcs11rsa_generate(dst_key_t *key, int exp, void (*callback)(int)) {
 	if (pub != CK_INVALID_HANDLE)
 		(void) pkcs_C_DestroyObject(pk11_ctx->session, pub);
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 pkcs11rsa_isprivate(const dst_key_t *key) {
 	pk11_object_t *rsa = key->keydata.pkey;
 	CK_ATTRIBUTE *attr;
 
 	if (rsa == NULL)
-		return (ISC_FALSE);
+		return (false);
 	attr = pk11_attribute_bytype(rsa, CKA_PRIVATE_EXPONENT);
-	return (ISC_TF((attr != NULL) || rsa->ontoken));
+	return (attr != NULL || rsa->ontoken);
 }
 
 static void
@@ -715,7 +1370,8 @@ pkcs11rsa_destroy(dst_key_t *key) {
 		case CKA_EXPONENT_2:
 		case CKA_COEFFICIENT:
 			if (attr->pValue != NULL) {
-				memset(attr->pValue, 0, attr->ulValueLen);
+				isc_safe_memwipe(attr->pValue,
+						 attr->ulValueLen);
 				isc_mem_put(key->mctx,
 					    attr->pValue,
 					    attr->ulValueLen);
@@ -723,12 +1379,12 @@ pkcs11rsa_destroy(dst_key_t *key) {
 			break;
 		}
 	if (rsa->repr != NULL) {
-		memset(rsa->repr, 0, rsa->attrcnt * sizeof(*attr));
+		isc_safe_memwipe(rsa->repr, rsa->attrcnt * sizeof(*attr));
 		isc_mem_put(key->mctx,
 			    rsa->repr,
 			    rsa->attrcnt * sizeof(*attr));
 	}
-	memset(rsa, 0, sizeof(*rsa));
+	isc_safe_memwipe(rsa, sizeof(*rsa));
 	isc_mem_put(key->mctx, rsa, sizeof(*rsa));
 	key->keydata.pkey = NULL;
 }
@@ -765,13 +1421,13 @@ pkcs11rsa_todns(const dst_key_t *key, isc_buffer_t *data) {
 	if (e_bytes < 256) {	/*%< key exponent is <= 2040 bits */
 		if (r.length < 1)
 			return (ISC_R_NOSPACE);
-		isc_buffer_putuint8(data, (isc_uint8_t) e_bytes);
+		isc_buffer_putuint8(data, (uint8_t) e_bytes);
 		isc_region_consume(&r, 1);
 	} else {
 		if (r.length < 3)
 			return (ISC_R_NOSPACE);
 		isc_buffer_putuint8(data, 0);
-		isc_buffer_putuint16(data, (isc_uint16_t) e_bytes);
+		isc_buffer_putuint16(data, (uint16_t) e_bytes);
 		isc_region_consume(&r, 3);
 	}
 
@@ -812,7 +1468,7 @@ pkcs11rsa_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 	if (e_bytes == 0) {
 		if (r.length < 2) {
-			memset(rsa, 0, sizeof(*rsa));
+			isc_safe_memwipe(rsa, sizeof(*rsa));
 			isc_mem_put(key->mctx, rsa, sizeof(*rsa));
 			return (DST_R_INVALIDPUBLICKEY);
 		}
@@ -823,7 +1479,7 @@ pkcs11rsa_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	if (r.length < e_bytes) {
-		memset(rsa, 0, sizeof(*rsa));
+		isc_safe_memwipe(rsa, sizeof(*rsa));
 		isc_mem_put(key->mctx, rsa, sizeof(*rsa));
 		return (DST_R_INVALIDPUBLICKEY);
 	}
@@ -867,7 +1523,8 @@ pkcs11rsa_fromdns(dst_key_t *key, isc_buffer_t *data) {
 		case CKA_MODULUS:
 		case CKA_PUBLIC_EXPONENT:
 			if (attr->pValue != NULL) {
-				memset(attr->pValue, 0, attr->ulValueLen);
+				isc_safe_memwipe(attr->pValue,
+						 attr->ulValueLen);
 				isc_mem_put(key->mctx,
 					    attr->pValue,
 					    attr->ulValueLen);
@@ -875,12 +1532,13 @@ pkcs11rsa_fromdns(dst_key_t *key, isc_buffer_t *data) {
 			break;
 		}
 	if (rsa->repr != NULL) {
-		memset(rsa->repr, 0, rsa->attrcnt * sizeof(*attr));
+		isc_safe_memwipe(rsa->repr,
+				 rsa->attrcnt * sizeof(*attr));
 		isc_mem_put(key->mctx,
 			    rsa->repr,
 			    rsa->attrcnt * sizeof(*attr));
 	}
-	memset(rsa, 0, sizeof(*rsa));
+	isc_safe_memwipe(rsa, sizeof(*rsa));
 	isc_mem_put(key->mctx, rsa, sizeof(*rsa));
 	return (ISC_R_NOMEMORY);
 }
@@ -1014,14 +1672,16 @@ pkcs11rsa_tofile(const dst_key_t *key, const char *directory) {
 
 	if (key->engine != NULL) {
 		priv.elements[i].tag = TAG_RSA_ENGINE;
-		priv.elements[i].length = strlen(key->engine) + 1;
+		priv.elements[i].length =
+			(unsigned short)strlen(key->engine) + 1;
 		priv.elements[i].data = (unsigned char *)key->engine;
 		i++;
 	}
 
 	if (key->label != NULL) {
 		priv.elements[i].tag = TAG_RSA_LABEL;
-		priv.elements[i].length = strlen(key->label) + 1;
+		priv.elements[i].length =
+			(unsigned short)strlen(key->label) + 1;
 		priv.elements[i].data = (unsigned char *)key->label;
 		i++;
 	}
@@ -1032,7 +1692,7 @@ pkcs11rsa_tofile(const dst_key_t *key, const char *directory) {
 	for (i = 0; i < 10; i++) {
 		if (bufs[i] == NULL)
 			break;
-		memset(bufs[i], 0, modulus->ulValueLen);
+		isc_safe_memwipe(bufs[i], modulus->ulValueLen);
 		isc_mem_put(key->mctx, bufs[i], modulus->ulValueLen);
 	}
 	return (result);
@@ -1067,8 +1727,8 @@ pkcs11rsa_fetch(dst_key_t *key, const char *engine, const char *label,
 	pubrsa = pub->keydata.pkey;
 
 	rsa->object = CK_INVALID_HANDLE;
-	rsa->ontoken = ISC_TRUE;
-	rsa->reqlogon = ISC_TRUE;
+	rsa->ontoken = true;
+	rsa->reqlogon = true;
 	rsa->repr = (CK_ATTRIBUTE *) isc_mem_get(key->mctx, sizeof(*attr) * 2);
 	if (rsa->repr == NULL)
 		return (ISC_R_NOMEMORY);
@@ -1101,7 +1761,7 @@ pkcs11rsa_fetch(dst_key_t *key, const char *engine, const char *label,
 						  sizeof(*pk11_ctx));
 	if (pk11_ctx == NULL)
 		DST_RET(ISC_R_NOMEMORY);
-	ret = pk11_get_session(pk11_ctx, OP_RSA, ISC_TRUE, ISC_FALSE,
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
 			       rsa->reqlogon, NULL, rsa->slot);
 	if (ret != ISC_R_SUCCESS)
 		goto err;
@@ -1138,7 +1798,7 @@ pkcs11rsa_fetch(dst_key_t *key, const char *engine, const char *label,
 		DST_RET(ISC_R_NOMEMORY);
 
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	attr = pk11_attribute_bytype(rsa, CKA_MODULUS);
@@ -1150,7 +1810,7 @@ pkcs11rsa_fetch(dst_key_t *key, const char *engine, const char *label,
     err:
 	if (pk11_ctx != NULL) {
 		pk11_return_session(pk11_ctx);
-		memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+		isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 		isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 	}
 
@@ -1246,7 +1906,7 @@ pkcs11rsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		key->key_size = pub->key_size;
 
 		dst__privstruct_free(&priv, mctx);
-		memset(&priv, 0, sizeof(priv));
+		isc_safe_memwipe(&priv, sizeof(priv));
 
 		return (ISC_R_SUCCESS);
 	}
@@ -1275,7 +1935,7 @@ pkcs11rsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		if (ret != ISC_R_SUCCESS)
 			goto err;
 		dst__privstruct_free(&priv, mctx);
-		memset(&priv, 0, sizeof(priv));
+		isc_safe_memwipe(&priv, sizeof(priv));
 		return (ret);
 	}
 
@@ -1380,14 +2040,14 @@ pkcs11rsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		DST_RET(ISC_R_RANGE);
 
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 
 	return (ISC_R_SUCCESS);
 
  err:
 	pkcs11rsa_destroy(key);
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 	return (ret);
 }
 
@@ -1420,8 +2080,8 @@ pkcs11rsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 		return (ISC_R_NOMEMORY);
 	memset(rsa, 0, sizeof(*rsa));
 	rsa->object = CK_INVALID_HANDLE;
-	rsa->ontoken = ISC_TRUE;
-	rsa->reqlogon = ISC_TRUE;
+	rsa->ontoken = true;
+	rsa->reqlogon = true;
 	key->keydata.pkey = rsa;
 
 	rsa->repr = (CK_ATTRIBUTE *) isc_mem_get(key->mctx, sizeof(*attr) * 2);
@@ -1441,7 +2101,7 @@ pkcs11rsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 						  sizeof(*pk11_ctx));
 	if (pk11_ctx == NULL)
 		DST_RET(ISC_R_NOMEMORY);
-	ret = pk11_get_session(pk11_ctx, OP_RSA, ISC_TRUE, ISC_FALSE,
+	ret = pk11_get_session(pk11_ctx, OP_RSA, true, false,
 			       rsa->reqlogon, NULL, rsa->slot);
 	if (ret != ISC_R_SUCCESS)
 		goto err;
@@ -1514,7 +2174,7 @@ pkcs11rsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 	key->key_size = pk11_numbits(attr->pValue, attr->ulValueLen);
 
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ISC_R_SUCCESS);
@@ -1523,7 +2183,7 @@ pkcs11rsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 	pkcs11rsa_destroy(key);
 	if (pk11_ctx != NULL) {
 		pk11_return_session(pk11_ctx);
-		memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+		isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 		isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 	}
 
@@ -1532,7 +2192,11 @@ pkcs11rsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 
 static dst_func_t pkcs11rsa_functions = {
 	pkcs11rsa_createctx,
+#ifndef PK11_RSA_PKCS_REPLACE
 	pkcs11rsa_createctx2,
+#else
+	NULL, /*%< createctx2 */
+#endif
 	pkcs11rsa_destroyctx,
 	pkcs11rsa_adddata,
 	pkcs11rsa_sign,

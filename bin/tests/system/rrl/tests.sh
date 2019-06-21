@@ -1,28 +1,25 @@
-# Copyright (C) 2012, 2013  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
-
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 # test response rate limiting
 
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
 
+RNDCCMD="$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p ${CONTROLPORT} -s"
+
 #set -x
 
 ns1=10.53.0.1			    # root, defining the others
 ns2=10.53.0.2			    # test server
 ns3=10.53.0.3			    # secondary test server
+ns4=10.53.0.4			    # log-only test server
 ns7=10.53.0.7			    # whitelisted client
 
 USAGE="$0: [-x]"
@@ -44,7 +41,7 @@ trap 'exit 1' 1 2 15
 ret=0
 setret () {
     ret=1
-    echo "$*"
+    echo_i "$*"
 }
 
 
@@ -66,79 +63,81 @@ sec_start () {
 # turn off ${HOME}/.digrc
 HOME=/dev/null; export HOME
 
-#   $1=result name  $2=domain name  $3=dig options
-digcmd () {
-    OFILE=$1; shift
-    DIG_DOM=$1; shift
-    ARGS="+nosearch +time=1 +tries=1 +ignore -p 5300 $* $DIG_DOM @$ns2"
-    #echo I:dig $ARGS 1>&2
-    START=`date +%y%m%d%H%M.%S`
-    RESULT=`$DIG $ARGS 2>&1 | tee $OFILE=TEMP				\
-	    | sed -n -e '/^;; AUTHORITY/,/^$/d'				\
-		-e '/^;; ADDITIONAL/,/^$/d'				\
-		-e  's/^[^;].*	\([^	 ]\{1,\}\)$/\1/p'		\
-		-e 's/;; flags.* tc .*/TC/p'				\
-		-e 's/;; .* status: NXDOMAIN.*/NXDOMAIN/p'		\
-		-e 's/;; .* status: SERVFAIL.*/SERVFAIL/p'		\
-		-e 's/;; connection timed out.*/drop/p'			\
-		-e 's/;; communications error to.*/drop/p'		\
-	    | tr -d '\n'`
-    mv "$OFILE=TEMP" "$OFILE=$RESULT"
-    touch -t $START "$OFILE=$RESULT"
-}
-
-
 #   $1=number of tests  $2=target domain  $3=dig options
 QNUM=1
 burst () {
     BURST_LIMIT=$1; shift
     BURST_DOM_BASE="$1"; shift
-    while test "$BURST_LIMIT" -ge 1; do
-	CNT=`expr "00$QNUM" : '.*\(...\)'`
-	eval BURST_DOM="$BURST_DOM_BASE"
-	FILE="dig.out-$BURST_DOM-$CNT"
-	digcmd $FILE $BURST_DOM $* &
-	QNUM=`expr $QNUM + 1`
-	BURST_LIMIT=`expr "$BURST_LIMIT" - 1`
+
+    XCNT=$CNT
+    CNT='XXX'
+    eval FILENAME="mdig.out-$BURST_DOM_BASE"
+    CNT=$XCNT
+
+    DOMS=""
+    CNTS=`$PERL -e 'for ( $i = 0; $i < '$BURST_LIMIT'; $i++) { printf "%03d\n", '$QNUM' + $i; }'`
+    for CNT in $CNTS
+    do
+        eval BURST_DOM="$BURST_DOM_BASE"
+        DOMS="$DOMS $BURST_DOM"
     done
+    ARGS="+nocookie +continue +time=1 +tries=1 -p ${PORT} $* @$ns2 $DOMS"
+    $MDIG $ARGS 2>&1 | tee -a full-$FILENAME | sed -n -e '/^;; AUTHORITY/,/^$/d'			\
+		-e '/^;; ADDITIONAL/,/^$/d'				\
+		-e 's/^[^;].*	\([^	 ]\{1,\}\)$/\1/p'		\
+		-e 's/;; flags.* tc .*/TC/p'				\
+		-e 's/;; .* status: NXDOMAIN.*/NXDOMAIN/p'		\
+		-e 's/;; .* status: NOERROR.*/NOERROR/p'		\
+		-e 's/;; .* status: SERVFAIL.*/SERVFAIL/p'		\
+		-e 's/response failed with timed out.*/drop/p'		\
+		-e 's/;; communications error to.*/drop/p' >> $FILENAME
+    QNUM=`expr $QNUM + $BURST_LIMIT`
 }
 
+# compare integers $1 and $2; ensure the difference is no more than $3
+range () {
+    $PERL -e 'if (abs(int($ARGV[0]) - int($ARGV[1])) > int($ARGV[2])) { exit(1) }' $1 $2 $3
+}
 
 #   $1=domain  $2=IP address  $3=# of IP addresses  $4=TC  $5=drop
 #	$6=NXDOMAIN  $7=SERVFAIL or other errors
 ck_result() {
-    BAD=
-    wait
-    ADDRS=`ls dig.out-$1-*=$2				2>/dev/null | wc -l`
+    BAD=no
+    ADDRS=`egrep "^$2$" mdig.out-$1				2>/dev/null | wc -l`
     # count simple truncated and truncated NXDOMAIN as TC
-    TC=`ls dig.out-$1-*=TC dig.out-$1-*=NXDOMAINTC	2>/dev/null | wc -l`
-    DROP=`ls dig.out-$1-*=drop				2>/dev/null | wc -l`
+    TC=`egrep "^TC|NXDOMAINTC$" mdig.out-$1			2>/dev/null | wc -l`
+    DROP=`egrep "^drop$" mdig.out-$1				2>/dev/null | wc -l`
     # count NXDOMAIN and truncated NXDOMAIN as NXDOMAIN
-    NXDOMAIN=`ls dig.out-$1-*=NXDOMAIN  dig.out-$1-*=NXDOMAINTC	2>/dev/null \
-							| wc -l`
-    SERVFAIL=`ls dig.out-$1-*=SERVFAIL			2>/dev/null | wc -l`
-    if test $ADDRS -ne "$3"; then
-	setret "I:"$ADDRS" instead of $3 '$2' responses for $1"
-	BAD=yes
-    fi
-    if test $TC -ne "$4"; then
-	setret "I:"$TC" instead of $4 truncation responses for $1"
-	BAD=yes
-    fi
-    if test $DROP -ne "$5"; then
-	setret "I:"$DROP" instead of $5 dropped responses for $1"
-	BAD=yes
-    fi
-    if test $NXDOMAIN -ne "$6"; then
-	setret "I:"$NXDOMAIN" instead of $6 NXDOMAIN responses for $1"
-	BAD=yes
-    fi
-    if test $SERVFAIL -ne "$7"; then
-	setret "I:"$SERVFAIL" instead of $7 error responses for $1"
-	BAD=yes
-    fi
+    NXDOMAIN=`egrep "^NXDOMAIN|NXDOMAINTC$" mdig.out-$1		2>/dev/null | wc -l`
+    SERVFAIL=`egrep "^SERVFAIL$" mdig.out-$1			2>/dev/null | wc -l`
+    NOERROR=`egrep "^NOERROR$" mdig.out-$1			2>/dev/null | wc -l`
+    
+    range $ADDRS "$3" 1 ||
+    setret "$ADDRS instead of $3 '$2' responses for $1" &&
+    BAD=yes
+    
+    range $TC "$4" 1 ||
+    setret "$TC instead of $4 truncation responses for $1" &&
+    BAD=yes
+    
+    range $DROP "$5" 1 ||
+    setret "$DROP instead of $5 dropped responses for $1" &&
+    BAD=yes
+    
+    range $NXDOMAIN "$6" 1 ||
+    setret "$NXDOMAIN instead of $6 NXDOMAIN responses for $1" &&
+    BAD=yes
+    
+    range $SERVFAIL "$7" 1 ||
+    setret "$SERVFAIL instead of $7 error responses for $1" &&
+    BAD=yes
+
+    range $NOERROR "$8" 1 ||
+    setret "$NOERROR instead of $8 NOERROR responses for $1" &&
+    BAD=yes
+    
     if test -z "$BAD"; then
-	rm -f dig.out-$1-*
+	rm -f mdig.out-$1
     fi
 }
 
@@ -150,9 +149,9 @@ ckstats () {
     C=`sed -n -e "s/[	 ]*\([0-9]*\).responses $TYPE for rate limits.*/\1/p"  \
 	    ns2/named.stats | tail -1`
     C=`expr 0$C + 0`
-    if test "$C" -ne $EXPECTED; then
-	setret "I:wrong $LABEL $TYPE statistics of $C instead of $EXPECTED"
-    fi
+    
+    range "$C" $EXPECTED 1 ||
+    setret "wrong $LABEL $TYPE statistics of $C instead of $EXPECTED"
 }
 
 
@@ -164,7 +163,7 @@ sec_start
 burst 5 a1.tld3 +norec
 # basic rate limiting
 burst 3 a1.tld2
-# 1 second delay allows an additional response.
+# delay allows an additional response.
 sleep 1
 burst 10 a1.tld2
 # Request 30 different qnames to try a wildcard.
@@ -172,18 +171,18 @@ burst 30 'x$CNT.a2.tld2'
 # These should be counted and limited but are not.  See RT33138.
 burst 10 'y.x$CNT.a2.tld2'
 
-#					IP      TC      drop  NXDOMAIN SERVFAIL
+#					IP      TC      drop  NXDOMAIN SERVFAIL NOERROR
 # referrals to "."
-ck_result   a1.tld3	''		2	1	2	0	0
+ck_result   a1.tld3	x		0	1	2	0	0	2
 # check 13 results including 1 second delay that allows an additional response
-ck_result   a1.tld2	192.0.2.1	3	4	6	0	0
+ck_result   a1.tld2	192.0.2.1	3	4	6	0	0	8
 
 # Check the wild card answers.
 # The parent name of the 30 requests is counted.
-ck_result 'x*.a2.tld2'	192.0.2.2	2	10	18	0	0
+ck_result 'x*.a2.tld2'	192.0.2.2	2	10	18	0	0	12
 
 # These should be limited but are not.  See RT33138.
-ck_result 'y.x*.a2.tld2' 192.0.2.2	10	0	0	0	0
+ck_result 'y.x*.a2.tld2' 192.0.2.2	10	0	0	0	0	10
 
 #########
 sec_start
@@ -193,17 +192,17 @@ burst 10 'y$CNT.a3.tld3'
 burst 10 'z$CNT.a4.tld2'
 
 # 10 identical recursive responses are limited
-ck_result 'x.a3.tld3'	192.0.3.3	2	3	5	0	0
+ck_result 'x.a3.tld3'	192.0.3.3	2	3	5	0	0	5
 
 # 10 different recursive responses are not limited
-ck_result 'y*.a3.tld3'	192.0.3.3	10	0	0	0	0
+ck_result 'y*.a3.tld3'	192.0.3.3	10	0	0	0	0	10
 
 # 10 different NXDOMAIN responses are limited based on the parent name.
 #   We count 13 responses because we count truncated NXDOMAIN responses
 #   as both truncated and NXDOMAIN.
-ck_result 'z*.a4.tld2'	x		0	3	5	5	0
+ck_result 'z*.a4.tld2'	x		0	3	5	5	0	0
 
-$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p 9953 -s $ns2 stats
+$RNDCCMD $ns2 stats
 ckstats first dropped 36
 ckstats first truncated 21
 
@@ -214,24 +213,24 @@ sec_start
 burst 10 a5.tld2 +tcp
 burst 10 a6.tld2 -b $ns7
 burst 10 a7.tld4
-burst 2 a8.tld2 AAAA
-burst 2 a8.tld2 TXT
-burst 2 a8.tld2 SPF
+burst 2 a8.tld2 -t AAAA
+burst 2 a8.tld2 -t TXT
+burst 2 a8.tld2 -t SPF
 
-#					IP      TC      drop  NXDOMAIN SERVFAIL
+#					IP      TC      drop  NXDOMAIN SERVFAIL NOERROR
 # TCP responses are not rate limited
-ck_result a5.tld2	192.0.2.5	10	0	0	0	0
+ck_result a5.tld2	192.0.2.5	10	0	0	0	0	10
 
 # whitelisted client is not rate limited
-ck_result a6.tld2	192.0.2.6	10	0	0	0	0
+ck_result a6.tld2	192.0.2.6	10	0	0	0	0	10
 
 # Errors such as SERVFAIL are rate limited.
-ck_result a7.tld4	x		0	0	8	0	2
+ck_result a7.tld4	x		0	0	8	0	2	0
 
 # NODATA responses are counted as the same regardless of qtype.
-ck_result a8.tld2	''		2	2	2	0	0
+ck_result a8.tld2	x		0	2	2	0	0	4
 
-$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p 9953 -s $ns2 stats
+$RNDCCMD $ns2 stats
 ckstats second dropped 46
 ckstats second truncated 23
 
@@ -239,20 +238,45 @@ ckstats second truncated 23
 #########
 sec_start
 
-#					IP      TC      drop  NXDOMAIN SERVFAIL
+#					IP      TC      drop  NXDOMAIN SERVFAIL NOERROR
 # all-per-second
 #   The qnames are all unique but the client IP address is constant.
 QNUM=101
 burst 60 'all$CNT.a9.tld2'
 
-ck_result 'a*.a9.tld2'	192.0.2.8	50	0	10	0	0
+ck_result 'a*.a9.tld2'	192.0.2.8	50	0	10	0	0	50
 
-$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p 9953 -s $ns2 stats
+$RNDCCMD $ns2 stats
 ckstats final dropped 56
 ckstats final truncated 23
 
+#########
+sec_start
 
-echo "I:exit status: $ret"
-# exit $ret
-[ $ret -ne 0 ] && echo "I:test failure overridden"
-exit 0
+DIGOPTS="+nocookie +nosearch +time=1 +tries=1 +ignore -p ${PORT}"
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+
+grep "would limit" ns4/named.run >/dev/null 2>&1 ||
+setret "\"would limit\" not found in log file."
+
+$NAMED -gc broken.conf > broken.out 2>&1 & 
+sleep 2
+grep "min-table-size 1" broken.out > /dev/null || setret "min-table-size 0 was not changed to 1"
+
+if [ -f named.pid ]; then
+    $KILL `cat named.pid`
+    setret "named should not have started, but did"
+fi
+
+echo_i "exit status: $ret"
+[ $ret -eq 0 ] || exit 1

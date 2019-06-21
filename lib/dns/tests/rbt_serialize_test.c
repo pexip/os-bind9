@@ -1,36 +1,30 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: rbt_test.c,v 1.1.14.8 2012/02/10 16:24:37 ckb Exp $ */
 
 /* ! \file */
 
 #include <config.h>
+
 #include <atf-c.h>
-#include <isc/mem.h>
-#include <isc/print.h>
-#include <isc/random.h>
-#include <isc/string.h>
+
+#include <inttypes.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
-#ifdef HAVE_INTTYPES_H
-#include <inttypes.h> /* uintptr_t */
-#endif
+#include <isc/mem.h>
+#include <isc/print.h>
+#include <isc/random.h>
+#include <isc/string.h>
 
 #include <dns/rbt.h>
 #include <dns/fixedname.h>
@@ -108,7 +102,7 @@ delete_data(void *data, void *arg) {
 }
 
 static isc_result_t
-write_data(FILE *file, unsigned char *datap, void *arg, isc_uint64_t *crc) {
+write_data(FILE *file, unsigned char *datap, void *arg, uint64_t *crc) {
 	isc_result_t result;
 	size_t ret = 0;
 	data_holder_t *data = (data_holder_t *)datap;
@@ -148,7 +142,7 @@ write_data(FILE *file, unsigned char *datap, void *arg, isc_uint64_t *crc) {
 
 static isc_result_t
 fix_data(dns_rbtnode_t *p, void *base, size_t max, void *arg,
-	 isc_uint64_t *crc)
+	 uint64_t *crc)
 {
 	data_holder_t *data = p->data;
 	size_t size;
@@ -210,8 +204,7 @@ add_test_data(isc_mem_t *mymctx, dns_rbt_t *rbt) {
 
 		isc_buffer_init(&b, buffer, testdatap->name_len);
 		isc_buffer_add(&b, testdatap->name_len);
-		dns_fixedname_init(&fname);
-		name = dns_fixedname_name(&fname);
+		name = dns_fixedname_initname(&fname);
 		result = dns_name_fromtext(name, &b, dns_rootname, 0, NULL);
 		if (result != ISC_R_SUCCESS) {
 			testdatap++;
@@ -244,8 +237,7 @@ check_test_data(dns_rbt_t *rbt) {
 	dns_name_t *foundname;
 	rbt_testdata_t *testdatap = testdata;
 
-	dns_fixedname_init(&fixed);
-	foundname = dns_fixedname_name(&fixed);
+	foundname = dns_fixedname_initname(&fixed);
 
 	while (testdatap->name != NULL && testdatap->data.data != NULL) {
 		memmove(buffer, testdatap->name, testdatap->name_len + 1);
@@ -253,8 +245,7 @@ check_test_data(dns_rbt_t *rbt) {
 
 		isc_buffer_init(&b, arg, testdatap->name_len);
 		isc_buffer_add(&b, testdatap->name_len);
-		dns_fixedname_init(&fname);
-		name = dns_fixedname_name(&fname);
+		name = dns_fixedname_initname(&fname);
 		result = dns_name_fromtext(name, &b, dns_rootname, 0, NULL);
 		if (result != ISC_R_SUCCESS) {
 			testdatap++;
@@ -296,7 +287,7 @@ ATF_TC_BODY(serialize, tc) {
 
 	isc_mem_debugging = ISC_MEM_DEBUGRECORD;
 
-	result = dns_test_begin(NULL, ISC_TRUE);
+	result = dns_test_begin(NULL, true);
 	ATF_CHECK_STREQ(dns_result_totext(result), "success");
 	result = dns_rbt_create(mctx, delete_data, NULL, &rbt);
 	ATF_CHECK_STREQ(dns_result_totext(result), "success");
@@ -363,14 +354,14 @@ ATF_TC_BODY(deserialize_corrupt, tc) {
 	int fd;
 	off_t filesize = 0;
 	char *base, *p, *q;
-	isc_uint32_t r;
+	uint32_t r;
 	int i;
 
 	UNUSED(tc);
 
 	isc_mem_debugging = ISC_MEM_DEBUGRECORD;
 
-	result = dns_test_begin(NULL, ISC_TRUE);
+	result = dns_test_begin(NULL, true);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	/* Set up map file */

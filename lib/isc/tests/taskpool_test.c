@@ -1,20 +1,13 @@
 /*
- * Copyright (C) 2011, 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 /*! \file */
 
@@ -44,7 +37,7 @@ ATF_TC_BODY(create_pool, tc) {
 
 	UNUSED(tc);
 
-	result = isc_test_begin(NULL, ISC_TRUE);
+	result = isc_test_begin(NULL, true, 0);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = isc_taskpool_create(taskmgr, mctx, 8, 2, &pool);
@@ -68,7 +61,7 @@ ATF_TC_BODY(expand_pool, tc) {
 
 	UNUSED(tc);
 
-	result = isc_test_begin(NULL, ISC_TRUE);
+	result = isc_test_begin(NULL, true, 0);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = isc_taskpool_create(taskmgr, mctx, 10, 2, &pool1);
@@ -121,7 +114,7 @@ ATF_TC_BODY(get_tasks, tc) {
 
 	UNUSED(tc);
 
-	result = isc_test_begin(NULL, ISC_TRUE);
+	result = isc_test_begin(NULL, true, 0);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = isc_taskpool_create(taskmgr, mctx, 2, 2, &pool);
@@ -160,14 +153,14 @@ ATF_TC_BODY(set_privilege, tc) {
 
 	UNUSED(tc);
 
-	result = isc_test_begin(NULL, ISC_TRUE);
+	result = isc_test_begin(NULL, true, 0);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = isc_taskpool_create(taskmgr, mctx, 2, 2, &pool);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 	ATF_REQUIRE_EQ(isc_taskpool_size(pool), 2);
 
-	isc_taskpool_setprivilege(pool, ISC_TRUE);
+	isc_taskpool_setprivilege(pool, true);
 
 	isc_taskpool_gettask(pool, &task1);
 	isc_taskpool_gettask(pool, &task2);
@@ -181,7 +174,7 @@ ATF_TC_BODY(set_privilege, tc) {
 	ATF_CHECK(isc_task_privilege(task2));
 	ATF_CHECK(isc_task_privilege(task3));
 
-	isc_taskpool_setprivilege(pool, ISC_FALSE);
+	isc_taskpool_setprivilege(pool, false);
 
 	ATF_CHECK(!isc_task_privilege(task1));
 	ATF_CHECK(!isc_task_privilege(task2));

@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2005, 2007, 2009, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: a_1.c,v 1.8 2009/12/04 22:06:37 tbox Exp $ */
 
 /* by Bjorn.Victor@it.uu.se, 2005-05-07 */
 /* Based on generic/soa_6.c and generic/mx_15.c */
@@ -39,17 +33,18 @@ fromtext_ch_a(ARGS_FROMTEXT) {
 	UNUSED(callbacks);
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 
 	/* get domain name */
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	origin = (origin != NULL) ? origin : dns_rootname;
+	if (origin == NULL)
+		origin = dns_rootname;
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 	if ((options & DNS_RDATA_CHECKNAMES) != 0 &&
 	    (options & DNS_RDATA_CHECKREVERSE) != 0) {
-		isc_boolean_t ok;
-		ok = dns_name_ishostname(&name, ISC_FALSE);
+		bool ok;
+		ok = dns_name_ishostname(&name, false);
 		if (!ok && (options & DNS_RDATA_CHECKNAMESFAIL) != 0)
 			RETTOK(DNS_R_BADNAME);
 		if (!ok && callbacks != NULL)
@@ -57,7 +52,7 @@ fromtext_ch_a(ARGS_FROMTEXT) {
 	}
 
 	/* 16-bit octal address */
-	RETERR(isc_lex_getoctaltoken(lexer, &token, ISC_FALSE));
+	RETERR(isc_lex_getoctaltoken(lexer, &token, false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	return (uint16_tobuffer(token.value.as_ulong, target));
@@ -68,9 +63,9 @@ totext_ch_a(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	isc_boolean_t sub;
+	bool sub;
 	char buf[sizeof("0177777")];
-	isc_uint16_t addr;
+	uint16_t addr;
 
 	REQUIRE(rdata->type == dns_rdatatype_a);
 	REQUIRE(rdata->rdclass == dns_rdataclass_ch); /* 3 */
@@ -87,7 +82,7 @@ totext_ch_a(ARGS_TOTEXT) {
 	sub = name_prefix(&name, tctx->origin, &prefix);
 	RETERR(dns_name_totext(&prefix, sub, target));
 
-	sprintf(buf, "%o", addr); /* note octal */
+	snprintf(buf, sizeof(buf), "%o", addr); /* note octal */
 	RETERR(str_totext(" ", target));
 	return (str_totext(buf, target));
 }
@@ -184,7 +179,7 @@ compare_ch_a(ARGS_COMPARE) {
 	if (order != 0)
 		return (order);
 
-	order = memcmp(rdata1->data, rdata2->data, 2);
+	order = memcmp(region1.base, region2.base, 2);
 	if (order != 0)
 		order = (order < 0) ? -1 : 1;
 	return (order);
@@ -279,7 +274,7 @@ digest_ch_a(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_ch_a(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_a);
@@ -290,7 +285,7 @@ checkowner_ch_a(ARGS_CHECKOWNER) {
 	return (dns_name_ishostname(name, wildcard));
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_ch_a(ARGS_CHECKNAMES) {
 	isc_region_t region;
 	dns_name_t name;
@@ -303,13 +298,13 @@ checknames_ch_a(ARGS_CHECKNAMES) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_init(&name, NULL);
 	dns_name_fromregion(&name, &region);
-	if (!dns_name_ishostname(&name, ISC_FALSE)) {
+	if (!dns_name_ishostname(&name, false)) {
 		if (bad != NULL)
 			dns_name_clone(&name, bad);
-		return (ISC_FALSE);
+		return (false);
 	}
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

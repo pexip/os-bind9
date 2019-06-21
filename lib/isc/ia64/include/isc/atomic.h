@@ -1,23 +1,19 @@
 /*
- * Copyright (C) 2006, 2007, 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: atomic.h,v 1.7 2009/06/24 02:22:50 marka Exp $ */
 
 #ifndef ISC_ATOMIC_H
 #define ISC_ATOMIC_H 1
+
+#include <inttypes.h>
 
 #include <isc/platform.h>
 #include <isc/types.h>
@@ -30,15 +26,15 @@
  * Open issue: can 'fetchadd' make the code faster for some particular values
  * (e.g., 1 and -1)?
  */
-static inline isc_int32_t
+static inline int32_t
 #ifdef __GNUC__
 __attribute__ ((unused))
 #endif
-isc_atomic_xadd(isc_int32_t *p, isc_int32_t val)
+isc_atomic_xadd(int32_t *p, int32_t val)
 {
-	isc_int32_t prev, swapped;
+	int32_t prev, swapped;
 
-	for (prev = *(volatile isc_int32_t *)p; ; prev = swapped) {
+	for (prev = *(volatile int32_t *)p; ; prev = swapped) {
 		swapped = prev + val;
 		__asm__ volatile(
 			"mov ar.ccv=%2;;"
@@ -60,7 +56,7 @@ static inline void
 #ifdef __GNUC__
 __attribute__ ((unused))
 #endif
-isc_atomic_store(isc_int32_t *p, isc_int32_t val)
+isc_atomic_store(int32_t *p, int32_t val)
 {
 	__asm__ volatile(
 		"st4.rel %0=%1"
@@ -75,13 +71,13 @@ isc_atomic_store(isc_int32_t *p, isc_int32_t val)
  * original value is equal to 'cmpval'.  The original value is returned in any
  * case.
  */
-static inline isc_int32_t
+static inline int32_t
 #ifdef __GNUC__
 __attribute__ ((unused))
 #endif
-isc_atomic_cmpxchg(isc_int32_t *p, isc_int32_t cmpval, isc_int32_t val)
+isc_atomic_cmpxchg(int32_t *p, int32_t cmpval, int32_t val)
 {
-	isc_int32_t ret;
+	int32_t ret;
 
 	__asm__ volatile(
 		"mov ar.ccv=%2;;"

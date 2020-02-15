@@ -1,22 +1,13 @@
 /*
- * Copyright (C) 2009, 2011, 2013-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: hip_55.c,v 1.8 2011/01/13 04:59:26 tbox Exp $ */
-
-/* reviewed: TBC */
 
 /* RFC 5205 */
 
@@ -51,7 +42,7 @@ fromtext_hip(ARGS_FROMTEXT) {
 	 * Algorithm.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
@@ -67,7 +58,7 @@ fromtext_hip(ARGS_FROMTEXT) {
 	 */
 	start = isc_buffer_used(target);
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(isc_hex_decodestring(DNS_AS_STR(token), target));
 
 	/*
@@ -76,14 +67,14 @@ fromtext_hip(ARGS_FROMTEXT) {
 	len = (unsigned char *)isc_buffer_used(target) - start;
 	if (len > 0xffU)
 		RETTOK(ISC_R_RANGE);
-	RETERR(uint8_tobuffer((isc_uint32_t)len, &hit_len));
+	RETERR(uint8_tobuffer((uint32_t)len, &hit_len));
 
 	/*
 	 * Public key (base64).
 	 */
 	start = isc_buffer_used(target);
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(isc_base64_decodestring(DNS_AS_STR(token), target));
 
 	/*
@@ -92,7 +83,10 @@ fromtext_hip(ARGS_FROMTEXT) {
 	len = (unsigned char *)isc_buffer_used(target) - start;
 	if (len > 0xffffU)
 		RETTOK(ISC_R_RANGE);
-	RETERR(uint16_tobuffer((isc_uint32_t)len, &key_len));
+	RETERR(uint16_tobuffer((uint32_t)len, &key_len));
+
+	if (origin == NULL)
+		origin = dns_rootname;
 
 	/*
 	 * Rendezvous Servers.
@@ -101,11 +95,10 @@ fromtext_hip(ARGS_FROMTEXT) {
 	do {
 		RETERR(isc_lex_getmastertoken(lexer, &token,
 					      isc_tokentype_string,
-					      ISC_TRUE));
+					      true));
 		if (token.type != isc_tokentype_string)
 			break;
 		buffer_fromregion(&buffer, &token.value.as_region);
-		origin = (origin != NULL) ? origin : dns_rootname;
 		RETTOK(dns_name_fromtext(&name, &buffer, origin, options,
 					 target));
 	} while (1);
@@ -146,7 +139,7 @@ totext_hip(ARGS_TOTEXT) {
 	/*
 	 * Algorithm
 	 */
-	sprintf(buf, "%u ", algorithm);
+	snprintf(buf, sizeof(buf), "%u ", algorithm);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -176,7 +169,7 @@ totext_hip(ARGS_TOTEXT) {
 	while (region.length > 0) {
 		dns_name_fromregion(&name, &region);
 
-		RETERR(dns_name_totext(&name, ISC_FALSE, target));
+		RETERR(dns_name_totext(&name, false, target));
 		isc_region_consume(&region, name.length);
 		if (region.length > 0)
 			RETERR(str_totext(tctx->linebreak, target));
@@ -190,8 +183,8 @@ static inline isc_result_t
 fromwire_hip(ARGS_FROMWIRE) {
 	isc_region_t region, rr;
 	dns_name_t name;
-	isc_uint8_t hit_len;
-	isc_uint16_t key_len;
+	uint8_t hit_len;
+	uint16_t key_len;
 
 	REQUIRE(type == dns_rdatatype_hip);
 
@@ -384,7 +377,7 @@ digest_hip(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_hip(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_hip);
@@ -394,10 +387,10 @@ checkowner_hip(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_hip(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_hip);
@@ -406,7 +399,7 @@ checknames_hip(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 isc_result_t
@@ -454,8 +447,8 @@ casecompare_hip(ARGS_COMPARE) {
 	dns_name_t name1;
 	dns_name_t name2;
 	int order;
-	isc_uint8_t hit_len;
-	isc_uint16_t key_len;
+	uint8_t hit_len;
+	uint16_t key_len;
 
 	REQUIRE(rdata1->type == rdata2->type);
 	REQUIRE(rdata1->rdclass == rdata2->rdclass);

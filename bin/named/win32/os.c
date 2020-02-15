@@ -1,22 +1,17 @@
 /*
- * Copyright (C) 2004, 2005, 2007-2009, 2012-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -45,8 +40,10 @@
 #include <named/ntservice.h>
 
 
+static char *lockfile = NULL;
 static char *pidfile = NULL;
 static int devnullfd = -1;
+static int lockfilefd = -1;
 
 static BOOL Initialized = FALSE;
 
@@ -58,14 +55,15 @@ ns_paths_init(void) {
 	if (!Initialized)
 		isc_ntpaths_init();
 
-	ns_g_conffile = isc_ntpaths_get(NAMED_CONF_PATH);
 	lwresd_g_conffile = isc_ntpaths_get(LWRES_CONF_PATH);
 	lwresd_g_resolvconffile = isc_ntpaths_get(RESOLV_CONF_PATH);
 	ns_g_conffile = isc_ntpaths_get(NAMED_CONF_PATH);
 	ns_g_defaultpidfile = isc_ntpaths_get(NAMED_PID_PATH);
 	lwresd_g_defaultpidfile = isc_ntpaths_get(LWRESD_PID_PATH);
+	ns_g_defaultlockfile = isc_ntpaths_get(NAMED_LOCK_PATH);
 	ns_g_keyfile = isc_ntpaths_get(RNDC_KEY_PATH);
 	ns_g_defaultsessionkeyfile = isc_ntpaths_get(SESSION_KEY_PATH);
+	ns_g_defaultdnstap = NULL;
 
 	Initialized = TRUE;
 }
@@ -168,6 +166,11 @@ void
 ns_os_changeuser(void) {
 }
 
+unsigned int
+ns_os_uid(void) {
+	return (0);
+}
+
 void
 ns_os_adjustnofile(void) {
 }
@@ -177,7 +180,7 @@ ns_os_minprivs(void) {
 }
 
 static int
-safe_open(const char *filename, int mode, isc_boolean_t append) {
+safe_open(const char *filename, int mode, bool append) {
 	int fd;
 	struct stat sb;
 
@@ -205,14 +208,30 @@ cleanup_pidfile(void) {
 	pidfile = NULL;
 }
 
+static void
+cleanup_lockfile(void) {
+	if (lockfilefd != -1) {
+		close(lockfilefd);
+		lockfilefd = -1;
+	}
+
+	if (lockfile != NULL) {
+		int n = unlink(lockfile);
+		if (n == -1 && errno != ENOENT)
+			ns_main_earlywarning("unlink '%s': failed", lockfile);
+		free(lockfile);
+		lockfile = NULL;
+	}
+}
+
 FILE *
-ns_os_openfile(const char *filename, int mode, isc_boolean_t switch_user) {
+ns_os_openfile(const char *filename, int mode, bool switch_user) {
 	char strbuf[ISC_STRERRORSIZE];
 	FILE *fp;
 	int fd;
 
 	UNUSED(switch_user);
-	fd = safe_open(filename, mode, ISC_FALSE);
+	fd = safe_open(filename, mode, false);
 	if (fd < 0) {
 		isc__strerror(errno, strbuf, sizeof(strbuf));
 		ns_main_earlywarning("could not open file '%s': %s",
@@ -232,8 +251,8 @@ ns_os_openfile(const char *filename, int mode, isc_boolean_t switch_user) {
 }
 
 void
-ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
-	FILE *lockfile;
+ns_os_writepidfile(const char *filename, bool first_time) {
+	FILE *pidlockfile;
 	pid_t pid;
 	char strbuf[ISC_STRERRORSIZE];
 	void (*report)(const char *, ...);
@@ -256,9 +275,9 @@ ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
 		return;
 	}
 
-	lockfile = ns_os_openfile(filename, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
-				  ISC_FALSE);
-	if (lockfile == NULL) {
+	pidlockfile = ns_os_openfile(filename, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
+				     false);
+	if (pidlockfile == NULL) {
 		free(pidfile);
 		pidfile = NULL;
 		return;
@@ -266,25 +285,74 @@ ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
 
 	pid = getpid();
 
-	if (fprintf(lockfile, "%ld\n", (long)pid) < 0) {
+	if (fprintf(pidlockfile, "%ld\n", (long)pid) < 0) {
 		(*report)("fprintf() to pid file '%s' failed", filename);
-		(void)fclose(lockfile);
+		(void)fclose(pidlockfile);
 		cleanup_pidfile();
 		return;
 	}
-	if (fflush(lockfile) == EOF) {
+	if (fflush(pidlockfile) == EOF) {
 		(*report)("fflush() to pid file '%s' failed", filename);
-		(void)fclose(lockfile);
+		(void)fclose(pidlockfile);
 		cleanup_pidfile();
 		return;
 	}
-	(void)fclose(lockfile);
+	(void)fclose(pidlockfile);
 }
+
+bool
+ns_os_issingleton(const char *filename) {
+	char strbuf[ISC_STRERRORSIZE];
+	OVERLAPPED o;
+
+	if (lockfilefd != -1)
+		return (true);
+
+	if (strcasecmp(filename, "none") == 0)
+		return (true);
+
+	lockfile = strdup(filename);
+	if (lockfile == NULL) {
+		isc__strerror(errno, strbuf, sizeof(strbuf));
+		ns_main_earlyfatal("couldn't allocate memory for '%s': %s",
+				   filename, strbuf);
+	}
+
+	/*
+	 * ns_os_openfile() uses safeopen() which removes any existing
+	 * files. We can't use that here.
+	 */
+	lockfilefd = open(filename, O_WRONLY | O_CREAT,
+			  S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+	if (lockfilefd == -1) {
+		cleanup_lockfile();
+		return (false);
+	}
+
+	memset(&o, 0, sizeof(o));
+	/* Expect ERROR_LOCK_VIOLATION if already locked */
+	if (!LockFileEx((HANDLE) _get_osfhandle(lockfilefd),
+			LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+			0, 0, 1, &o)) {
+		cleanup_lockfile();
+		return (false);
+	}
+
+	return (true);
+}
+
 
 void
 ns_os_shutdown(void) {
 	closelog();
 	cleanup_pidfile();
+
+	if (lockfilefd != -1) {
+		(void) UnlockFile((HANDLE) _get_osfhandle(lockfilefd),
+				  0, 0, 0, 1);
+		close(lockfilefd);
+		lockfilefd = -1;
+	}
 	ntservice_shutdown();	/* This MUST be the last thing done */
 }
 
@@ -312,4 +380,81 @@ ns_os_tzset(void) {
 void
 ns_os_started(void) {
 	ntservice_init();
+}
+
+static char unamebuf[BUFSIZ];
+static char *unamep = NULL;
+
+static void
+getuname(void) {
+	DWORD fvilen;
+	char *fvi;
+	VS_FIXEDFILEINFO *ffi;
+	UINT ffilen;
+	SYSTEM_INFO sysinfo;
+	char *arch;
+
+	fvi = NULL;
+	fvilen = GetFileVersionInfoSize("kernel32.dll", 0);
+	if (fvilen == 0) {
+		goto err;
+	}
+	fvi = (char *)malloc(fvilen);
+	if (fvi == NULL) {
+		goto err;
+	}
+	memset(fvi, 0, fvilen);
+	if (GetFileVersionInfo("kernel32.dll", 0, fvilen, fvi) == 0) {
+		goto err;
+	}
+	ffi = NULL;
+	ffilen = 0;
+	if ((VerQueryValue(fvi, "\\", &ffi, &ffilen) == 0) ||
+	    (ffi == NULL) || (ffilen == 0)) {
+		goto err;
+	}
+	memset(&sysinfo, 0, sizeof(sysinfo));
+	GetSystemInfo(&sysinfo);
+	switch (sysinfo.wProcessorArchitecture) {
+	case PROCESSOR_ARCHITECTURE_INTEL:
+		arch = "x86";
+		break;
+	case PROCESSOR_ARCHITECTURE_ARM:
+		arch = "arm";
+		break;
+	case PROCESSOR_ARCHITECTURE_IA64:
+		arch = "ia64";
+		break;
+	case PROCESSOR_ARCHITECTURE_AMD64:
+		arch = "x64";
+		break;
+	default:
+		arch = "unknown architecture";
+		break;
+	}
+
+	snprintf(unamebuf, sizeof(unamebuf),
+		 "Windows %d %d build %d %d for %s\n",
+		 (ffi->dwProductVersionMS >> 16) & 0xffff,
+		 ffi->dwProductVersionMS & 0xffff,
+		 (ffi->dwProductVersionLS >> 16) & 0xffff,
+		 ffi->dwProductVersionLS & 0xffff,
+		 arch);
+
+    err:
+	if (fvi != NULL) {
+		free(fvi);
+	}
+	unamep = unamebuf;
+}
+
+/*
+ * GetVersionEx() returns 6.2 (aka Windows 8.1) since it was obsoleted
+ * so we had to switch to the recommended way to get the Windows version.
+ */
+char *
+ns_os_uname(void) {
+	if (unamep == NULL)
+		getuname();
+	return (unamep);
 }

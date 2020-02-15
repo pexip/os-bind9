@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
@@ -23,6 +16,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -43,14 +37,14 @@
 	} while (0)
 
 
-static isc_result_t bind_ttl(isc_textregion_t *source, isc_uint32_t *ttl);
+static isc_result_t bind_ttl(isc_textregion_t *source, uint32_t *ttl);
 
 /*
  * Helper for dns_ttl_totext().
  */
 static isc_result_t
-ttlfmt(unsigned int t, const char *s, isc_boolean_t verbose,
-       isc_boolean_t space, isc_buffer_t *target)
+ttlfmt(unsigned int t, const char *s, bool verbose,
+       bool space, isc_buffer_t *target)
 {
 	char tmp[60];
 	unsigned int len;
@@ -78,7 +72,14 @@ ttlfmt(unsigned int t, const char *s, isc_boolean_t verbose,
  * Derived from bind8 ns_format_ttl().
  */
 isc_result_t
-dns_ttl_totext(isc_uint32_t src, isc_boolean_t verbose, isc_buffer_t *target) {
+dns_ttl_totext(uint32_t src, bool verbose, isc_buffer_t *target) {
+	return (dns_ttl_totext2(src, verbose, true, target));
+}
+
+isc_result_t
+dns_ttl_totext2(uint32_t src, bool verbose,
+		bool upcase, isc_buffer_t *target)
+{
 	unsigned secs, mins, hours, days, weeks, x;
 
 	secs = src % 60;   src /= 60;
@@ -90,24 +91,24 @@ dns_ttl_totext(isc_uint32_t src, isc_boolean_t verbose, isc_buffer_t *target) {
 
 	x = 0;
 	if (weeks != 0) {
-		RETERR(ttlfmt(weeks, "week", verbose, ISC_TF(x > 0), target));
+		RETERR(ttlfmt(weeks, "week", verbose, (x > 0), target));
 		x++;
 	}
 	if (days != 0) {
-		RETERR(ttlfmt(days, "day", verbose, ISC_TF(x > 0), target));
+		RETERR(ttlfmt(days, "day", verbose, (x > 0), target));
 		x++;
 	}
 	if (hours != 0) {
-		RETERR(ttlfmt(hours, "hour", verbose, ISC_TF(x > 0), target));
+		RETERR(ttlfmt(hours, "hour", verbose, (x > 0), target));
 		x++;
 	}
 	if (mins != 0) {
-		RETERR(ttlfmt(mins, "minute", verbose, ISC_TF(x > 0), target));
+		RETERR(ttlfmt(mins, "minute", verbose, (x > 0), target));
 		x++;
 	}
 	if (secs != 0 ||
 	    (weeks == 0 && days == 0 && hours == 0 && mins == 0)) {
-		RETERR(ttlfmt(secs, "second", verbose, ISC_TF(x > 0), target));
+		RETERR(ttlfmt(secs, "second", verbose, (x > 0), target));
 		x++;
 	}
 	INSIST (x > 0);
@@ -116,7 +117,7 @@ dns_ttl_totext(isc_uint32_t src, isc_boolean_t verbose, isc_buffer_t *target) {
 	 * in upper case. (Why?  Because BIND 8 does that.
 	 * Presumably it has a reason.)
 	 */
-	if (x == 1 && !verbose) {
+	if (x == 1 && upcase && !verbose) {
 		isc_region_t region;
 		/*
 		 * The unit letter is the last character in the
@@ -133,12 +134,12 @@ dns_ttl_totext(isc_uint32_t src, isc_boolean_t verbose, isc_buffer_t *target) {
 }
 
 isc_result_t
-dns_counter_fromtext(isc_textregion_t *source, isc_uint32_t *ttl) {
+dns_counter_fromtext(isc_textregion_t *source, uint32_t *ttl) {
 	return (bind_ttl(source, ttl));
 }
 
 isc_result_t
-dns_ttl_fromtext(isc_textregion_t *source, isc_uint32_t *ttl) {
+dns_ttl_fromtext(isc_textregion_t *source, uint32_t *ttl) {
 	isc_result_t result;
 
 	result = bind_ttl(source, ttl);
@@ -148,9 +149,9 @@ dns_ttl_fromtext(isc_textregion_t *source, isc_uint32_t *ttl) {
 }
 
 static isc_result_t
-bind_ttl(isc_textregion_t *source, isc_uint32_t *ttl) {
-	isc_uint64_t tmp = 0ULL;
-	isc_uint32_t n;
+bind_ttl(isc_textregion_t *source, uint32_t *ttl) {
+	uint64_t tmp = 0ULL;
+	uint32_t n;
 	char *s;
 	char buf[64];
 	char nbuf[64]; /* Number buffer */
@@ -161,8 +162,8 @@ bind_ttl(isc_textregion_t *source, isc_uint32_t *ttl) {
 	 */
 	if (source->length > sizeof(buf) - 1)
 		return (DNS_R_SYNTAX);
-	strncpy(buf, source->base, source->length);
-	buf[source->length] = '\0';
+	/* Copy source->length bytes and NUL terminate. */
+	snprintf(buf, sizeof(buf), "%.*s", (int)source->length, source->base);
 	s = buf;
 
 	do {
@@ -179,27 +180,27 @@ bind_ttl(isc_textregion_t *source, isc_uint32_t *ttl) {
 		switch (*s) {
 		case 'w':
 		case 'W':
-			tmp += (isc_uint64_t) n * 7 * 24 * 3600;
+			tmp += (uint64_t) n * 7 * 24 * 3600;
 			s++;
 			break;
 		case 'd':
 		case 'D':
-			tmp += (isc_uint64_t) n * 24 * 3600;
+			tmp += (uint64_t) n * 24 * 3600;
 			s++;
 			break;
 		case 'h':
 		case 'H':
-			tmp += (isc_uint64_t) n * 3600;
+			tmp += (uint64_t) n * 3600;
 			s++;
 			break;
 		case 'm':
 		case 'M':
-			tmp += (isc_uint64_t) n * 60;
+			tmp += (uint64_t) n * 60;
 			s++;
 			break;
 		case 's':
 		case 'S':
-			tmp += (isc_uint64_t) n;
+			tmp += (uint64_t) n;
 			s++;
 			break;
 		case '\0':
@@ -216,6 +217,6 @@ bind_ttl(isc_textregion_t *source, isc_uint32_t *ttl) {
 	if (tmp > 0xffffffffULL)
 		return (ISC_R_RANGE);
 
-	*ttl = (isc_uint32_t)(tmp & 0xffffffffUL);
+	*ttl = (uint32_t)(tmp & 0xffffffffUL);
 	return (ISC_R_SUCCESS);
 }

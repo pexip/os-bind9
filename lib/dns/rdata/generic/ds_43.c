@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /* RFC3658 */
 
@@ -33,12 +26,10 @@
 #include "dst_gost.h"
 
 static inline isc_result_t
-fromtext_ds(ARGS_FROMTEXT) {
+generic_fromtext_ds(ARGS_FROMTEXT) {
 	isc_token_t token;
 	unsigned char c;
 	int length;
-
-	REQUIRE(type == dns_rdatatype_ds);
 
 	UNUSED(type);
 	UNUSED(rdclass);
@@ -50,7 +41,7 @@ fromtext_ds(ARGS_FROMTEXT) {
 	 * Key tag.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
@@ -59,7 +50,7 @@ fromtext_ds(ARGS_FROMTEXT) {
 	 * Algorithm.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secalg_fromtext(&c, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &c, 1));
 
@@ -67,7 +58,7 @@ fromtext_ds(ARGS_FROMTEXT) {
 	 * Digest type.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_dsdigest_fromtext(&c, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &c, 1));
 
@@ -97,12 +88,20 @@ fromtext_ds(ARGS_FROMTEXT) {
 }
 
 static inline isc_result_t
-totext_ds(ARGS_TOTEXT) {
+fromtext_ds(ARGS_FROMTEXT) {
+
+	REQUIRE(type == dns_rdatatype_ds);
+
+	return (generic_fromtext_ds(rdclass, type, lexer, origin, options,
+				    target, callbacks));
+}
+
+static inline isc_result_t
+generic_totext_ds(ARGS_TOTEXT) {
 	isc_region_t sr;
 	char buf[sizeof("64000 ")];
 	unsigned int n;
 
-	REQUIRE(rdata->type == dns_rdatatype_ds);
 	REQUIRE(rdata->length != 0);
 
 	UNUSED(tctx);
@@ -114,7 +113,7 @@ totext_ds(ARGS_TOTEXT) {
 	 */
 	n = uint16_fromregion(&sr);
 	isc_region_consume(&sr, 2);
-	sprintf(buf, "%u ", n);
+	snprintf(buf, sizeof(buf), "%u ", n);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -122,7 +121,7 @@ totext_ds(ARGS_TOTEXT) {
 	 */
 	n = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
-	sprintf(buf, "%u ", n);
+	snprintf(buf, sizeof(buf), "%u ", n);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -130,7 +129,7 @@ totext_ds(ARGS_TOTEXT) {
 	 */
 	n = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
-	sprintf(buf, "%u", n);
+	snprintf(buf, sizeof(buf), "%u", n);
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -153,10 +152,16 @@ totext_ds(ARGS_TOTEXT) {
 }
 
 static inline isc_result_t
-fromwire_ds(ARGS_FROMWIRE) {
-	isc_region_t sr;
+totext_ds(ARGS_TOTEXT) {
 
-	REQUIRE(type == dns_rdatatype_ds);
+	REQUIRE(rdata->type == dns_rdatatype_ds);
+
+	return (generic_totext_ds(rdata, tctx, target));
+}
+
+static inline isc_result_t
+generic_fromwire_ds(ARGS_FROMWIRE) {
+	isc_region_t sr;
 
 	UNUSED(type);
 	UNUSED(rdclass);
@@ -202,6 +207,15 @@ fromwire_ds(ARGS_FROMWIRE) {
 }
 
 static inline isc_result_t
+fromwire_ds(ARGS_FROMWIRE) {
+
+	REQUIRE(type == dns_rdatatype_ds);
+
+	return (generic_fromwire_ds(rdclass, type, source, dctx, options,
+				    target));
+}
+
+static inline isc_result_t
 towire_ds(ARGS_TOWIRE) {
 	isc_region_t sr;
 
@@ -231,13 +245,16 @@ compare_ds(ARGS_COMPARE) {
 }
 
 static inline isc_result_t
-fromstruct_ds(ARGS_FROMSTRUCT) {
+generic_fromstruct_ds(ARGS_FROMSTRUCT) {
 	dns_rdata_ds_t *ds = source;
 
-	REQUIRE(type == dns_rdatatype_ds);
 	REQUIRE(source != NULL);
 	REQUIRE(ds->common.rdtype == type);
 	REQUIRE(ds->common.rdclass == rdclass);
+
+	UNUSED(type);
+	UNUSED(rdclass);
+
 	switch (ds->digest_type) {
 	case DNS_DSDIGEST_SHA1:
 		REQUIRE(ds->length == ISC_SHA1_DIGESTLENGTH);
@@ -255,9 +272,6 @@ fromstruct_ds(ARGS_FROMSTRUCT) {
 		break;
 	}
 
-	UNUSED(type);
-	UNUSED(rdclass);
-
 	RETERR(uint16_tobuffer(ds->key_tag, target));
 	RETERR(uint8_tobuffer(ds->algorithm, target));
 	RETERR(uint8_tobuffer(ds->digest_type, target));
@@ -266,17 +280,23 @@ fromstruct_ds(ARGS_FROMSTRUCT) {
 }
 
 static inline isc_result_t
-tostruct_ds(ARGS_TOSTRUCT) {
+fromstruct_ds(ARGS_FROMSTRUCT) {
+
+	REQUIRE(type == dns_rdatatype_ds);
+
+	return (generic_fromstruct_ds(rdclass, type, source, target));
+}
+
+static inline isc_result_t
+generic_tostruct_ds(ARGS_TOSTRUCT) {
 	dns_rdata_ds_t *ds = target;
 	isc_region_t region;
 
-	REQUIRE(rdata->type == dns_rdatatype_ds);
 	REQUIRE(target != NULL);
 	REQUIRE(rdata->length != 0);
-
-	ds->common.rdclass = rdata->rdclass;
-	ds->common.rdtype = rdata->type;
-	ISC_LINK_INIT(&ds->common, link);
+	REQUIRE(ds->common.rdtype == rdata->type);
+	REQUIRE(ds->common.rdclass == rdata->rdclass);
+	REQUIRE(!ISC_LINK_LINKED(&ds->common, link));
 
 	dns_rdata_toregion(rdata, &region);
 
@@ -294,6 +314,20 @@ tostruct_ds(ARGS_TOSTRUCT) {
 
 	ds->mctx = mctx;
 	return (ISC_R_SUCCESS);
+}
+
+static inline isc_result_t
+tostruct_ds(ARGS_TOSTRUCT) {
+	dns_rdata_ds_t *ds = target;
+
+	REQUIRE(rdata->type == dns_rdatatype_ds);
+	REQUIRE(target != NULL);
+
+	ds->common.rdclass = rdata->rdclass;
+	ds->common.rdtype = rdata->type;
+	ISC_LINK_INIT(&ds->common, link);
+
+	return (generic_tostruct_ds(rdata, target, mctx));
 }
 
 static inline void
@@ -333,7 +367,7 @@ digest_ds(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_ds(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_ds);
@@ -343,10 +377,10 @@ checkowner_ds(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_ds(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_ds);
@@ -355,7 +389,7 @@ checknames_ds(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

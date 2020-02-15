@@ -1,29 +1,25 @@
 /*
- * Copyright (C) 2004-2011, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: os.c,v 1.107 2011/03/02 00:02:54 marka Exp $ */
 
 /*! \file */
 
 #include <config.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <sys/types.h>	/* dev_t FreeBSD 2.1 */
 #include <sys/stat.h>
+#ifdef HAVE_UNAME
+#include <sys/utsname.h>
+#endif
 
 #include <ctype.h>
 #include <errno.h>
@@ -47,6 +43,7 @@
 #include <isc/strerror.h>
 #include <isc/string.h>
 
+#include <named/globals.h>
 #include <named/main.h>
 #include <named/os.h>
 #ifdef HAVE_LIBSCF
@@ -54,7 +51,9 @@
 #endif
 
 static char *pidfile = NULL;
+static char *lockfile = NULL;
 static int devnullfd = -1;
+static int singletonfd = -1;
 
 #ifndef ISC_FACILITY
 #define ISC_FACILITY LOG_DAEMON
@@ -109,13 +108,13 @@ static pid_t mainpid = 0;
 #endif
 
 static struct passwd *runas_pw = NULL;
-static isc_boolean_t done_setuid = ISC_FALSE;
+static bool done_setuid = false;
 static int dfd[2] = { -1, -1 };
 
 #ifdef HAVE_LINUX_CAPABILITY_H
 
-static isc_boolean_t non_root = ISC_FALSE;
-static isc_boolean_t non_root_caps = ISC_FALSE;
+static bool non_root = false;
+static bool non_root_caps = false;
 
 #ifdef HAVE_SYS_CAPABILITY_H
 #include <sys/capability.h>
@@ -233,18 +232,47 @@ linux_setcaps(cap_t caps) {
 		cap_free(curcaps); \
 	} while (0)
 #else
-#define SET_CAP(flag) do { caps |= (1 << (flag)); } while (0)
+#define SET_CAP(flag) \
+	do { \
+		if (curcaps & (1 << (flag))) { \
+			caps |= (1 << (flag)); \
+		} \
+	} while (0)
 #define INIT_CAP do { caps = 0; } while (0)
+#endif /* HAVE_LIBCAP */
+
+#ifndef HAVE_LIBCAP
+/*%
+ * Store the bitmask representing the permitted capability set in 'capsp'.  To
+ * match libcap-enabled behavior, capget() syscall errors are not reported,
+ * they just cause 'capsp' to be set to 0, which effectively prevents any
+ * capability from being subsequently requested.
+ */
+static void
+linux_getpermittedcaps(cap_t *capsp) {
+	struct __user_cap_header_struct caphead;
+	struct __user_cap_data_struct curcaps;
+
+	memset(&caphead, 0, sizeof(caphead));
+	caphead.version = _LINUX_CAPABILITY_VERSION;
+	caphead.pid = 0;
+	memset(&curcaps, 0, sizeof(curcaps));
+	syscall(SYS_capget, &caphead, &curcaps);
+
+	*capsp = curcaps.permitted;
+}
 #endif /* HAVE_LIBCAP */
 
 static void
 linux_initialprivs(void) {
+	cap_t curcaps;
 	cap_t caps;
 #ifdef HAVE_LIBCAP
-	cap_t curcaps;
 	cap_value_t capval;
 	char strbuf[ISC_STRERRORSIZE];
 	int err;
+#else
+	linux_getpermittedcaps(&curcaps);
 #endif
 
 	/*%
@@ -309,12 +337,14 @@ linux_initialprivs(void) {
 
 static void
 linux_minprivs(void) {
+	cap_t curcaps;
 	cap_t caps;
 #ifdef HAVE_LIBCAP
-	cap_t curcaps;
 	cap_value_t capval;
 	char strbuf[ISC_STRERRORSIZE];
 	int err;
+#else
+	linux_getpermittedcaps(&curcaps);
 #endif
 
 	INIT_CAP;
@@ -359,9 +389,9 @@ linux_keepcaps(void) {
 			ns_main_earlyfatal("prctl() failed: %s", strbuf);
 		}
 	} else {
-		non_root_caps = ISC_TRUE;
+		non_root_caps = true;
 		if (getuid() != 0)
-			non_root = ISC_TRUE;
+			non_root = true;
 	}
 }
 #endif
@@ -459,7 +489,7 @@ ns_os_daemonize(void) {
 			(void)close(STDOUT_FILENO);
 			(void)dup2(devnullfd, STDOUT_FILENO);
 		}
-		if (devnullfd != STDERR_FILENO) {
+		if (devnullfd != STDERR_FILENO && !ns_g_keepstderr) {
 			(void)close(STDERR_FILENO);
 			(void)dup2(devnullfd, STDERR_FILENO);
 		}
@@ -497,16 +527,16 @@ ns_os_closedevnull(void) {
 	}
 }
 
-static isc_boolean_t
+static bool
 all_digits(const char *s) {
 	if (*s == '\0')
-		return (ISC_FALSE);
+		return (false);
 	while (*s != '\0') {
 		if (!isdigit((*s)&0xff))
-			return (ISC_FALSE);
+			return (false);
 		s++;
 	}
-	return (ISC_TRUE);
+	return (true);
 }
 
 void
@@ -565,7 +595,7 @@ ns_os_changeuser(void) {
 	if (runas_pw == NULL || done_setuid)
 		return;
 
-	done_setuid = ISC_TRUE;
+	done_setuid = true;
 
 #ifdef HAVE_LINUXTHREADS
 #ifdef HAVE_LINUX_CAPABILITY_H
@@ -606,6 +636,13 @@ ns_os_changeuser(void) {
 #endif
 }
 
+uid_t
+ns_os_uid(void) {
+	if (runas_pw == NULL)
+		return (0);
+	return (runas_pw->pw_uid);
+}
+
 void
 ns_os_adjustnofile(void) {
 #ifdef HAVE_LINUXTHREADS
@@ -640,7 +677,7 @@ ns_os_minprivs(void) {
 }
 
 static int
-safe_open(const char *filename, mode_t mode, isc_boolean_t append) {
+safe_open(const char *filename, mode_t mode, bool append) {
 	int fd;
 	struct stat sb;
 
@@ -674,6 +711,27 @@ cleanup_pidfile(void) {
 	pidfile = NULL;
 }
 
+static void
+cleanup_lockfile(void) {
+	if (singletonfd != -1) {
+		close(singletonfd);
+		singletonfd = -1;
+	}
+
+	if (lockfile != NULL) {
+		int n = unlink(lockfile);
+		if (n == -1 && errno != ENOENT)
+			ns_main_earlywarning("unlink '%s': failed", lockfile);
+		free(lockfile);
+		lockfile = NULL;
+	}
+}
+
+/*
+ * Ensure that a directory exists.
+ * NOTE: This function overwrites the '/' characters in 'filename' with
+ * nulls. The caller should copy the filename to a fresh buffer first.
+ */
 static int
 mkdirpath(char *filename, void (*report)(const char *, ...)) {
 	char *slash = strrchr(filename, '/');
@@ -730,7 +788,9 @@ mkdirpath(char *filename, void (*report)(const char *, ...)) {
 
 static void
 setperms(uid_t uid, gid_t gid) {
+#if defined(HAVE_SETEGID) || defined(HAVE_SETRESGID)
 	char strbuf[ISC_STRERRORSIZE];
+#endif
 #if !defined(HAVE_SETEGID) && defined(HAVE_SETRESGID)
 	gid_t oldgid, tmpg;
 #endif
@@ -771,7 +831,7 @@ setperms(uid_t uid, gid_t gid) {
 }
 
 FILE *
-ns_os_openfile(const char *filename, mode_t mode, isc_boolean_t switch_user) {
+ns_os_openfile(const char *filename, mode_t mode, bool switch_user) {
 	char strbuf[ISC_STRERRORSIZE], *f;
 	FILE *fp;
 	int fd;
@@ -799,7 +859,7 @@ ns_os_openfile(const char *filename, mode_t mode, isc_boolean_t switch_user) {
 		/* Set UID/GID to the one we'll be running with eventually */
 		setperms(runas_pw->pw_uid, runas_pw->pw_gid);
 
-		fd = safe_open(filename, mode, ISC_FALSE);
+		fd = safe_open(filename, mode, false);
 
 #ifndef HAVE_LINUXTHREADS
 		/* Restore UID/GID to root */
@@ -808,7 +868,7 @@ ns_os_openfile(const char *filename, mode_t mode, isc_boolean_t switch_user) {
 
 		if (fd == -1) {
 #ifndef HAVE_LINUXTHREADS
-			fd = safe_open(filename, mode, ISC_FALSE);
+			fd = safe_open(filename, mode, false);
 			if (fd != -1) {
 				ns_main_earlywarning("Required root "
 						     "permissions to open "
@@ -829,7 +889,7 @@ ns_os_openfile(const char *filename, mode_t mode, isc_boolean_t switch_user) {
 #endif /* HAVE_LINUXTHREADS */
 		}
 	} else {
-		fd = safe_open(filename, mode, ISC_FALSE);
+		fd = safe_open(filename, mode, false);
 	}
 
 	if (fd < 0) {
@@ -850,8 +910,8 @@ ns_os_openfile(const char *filename, mode_t mode, isc_boolean_t switch_user) {
 }
 
 void
-ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
-	FILE *lockfile;
+ns_os_writepidfile(const char *filename, bool first_time) {
+	FILE *fh;
 	pid_t pid;
 	char strbuf[ISC_STRERRORSIZE];
 	void (*report)(const char *, ...);
@@ -874,9 +934,9 @@ ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
 		return;
 	}
 
-	lockfile = ns_os_openfile(filename, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
+	fh = ns_os_openfile(filename, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
 				  first_time);
-	if (lockfile == NULL) {
+	if (fh == NULL) {
 		cleanup_pidfile();
 		return;
 	}
@@ -885,25 +945,81 @@ ns_os_writepidfile(const char *filename, isc_boolean_t first_time) {
 #else
 	pid = getpid();
 #endif
-	if (fprintf(lockfile, "%ld\n", (long)pid) < 0) {
+	if (fprintf(fh, "%ld\n", (long)pid) < 0) {
 		(*report)("fprintf() to pid file '%s' failed", filename);
-		(void)fclose(lockfile);
+		(void)fclose(fh);
 		cleanup_pidfile();
 		return;
 	}
-	if (fflush(lockfile) == EOF) {
+	if (fflush(fh) == EOF) {
 		(*report)("fflush() to pid file '%s' failed", filename);
-		(void)fclose(lockfile);
+		(void)fclose(fh);
 		cleanup_pidfile();
 		return;
 	}
-	(void)fclose(lockfile);
+	(void)fclose(fh);
+}
+
+bool
+ns_os_issingleton(const char *filename) {
+	char strbuf[ISC_STRERRORSIZE];
+	struct flock lock;
+
+	if (singletonfd != -1)
+		return (true);
+
+	if (strcasecmp(filename, "none") == 0)
+		return (true);
+
+	/*
+	 * Make the containing directory if it doesn't exist.
+	 */
+	lockfile = strdup(filename);
+	if (lockfile == NULL) {
+		isc__strerror(errno, strbuf, sizeof(strbuf));
+		ns_main_earlyfatal("couldn't allocate memory for '%s': %s",
+				   filename, strbuf);
+	} else {
+		int ret = mkdirpath(lockfile, ns_main_earlywarning);
+		if (ret == -1) {
+			ns_main_earlywarning("couldn't create '%s'", filename);
+			cleanup_lockfile();
+			return (false);
+		}
+	}
+
+	/*
+	 * ns_os_openfile() uses safeopen() which removes any existing
+	 * files. We can't use that here.
+	 */
+	singletonfd = open(filename, O_WRONLY | O_CREAT,
+			   S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+	if (singletonfd == -1) {
+		cleanup_lockfile();
+		return (false);
+	}
+
+	memset(&lock, 0, sizeof(lock));
+	lock.l_type = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 1;
+
+	/* Non-blocking (does not wait for lock) */
+	if (fcntl(singletonfd, F_SETLK, &lock) == -1) {
+		close(singletonfd);
+		singletonfd = -1;
+		return (false);
+	}
+
+	return (true);
 }
 
 void
 ns_os_shutdown(void) {
 	closelog();
 	cleanup_pidfile();
+	cleanup_lockfile();
 }
 
 isc_result_t
@@ -965,4 +1081,34 @@ ns_os_tzset(void) {
 #ifdef HAVE_TZSET
 	tzset();
 #endif
+}
+
+static char unamebuf[BUFSIZ];
+static char *unamep = NULL;
+
+static void
+getuname(void) {
+#ifdef HAVE_UNAME
+	struct utsname uts;
+
+	memset(&uts, 0, sizeof(uts));
+	if (uname(&uts) < 0) {
+		snprintf(unamebuf, sizeof(unamebuf), "unknown architecture");
+		return;
+	}
+
+	snprintf(unamebuf, sizeof(unamebuf),
+		 "%s %s %s %s",
+		 uts.sysname, uts.machine, uts.release, uts.version);
+#else
+	snprintf(unamebuf, sizeof(unamebuf), "unknown architecture");
+#endif
+	unamep = unamebuf;
+}
+
+char *
+ns_os_uname(void) {
+	if (unamep == NULL)
+		getuname();
+	return (unamep);
 }

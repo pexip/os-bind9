@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2012-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
@@ -22,8 +17,12 @@
 #error "ECDSA without EVP for SHA2?"
 #endif
 
+#include <stdbool.h>
+
+
 #include <isc/entropy.h>
 #include <isc/mem.h>
+#include <isc/safe.h>
 #include <isc/sha2.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -48,6 +47,33 @@
 #endif
 
 #define DST_RET(a) {ret = a; goto err;}
+
+#if !defined(HAVE_ECDSA_SIG_GET0)
+/* From OpenSSL 1.1 */
+static void
+ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps) {
+	if (pr != NULL) {
+		*pr = sig->r;
+	}
+	if (ps != NULL) {
+		*ps = sig->s;
+	}
+}
+
+static int
+ECDSA_SIG_set0(ECDSA_SIG *sig, BIGNUM *r, BIGNUM *s) {
+	if (r == NULL || s == NULL) {
+		return 0;
+	}
+
+	BN_clear_free(sig->r);
+	BN_clear_free(sig->s);
+	sig->r = r;
+	sig->s = s;
+
+	return 1;
+}
+#endif
 
 static isc_result_t opensslecdsa_todns(const dst_key_t *key,
 				       isc_buffer_t *data);
@@ -110,7 +136,7 @@ opensslecdsa_adddata(dst_context_t *dctx, const isc_region_t *data) {
 }
 
 static int
-BN_bn2bin_fixed(BIGNUM *bn, unsigned char *buf, int size) {
+BN_bn2bin_fixed(const BIGNUM *bn, unsigned char *buf, int size) {
 	int bytes = size - BN_num_bytes(bn);
 
 	while (bytes-- > 0)
@@ -123,13 +149,14 @@ static isc_result_t
 opensslecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
-	isc_region_t r;
+	isc_region_t region;
 	ECDSA_SIG *ecdsasig;
 	EVP_MD_CTX *evp_md_ctx = dctx->ctxdata.evp_md_ctx;
 	EVP_PKEY *pkey = key->keydata.pkey;
 	EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey);
 	unsigned int dgstlen, siglen;
 	unsigned char digest[EVP_MAX_MD_SIZE];
+	const BIGNUM *r, *s;
 
 	REQUIRE(key->key_alg == DST_ALG_ECDSA256 ||
 		key->key_alg == DST_ALG_ECDSA384);
@@ -142,8 +169,8 @@ opensslecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	else
 		siglen = DNS_SIG_ECDSA384SIZE;
 
-	isc_buffer_availableregion(sig, &r);
-	if (r.length < siglen)
+	isc_buffer_availableregion(sig, &region);
+	if (region.length < siglen)
 		DST_RET(ISC_R_NOSPACE);
 
 	if (!EVP_DigestFinal(evp_md_ctx, digest, &dgstlen))
@@ -156,10 +183,11 @@ opensslecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category,
 					       "ECDSA_do_sign",
 					       DST_R_SIGNFAILURE));
-	BN_bn2bin_fixed(ecdsasig->r, r.base, siglen / 2);
-	isc_region_consume(&r, siglen / 2);
-	BN_bn2bin_fixed(ecdsasig->s, r.base, siglen / 2);
-	isc_region_consume(&r, siglen / 2);
+	ECDSA_SIG_get0(ecdsasig, &r, &s);
+	BN_bn2bin_fixed(r, region.base, siglen / 2);
+	isc_region_consume(&region, siglen / 2);
+	BN_bn2bin_fixed(s, region.base, siglen / 2);
+	isc_region_consume(&region, siglen / 2);
 	ECDSA_SIG_free(ecdsasig);
 	isc_buffer_add(sig, siglen);
 	ret = ISC_R_SUCCESS;
@@ -182,6 +210,7 @@ opensslecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey);
 	unsigned int dgstlen, siglen;
 	unsigned char digest[EVP_MAX_MD_SIZE];
+	BIGNUM *r = NULL, *s = NULL ;
 
 	REQUIRE(key->key_alg == DST_ALG_ECDSA256 ||
 		key->key_alg == DST_ALG_ECDSA384);
@@ -205,13 +234,10 @@ opensslecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	ecdsasig = ECDSA_SIG_new();
 	if (ecdsasig == NULL)
 		DST_RET (ISC_R_NOMEMORY);
-	if (ecdsasig->r != NULL)
-		BN_free(ecdsasig->r);
-	ecdsasig->r = BN_bin2bn(cp, siglen / 2, NULL);
+	r = BN_bin2bn(cp, siglen / 2, NULL);
 	cp += siglen / 2;
-	if (ecdsasig->s != NULL)
-		BN_free(ecdsasig->s);
-	ecdsasig->s = BN_bin2bn(cp, siglen / 2, NULL);
+	s = BN_bin2bn(cp, siglen / 2, NULL);
+	ECDSA_SIG_set0(ecdsasig, r, s);
 	/* cp += siglen / 2; */
 
 	status = ECDSA_do_verify(digest, dgstlen, ecdsasig, eckey);
@@ -237,9 +263,9 @@ opensslecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 opensslecdsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
-	isc_boolean_t ret;
+	bool ret;
 	int status;
 	EVP_PKEY *pkey1 = key1->keydata.pkey;
 	EVP_PKEY *pkey2 = key2->keydata.pkey;
@@ -248,30 +274,30 @@ opensslecdsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	const BIGNUM *priv1, *priv2;
 
 	if (pkey1 == NULL && pkey2 == NULL)
-		return (ISC_TRUE);
+		return (true);
 	else if (pkey1 == NULL || pkey2 == NULL)
-		return (ISC_FALSE);
+		return (false);
 
 	eckey1 = EVP_PKEY_get1_EC_KEY(pkey1);
 	eckey2 = EVP_PKEY_get1_EC_KEY(pkey2);
 	if (eckey1 == NULL && eckey2 == NULL) {
-		DST_RET (ISC_TRUE);
+		DST_RET (true);
 	} else if (eckey1 == NULL || eckey2 == NULL)
-		DST_RET (ISC_FALSE);
+		DST_RET (false);
 
 	status = EVP_PKEY_cmp(pkey1, pkey2);
 	if (status != 1)
-		DST_RET (ISC_FALSE);
+		DST_RET (false);
 
 	priv1 = EC_KEY_get0_private_key(eckey1);
 	priv2 = EC_KEY_get0_private_key(eckey2);
 	if (priv1 != NULL || priv2 != NULL) {
 		if (priv1 == NULL || priv2 == NULL)
-			DST_RET (ISC_FALSE);
+			DST_RET (false);
 		if (BN_cmp(priv1, priv2) != 0)
-			DST_RET (ISC_FALSE);
+			DST_RET (false);
 	}
-	ret = ISC_TRUE;
+	ret = true;
 
  err:
 	if (eckey1 != NULL)
@@ -326,13 +352,13 @@ opensslecdsa_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 opensslecdsa_isprivate(const dst_key_t *key) {
-	isc_boolean_t ret;
+	bool ret;
 	EVP_PKEY *pkey = key->keydata.pkey;
 	EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey);
 
-	ret = ISC_TF(eckey != NULL && EC_KEY_get0_private_key(eckey) != NULL);
+	ret = (eckey != NULL && EC_KEY_get0_private_key(eckey) != NULL);
 	if (eckey != NULL)
 		EC_KEY_free(eckey);
 	return (ret);
@@ -543,7 +569,7 @@ opensslecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		key->keydata.pkey = pub->keydata.pkey;
 		pub->keydata.pkey = NULL;
 		dst__privstruct_free(&priv, mctx);
-		memset(&priv, 0, sizeof(priv));
+		isc_safe_memwipe(&priv, sizeof(priv));
 		return (ISC_R_SUCCESS);
 	}
 
@@ -585,7 +611,7 @@ opensslecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (eckey != NULL)
 		EC_KEY_free(eckey);
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 	return (ret);
 }
 

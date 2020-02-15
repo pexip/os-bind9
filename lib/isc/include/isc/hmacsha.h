@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2005-2007, 2009, 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: hmacsha.h,v 1.9 2009/02/06 23:47:42 tbox Exp $ */
 
 /*! \file isc/hmacsha.h
  * This is the header file for the HMAC-SHA1, HMAC-SHA224, HMAC-SHA256,
@@ -23,6 +17,8 @@
 
 #ifndef ISC_HMACSHA_H
 #define ISC_HMACSHA_H 1
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/platform.h>
@@ -37,13 +33,21 @@
 #define ISC_HMACSHA512_KEYLENGTH ISC_SHA512_BLOCK_LENGTH
 
 #ifdef ISC_PLATFORM_OPENSSLHASH
+#include <openssl/opensslv.h>
 #include <openssl/hmac.h>
 
-typedef HMAC_CTX isc_hmacsha1_t;
-typedef HMAC_CTX isc_hmacsha224_t;
-typedef HMAC_CTX isc_hmacsha256_t;
-typedef HMAC_CTX isc_hmacsha384_t;
-typedef HMAC_CTX isc_hmacsha512_t;
+typedef struct {
+	HMAC_CTX *ctx;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+	HMAC_CTX _ctx;
+#endif
+} isc_hmacsha_t;
+
+typedef isc_hmacsha_t isc_hmacsha1_t;
+typedef isc_hmacsha_t isc_hmacsha224_t;
+typedef isc_hmacsha_t isc_hmacsha256_t;
+typedef isc_hmacsha_t isc_hmacsha384_t;
+typedef isc_hmacsha_t isc_hmacsha512_t;
 
 #elif PKCS11CRYPTO
 #include <pk11/pk11.h>
@@ -98,8 +102,11 @@ isc_hmacsha1_update(isc_hmacsha1_t *ctx, const unsigned char *buf,
 void
 isc_hmacsha1_sign(isc_hmacsha1_t *ctx, unsigned char *digest, size_t len);
 
-isc_boolean_t
+bool
 isc_hmacsha1_verify(isc_hmacsha1_t *ctx, unsigned char *digest, size_t len);
+
+bool
+isc_hmacsha1_check(int testing);
 
 
 void
@@ -116,7 +123,7 @@ isc_hmacsha224_update(isc_hmacsha224_t *ctx, const unsigned char *buf,
 void
 isc_hmacsha224_sign(isc_hmacsha224_t *ctx, unsigned char *digest, size_t len);
 
-isc_boolean_t
+bool
 isc_hmacsha224_verify(isc_hmacsha224_t *ctx, unsigned char *digest, size_t len);
 
 
@@ -134,7 +141,7 @@ isc_hmacsha256_update(isc_hmacsha256_t *ctx, const unsigned char *buf,
 void
 isc_hmacsha256_sign(isc_hmacsha256_t *ctx, unsigned char *digest, size_t len);
 
-isc_boolean_t
+bool
 isc_hmacsha256_verify(isc_hmacsha256_t *ctx, unsigned char *digest, size_t len);
 
 
@@ -152,7 +159,7 @@ isc_hmacsha384_update(isc_hmacsha384_t *ctx, const unsigned char *buf,
 void
 isc_hmacsha384_sign(isc_hmacsha384_t *ctx, unsigned char *digest, size_t len);
 
-isc_boolean_t
+bool
 isc_hmacsha384_verify(isc_hmacsha384_t *ctx, unsigned char *digest, size_t len);
 
 
@@ -170,7 +177,7 @@ isc_hmacsha512_update(isc_hmacsha512_t *ctx, const unsigned char *buf,
 void
 isc_hmacsha512_sign(isc_hmacsha512_t *ctx, unsigned char *digest, size_t len);
 
-isc_boolean_t
+bool
 isc_hmacsha512_verify(isc_hmacsha512_t *ctx, unsigned char *digest, size_t len);
 
 ISC_LANG_ENDDECLS

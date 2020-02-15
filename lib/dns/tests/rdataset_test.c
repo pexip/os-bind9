@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
@@ -54,7 +48,7 @@ ATF_TC_BODY(trimttl, tc) {
 	dns_rdataset_init(&rdataset);
 	dns_rdataset_init(&sigrdataset);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	rdataset.ttl = 900;
@@ -63,7 +57,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_TRUE);
+			     true);
 	ATF_REQUIRE_EQ(rdataset.ttl, 800);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 800);
 
@@ -73,7 +67,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_TRUE);
+			     true);
 	ATF_REQUIRE_EQ(rdataset.ttl, 120);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 120);
 
@@ -83,7 +77,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_FALSE);
+			     false);
 	ATF_REQUIRE_EQ(rdataset.ttl, 0);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 0);
 
@@ -93,7 +87,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_TRUE);
+			     true);
 	ATF_REQUIRE_EQ(rdataset.ttl, 800);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 800);
 
@@ -103,7 +97,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_TRUE);
+			     true);
 	ATF_REQUIRE_EQ(rdataset.ttl, 120);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 120);
 
@@ -113,7 +107,7 @@ ATF_TC_BODY(trimttl, tc) {
 	rrsig.originalttl = 1000;
 
 	dns_rdataset_trimttl(&rdataset, &sigrdataset, &rrsig, ttltimenow,
-			     ISC_FALSE);
+			     false);
 	ATF_REQUIRE_EQ(rdataset.ttl, 0);
 	ATF_REQUIRE_EQ(sigrdataset.ttl, 0);
 

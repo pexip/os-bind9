@@ -1,18 +1,13 @@
 #!/bin/sh -e
 #
-# Copyright (C) 2009-2012, 2014  Internet Systems Consortium, Inc. ("ISC")
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 SYSTEMTESTTOP=../..
 . $SYSTEMTESTTOP/conf.sh
@@ -23,7 +18,7 @@ infile=root.db.in
 
 (cd ../ns2 && $SHELL keygen.sh )
 
-cat $infile ../ns2/dsset-example. > $zonefile
+cat $infile ../ns2/dsset-example$TP > $zonefile
 
 zskact=`$KEYGEN -3 -q -r $RANDFILE $zone`
 zskvanish=`$KEYGEN -3 -q -r $RANDFILE $zone`
@@ -38,28 +33,12 @@ rm $zsknopriv.private
 ksksby=`$KEYGEN -3 -q -r $RANDFILE -P now -A now+15s -fk $zone`
 kskrev=`$KEYGEN -3 -q -r $RANDFILE -R now+15s -fk $zone`
 
-cat $ksksby.key | grep -v '^; ' | $PERL -n -e '
-local ($dn, $class, $type, $flags, $proto, $alg, @rest) = split;
-local $key = join("", @rest);
-print <<EOF
-trusted-keys {
-    "$dn" $flags $proto $alg "$key";
-};
-EOF
-' > trusted.conf
+keyfile_to_trusted_keys $ksksby > trusted.conf
 cp trusted.conf ../ns2/trusted.conf
 cp trusted.conf ../ns3/trusted.conf
 cp trusted.conf ../ns4/trusted.conf
 
-cat $kskrev.key | grep -v '^; ' | $PERL -n -e '
-local ($dn, $class, $type, $flags, $proto, $alg, @rest) = split;
-local $key = join("", @rest);
-print <<EOF
-trusted-keys {
-    "$dn" $flags $proto $alg "$key";
-};
-EOF
-' > trusted.conf
+keyfile_to_trusted_keys $kskrev > trusted.conf
 cp trusted.conf ../ns5/trusted.conf
 
 echo $zskact > ../active.key

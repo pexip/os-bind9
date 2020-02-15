@@ -1,26 +1,27 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifdef PKCS11CRYPTO
 
 #include <config.h>
 
+#include <pk11/site.h>
+
+#ifndef PK11_DH_DISABLE
+
 #include <ctype.h>
+#include <stdbool.h>
 
 #include <isc/mem.h>
+#include <isc/safe.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -142,8 +143,8 @@ pkcs11dh_loadpriv(const dst_key_t *key,
     err:
 	for (i = 6; i <= 8; i++)
 		if (keyTemplate[i].pValue != NULL) {
-			memset(keyTemplate[i].pValue, 0,
-			       keyTemplate[i].ulValueLen);
+			isc_safe_memwipe(keyTemplate[i].pValue,
+					 keyTemplate[i].ulValueLen);
 			isc_mem_put(key->mctx,
 				    keyTemplate[i].pValue,
 				    keyTemplate[i].ulValueLen);
@@ -194,8 +195,9 @@ pkcs11dh_computesecret(const dst_key_t *pub, const dst_key_t *priv,
 	if (attr == NULL)
 		return (DST_R_INVALIDPUBLICKEY);
 
-	ret = pk11_get_session(&ctx, OP_DH, ISC_TRUE, ISC_FALSE, ISC_FALSE,
-			       NULL, pk11_get_best_token(OP_DH));
+	ret = pk11_get_session(&ctx, OP_DH, true, false,
+			       priv->keydata.pkey->reqlogon, NULL,
+			       pk11_get_best_token(OP_DH));
 	if (ret != ISC_R_SUCCESS)
 		return (ret);
 
@@ -242,7 +244,8 @@ pkcs11dh_computesecret(const dst_key_t *pub, const dst_key_t *priv,
 	if (hDerived != CK_INVALID_HANDLE)
 		(void) pkcs_C_DestroyObject(ctx.session, hDerived);
 	if (valTemplate[0].pValue != NULL) {
-		memset(valTemplate[0].pValue, 0, valTemplate[0].ulValueLen);
+		isc_safe_memwipe(valTemplate[0].pValue,
+				 valTemplate[0].ulValueLen);
 		isc_mem_put(pub->mctx,
 			    valTemplate[0].pValue,
 			    valTemplate[0].ulValueLen);
@@ -250,14 +253,14 @@ pkcs11dh_computesecret(const dst_key_t *pub, const dst_key_t *priv,
 	if ((hKey != CK_INVALID_HANDLE) && !priv->keydata.pkey->ontoken)
 		(void) pkcs_C_DestroyObject(ctx.session, hKey);
 	if (mech.pParameter != NULL) {
-		memset(mech.pParameter, 0, mech.ulParameterLen);
+		isc_safe_memwipe(mech.pParameter, mech.ulParameterLen);
 		isc_mem_put(pub->mctx, mech.pParameter, mech.ulParameterLen);
 	}
 	pk11_return_session(&ctx);
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 pkcs11dh_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	pk11_object_t *dh1, *dh2;
 	CK_ATTRIBUTE *attr1, *attr2;
@@ -266,39 +269,39 @@ pkcs11dh_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	dh2 = key2->keydata.pkey;
 
 	if ((dh1 == NULL) && (dh2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((dh1 == NULL) || (dh2 == NULL))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_PRIME);
 	attr2 = pk11_attribute_bytype(dh2, CKA_PRIME);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_BASE);
 	attr2 = pk11_attribute_bytype(dh2, CKA_BASE);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_VALUE);
 	attr2 = pk11_attribute_bytype(dh2, CKA_VALUE);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_VALUE2);
 	attr2 = pk11_attribute_bytype(dh2, CKA_VALUE2);
@@ -307,18 +310,18 @@ pkcs11dh_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	     (attr1->ulValueLen != attr2->ulValueLen) ||
 	     !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				attr1->ulValueLen)))
-		return (ISC_FALSE);
+		return (false);
 
 	if (!dh1->ontoken && !dh2->ontoken)
-		return (ISC_TRUE);
+		return (true);
 	else if (dh1->ontoken || dh2->ontoken ||
 		 (dh1->object != dh2->object))
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static isc_boolean_t
+static bool
 pkcs11dh_paramcompare(const dst_key_t *key1, const dst_key_t *key2) {
 	pk11_object_t *dh1, *dh2;
 	CK_ATTRIBUTE *attr1, *attr2;
@@ -327,31 +330,31 @@ pkcs11dh_paramcompare(const dst_key_t *key1, const dst_key_t *key2) {
 	dh2 = key2->keydata.pkey;
 
 	if ((dh1 == NULL) && (dh2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((dh1 == NULL) || (dh2 == NULL))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_PRIME);
 	attr2 = pk11_attribute_bytype(dh2, CKA_PRIME);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
 	attr1 = pk11_attribute_bytype(dh1, CKA_BASE);
 	attr2 = pk11_attribute_bytype(dh2, CKA_BASE);
 	if ((attr1 == NULL) && (attr2 == NULL))
-		return (ISC_TRUE);
+		return (true);
 	else if ((attr1 == NULL) || (attr2 == NULL) ||
 		 (attr1->ulValueLen != attr2->ulValueLen) ||
 		 !isc_safe_memequal(attr1->pValue, attr2->pValue,
 				    attr1->ulValueLen))
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static isc_result_t
@@ -409,8 +412,8 @@ pkcs11dh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
 						  sizeof(*pk11_ctx));
 	if (pk11_ctx == NULL)
 		return (ISC_R_NOMEMORY);
-	ret = pk11_get_session(pk11_ctx, OP_DH, ISC_TRUE, ISC_FALSE,
-			       ISC_FALSE, NULL, pk11_get_best_token(OP_DH));
+	ret = pk11_get_session(pk11_ctx, OP_DH, true, false,
+			       false, NULL, pk11_get_best_token(OP_DH));
 	if (ret != ISC_R_SUCCESS)
 		goto err;
 
@@ -542,7 +545,7 @@ pkcs11dh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
 	(void) pkcs_C_DestroyObject(pk11_ctx->session, pub);
 	(void) pkcs_C_DestroyObject(pk11_ctx->session, domainparams);
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ISC_R_SUCCESS);
@@ -557,46 +560,50 @@ pkcs11dh_generate(dst_key_t *key, int generator, void (*callback)(int)) {
 		(void) pkcs_C_DestroyObject(pk11_ctx->session, domainparams);
 
 	if (pubTemplate[4].pValue != NULL) {
-		memset(pubTemplate[4].pValue, 0, pubTemplate[4].ulValueLen);
+		isc_safe_memwipe(pubTemplate[4].pValue,
+				 pubTemplate[4].ulValueLen);
 		isc_mem_put(key->mctx,
 			    pubTemplate[4].pValue,
 			    pubTemplate[4].ulValueLen);
 	}
 	if (pubTemplate[5].pValue != NULL) {
-		memset(pubTemplate[5].pValue, 0, pubTemplate[5].ulValueLen);
+		isc_safe_memwipe(pubTemplate[5].pValue,
+				 pubTemplate[5].ulValueLen);
 		isc_mem_put(key->mctx,
 			    pubTemplate[5].pValue,
 			    pubTemplate[5].ulValueLen);
 	}
 	if (pTemplate[0].pValue != NULL) {
-		memset(pTemplate[0].pValue, 0, pTemplate[0].ulValueLen);
+		isc_safe_memwipe(pTemplate[0].pValue,
+				 pTemplate[0].ulValueLen);
 		isc_mem_put(key->mctx,
 			    pTemplate[0].pValue,
 			    pTemplate[0].ulValueLen);
 	}
 	if (pTemplate[1].pValue != NULL) {
-		memset(pTemplate[1].pValue, 0, pTemplate[1].ulValueLen);
+		isc_safe_memwipe(pTemplate[1].pValue,
+				 pTemplate[1].ulValueLen);
 		isc_mem_put(key->mctx,
 			    pTemplate[1].pValue,
 			    pTemplate[1].ulValueLen);
 	}
 
 	pk11_return_session(pk11_ctx);
-	memset(pk11_ctx, 0, sizeof(*pk11_ctx));
+	isc_safe_memwipe(pk11_ctx, sizeof(*pk11_ctx));
 	isc_mem_put(key->mctx, pk11_ctx, sizeof(*pk11_ctx));
 
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 pkcs11dh_isprivate(const dst_key_t *key) {
 	pk11_object_t *dh = key->keydata.pkey;
 	CK_ATTRIBUTE *attr;
 
 	if (dh == NULL)
-		return (ISC_FALSE);
+		return (false);
 	attr = pk11_attribute_bytype(dh, CKA_VALUE2);
-	return (ISC_TF((attr != NULL) || dh->ontoken));
+	return (attr != NULL || dh->ontoken);
 }
 
 static void
@@ -618,7 +625,8 @@ pkcs11dh_destroy(dst_key_t *key) {
 		case CKA_PRIME:
 		case CKA_BASE:
 			if (attr->pValue != NULL) {
-				memset(attr->pValue, 0, attr->ulValueLen);
+				isc_safe_memwipe(attr->pValue,
+						 attr->ulValueLen);
 				isc_mem_put(key->mctx,
 					    attr->pValue,
 					    attr->ulValueLen);
@@ -626,25 +634,25 @@ pkcs11dh_destroy(dst_key_t *key) {
 			break;
 		}
 	if (dh->repr != NULL) {
-		memset(dh->repr, 0, dh->attrcnt * sizeof(*attr));
+		isc_safe_memwipe(dh->repr, dh->attrcnt * sizeof(*attr));
 		isc_mem_put(key->mctx, dh->repr, dh->attrcnt * sizeof(*attr));
 	}
-	memset(dh, 0, sizeof(*dh));
+	isc_safe_memwipe(dh, sizeof(*dh));
 	isc_mem_put(key->mctx, dh, sizeof(*dh));
 	key->keydata.pkey = NULL;
 }
 
 static void
-uint16_toregion(isc_uint16_t val, isc_region_t *region) {
+uint16_toregion(uint16_t val, isc_region_t *region) {
 	*region->base = (val & 0xff00) >> 8;
 	isc_region_consume(region, 1);
 	*region->base = (val & 0x00ff);
 	isc_region_consume(region, 1);
 }
 
-static isc_uint16_t
+static uint16_t
 uint16_fromregion(isc_region_t *region) {
-	isc_uint16_t val;
+	uint16_t val;
 	unsigned char *cp = region->base;
 
 	val = ((unsigned int)(cp[0])) << 8;
@@ -660,7 +668,7 @@ pkcs11dh_todns(const dst_key_t *key, isc_buffer_t *data) {
 	pk11_object_t *dh;
 	CK_ATTRIBUTE *attr;
 	isc_region_t r;
-	isc_uint16_t dnslen, plen = 0, glen = 0, publen = 0;
+	uint16_t dnslen, plen = 0, glen = 0, publen = 0;
 	CK_BYTE *prime = NULL, *base = NULL, *pub = NULL;
 
 	REQUIRE(key->keydata.pkey != NULL);
@@ -673,15 +681,15 @@ pkcs11dh_todns(const dst_key_t *key, isc_buffer_t *data) {
 		switch (attr->type) {
 		case CKA_VALUE:
 			pub = (CK_BYTE *) attr->pValue;
-			publen = (isc_uint16_t) attr->ulValueLen;
+			publen = (uint16_t) attr->ulValueLen;
 			break;
 		case CKA_PRIME:
 			prime = (CK_BYTE *) attr->pValue;
-			plen = (isc_uint16_t) attr->ulValueLen;
+			plen = (uint16_t) attr->ulValueLen;
 			break;
 		case CKA_BASE:
 			base = (CK_BYTE *) attr->pValue;
-			glen = (isc_uint16_t) attr->ulValueLen;
+			glen = (uint16_t) attr->ulValueLen;
 			break;
 		}
 	REQUIRE((prime != NULL) && (base != NULL) && (pub != NULL));
@@ -734,42 +742,43 @@ pkcs11dh_todns(const dst_key_t *key, isc_buffer_t *data) {
 
 static isc_result_t
 pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
-	pk11_object_t *dh;
+	pk11_object_t *dh = NULL;
 	isc_region_t r;
-	isc_uint16_t plen, glen, plen_, glen_, publen;
+	uint16_t plen, glen, plen_, glen_, publen;
 	CK_BYTE *prime = NULL, *base = NULL, *pub = NULL;
 	CK_ATTRIBUTE *attr;
 	int special = 0;
+	isc_result_t result;
 
 	isc_buffer_remainingregion(data, &r);
-	if (r.length == 0)
-		return (ISC_R_SUCCESS);
+	if (r.length == 0) {
+		result = ISC_R_SUCCESS;
+		goto cleanup;
+	}
 
 	dh = (pk11_object_t *) isc_mem_get(key->mctx, sizeof(*dh));
-	if (dh == NULL)
-		return (ISC_R_NOMEMORY);
+	if (dh == NULL) {
+		result = ISC_R_NOMEMORY;
+		goto cleanup;
+	}
+
 	memset(dh, 0, sizeof(*dh));
+	result = DST_R_INVALIDPUBLICKEY;
 
 	/*
 	 * Read the prime length.  1 & 2 are table entries, > 16 means a
 	 * prime follows, otherwise an error.
 	 */
-	if (r.length < 2) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (r.length < 2)
+		goto cleanup;
+
 	plen = uint16_fromregion(&r);
-	if (plen < 16 && plen != 1 && plen != 2) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
-	if (r.length < plen) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (plen < 16 && plen != 1 && plen != 2)
+		goto cleanup;
+
+	if (r.length < plen)
+		goto cleanup;
+
 	plen_ = plen;
 	if (plen == 1 || plen == 2) {
 		if (plen == 1) {
@@ -792,9 +801,7 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 				plen_ = sizeof(pk11_dh_bn1536);
 				break;
 			default:
-				memset(dh, 0, sizeof(*dh));
-				isc_mem_put(key->mctx, dh, sizeof(*dh));
-				return (DST_R_INVALIDPUBLICKEY);
+				goto cleanup;
 		}
 	}
 	else {
@@ -807,17 +814,13 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	 * special, but it might not be.  If it's 0 and the prime is not
 	 * special, we have a problem.
 	 */
-	if (r.length < 2) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (r.length < 2)
+		goto cleanup;
+
 	glen = uint16_fromregion(&r);
-	if (r.length < glen) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (r.length < glen)
+		goto cleanup;
+
 	glen_ = glen;
 	if (special != 0) {
 		if (glen == 0) {
@@ -826,38 +829,26 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 		}
 		else {
 			base = r.base;
-			if (isc_safe_memequal(base, pk11_dh_bn2, glen)) {
-				base = pk11_dh_bn2;
-				glen_ = sizeof(pk11_dh_bn2);
-			}
-			else {
-				memset(dh, 0, sizeof(*dh));
-				isc_mem_put(key->mctx, dh, sizeof(*dh));
-				return (DST_R_INVALIDPUBLICKEY);
-			}
+			if (!isc_safe_memequal(base, pk11_dh_bn2, glen))
+				goto cleanup;
+			base = pk11_dh_bn2;
+			glen_ = sizeof(pk11_dh_bn2);
 		}
 	}
 	else {
-		if (glen == 0) {
-			memset(dh, 0, sizeof(*dh));
-			isc_mem_put(key->mctx, dh, sizeof(*dh));
-			return (DST_R_INVALIDPUBLICKEY);
-		}
+		if (glen == 0)
+			goto cleanup;
 		base = r.base;
 	}
 	isc_region_consume(&r, glen);
 
-	if (r.length < 2) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (r.length < 2)
+		goto cleanup;
+
 	publen = uint16_fromregion(&r);
-	if (r.length < publen) {
-		memset(dh, 0, sizeof(*dh));
-		isc_mem_put(key->mctx, dh, sizeof(*dh));
-		return (DST_R_INVALIDPUBLICKEY);
-	}
+	if (r.length < publen)
+		goto cleanup;
+
 	pub = r.base;
 	isc_region_consume(&r, publen);
 
@@ -897,7 +888,7 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 	return (ISC_R_SUCCESS);
 
-    nomemory:
+ nomemory:
 	for (attr = pk11_attribute_first(dh);
 	     attr != NULL;
 	     attr = pk11_attribute_next(dh, attr))
@@ -906,7 +897,8 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 		case CKA_PRIME:
 		case CKA_BASE:
 			if (attr->pValue != NULL) {
-				memset(attr->pValue, 0, attr->ulValueLen);
+				isc_safe_memwipe(attr->pValue,
+						 attr->ulValueLen);
 				isc_mem_put(key->mctx,
 					    attr->pValue,
 					    attr->ulValueLen);
@@ -914,12 +906,18 @@ pkcs11dh_fromdns(dst_key_t *key, isc_buffer_t *data) {
 			break;
 		}
 	if (dh->repr != NULL) {
-		memset(dh->repr, 0, dh->attrcnt * sizeof(*attr));
+		isc_safe_memwipe(dh->repr, dh->attrcnt * sizeof(*attr));
 		isc_mem_put(key->mctx, dh->repr, dh->attrcnt * sizeof(*attr));
 	}
-	memset(dh, 0, sizeof(*dh));
-	isc_mem_put(key->mctx, dh, sizeof(*dh));
-	return (ISC_R_NOMEMORY);
+
+	result = ISC_R_NOMEMORY;
+
+ cleanup:
+	if (dh != NULL) {
+		isc_safe_memwipe(dh, sizeof(*dh));
+		isc_mem_put(key->mctx, dh, sizeof(*dh));
+	}
+	return (result);
 }
 
 static isc_result_t
@@ -1003,7 +1001,7 @@ pkcs11dh_tofile(const dst_key_t *key, const char *directory) {
 	for (i = 0; i < 4; i++) {
 		if (bufs[i] == NULL)
 			break;
-		memset(bufs[i], 0, prime->ulValueLen);
+		isc_safe_memwipe(bufs[i], prime->ulValueLen);
 		isc_mem_put(key->mctx, bufs[i], prime->ulValueLen);
 	}
 	return (result);
@@ -1091,7 +1089,7 @@ pkcs11dh_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
  err:
 	pkcs11dh_destroy(key);
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 	return (ret);
 }
 
@@ -1126,6 +1124,7 @@ dst__pkcs11dh_init(dst_func_t **funcp) {
 		*funcp = &pkcs11dh_functions;
 	return (ISC_R_SUCCESS);
 }
+#endif /* !PK11_DH_DISABLE */
 
 #else /* PKCS11CRYPTO */
 

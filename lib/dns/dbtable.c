@@ -1,30 +1,17 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * $Id: dbtable.c,v 1.33 2007/06/19 23:47:16 tbox Exp $
- */
-
-/*! \file
- * \author
- * Principal Author: DCL
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/mem.h>
 #include <isc/rwlock.h>
@@ -152,7 +139,7 @@ dns_dbtable_attach(dns_dbtable_t *source, dns_dbtable_t **targetp) {
 void
 dns_dbtable_detach(dns_dbtable_t **dbtablep) {
 	dns_dbtable_t *dbtable;
-	isc_boolean_t free_dbtable = ISC_FALSE;
+	bool free_dbtable = false;
 
 	REQUIRE(dbtablep != NULL);
 	dbtable = *dbtablep;
@@ -163,7 +150,7 @@ dns_dbtable_detach(dns_dbtable_t **dbtablep) {
 	INSIST(dbtable->references > 0);
 	dbtable->references--;
 	if (dbtable->references == 0)
-		free_dbtable = ISC_TRUE;
+		free_dbtable = true;
 
 	UNLOCK(&dbtable->lock);
 
@@ -176,16 +163,16 @@ dns_dbtable_detach(dns_dbtable_t **dbtablep) {
 isc_result_t
 dns_dbtable_add(dns_dbtable_t *dbtable, dns_db_t *db) {
 	isc_result_t result;
-	dns_db_t *clone;
+	dns_db_t *dbclone;
 
 	REQUIRE(VALID_DBTABLE(dbtable));
 	REQUIRE(dns_db_class(db) == dbtable->rdclass);
 
-	clone = NULL;
-	dns_db_attach(db, &clone);
+	dbclone = NULL;
+	dns_db_attach(db, &dbclone);
 
 	RWLOCK(&dbtable->tree_lock, isc_rwlocktype_write);
-	result = dns_rbt_addname(dbtable->rbt, dns_db_origin(clone), clone);
+	result = dns_rbt_addname(dbtable->rbt, dns_db_origin(dbclone), dbclone);
 	RWUNLOCK(&dbtable->tree_lock, isc_rwlocktype_write);
 
 	return (result);
@@ -217,7 +204,7 @@ dns_dbtable_remove(dns_dbtable_t *dbtable, dns_db_t *db) {
 	if (result == ISC_R_SUCCESS) {
 		INSIST(stored_data == db);
 
-		(void)dns_rbt_deletename(dbtable->rbt, name, ISC_FALSE);
+		(void)dns_rbt_deletename(dbtable->rbt, name, false);
 	}
 
 	RWUNLOCK(&dbtable->tree_lock, isc_rwlocktype_write);

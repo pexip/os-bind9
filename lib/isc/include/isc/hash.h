@@ -1,25 +1,20 @@
 /*
- * Copyright (C) 2004-2007, 2009, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: hash.h,v 1.12 2009/01/17 23:47:43 tbox Exp $ */
 
 #ifndef ISC_HASH_H
 #define ISC_HASH_H 1
 
+#include <stdbool.h>
+
+#include <isc/deprecated.h>
 #include <isc/types.h>
 
 /*****
@@ -83,6 +78,8 @@
  ***/
 ISC_LANG_BEGINDECLS
 
+LIBISC_EXTERNAL_DATA extern isc_hash_t *isc_hashctx;
+
 isc_result_t
 isc_hash_ctxcreate(isc_mem_t *mctx, isc_entropy_t *entropy, size_t limit,
 		   isc_hash_t **hctx);
@@ -105,7 +102,8 @@ isc_hash_create(isc_mem_t *mctx, isc_entropy_t *entropy, size_t limit);
  */
 
 void
-isc_hash_ctxattach(isc_hash_t *hctx, isc_hash_t **hctxp);
+isc_hash_ctxattach(isc_hash_t *hctx, isc_hash_t **hctxp)
+	ISC_DEPRECATED;
 /*!<
  * \brief Attach to a hash object.
  *
@@ -113,7 +111,8 @@ isc_hash_ctxattach(isc_hash_t *hctx, isc_hash_t **hctxp);
  */
 
 void
-isc_hash_ctxdetach(isc_hash_t **hctxp);
+isc_hash_ctxdetach(isc_hash_t **hctxp)
+	ISC_DEPRECATED;
 /*!<
  * \brief Detach from a hash object.
  *
@@ -158,10 +157,12 @@ isc_hash_init(void);
 /*@{*/
 unsigned int
 isc_hash_ctxcalc(isc_hash_t *hctx, const unsigned char *key,
-		 unsigned int keylen, isc_boolean_t case_sensitive);
+		 unsigned int keylen, bool case_sensitive)
+	ISC_DEPRECATED;
 unsigned int
 isc_hash_calc(const unsigned char *key, unsigned int keylen,
-	      isc_boolean_t case_sensitive);
+	      bool case_sensitive)
+	ISC_DEPRECATED;
 /*!<
  * \brief Calculate a hash value.
  *
@@ -177,13 +178,14 @@ isc_hash_calc(const unsigned char *key, unsigned int keylen,
  * specified for the corresponding hash object.
  *
  * 'case_sensitive' specifies whether the hash key should be treated as
- * case_sensitive values.  It should typically be ISC_FALSE if the hash key
+ * case_sensitive values.  It should typically be false if the hash key
  * is a DNS name.
  */
 /*@}*/
 
 void
-isc__hash_setvec(const isc_uint16_t *vec);
+isc__hash_setvec(const uint16_t *vec)
+	ISC_DEPRECATED;
 
 /*!<
  * \brief Set the contents of the random vector used in hashing.
@@ -196,6 +198,51 @@ isc__hash_setvec(const isc_uint16_t *vec);
  *
  * 'vec' is not documented here on purpose. You should know what you are
  * doing before using this function.
+ */
+
+const void *
+isc_hash_get_initializer(void);
+
+void
+isc_hash_set_initializer(const void *initializer);
+
+uint32_t
+isc_hash_function(const void *data, size_t length,
+		  bool case_sensitive,
+		  const uint32_t *previous_hashp);
+uint32_t
+isc_hash_function_reverse(const void *data, size_t length,
+			  bool case_sensitive,
+			  const uint32_t *previous_hashp);
+/*!<
+ * \brief Calculate a hash over data.
+ *
+ * This hash function is useful for hashtables. The hash function is
+ * opaque and not important to the caller. The returned hash values are
+ * non-deterministic and will have different mapping every time a
+ * process using this library is run, but will have uniform
+ * distribution.
+ *
+ * isc_hash_function() calculates the hash from start to end over the
+ * input data. isc_hash_function_reverse() calculates the hash from the
+ * end to the start over the input data. The difference in order is
+ * useful in incremental hashing; for example, a previously hashed
+ * value for 'com' can be used as input when hashing 'example.com'.
+ *
+ * This is a new variant of isc_hash_calc() and will supercede
+ * isc_hash_calc() eventually.
+ *
+ * 'data' is the data to be hashed.
+ *
+ * 'length' is the size of the data to be hashed.
+ *
+ * 'case_sensitive' specifies whether the hash key should be treated as
+ * case_sensitive values.  It should typically be false if the hash key
+ * is a DNS name.
+ *
+ * 'previous_hashp' is a pointer to a previous hash value returned by
+ * this function. It can be used to perform incremental hashing. NULL
+ * must be passed during first calls.
  */
 
 ISC_LANG_ENDDECLS

@@ -1,25 +1,21 @@
 /*
- * Copyright (C) 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #ifndef ISC_STATS_H
 #define ISC_STATS_H 1
 
 /*! \file isc/stats.h */
+
+#include <inttypes.h>
 
 #include <isc/types.h>
 
@@ -33,7 +29,7 @@ ISC_LANG_BEGINDECLS
 /*%<
  * Dump callback type.
  */
-typedef void (*isc_stats_dumper_t)(isc_statscounter_t, isc_uint64_t, void *);
+typedef void (*isc_stats_dumper_t)(isc_statscounter_t, uint64_t, void *);
 
 isc_result_t
 isc_stats_create(isc_mem_t *mctx, isc_stats_t **statsp, int ncounters);
@@ -117,7 +113,7 @@ isc_stats_dump(isc_stats_t *stats, isc_stats_dumper_t dump_fn, void *arg,
  */
 
 void
-isc_stats_set(isc_stats_t *stats, isc_uint64_t val,
+isc_stats_set(isc_stats_t *stats, uint64_t val,
 	      isc_statscounter_t counter);
 /*%<
  * Set the given counter to the specfied value.
@@ -127,7 +123,7 @@ isc_stats_set(isc_stats_t *stats, isc_uint64_t val,
  */
 
 void
-isc_stats_set(isc_stats_t *stats, isc_uint64_t val,
+isc_stats_set(isc_stats_t *stats, uint64_t val,
 	      isc_statscounter_t counter);
 /*%<
  * Set the given counter to the specfied value.

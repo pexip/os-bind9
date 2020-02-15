@@ -1,23 +1,13 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2012, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: mx_15.c,v 1.58 2009/12/04 22:06:37 tbox Exp $ */
-
-/* reviewed: Wed Mar 15 18:05:46 PST 2000 by brister */
 
 #ifndef RDATA_GENERIC_MX_15_C
 #define RDATA_GENERIC_MX_15_C
@@ -26,24 +16,26 @@
 
 #include <isc/net.h>
 
+#include <dns/fixedname.h>
+
 #define RRTYPE_MX_ATTRIBUTES (0)
 
-static isc_boolean_t
+static bool
 check_mx(isc_token_t *token) {
 	char tmp[sizeof("xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:123.123.123.123.")];
 	struct in_addr addr;
 	struct in6_addr addr6;
 
 	if (strlcpy(tmp, DNS_AS_STR(*token), sizeof(tmp)) >= sizeof(tmp))
-		return (ISC_TRUE);
+		return (true);
 
 	if (tmp[strlen(tmp) - 1] == '.')
 		tmp[strlen(tmp) - 1] = '\0';
 	if (inet_aton(tmp, &addr) == 1 ||
 	    inet_pton(AF_INET6, tmp, &addr6) == 1)
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline isc_result_t
@@ -51,7 +43,7 @@ fromtext_mx(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
 	isc_buffer_t buffer;
-	isc_boolean_t ok;
+	bool ok;
 
 	REQUIRE(type == dns_rdatatype_mx);
 
@@ -59,15 +51,15 @@ fromtext_mx(ARGS_FROMTEXT) {
 	UNUSED(rdclass);
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 
-	ok = ISC_TRUE;
+	ok = true;
 	if ((options & DNS_RDATA_CHECKMX) != 0)
 		ok = check_mx(&token);
 	if (!ok && (options & DNS_RDATA_CHECKMXFAIL) != 0)
@@ -77,11 +69,12 @@ fromtext_mx(ARGS_FROMTEXT) {
 
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	origin = (origin != NULL) ? origin : dns_rootname;
+	if (origin == NULL)
+		origin = dns_rootname;
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
-	ok = ISC_TRUE;
+	ok = true;
 	if ((options & DNS_RDATA_CHECKNAMES) != 0)
-		ok = dns_name_ishostname(&name, ISC_FALSE);
+		ok = dns_name_ishostname(&name, false);
 	if (!ok && (options & DNS_RDATA_CHECKNAMESFAIL) != 0)
 		RETTOK(DNS_R_BADNAME);
 	if (!ok && callbacks != NULL)
@@ -94,7 +87,7 @@ totext_mx(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	isc_boolean_t sub;
+	bool sub;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -107,7 +100,7 @@ totext_mx(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &region);
 	num = uint16_fromregion(&region);
 	isc_region_consume(&region, 2);
-	sprintf(buf, "%u", num);
+	snprintf(buf, sizeof(buf), "%u", num);
 	RETERR(str_totext(buf, target));
 
 	RETERR(str_totext(" ", target));
@@ -250,8 +243,15 @@ freestruct_mx(ARGS_FREESTRUCT) {
 	mx->mctx = NULL;
 }
 
+static unsigned char port25_offset[] = { 0, 3 };
+static unsigned char port25_ndata[] = "\003_25\004_tcp";
+static dns_name_t port25 =
+	 DNS_NAME_INITNONABSOLUTE(port25_ndata, port25_offset);
+
 static inline isc_result_t
 additionaldata_mx(ARGS_ADDLDATA) {
+	isc_result_t result;
+	dns_fixedname_t fixed;
 	dns_name_t name;
 	dns_offsets_t offsets;
 	isc_region_t region;
@@ -263,7 +263,20 @@ additionaldata_mx(ARGS_ADDLDATA) {
 	isc_region_consume(&region, 2);
 	dns_name_fromregion(&name, &region);
 
-	return ((add)(arg, &name, dns_rdatatype_a));
+	if (dns_name_equal(&name, dns_rootname))
+		return (ISC_R_SUCCESS);
+
+	result = (add)(arg, &name, dns_rdatatype_a);
+	if (result != ISC_R_SUCCESS)
+		return (result);
+
+	dns_fixedname_init(&fixed);
+	result = dns_name_concatenate(&port25, &name,
+				      dns_fixedname_name(&fixed), NULL);
+	if (result != ISC_R_SUCCESS)
+		return (ISC_R_SUCCESS);
+
+	return ((add)(arg, dns_fixedname_name(&fixed), dns_rdatatype_tlsa));
 }
 
 static inline isc_result_t
@@ -283,7 +296,7 @@ digest_mx(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_mx(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_mx);
@@ -294,7 +307,7 @@ checkowner_mx(ARGS_CHECKOWNER) {
 	return (dns_name_ishostname(name, wildcard));
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_mx(ARGS_CHECKNAMES) {
 	isc_region_t region;
 	dns_name_t name;
@@ -307,12 +320,12 @@ checknames_mx(ARGS_CHECKNAMES) {
 	isc_region_consume(&region, 2);
 	dns_name_init(&name, NULL);
 	dns_name_fromregion(&name, &region);
-	if (!dns_name_ishostname(&name, ISC_FALSE)) {
+	if (!dns_name_ishostname(&name, false)) {
 		if (bad != NULL)
 			dns_name_clone(&name, bad);
-		return (ISC_FALSE);
+		return (false);
 	}
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

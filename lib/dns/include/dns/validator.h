@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2010, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: validator.h,v 1.46 2010/02/25 05:08:01 tbox Exp $ */
 
 #ifndef DNS_VALIDATOR_H
 #define DNS_VALIDATOR_H 1
@@ -54,6 +47,8 @@
  * Standards:
  *\li	RFCs:	1034, 1035, 2181, 4033, 4034, 4035.
  */
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/event.h>
@@ -103,11 +98,11 @@ typedef struct dns_validatorevent {
 	/*
 	 * Optout proof seen.
 	 */
-	isc_boolean_t			optout;
+	bool			optout;
 	/*
 	 * Answer is secure.
 	 */
-	isc_boolean_t			secure;
+	bool			secure;
 } dns_validatorevent_t;
 
 #define DNS_VALIDATOR_NOQNAMEPROOF 0
@@ -143,7 +138,7 @@ struct dns_validator {
 	void *				arg;
 	unsigned int			labels;
 	dns_rdataset_t *		currentset;
-	isc_boolean_t			seensig;
+	bool			seensig;
 	dns_rdataset_t *		keyset;
 	dns_rdataset_t *		dsset;
 	dns_rdataset_t *		soaset;
@@ -159,12 +154,13 @@ struct dns_validator {
 	ISC_LINK(dns_validator_t)	link;
 	dns_rdataset_t 			dlv;
 	dns_fixedname_t			dlvsep;
-	isc_boolean_t			havedlvsep;
-	isc_boolean_t			mustbesecure;
+	bool			havedlvsep;
+	bool			mustbesecure;
 	unsigned int			dlvlabels;
 	unsigned int			depth;
 	unsigned int			authcount;
 	unsigned int			authfail;
+	isc_stdtime_t			start;
 };
 
 /*%
@@ -173,6 +169,7 @@ struct dns_validator {
 #define DNS_VALIDATOR_DLV		0x0001U
 #define DNS_VALIDATOR_DEFER		0x0002U
 #define DNS_VALIDATOR_NOCDFLAG		0x0004U
+#define DNS_VALIDATOR_NONTA		0x0008U  /*% Ignore NTA table */
 
 ISC_LANG_BEGINDECLS
 

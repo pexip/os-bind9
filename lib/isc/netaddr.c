@@ -1,27 +1,22 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2010-2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include <isc/buffer.h>
 #include <isc/msgs.h>
@@ -32,40 +27,40 @@
 #include <isc/string.h>
 #include <isc/util.h>
 
-isc_boolean_t
+bool
 isc_netaddr_equal(const isc_netaddr_t *a, const isc_netaddr_t *b) {
 	REQUIRE(a != NULL && b != NULL);
 
 	if (a->family != b->family)
-		return (ISC_FALSE);
+		return (false);
 
 	if (a->zone != b->zone)
-		return (ISC_FALSE);
+		return (false);
 
 	switch (a->family) {
 	case AF_INET:
 		if (a->type.in.s_addr != b->type.in.s_addr)
-			return (ISC_FALSE);
+			return (false);
 		break;
 	case AF_INET6:
 		if (memcmp(&a->type.in6, &b->type.in6,
 			   sizeof(a->type.in6)) != 0 ||
 		    a->zone != b->zone)
-			return (ISC_FALSE);
+			return (false);
 		break;
 #ifdef ISC_PLATFORM_HAVESYSUNH
 	case AF_UNIX:
 		if (strcmp(a->type.un, b->type.un) != 0)
-			return (ISC_FALSE);
+			return (false);
 		break;
 #endif
 	default:
-		return (ISC_FALSE);
+		return (false);
 	}
-	return (ISC_TRUE);
+	return (true);
 }
 
-isc_boolean_t
+bool
 isc_netaddr_eqprefix(const isc_netaddr_t *a, const isc_netaddr_t *b,
 		     unsigned int prefixlen)
 {
@@ -77,10 +72,10 @@ isc_netaddr_eqprefix(const isc_netaddr_t *a, const isc_netaddr_t *b,
 	REQUIRE(a != NULL && b != NULL);
 
 	if (a->family != b->family)
-		return (ISC_FALSE);
+		return (false);
 
 	if (a->zone != b->zone && b->zone != 0)
-		return (ISC_FALSE);
+		return (false);
 
 	switch (a->family) {
 	case AF_INET:
@@ -94,7 +89,7 @@ isc_netaddr_eqprefix(const isc_netaddr_t *a, const isc_netaddr_t *b,
 		ipabytes = 16;
 		break;
 	default:
-		return (ISC_FALSE);
+		return (false);
 	}
 
 	/*
@@ -108,7 +103,7 @@ isc_netaddr_eqprefix(const isc_netaddr_t *a, const isc_netaddr_t *b,
 
 	if (nbytes > 0) {
 		if (memcmp(pa, pb, nbytes) != 0)
-			return (ISC_FALSE);
+			return (false);
 	}
 	if (nbits > 0) {
 		unsigned int bytea, byteb, mask;
@@ -118,9 +113,9 @@ isc_netaddr_eqprefix(const isc_netaddr_t *a, const isc_netaddr_t *b,
 		byteb = pb[nbytes];
 		mask = (0xFF << (8-nbits)) & 0xFF;
 		if ((bytea & mask) != (byteb & mask))
-			return (ISC_FALSE);
+			return (false);
 	}
-	return (ISC_TRUE);
+	return (true);
 }
 
 isc_result_t
@@ -173,7 +168,7 @@ isc_netaddr_totext(const isc_netaddr_t *netaddr, isc_buffer_t *target) {
 		return (ISC_R_NOSPACE);
 
 	isc_buffer_putmem(target, (unsigned char *)abuf, alen);
-	isc_buffer_putmem(target, (unsigned char *)zbuf, zlen);
+	isc_buffer_putmem(target, (unsigned char *)zbuf, (unsigned int)zlen);
 
 	return (ISC_R_SUCCESS);
 }
@@ -279,7 +274,6 @@ isc_netaddr_masktoprefixlen(const isc_netaddr_t *s, unsigned int *lenp) {
 	for (; i < ipbytes; i++) {
 		if (p[i] != 0)
 			return (ISC_R_MASKNONCONTIG);
-		i++;
 	}
 	*lenp = nbytes * 8 + nbits;
 	return (ISC_R_SUCCESS);
@@ -307,7 +301,7 @@ isc_netaddr_frompath(isc_netaddr_t *netaddr, const char *path) {
 
 	memset(netaddr, 0, sizeof(*netaddr));
 	netaddr->family = AF_UNIX;
-	strcpy(netaddr->type.un, path);
+	strlcpy(netaddr->type.un, path, sizeof(netaddr->type.un));
 	netaddr->zone = 0;
 	return (ISC_R_SUCCESS);
 #else
@@ -319,14 +313,14 @@ isc_netaddr_frompath(isc_netaddr_t *netaddr, const char *path) {
 
 
 void
-isc_netaddr_setzone(isc_netaddr_t *netaddr, isc_uint32_t zone) {
+isc_netaddr_setzone(isc_netaddr_t *netaddr, uint32_t zone) {
 	/* we currently only support AF_INET6. */
 	REQUIRE(netaddr->family == AF_INET6);
 
 	netaddr->zone = zone;
 }
 
-isc_uint32_t
+uint32_t
 isc_netaddr_getzone(const isc_netaddr_t *netaddr) {
 	return (netaddr->zone);
 }
@@ -373,49 +367,65 @@ isc_netaddr_any6(isc_netaddr_t *netaddr) {
 	netaddr->type.in6 = in6addr_any;
 }
 
-isc_boolean_t
+bool
 isc_netaddr_ismulticast(isc_netaddr_t *na) {
 	switch (na->family) {
 	case AF_INET:
-		return (ISC_TF(ISC_IPADDR_ISMULTICAST(na->type.in.s_addr)));
+		return (ISC_IPADDR_ISMULTICAST(na->type.in.s_addr));
 	case AF_INET6:
-		return (ISC_TF(IN6_IS_ADDR_MULTICAST(&na->type.in6)));
+		return (IN6_IS_ADDR_MULTICAST(&na->type.in6));
 	default:
-		return (ISC_FALSE);  /* XXXMLG ? */
+		return (false);  /* XXXMLG ? */
 	}
 }
 
-isc_boolean_t
+bool
 isc_netaddr_isexperimental(isc_netaddr_t *na) {
 	switch (na->family) {
 	case AF_INET:
-		return (ISC_TF(ISC_IPADDR_ISEXPERIMENTAL(na->type.in.s_addr)));
+		return (ISC_IPADDR_ISEXPERIMENTAL(na->type.in.s_addr));
 	default:
-		return (ISC_FALSE);  /* XXXMLG ? */
+		return (false);  /* XXXMLG ? */
 	}
 }
 
-isc_boolean_t
+bool
 isc_netaddr_islinklocal(isc_netaddr_t *na) {
 	switch (na->family) {
 	case AF_INET:
-		return (ISC_FALSE);
+		return (false);
 	case AF_INET6:
-		return (ISC_TF(IN6_IS_ADDR_LINKLOCAL(&na->type.in6)));
+		return (IN6_IS_ADDR_LINKLOCAL(&na->type.in6));
 	default:
-		return (ISC_FALSE);
+		return (false);
 	}
 }
 
-isc_boolean_t
+bool
 isc_netaddr_issitelocal(isc_netaddr_t *na) {
 	switch (na->family) {
 	case AF_INET:
-		return (ISC_FALSE);
+		return (false);
 	case AF_INET6:
-		return (ISC_TF(IN6_IS_ADDR_SITELOCAL(&na->type.in6)));
+		return (IN6_IS_ADDR_SITELOCAL(&na->type.in6));
 	default:
-		return (ISC_FALSE);
+		return (false);
+	}
+}
+
+#define ISC_IPADDR_ISNETZERO(i) \
+	       (((uint32_t)(i) & ISC__IPADDR(0xff000000)) \
+		== ISC__IPADDR(0x00000000))
+
+bool
+isc_netaddr_isnetzero(isc_netaddr_t *na) {
+	switch (na->family) {
+	case AF_INET:
+		return (ISC_IPADDR_ISNETZERO(na->type.in.s_addr));
+	case AF_INET6:
+		return (false);
+	default:
+		return (false);
 	}
 }
 
@@ -432,4 +442,17 @@ isc_netaddr_fromv4mapped(isc_netaddr_t *t, const isc_netaddr_t *s) {
 	t->family = AF_INET;
 	memmove(&t->type.in, (char *)&src->type.in6 + 12, 4);
 	return;
+}
+
+bool
+isc_netaddr_isloopback(const isc_netaddr_t *na) {
+	switch (na->family) {
+	case AF_INET:
+		return ((ntohl(na->type.in.s_addr) & 0xff000000U) ==
+			0x7f000000U);
+	case AF_INET6:
+		return (IN6_IS_ADDR_LOOPBACK(&na->type.in6));
+	default:
+		return (false);
+	}
 }

@@ -1,20 +1,17 @@
 /*
- * Copyright (C) 2013  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include "config.h"
+
+#include <inttypes.h>
 
 #include <isc/assertions.h>
 #include <isc/crc64.h>
@@ -25,7 +22,7 @@
 /*%<
  * ECMA-182 CRC64 polynomial.
  */
-static const isc_uint64_t crc64_table[256] = {
+static const uint64_t crc64_table[256] = {
 	0x0000000000000000ULL, 0x42F0E1EBA9EA3693ULL, 0x85E1C3D753D46D26ULL,
 	0xC711223CFA3E5BB5ULL, 0x493366450E42ECDFULL, 0x0BC387AEA7A8DA4CULL,
 	0xCCD2A5925D9681F9ULL, 0x8E224479F47CB76AULL, 0x9266CC8A1C85D9BEULL,
@@ -115,14 +112,14 @@ static const isc_uint64_t crc64_table[256] = {
 };
 
 void
-isc_crc64_init(isc_uint64_t *crc) {
+isc_crc64_init(uint64_t *crc) {
 	REQUIRE(crc != NULL);
 
 	*crc = 0xffffffffffffffffULL;
 }
 
 void
-isc_crc64_update(isc_uint64_t *crc, const void *data, size_t len) {
+isc_crc64_update(uint64_t *crc, const void *data, size_t len) {
 	const unsigned char *p = data;
 	int i;
 
@@ -137,7 +134,7 @@ isc_crc64_update(isc_uint64_t *crc, const void *data, size_t len) {
 
 
 void
-isc_crc64_final(isc_uint64_t *crc) {
+isc_crc64_final(uint64_t *crc) {
 	REQUIRE(crc != NULL);
 
 	*crc ^= 0xffffffffffffffffULL;

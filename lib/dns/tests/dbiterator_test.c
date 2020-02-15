@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2011, 2012  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
@@ -58,7 +52,7 @@ test_create(const atf_tc_t *tc) {
 	dns_db_t *db = NULL;
 	dns_dbiterator_t *iter = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -104,10 +98,9 @@ test_walk(const atf_tc_t *tc) {
 
 	UNUSED(tc);
 
-	dns_fixedname_init(&f);
-	name = dns_fixedname_name(&f);
+	name = dns_fixedname_initname(&f);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -167,10 +160,9 @@ static void test_reverse(const atf_tc_t *tc) {
 
 	UNUSED(tc);
 
-	dns_fixedname_init(&f);
-	name = dns_fixedname_name(&f);
+	name = dns_fixedname_initname(&f);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -228,12 +220,10 @@ static void test_seek(const atf_tc_t *tc) {
 
 	UNUSED(tc);
 
-	dns_fixedname_init(&f1);
-	name = dns_fixedname_name(&f1);
-	dns_fixedname_init(&f2);
-	seekname = dns_fixedname_name(&f2);
+	name = dns_fixedname_initname(&f1);
+	seekname = dns_fixedname_initname(&f2);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -301,10 +291,9 @@ static void test_seek_empty(const atf_tc_t *tc) {
 
 	UNUSED(tc);
 
-	dns_fixedname_init(&f1);
-	seekname = dns_fixedname_name(&f1);
+	seekname = dns_fixedname_initname(&f1);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -318,7 +307,7 @@ static void test_seek_empty(const atf_tc_t *tc) {
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_dbiterator_seek(iter, seekname);
-	ATF_CHECK_EQ(result, ISC_R_NOTFOUND);
+	ATF_CHECK_EQ(result, DNS_R_PARTIALMATCH);
 
 	dns_dbiterator_destroy(&iter);
 	dns_db_detach(&db);
@@ -358,10 +347,9 @@ static void test_seek_nx(const atf_tc_t *tc) {
 
 	UNUSED(tc);
 
-	dns_fixedname_init(&f1);
-	seekname = dns_fixedname_name(&f1);
+	seekname = dns_fixedname_initname(&f1);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_test_loaddb(&db, dns_dbtype_cache, TEST_ORIGIN,
@@ -372,6 +360,12 @@ static void test_seek_nx(const atf_tc_t *tc) {
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = make_name("nonexistent." TEST_ORIGIN, seekname);
+	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+
+	result = dns_dbiterator_seek(iter, seekname);
+	ATF_CHECK_EQ(result, DNS_R_PARTIALMATCH);
+
+	result = make_name("nonexistent.", seekname);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_dbiterator_seek(iter, seekname);

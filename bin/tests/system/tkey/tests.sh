@@ -1,19 +1,13 @@
 #!/bin/sh
 #
-# Copyright (C) 2004, 2007, 2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
-# Copyright (C) 2001  Internet Software Consortium.
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 # $Id: tests.sh,v 1.11 2011/11/03 23:46:26 tbox Exp $
 
@@ -39,7 +33,7 @@ for owner in . foo.example.
 do
 	echo "I:creating new key using owner name \"$owner\""
 	ret=0
-	keyname=`./keycreate $dhkeyname $owner` || ret=1
+	keyname=`$KEYCREATE $dhkeyname $owner` || ret=1
 	if [ $ret != 0 ]; then
 		echo "I:failed"
 		status=`expr $status + $ret`
@@ -61,7 +55,7 @@ do
 
 	echo "I:deleting new key"
 	ret=0
-	./keydelete $keyname || ret=1
+	$KEYDELETE $keyname || ret=1
 	if [ $ret != 0 ]; then
 		echo "I:failed"
 	fi
@@ -81,7 +75,7 @@ done
 
 echo "I:creating new key using owner name bar.example."
 ret=0
-keyname=`./keycreate $dhkeyname bar.example.` || ret=1
+keyname=`$KEYCREATE $dhkeyname bar.example.` || ret=1
 if [ $ret != 0 ]; then
         echo "I:failed"
 	status=`expr $status + $ret`
@@ -122,7 +116,7 @@ status=`expr $status + $ret`
 
 echo "I:recreating the bar.example. key"
 ret=0
-keyname=`./keycreate $dhkeyname bar.example.` || ret=1
+keyname=`$KEYCREATE $dhkeyname bar.example.` || ret=1
 if [ $ret != 0 ]; then
         echo "I:failed"
 	status=`expr $status + $ret`
@@ -150,4 +144,4 @@ fi
 status=`expr $status + $ret`
 
 echo "I:exit status: $status"
-exit $status
+[ $status -eq 0 ] || exit 1

@@ -1,17 +1,11 @@
-# Copyright (C) 2004-2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
-# Copyright (C) 1998-2003  Internet Software Consortium.
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 ###
 ### Common Makefile rules for BIND 9.
@@ -54,6 +48,7 @@ all: ${PREREQS} subdirs ${TARGETS} testdirs
 ###
 ### Makefile may define:
 ###	SUBDIRS
+###	DEPDIRS
 
 ALL_SUBDIRS = ${SUBDIRS} nulldir
 ALL_TESTDIRS = ${TESTDIRS} nulldir
@@ -84,9 +79,9 @@ testdirs:
 
 install:: all
 
-install clean distclean maintainer-clean doc docclean man manclean::
+install uninstall clean distclean maintainer-clean doc docclean man manclean::
 	@for i in ${ALL_SUBDIRS} ${ALL_TESTDIRS}; do \
-		if [ "$$i" != "nulldir" -a -d $$i ]; then \
+		if [ "$$i" != "nulldir" -a -d $$i -a -f $$i/Makefile ]; then \
 			echo "making $@ in `pwd`/$$i"; \
 			(cd $$i; ${MAKE} ${MAKEDEFS} DESTDIR="${DESTDIR}" $@) || exit 1; \
 		fi; \
@@ -141,6 +136,7 @@ LIBTOOL = @LIBTOOL@
 LIBTOOL_MODE_COMPILE = ${LIBTOOL} @LIBTOOL_MODE_COMPILE@
 LIBTOOL_MODE_INSTALL = ${LIBTOOL} @LIBTOOL_MODE_INSTALL@
 LIBTOOL_MODE_LINK = ${LIBTOOL} @LIBTOOL_MODE_LINK@
+LIBTOOL_MODE_UNINSTALL = ${LIBTOOL} @LIBTOOL_MODE_UNINSTALL@
 PURIFY = @PURIFY@
 
 MKDEP = ${SHELL} ${top_builddir}/make/mkdep
@@ -241,7 +237,7 @@ distclean maintainer-clean::
 	rm -f Makefile
 
 depend:
-	@for i in ${ALL_SUBDIRS}; do \
+	@for i in ${ALL_SUBDIRS} ${ALL_TESTDIRS}; do \
 		if [ "$$i" != "nulldir" -a -d $$i ]; then \
 			echo "making depend in `pwd`/$$i"; \
 			(cd $$i; ${MAKE} ${MAKEDEFS} DESTDIR="${DESTDIR}" $@) || exit 1; \
@@ -308,10 +304,13 @@ INSTALL_LIBRARY =	@INSTALL_LIBRARY@
 ###
 
 XSLTPROC =		@XSLTPROC@ --novalid --xinclude --nonet
+XMLLINT =		@XMLLINT@
 PERL =			@PERL@
 LATEX =			@LATEX@
 PDFLATEX =		@PDFLATEX@
+DBLATEX =		@DBLATEX@
 W3M =			@W3M@
+PANDOC =		@PANDOC@
 
 ###
 ### Script language program used to create internal symbol tables

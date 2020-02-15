@@ -1,23 +1,19 @@
 /*
- * Copyright (C) 2005, 2007, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: atomic.h,v 1.6 2008/01/24 23:47:00 tbox Exp $ */
 
 #ifndef ISC_ATOMIC_H
 #define ISC_ATOMIC_H 1
+
+#include <inttypes.h>
 
 #include <isc/platform.h>
 #include <isc/types.h>
@@ -35,12 +31,11 @@
  * registers for arguments, which would not actually correspond to the
  * intended address or value in the embedded mnemonic.
  */
-#include <isc/util.h>		/* for 'UNUSED' macro */
 
-static isc_int32_t
-isc_atomic_xadd(isc_int32_t *p, isc_int32_t val) {
-	UNUSED(p);
-	UNUSED(val);
+static int32_t
+isc_atomic_xadd(int32_t *p, int32_t val) {
+	(void)(p);
+	(void)(val);
 
 	__asm (
 		"movq %rdi, %rdx\n"
@@ -56,10 +51,10 @@ isc_atomic_xadd(isc_int32_t *p, isc_int32_t val) {
 }
 
 #ifdef ISC_PLATFORM_HAVEXADDQ
-static isc_int64_t
-isc_atomic_xaddq(isc_int64_t *p, isc_int64_t val) {
-	UNUSED(p);
-	UNUSED(val);
+static int64_t
+isc_atomic_xaddq(int64_t *p, int64_t val) {
+	(void)(p);
+	(void)(val);
 
 	__asm (
 		"movq %rdi, %rdx\n"
@@ -76,9 +71,9 @@ isc_atomic_xaddq(isc_int64_t *p, isc_int64_t val) {
 #endif
 
 static void
-isc_atomic_store(isc_int32_t *p, isc_int32_t val) {
-	UNUSED(p);
-	UNUSED(val);
+isc_atomic_store(int32_t *p, int32_t val) {
+	(void)(p);
+	(void)(val);
 
 	__asm (
 		"movq %rdi, %rax\n"
@@ -87,19 +82,36 @@ isc_atomic_store(isc_int32_t *p, isc_int32_t val) {
 		"lock;"
 #endif
 		"xchgl (%rax), %edx\n"
-		/*
-		 * XXX: assume %rax will be used as the return value.
-		 */
 		);
 }
 
-static isc_int32_t
-isc_atomic_cmpxchg(isc_int32_t *p, isc_int32_t cmpval, isc_int32_t val) {
-	UNUSED(p);
-	UNUSED(cmpval);
-	UNUSED(val);
+#ifdef ISC_PLATFORM_HAVEATOMICSTOREQ
+static void
+isc_atomic_storeq(int64_t *p, int64_t val) {
+	(void)(p);
+	(void)(val);
 
 	__asm (
+		"movq %rdi, %rax\n"
+		"movq %rsi, %rdx\n"
+#ifdef ISC_PLATFORM_USETHREADS
+		"lock;"
+#endif
+		"xchgq (%rax), %rdx\n"
+		);
+}
+#endif
+
+static int32_t
+isc_atomic_cmpxchg(int32_t *p, int32_t cmpval, int32_t val) {
+	(void)(p);
+	(void)(cmpval);
+	(void)(val);
+
+	__asm (
+		/*
+		 * p is %rdi, cmpval is %esi, val is %edx.
+		 */
 		"movl %edx, %ecx\n"
 		"movl %esi, %eax\n"
 		"movq %rdi, %rdx\n"
@@ -108,8 +120,12 @@ isc_atomic_cmpxchg(isc_int32_t *p, isc_int32_t cmpval, isc_int32_t val) {
 		"lock;"
 #endif
 		/*
-		 * If (%rdi) == %eax then (%rdi) := %edx.
-		 * %eax is set to old (%ecx), which will be the return value.
+		 * If [%rdi] == %eax then [%rdi] := %ecx (equal to %edx
+		 * from above), and %eax is untouched (equal to %esi)
+		 * from above.
+		 *
+		 * Else if [%rdi] != %eax then [%rdi] := [%rdi]
+		 * (rewritten in write cycle) and %eax := [%rdi].
 		 */
 		"cmpxchgl %ecx, (%rdx)"
 		);

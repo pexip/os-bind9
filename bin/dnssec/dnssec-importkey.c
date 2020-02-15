@@ -1,23 +1,19 @@
 /*
- * Copyright (C) 2013-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include <isc/buffer.h>
@@ -64,18 +60,20 @@ static dns_rdataclass_t rdclass;
 static dns_fixedname_t	fixed;
 static dns_name_t	*name = NULL;
 static isc_mem_t	*mctx = NULL;
-static isc_boolean_t	setpub = ISC_FALSE, setdel = ISC_FALSE;
-static isc_boolean_t	setttl = ISC_FALSE;
+static bool	setpub = false, setdel = false;
+static bool	setttl = false;
 static isc_stdtime_t	pub = 0, del = 0;
 static dns_ttl_t	ttl = 0;
+static isc_stdtime_t	syncadd = 0, syncdel = 0;
+static bool	setsyncadd = false;
+static bool	setsyncdel = false;
 
 static isc_result_t
 initname(char *setname) {
 	isc_result_t result;
 	isc_buffer_t buf;
 
-	dns_fixedname_init(&fixed);
-	name = dns_fixedname_name(&fixed);
+	name = dns_fixedname_initname(&fixed);
 
 	isc_buffer_init(&buf, setname, strlen(setname));
 	isc_buffer_add(&buf, strlen(setname));
@@ -128,7 +126,7 @@ loadset(const char *filename, dns_rdataset_t *rdataset) {
 			      isc_result_totext(result));
 	}
 
-	result = dns_db_findnode(db, name, ISC_FALSE, &node);
+	result = dns_db_findnode(db, name, false, &node);
 	if (result != ISC_R_SUCCESS)
 		fatal("can't find %s node in %s", setname, filename);
 
@@ -183,8 +181,7 @@ loadkey(char *filename, unsigned char *key_buf, unsigned int key_buf_size,
 
 	rdclass = dst_key_class(key);
 
-	dns_fixedname_init(&fixed);
-	name = dns_fixedname_name(&fixed);
+	name = dns_fixedname_initname(&fixed);
 	result = dns_name_copy(dst_key_name(key), name, NULL);
 	if (result != ISC_R_SUCCESS)
 		fatal("can't copy name");
@@ -231,11 +228,16 @@ emit(const char *dir, dns_rdata_t *rdata) {
 		dst_key_free(&tmp);
 	}
 
-	dst_key_setexternal(key, ISC_TRUE);
+	dst_key_setexternal(key, true);
 	if (setpub)
 		dst_key_settime(key, DST_TIME_PUBLISH, pub);
 	if (setdel)
 		dst_key_settime(key, DST_TIME_DELETE, del);
+	if (setsyncadd)
+		dst_key_settime(key, DST_TIME_SYNCPUBLISH, syncadd);
+	if (setsyncdel)
+		dst_key_settime(key, DST_TIME_SYNCDELETE, syncdel);
+
 	if (setttl)
 		dst_key_setttl(key, ttl);
 
@@ -278,8 +280,12 @@ usage(void) {
 	fprintf(stderr, "Timing options:\n");
 	fprintf(stderr, "    -P date/[+-]offset/none: set/unset key "
 						     "publication date\n");
+	fprintf(stderr, "    -P sync date/[+-]offset/none: set/unset "
+				"CDS and CDNSKEY publication date\n");
 	fprintf(stderr, "    -D date/[+-]offset/none: set/unset key "
 						     "deletion date\n");
+	fprintf(stderr, "    -D sync date/[+-]offset/none: set/unset "
+				"CDS and CDNSKEY deletion date\n");
 
 	exit (-1);
 }
@@ -312,12 +318,24 @@ main(int argc, char **argv) {
 #endif
 	dns_result_register();
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 #define CMDLINE_FLAGS "D:f:hK:L:P:v:V"
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 		switch (ch) {
 		case 'D':
+			/* -Dsync ? */
+			if (isoptarg("sync", argv, usage)) {
+				if (setsyncdel)
+					fatal("-D sync specified more than "
+					      "once");
+
+				syncdel = strtotime(isc_commandline_argument,
+						   now, now, &setsyncdel);
+				break;
+			}
+			/* -Ddnskey ? */
+			(void)isoptarg("dnskey", argv, usage);
 			if (setdel)
 				fatal("-D specified more than once");
 
@@ -331,9 +349,21 @@ main(int argc, char **argv) {
 			break;
 		case 'L':
 			ttl = strtottl(isc_commandline_argument);
-			setttl = ISC_TRUE;
+			setttl = true;
 			break;
 		case 'P':
+			/* -Psync ? */
+			if (isoptarg("sync", argv, usage)) {
+				if (setsyncadd)
+					fatal("-P sync specified more than "
+					      "once");
+
+				syncadd = strtotime(isc_commandline_argument,
+						   now, now, &setsyncadd);
+				break;
+			}
+			/* -Pdnskey ? */
+			(void)isoptarg("dnskey", argv, usage);
 			if (setpub)
 				fatal("-P specified more than once");
 

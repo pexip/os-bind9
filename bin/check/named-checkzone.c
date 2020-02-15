@@ -1,27 +1,22 @@
 /*
- * Copyright (C) 2004-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: named-checkzone.c,v 1.65.32.2 2012/02/07 02:45:21 each Exp $ */
 
 /*! \file */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include <isc/app.h>
 #include <isc/commandline.h>
@@ -58,7 +53,7 @@ dns_zone_t *zone = NULL;
 dns_zonetype_t zonetype = dns_zone_master;
 static int dumpzone = 0;
 static const char *output_filename;
-static char *prog_name = NULL;
+static const char *prog_name = NULL;
 static const dns_master_style_t *outputstyle = NULL;
 static enum { progmode_check, progmode_compile } progmode;
 
@@ -115,10 +110,10 @@ main(int argc, char **argv) {
 	dns_masterformat_t inputformat = dns_masterformat_text;
 	dns_masterformat_t outputformat = dns_masterformat_text;
 	dns_masterrawheader_t header;
-	isc_uint32_t rawversion = 1, serialnum = 0;
+	uint32_t rawversion = 1, serialnum = 0;
 	dns_ttl_t maxttl = 0;
-	isc_boolean_t snset = ISC_FALSE;
-	isc_boolean_t logdump = ISC_FALSE;
+	bool snset = false;
+	bool logdump = false;
 	FILE *errout = stdout;
 	char *endp;
 
@@ -168,7 +163,7 @@ main(int argc, char **argv) {
 
 #define ARGCMP(X) (strcmp(isc_commandline_argument, X) == 0)
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 	while ((c = isc_commandline_parse(argc, argv,
 			       "c:df:hi:jJ:k:L:l:m:n:qr:s:t:o:vw:DF:M:S:T:W:"))
@@ -186,33 +181,33 @@ main(int argc, char **argv) {
 			if (ARGCMP("full")) {
 				zone_options |= DNS_ZONEOPT_CHECKINTEGRITY |
 						DNS_ZONEOPT_CHECKSIBLING;
-				docheckmx = ISC_TRUE;
-				docheckns = ISC_TRUE;
-				dochecksrv = ISC_TRUE;
+				docheckmx = true;
+				docheckns = true;
+				dochecksrv = true;
 			} else if (ARGCMP("full-sibling")) {
 				zone_options |= DNS_ZONEOPT_CHECKINTEGRITY;
 				zone_options &= ~DNS_ZONEOPT_CHECKSIBLING;
-				docheckmx = ISC_TRUE;
-				docheckns = ISC_TRUE;
-				dochecksrv = ISC_TRUE;
+				docheckmx = true;
+				docheckns = true;
+				dochecksrv = true;
 			} else if (ARGCMP("local")) {
 				zone_options |= DNS_ZONEOPT_CHECKINTEGRITY;
 				zone_options |= DNS_ZONEOPT_CHECKSIBLING;
-				docheckmx = ISC_FALSE;
-				docheckns = ISC_FALSE;
-				dochecksrv = ISC_FALSE;
+				docheckmx = false;
+				docheckns = false;
+				dochecksrv = false;
 			} else if (ARGCMP("local-sibling")) {
 				zone_options |= DNS_ZONEOPT_CHECKINTEGRITY;
 				zone_options &= ~DNS_ZONEOPT_CHECKSIBLING;
-				docheckmx = ISC_FALSE;
-				docheckns = ISC_FALSE;
-				dochecksrv = ISC_FALSE;
+				docheckmx = false;
+				docheckns = false;
+				dochecksrv = false;
 			} else if (ARGCMP("none")) {
 				zone_options &= ~DNS_ZONEOPT_CHECKINTEGRITY;
 				zone_options &= ~DNS_ZONEOPT_CHECKSIBLING;
-				docheckmx = ISC_FALSE;
-				docheckns = ISC_FALSE;
-				dochecksrv = ISC_FALSE;
+				docheckmx = false;
+				docheckns = false;
+				dochecksrv = false;
 			} else {
 				fprintf(stderr, "invalid argument to -i: %s\n",
 					isc_commandline_argument);
@@ -229,12 +224,12 @@ main(int argc, char **argv) {
 			break;
 
 		case 'j':
-			nomerge = ISC_FALSE;
+			nomerge = false;
 			break;
 
 		case 'J':
 			journal = isc_commandline_argument;
-			nomerge = ISC_FALSE;
+			nomerge = false;
 			break;
 
 		case 'k':
@@ -255,7 +250,7 @@ main(int argc, char **argv) {
 			break;
 
 		case 'L':
-			snset = ISC_TRUE;
+			snset = true;
 			endp = NULL;
 			serialnum = strtol(isc_commandline_argument, &endp, 0);
 			if (*endp != '\0') {
@@ -514,7 +509,7 @@ main(int argc, char **argv) {
 	     strcmp(output_filename, "/dev/fd/1") == 0 ||
 	     strcmp(output_filename, "/dev/stdout") == 0)) {
 		errout = stderr;
-		logdump = ISC_FALSE;
+		logdump = false;
 	}
 
 	if (isc_commandline_index + 2 != argc)

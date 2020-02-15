@@ -1,26 +1,21 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: lfsr.h,v 1.17 2007/06/19 23:47:18 tbox Exp $ */
 
 #ifndef ISC_LFSR_H
 #define ISC_LFSR_H 1
 
 /*! \file isc/lfsr.h */
+
+#include <inttypes.h>
 
 #include <isc/lang.h>
 #include <isc/types.h>
@@ -43,9 +38,9 @@ typedef void (*isc_lfsrreseed_t)(isc_lfsr_t *, void *);
  * needs to be taken to not change state once the lfsr is in operation.
  */
 struct isc_lfsr {
-	isc_uint32_t		state;	/*%< previous state */
+	uint32_t		state;	/*%< previous state */
 	unsigned int		bits;	/*%< length */
-	isc_uint32_t		tap;	/*%< bit taps */
+	uint32_t		tap;	/*%< bit taps */
 	unsigned int		count;	/*%< reseed count (in BITS!) */
 	isc_lfsrreseed_t	reseed;	/*%< reseed function */
 	void		       *arg;	/*%< reseed function argument */
@@ -54,9 +49,9 @@ struct isc_lfsr {
 ISC_LANG_BEGINDECLS
 
 
-void 
-isc_lfsr_init(isc_lfsr_t *lfsr, isc_uint32_t state, unsigned int bits,
-		   isc_uint32_t tap, unsigned int count,
+void
+isc_lfsr_init(isc_lfsr_t *lfsr, uint32_t state, unsigned int bits,
+		   uint32_t tap, unsigned int count,
 		   isc_lfsrreseed_t reseed, void *arg);
 /*%<
  * Initialize an LFSR.
@@ -75,7 +70,7 @@ isc_lfsr_init(isc_lfsr_t *lfsr, isc_uint32_t state, unsigned int bits,
  *\li	tap != 0
  */
 
-void 
+void
 isc_lfsr_generate(isc_lfsr_t *lfsr, void *data, unsigned int count);
 /*%<
  * Returns "count" bytes of data from the LFSR.
@@ -89,7 +84,7 @@ isc_lfsr_generate(isc_lfsr_t *lfsr, void *data, unsigned int count);
  *\li	count > 0.
  */
 
-void 
+void
 isc_lfsr_skip(isc_lfsr_t *lfsr, unsigned int skip);
 /*%<
  * Skip "skip" states.
@@ -99,7 +94,7 @@ isc_lfsr_skip(isc_lfsr_t *lfsr, unsigned int skip);
  *\li	lfsr be valid.
  */
 
-isc_uint32_t 
+uint32_t
 isc_lfsr_generate32(isc_lfsr_t *lfsr1, isc_lfsr_t *lfsr2);
 /*%<
  * Given two LFSRs, use the current state from each to skip entries in the

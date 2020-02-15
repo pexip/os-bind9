@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 /* This code uses functions which are only available on Server 2003 and
  * higher, and Windows XP and higher.
@@ -32,8 +24,9 @@
  * XXXPDM 5 August, 2002
  */
 
-#define MAKE_EXTERNAL 1
 #include <config.h>
+
+#define MAKE_EXTERNAL 1
 
 #include <sys/types.h>
 
@@ -42,7 +35,9 @@
 #endif
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -68,6 +63,7 @@
 #include <isc/socket.h>
 #include <isc/stats.h>
 #include <isc/strerror.h>
+#include <isc/string.h>
 #include <isc/syslog.h>
 #include <isc/task.h>
 #include <isc/thread.h>
@@ -83,7 +79,7 @@
  * other than -1, we check to make sure DSCP values match it, and
  * assert if not.
  */
-int isc_dscp_check_value = -1;
+LIBISC_EXTERNAL_DATA int isc_dscp_check_value = -1;
 
 /*
  * How in the world can Microsoft exist with APIs like this?
@@ -266,7 +262,7 @@ struct isc_socket {
 	ISC_LIST(isc_socketevent_t)		send_list;
 	ISC_LIST(isc_socketevent_t)		recv_list;
 	ISC_LIST(isc_socket_newconnev_t)	accept_list;
-	isc_socket_connev_t		       *connect_ev;
+	ISC_LIST(isc_socket_connev_t)		connect_list;
 
 	isc_sockaddr_t		address;  /* remote address */
 
@@ -332,7 +328,7 @@ struct isc_socketmgr {
 
 	/* Locked by manager lock. */
 	ISC_LIST(isc_socket_t)		socklist;
-	isc_boolean_t			bShutdown;
+	bool			bShutdown;
 	isc_condition_t			shutdown_ok;
 	HANDLE				hIoCompletionPort;
 	int				maxIOCPThreads;
@@ -367,14 +363,15 @@ static isc_result_t socket_create(isc_socketmgr_t *manager0, int pf,
 static isc_threadresult_t WINAPI SocketIoThread(LPVOID ThreadContext);
 static void maybe_free_socket(isc_socket_t **, int);
 static void free_socket(isc_socket_t **, int);
-static isc_boolean_t senddone_is_active(isc_socket_t *sock, isc_socketevent_t *dev);
-static isc_boolean_t acceptdone_is_active(isc_socket_t *sock, isc_socket_newconnev_t *dev);
-static isc_boolean_t connectdone_is_active(isc_socket_t *sock, isc_socket_connev_t *dev);
+static bool senddone_is_active(isc_socket_t *sock, isc_socketevent_t *dev);
+static bool acceptdone_is_active(isc_socket_t *sock, isc_socket_newconnev_t *dev);
+static bool connectdone_is_active(isc_socket_t *sock, isc_socket_connev_t *dev);
 static void send_recvdone_event(isc_socket_t *sock, isc_socketevent_t **dev);
 static void send_senddone_event(isc_socket_t *sock, isc_socketevent_t **dev);
 static void send_acceptdone_event(isc_socket_t *sock, isc_socket_newconnev_t **adev);
 static void send_connectdone_event(isc_socket_t *sock, isc_socket_connev_t **cdev);
 static void send_recvdone_abort(isc_socket_t *sock, isc_result_t result);
+static void send_connectdone_abort(isc_socket_t *sock, isc_result_t result);
 static void queue_receive_event(isc_socket_t *sock, isc_task_t *task, isc_socketevent_t *dev);
 static void queue_receive_request(isc_socket_t *sock);
 
@@ -388,6 +385,7 @@ void
 sock_dump(isc_socket_t *sock) {
 	isc_socketevent_t *ldev;
 	isc_socket_newconnev_t *ndev;
+	isc_socket_connev_t *cdev;
 
 #if 0
 	isc_sockaddr_t addr;
@@ -407,13 +405,13 @@ sock_dump(isc_socket_t *sock) {
 #endif
 
 	printf("\n\t\tSock Dump\n");
-	printf("\t\tfd: %u\n", sock->fd);
-	printf("\t\treferences: %d\n", sock->references);
-	printf("\t\tpending_accept: %d\n", sock->pending_accept);
-	printf("\t\tconnecting: %d\n", sock->pending_connect);
-	printf("\t\tconnected: %d\n", sock->connected);
-	printf("\t\tbound: %d\n", sock->bound);
-	printf("\t\tpending_iocp: %d\n", sock->pending_iocp);
+	printf("\t\tfd: %Iu\n", sock->fd);
+	printf("\t\treferences: %u\n", sock->references);
+	printf("\t\tpending_accept: %u\n", sock->pending_accept);
+	printf("\t\tconnecting: %u\n", sock->pending_connect);
+	printf("\t\tconnected: %u\n", sock->connected);
+	printf("\t\tbound: %u\n", sock->bound);
+	printf("\t\tpending_iocp: %u\n", sock->pending_iocp);
 	printf("\t\tsocket type: %d\n", sock->type);
 
 	printf("\n\t\tSock Recv List\n");
@@ -435,6 +433,13 @@ sock_dump(isc_socket_t *sock) {
 	while (ndev != NULL) {
 		printf("\t\tdev: %p\n", ldev);
 		ndev = ISC_LIST_NEXT(ndev, ev_link);
+	}
+
+	printf("\n\t\tSock Connect List\n");
+	cdev = ISC_LIST_HEAD(sock->connect_list);
+	while (cdev != NULL) {
+		printf("\t\tdev: %p\n", cdev);
+		cdev = ISC_LIST_NEXT(cdev, ev_link);
 	}
 }
 
@@ -494,7 +499,6 @@ iocompletionport_createthreads(int total_threads, isc_socketmgr_t *manager) {
 				ISC_MSG_FAILED,
 				"Can't create IOCP thread: %s"),
 				strbuf);
-			exit(1);
 		}
 	}
 }
@@ -522,7 +526,6 @@ iocompletionport_init(isc_socketmgr_t *manager) {
 					   "HeapCreate() failed during "
 					   "initialization: %s"),
 			    strbuf);
-		exit(1);
 	}
 
 	manager->maxIOCPThreads = min(isc_os_ncpus() + 1, MAX_IOCPTHREADS);
@@ -540,7 +543,6 @@ iocompletionport_init(isc_socketmgr_t *manager) {
 				"CreateIoCompletionPort() failed "
 				"during initialization: %s"),
 				strbuf);
-		exit(1);
 	}
 
 	/*
@@ -585,7 +587,6 @@ iocompletionport_update(isc_socket_t *sock) {
 				"CreateIoCompletionPort() failed "
 				"during initialization: %s"),
 				strbuf);
-		exit(1);
 	}
 
 	InterlockedIncrement(&sock->manager->iocp_total);
@@ -613,7 +614,7 @@ socket_close(isc_socket_t *sock) {
 }
 
 static isc_once_t initialise_once = ISC_ONCE_INIT;
-static isc_boolean_t initialised = ISC_FALSE;
+static bool initialised = false;
 
 static void
 initialise(void) {
@@ -637,13 +638,12 @@ initialise(void) {
 			    isc_msgcat_get(isc_msgcat, ISC_MSGSET_GENERAL,
 					   ISC_MSG_FAILED, "failed"),
 			    strbuf);
-		exit(1);
 	}
 	/*
-	 * The following APIs do not exist as functions in a library, but we must
-	 * ask winsock for them.  They are "extensions" -- but why they cannot be
-	 * actual functions is beyond me.  So, ask winsock for the pointers to the
-	 * functions we need.
+	 * The following APIs do not exist as functions in a library, but
+	 * we must ask winsock for them.  They are "extensions" -- but why
+	 * they cannot be actual functions is beyond me.  So, ask winsock
+	 * for the pointers to the functions we need.
 	 */
 	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	INSIST(sock != INVALID_SOCKET);
@@ -667,7 +667,7 @@ initialise(void) {
 
 	closesocket(sock);
 
-	initialised = ISC_TRUE;
+	initialised = true;
 }
 
 /*
@@ -739,7 +739,7 @@ queue_receive_request(isc_socket_t *sock) {
 	isc_result_t isc_result;
 
  retry:
-	need_retry = ISC_FALSE;
+	need_retry = false;
 
 	/*
 	 * If we already have a receive pending, do nothing.
@@ -799,7 +799,7 @@ queue_receive_request(isc_socket_t *sock) {
 		case WSAECONNRESET:
 			if (!sock->connected) {
 				/* soft error */
-				need_retry = ISC_TRUE;
+				need_retry = true;
 				break;
 			}
 			/* FALLTHROUGH */
@@ -881,7 +881,7 @@ socket_log(int lineno, isc_socket_t *sock, isc_sockaddr_t *address,
 		isc_sockaddr_format(address, peerbuf, sizeof(peerbuf));
 		isc_log_iwrite(isc_lctx, category, module, level,
 			       msgcat, msgset, message,
-				   "socket %p line %d peer %s: %s", sock, lineno,
+				   "socket %p line %d %s: %s", sock, lineno,
 				   peerbuf, msgbuf);
 	}
 
@@ -992,6 +992,7 @@ build_msghdr_send(isc_socket_t *sock, isc_socketevent_t *dev,
 
 		memmove(cpbuffer->buf,(dev->region.base + dev->n), write_count);
 		cpbuffer->buflen = (unsigned int)write_count;
+		ISC_LINK_INIT(cpbuffer, link);
 		ISC_LIST_ENQUEUE(lpo->bufferlist, cpbuffer, link);
 		iov[0].buf = cpbuffer->buf;
 		iov[0].len = (u_long)write_count;
@@ -1105,7 +1106,7 @@ static void
 dump_msg(struct msghdr *msg, isc_socket_t *sock) {
 	unsigned int i;
 
-	printf("MSGHDR %p, Socket #: %u\n", msg, sock->fd);
+	printf("MSGHDR %p, Socket #: %Iu\n", msg, sock->fd);
 	printf("\tname %p, namelen %d\n", msg->msg_name, msg->msg_namelen);
 	printf("\tiov %p, iovlen %d\n", msg->msg_iov, msg->msg_iovlen);
 	for (i = 0; i < (unsigned int)msg->msg_iovlen; i++)
@@ -1343,7 +1344,6 @@ static int
 completeio_send(isc_socket_t *sock, isc_socketevent_t *dev,
 		struct msghdr *messagehdr, int cc, int send_errno)
 {
-	char addrbuf[ISC_SOCKADDR_FORMATSIZE];
 	char strbuf[ISC_STRERRORSIZE];
 
 	if (send_errno != 0) {
@@ -1352,22 +1352,6 @@ completeio_send(isc_socket_t *sock, isc_socketevent_t *dev,
 
 		return (map_socket_error(sock, send_errno, &dev->result,
 			strbuf, sizeof(strbuf)));
-
-		/*
-		 * The other error types depend on whether or not the
-		 * socket is UDP or TCP.  If it is UDP, some errors
-		 * that we expect to be fatal under TCP are merely
-		 * annoying, and are really soft errors.
-		 *
-		 * However, these soft errors are still returned as
-		 * a status.
-		 */
-		isc_sockaddr_format(&dev->address, addrbuf, sizeof(addrbuf));
-		isc__strerror(send_errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__, "completeio_send: %s: %s",
-				 addrbuf, strbuf);
-		dev->result = isc__errno2result(send_errno);
-		return (DOIO_HARD);
 	}
 
 	/*
@@ -1393,7 +1377,7 @@ startio_send(isc_socket_t *sock, isc_socketevent_t *dev, int *nbytes,
 	char strbuf[ISC_STRERRORSIZE];
 	IoCompletionInfo *lpo;
 	int status;
-	struct msghdr *msghdr;
+	struct msghdr *mh;
 
 	lpo = (IoCompletionInfo *)HeapAlloc(hHeapHandle,
 					    HEAP_ZERO_MEMORY,
@@ -1401,13 +1385,13 @@ startio_send(isc_socket_t *sock, isc_socketevent_t *dev, int *nbytes,
 	RUNTIME_CHECK(lpo != NULL);
 	lpo->request_type = SOCKET_SEND;
 	lpo->dev = dev;
-	msghdr = &lpo->messagehdr;
-	memset(msghdr, 0, sizeof(struct msghdr));
+	mh = &lpo->messagehdr;
+	memset(mh, 0, sizeof(struct msghdr));
 	ISC_LIST_INIT(lpo->bufferlist);
 
-	build_msghdr_send(sock, dev, msghdr, cmsg, sock->iov, lpo);
+	build_msghdr_send(sock, dev, mh, cmsg, sock->iov, lpo);
 
-	*nbytes = internal_sendmsg(sock, lpo, msghdr, 0, send_errno);
+	*nbytes = internal_sendmsg(sock, lpo, mh, 0, send_errno);
 
 	if (*nbytes <= 0) {
 		/*
@@ -1486,7 +1470,7 @@ allocate_socket(isc_socketmgr_t *manager, isc_sockettype_t type,
 	ISC_LIST_INIT(sock->recv_list);
 	ISC_LIST_INIT(sock->send_list);
 	ISC_LIST_INIT(sock->accept_list);
-	sock->connect_ev = NULL;
+	ISC_LIST_INIT(sock->connect_list);
 	sock->pending_accept = 0;
 	sock->pending_recv = 0;
 	sock->pending_send = 0;
@@ -1541,7 +1525,7 @@ consistent(isc_socket_t *sock) {
 	isc_socket_newconnev_t *nev;
 	unsigned int count;
 	char *crash_reason;
-	isc_boolean_t crash = ISC_FALSE;
+	bool crash = false;
 
 	REQUIRE(sock->pending_iocp == sock->pending_recv + sock->pending_send
 		+ sock->pending_accept + sock->pending_connect);
@@ -1553,7 +1537,7 @@ consistent(isc_socket_t *sock) {
 		dev = ISC_LIST_NEXT(dev, ev_link);
 	}
 	if (count > sock->pending_send) {
-		crash = ISC_TRUE;
+		crash = true;
 		crash_reason = "send_list > sock->pending_send";
 	}
 
@@ -1564,8 +1548,8 @@ consistent(isc_socket_t *sock) {
 		nev = ISC_LIST_NEXT(nev, ev_link);
 	}
 	if (count > sock->pending_accept) {
-		crash = ISC_TRUE;
-		crash_reason = "send_list > sock->pending_send";
+		crash = true;
+		crash_reason = "accept_list > sock->pending_accept";
 	}
 
 	if (crash) {
@@ -1573,7 +1557,7 @@ consistent(isc_socket_t *sock) {
 			   ISC_MSG_DESTROYING, "SOCKET INCONSISTENT: %s",
 			   crash_reason);
 		sock_dump(sock);
-		INSIST(crash == ISC_FALSE);
+		INSIST(crash == false);
 	}
 }
 
@@ -1609,6 +1593,7 @@ maybe_free_socket(isc_socket_t **socketp, int lineno) {
 	    || !ISC_LIST_EMPTY(sock->recv_list)
 	    || !ISC_LIST_EMPTY(sock->send_list)
 	    || !ISC_LIST_EMPTY(sock->accept_list)
+	    || !ISC_LIST_EMPTY(sock->connect_list)
 	    || sock->fd != INVALID_SOCKET) {
 		UNLOCK(&sock->lock);
 		return;
@@ -1826,7 +1811,7 @@ socket_create(isc_socketmgr_t *manager, int pf, isc_sockettype_t type,
 
 	if (dup_socket) {
 #ifndef ISC_ALLOW_MAPPED
-		isc__socket_ipv6only(sock, ISC_TRUE);
+		isc__socket_ipv6only(sock, true);
 #endif
 
 		if (dup_socket->bound) {
@@ -2030,7 +2015,8 @@ send_connectdone_event(isc_socket_t *sock, isc_socket_connev_t **cdev) {
 	task = (*cdev)->ev_sender;
 	(*cdev)->ev_sender = sock;
 
-	sock->connect_ev = NULL;
+	if (ISC_LINK_LINKED(*cdev, ev_link))
+		ISC_LIST_DEQUEUE(sock->connect_list, *cdev, ev_link);
 
 	isc_task_sendanddetach(&task, (isc_event_t **)cdev);
 
@@ -2148,6 +2134,7 @@ done:
 static void
 internal_connect(isc_socket_t *sock, IoCompletionInfo *lpo, int connect_errno) {
 	isc_socket_connev_t *cdev;
+	isc_result_t result;
 	char strbuf[ISC_STRERRORSIZE];
 
 	INSIST(VALID_SOCKET(sock));
@@ -2160,7 +2147,7 @@ internal_connect(isc_socket_t *sock, IoCompletionInfo *lpo, int connect_errno) {
 	sock->pending_connect = 0;
 
 	/*
-	 * Has this event been canceled?
+	 * If the event is no longer in the list we can just close and return.
 	 */
 	cdev = lpo->cdev;
 	if (!connectdone_is_active(sock, cdev)) {
@@ -2195,7 +2182,7 @@ internal_connect(isc_socket_t *sock, IoCompletionInfo *lpo, int connect_errno) {
 		 * Translate other errors into ISC_R_* flavors.
 		 */
 		switch (connect_errno) {
-#define ERROR_MATCH(a, b) case a: cdev->result = b; break;
+#define ERROR_MATCH(a, b) case a: result = b; break;
 			ERROR_MATCH(WSAEACCES, ISC_R_NOPERM);
 			ERROR_MATCH(WSAEADDRNOTAVAIL, ISC_R_ADDRNOTAVAIL);
 			ERROR_MATCH(WSAEAFNOSUPPORT, ISC_R_ADDRNOTAVAIL);
@@ -2210,7 +2197,7 @@ internal_connect(isc_socket_t *sock, IoCompletionInfo *lpo, int connect_errno) {
 			ERROR_MATCH(WSAETIMEDOUT, ISC_R_TIMEDOUT);
 #undef ERROR_MATCH
 		default:
-			cdev->result = ISC_R_UNEXPECTED;
+			result = ISC_R_UNEXPECTED;
 			isc__strerror(connect_errno, strbuf, sizeof(strbuf));
 			UNEXPECTED_ERROR(__FILE__, __LINE__,
 					 "internal_connect: connect() %s",
@@ -2219,14 +2206,18 @@ internal_connect(isc_socket_t *sock, IoCompletionInfo *lpo, int connect_errno) {
 	} else {
 		INSIST(setsockopt(sock->fd, SOL_SOCKET,
 				  SO_UPDATE_CONNECT_CONTEXT, NULL, 0) == 0);
-		cdev->result = ISC_R_SUCCESS;
+		result = ISC_R_SUCCESS;
 		sock->connected = 1;
 		socket_log(__LINE__, sock, &sock->address, IOEVENT,
 			   isc_msgcat, ISC_MSGSET_SOCKET, ISC_MSG_ACCEPTEDCXN,
 			   "internal_connect: success");
 	}
 
-	send_connectdone_event(sock, &cdev);
+	do {
+		cdev->result = result;
+		send_connectdone_event(sock, &cdev);
+		cdev = ISC_LIST_HEAD(sock->connect_list);
+	} while (cdev != NULL);
 
 	UNLOCK(&sock->lock);
 }
@@ -2242,6 +2233,20 @@ send_recvdone_abort(isc_socket_t *sock, isc_result_t result) {
 		dev = ISC_LIST_HEAD(sock->recv_list);
 		dev->result = result;
 		send_recvdone_event(sock, &dev);
+	}
+}
+
+/*
+ * Loop through the socket, returning result for each done event pending.
+ */
+static void
+send_connectdone_abort(isc_socket_t *sock, isc_result_t result) {
+	isc_socket_connev_t *dev;
+
+	while (!ISC_LIST_EMPTY(sock->connect_list)) {
+		dev = ISC_LIST_HEAD(sock->connect_list);
+		dev->result = result;
+		send_connectdone_event(sock, &dev);
 	}
 }
 
@@ -2361,11 +2366,10 @@ internal_send(isc_socket_t *sock, isc_socketevent_t *dev,
 }
 
 /*
- * These return if the done event passed in is on the list (or for connect, is
- * the one we're waiting for.  Using these ensures we will not double-send an
- * event.
+ * These return if the done event passed in is on the list.
+ * Using these ensures we will not double-send an event.
  */
-static isc_boolean_t
+static bool
 senddone_is_active(isc_socket_t *sock, isc_socketevent_t *dev)
 {
 	isc_socketevent_t *ldev;
@@ -2374,10 +2378,10 @@ senddone_is_active(isc_socket_t *sock, isc_socketevent_t *dev)
 	while (ldev != NULL && ldev != dev)
 		ldev = ISC_LIST_NEXT(ldev, ev_link);
 
-	return (ldev == NULL ? ISC_FALSE : ISC_TRUE);
+	return (ldev == NULL ? false : true);
 }
 
-static isc_boolean_t
+static bool
 acceptdone_is_active(isc_socket_t *sock, isc_socket_newconnev_t *dev)
 {
 	isc_socket_newconnev_t *ldev;
@@ -2386,13 +2390,19 @@ acceptdone_is_active(isc_socket_t *sock, isc_socket_newconnev_t *dev)
 	while (ldev != NULL && ldev != dev)
 		ldev = ISC_LIST_NEXT(ldev, ev_link);
 
-	return (ldev == NULL ? ISC_FALSE : ISC_TRUE);
+	return (ldev == NULL ? false : true);
 }
 
-static isc_boolean_t
+static bool
 connectdone_is_active(isc_socket_t *sock, isc_socket_connev_t *dev)
 {
-	return (sock->connect_ev == dev ? ISC_TRUE : ISC_FALSE);
+	isc_socket_connev_t *cdev;
+
+	cdev = ISC_LIST_HEAD(sock->connect_list);
+	while (cdev != NULL && cdev != dev)
+		cdev = ISC_LIST_NEXT(cdev, ev_link);
+
+	return (cdev == NULL ? false : true);
 }
 
 //
@@ -2505,15 +2515,17 @@ SocketIoThread(LPVOID ThreadContext) {
 
 		request = lpo->request_type;
 
-		errstatus = 0;
-		if (!bSuccess) {
+		if (!bSuccess)
+			errstatus = GetLastError();
+		else
+			errstatus = 0;
+		if (!bSuccess && errstatus != ERROR_MORE_DATA) {
 			isc_result_t isc_result;
 
 			/*
 			 * Did the I/O operation complete?
 			 */
-			errstatus = GetLastError();
-			isc_result = isc__errno2resultx(errstatus, __FILE__, __LINE__);
+			isc_result = isc__errno2result(errstatus);
 
 			LOCK(&sock->lock);
 			CONSISTENT(sock);
@@ -2565,7 +2577,7 @@ SocketIoThread(LPVOID ThreadContext) {
 						goto wait_again;
 					} else {
 						errstatus = GetLastError();
-						isc_result = isc__errno2resultx(errstatus, __FILE__, __LINE__);
+						isc_result = isc__errno2result(errstatus);
 						socket_log(__LINE__, sock, NULL, EVENT, NULL, 0, 0,
 							"restart_accept() failed: errstatus=%d isc_result=%d",
 							errstatus, isc_result);
@@ -2592,10 +2604,9 @@ SocketIoThread(LPVOID ThreadContext) {
 				INSIST(sock->pending_connect == 1);
 				sock->pending_connect = 0;
 				if (connectdone_is_active(sock, lpo->cdev)) {
-					lpo->cdev->result = isc_result;
 					socket_log(__LINE__, sock, NULL, EVENT, NULL, 0, 0,
 						"canceled_connect");
-					send_connectdone_event(sock, &lpo->cdev);
+					send_connectdone_abort(sock, isc_result);
 				}
 				break;
 			}
@@ -2685,7 +2696,7 @@ isc__socketmgr_create2(isc_mem_t *mctx, isc_socketmgr_t **managerp,
 
 	iocompletionport_init(manager);	/* Create the Completion Ports */
 
-	manager->bShutdown = ISC_FALSE;
+	manager->bShutdown = false;
 	manager->totalSockets = 0;
 	manager->iocp_total = 0;
 
@@ -2746,7 +2757,7 @@ isc__socketmgr_destroy(isc_socketmgr_t **managerp) {
 	 * thread.
 	 */
 	signal_iocompletionport_exit(manager);
-	manager->bShutdown = ISC_TRUE;
+	manager->bShutdown = true;
 
 	/*
 	 * Wait for threads to exit.
@@ -3311,6 +3322,9 @@ isc__socket_filter(isc_socket_t *sock, const char *filter) {
 isc_result_t
 isc__socket_listen(isc_socket_t *sock, unsigned int backlog) {
 	char strbuf[ISC_STRERRORSIZE];
+#if defined(ISC_PLATFORM_HAVETFO) && defined(TCP_FASTOPEN)
+	char on = 1;
+#endif
 
 	REQUIRE(VALID_SOCKET(sock));
 
@@ -3340,6 +3354,17 @@ isc__socket_listen(isc_socket_t *sock, unsigned int backlog) {
 
 		return (ISC_R_UNEXPECTED);
 	}
+
+#if defined(ISC_PLATFORM_HAVETFO) && defined(TCP_FASTOPEN)
+	if (setsockopt(sock->fd, IPPROTO_TCP, TCP_FASTOPEN,
+		       &on, sizeof(on)) < 0) {
+		isc__strerror(errno, strbuf, sizeof(strbuf));
+		UNEXPECTED_ERROR(__FILE__, __LINE__,
+				 "setsockopt(%d, TCP_FASTOPEN) failed with %s",
+				 sock->fd, strbuf);
+		/* TCP_FASTOPEN is experimental so ignore failures */
+	}
+#endif
 
 	socket_log(__LINE__, sock, NULL, TRACE,
 		   isc_msgcat, ISC_MSGSET_SOCKET, ISC_MSG_BOUND, "listening");
@@ -3535,8 +3560,6 @@ isc__socket_connect(isc_socket_t *sock, isc_sockaddr_t *addr,
 		sock->bound = 1;
 	}
 
-	REQUIRE(!sock->pending_connect);
-
 	cdev = (isc_socket_connev_t *)isc_event_allocate(manager->mctx, sock,
 							ISC_SOCKEVENT_CONNECT,
 							action,	arg,
@@ -3547,7 +3570,16 @@ isc__socket_connect(isc_socket_t *sock, isc_sockaddr_t *addr,
 	}
 	ISC_LINK_INIT(cdev, ev_link);
 
-	if (sock->type == isc_sockettype_tcp) {
+	if (sock->connected) {
+		INSIST(isc_sockaddr_equal(&sock->address, addr));
+		cdev->result = ISC_R_SUCCESS;
+		isc_task_send(task, ISC_EVENT_PTR(&cdev));
+
+		UNLOCK(&sock->lock);
+		return (ISC_R_SUCCESS);
+	}
+
+	if ((sock->type == isc_sockettype_tcp) && !sock->pending_connect) {
 		/*
 		 * Queue io completion for an accept().
 		 */
@@ -3573,9 +3605,18 @@ isc__socket_connect(isc_socket_t *sock, isc_sockaddr_t *addr,
 		/*
 		 * Enqueue the request.
 		 */
-		sock->connect_ev = cdev;
+		INSIST(!ISC_LINK_LINKED(cdev, ev_link));
+		ISC_LIST_ENQUEUE(sock->connect_list, cdev, ev_link);
 		sock->pending_iocp++;
+	} else if (sock->type == isc_sockettype_tcp) {
+		INSIST(sock->pending_connect);
+		INSIST(isc_sockaddr_equal(&sock->address, addr));
+		isc_task_attach(task, &ntask);
+		cdev->ev_sender = ntask;
+		INSIST(!ISC_LINK_LINKED(cdev, ev_link));
+		ISC_LIST_ENQUEUE(sock->connect_list, cdev, ev_link);
 	} else {
+		REQUIRE(!sock->pending_connect);
 		WSAConnect(sock->fd, &addr->type.sa, addr->length, NULL, NULL, NULL, NULL);
 		cdev->result = ISC_R_SUCCESS;
 		isc_task_send(task, (isc_event_t **)&cdev);
@@ -3761,28 +3802,28 @@ isc__socket_cancel(isc_socket_t *sock, isc_task_t *task, unsigned int how) {
 	}
 	how &= ~ISC_SOCKCANCEL_ACCEPT;
 
-	/*
-	 * Connecting is not a list.
-	 */
 	if (((how & ISC_SOCKCANCEL_CONNECT) == ISC_SOCKCANCEL_CONNECT)
-	    && sock->connect_ev != NULL) {
+	    && !ISC_LIST_EMPTY(sock->connect_list)) {
 		isc_socket_connev_t    *dev;
+		isc_socket_connev_t    *next;
 		isc_task_t	       *current_task;
 
 		INSIST(sock->pending_connect);
 
-		dev = sock->connect_ev;
-		current_task = dev->ev_sender;
+		dev = ISC_LIST_HEAD(sock->connect_list);
 
-		if ((task == NULL) || (task == current_task)) {
-			closesocket(sock->fd);
-			sock->fd = INVALID_SOCKET;
-			_set_state(sock, SOCK_CLOSED);
-
-			sock->connect_ev = NULL;
-			dev->result = ISC_R_CANCELED;
-			send_connectdone_event(sock, &dev);
+		while (dev != NULL) {
+			current_task = dev->ev_sender;
+			next = ISC_LIST_NEXT(dev, ev_link);
+			if ((task == NULL) || (task == current_task)) {
+				dev->result = ISC_R_CANCELED;
+				send_connectdone_event(sock, &dev);
+			}
+			dev = next;
 		}
+		closesocket(sock->fd);
+		sock->fd = INVALID_SOCKET;
+		_set_state(sock, SOCK_CLOSED);
 	}
 	how &= ~ISC_SOCKCANCEL_CONNECT;
 
@@ -3810,9 +3851,9 @@ isc__socket_gettype(isc_socket_t *sock) {
 	return (type);
 }
 
-isc_boolean_t
+bool
 isc__socket_isbound(isc_socket_t *sock) {
-	isc_boolean_t val;
+	bool val;
 
 	REQUIRE(VALID_SOCKET(sock));
 
@@ -3824,17 +3865,17 @@ isc__socket_isbound(isc_socket_t *sock) {
 	 */
 	if (sock->fd == INVALID_SOCKET) {
 		UNLOCK(&sock->lock);
-		return (ISC_FALSE);
+		return (false);
 	}
 
-	val = ((sock->bound) ? ISC_TRUE : ISC_FALSE);
+	val = ((sock->bound) ? true : false);
 	UNLOCK(&sock->lock);
 
 	return (val);
 }
 
 void
-isc__socket_ipv6only(isc_socket_t *sock, isc_boolean_t yes) {
+isc__socket_ipv6only(isc_socket_t *sock, bool yes) {
 #if defined(IPV6_V6ONLY)
 	int onoff = yes ? 1 : 0;
 #else
@@ -3880,14 +3921,14 @@ isc__socket_dscp(isc_socket_t *sock, isc_dscp_t dscp) {
 }
 
 void
-isc__socket_cleanunix(isc_sockaddr_t *addr, isc_boolean_t active) {
+isc__socket_cleanunix(isc_sockaddr_t *addr, bool active) {
 	UNUSED(addr);
 	UNUSED(active);
 }
 
 isc_result_t
-isc__socket_permunix(isc_sockaddr_t *addr, isc_uint32_t perm,
-		     isc_uint32_t owner,	isc_uint32_t group)
+isc__socket_permunix(isc_sockaddr_t *addr, uint32_t perm,
+		     uint32_t owner, uint32_t group)
 {
 	UNUSED(addr);
 	UNUSED(perm);
@@ -3906,8 +3947,7 @@ isc__socket_setname(isc_socket_t *socket, const char *name, void *tag) {
 	REQUIRE(VALID_SOCKET(socket));
 
 	LOCK(&socket->lock);
-	memset(socket->name, 0, sizeof(socket->name));
-	strncpy(socket->name, name, sizeof(socket->name) - 1);
+	strlcpy(socket->name, name, sizeof(socket->name));
 	socket->tag = tag;
 	UNLOCK(&socket->lock);
 }
@@ -3928,7 +3968,7 @@ isc__socket_getfd(isc_socket_t *socket) {
 }
 
 void
-isc__socketmgr_setreserved(isc_socketmgr_t *manager, isc_uint32_t reserved) {
+isc__socketmgr_setreserved(isc_socketmgr_t *manager, uint32_t reserved) {
 	UNUSED(manager);
 	UNUSED(reserved);
 }
@@ -4073,6 +4113,145 @@ error:
 	return (xmlrc);
 }
 #endif /* HAVE_LIBXML2 */
+
+#ifdef HAVE_JSON
+#define CHECKMEM(m) do { \
+	if (m == NULL) { \
+		result = ISC_R_NOMEMORY;\
+		goto error;\
+	} \
+} while(0)
+
+isc_result_t
+isc_socketmgr_renderjson(isc_socketmgr_t *mgr, json_object *stats) {
+	isc_result_t result = ISC_R_SUCCESS;
+	isc_socket_t *sock = NULL;
+	char peerbuf[ISC_SOCKADDR_FORMATSIZE];
+	isc_sockaddr_t addr;
+	ISC_SOCKADDR_LEN_T len;
+	json_object *obj, *array = json_object_new_array();
+
+	CHECKMEM(array);
+
+	LOCK(&mgr->lock);
+
+#ifdef USE_SHARED_MANAGER
+	obj = json_object_new_int(mgr->refs);
+	CHECKMEM(obj);
+	json_object_object_add(stats, "references", obj);
+#endif	/* USE_SHARED_MANAGER */
+
+	sock = ISC_LIST_HEAD(mgr->socklist);
+	while (sock != NULL) {
+		json_object *states, *entry = json_object_new_object();
+		char buf[255];
+
+		CHECKMEM(entry);
+		json_object_array_add(array, entry);
+
+		LOCK(&sock->lock);
+
+		snprintf(buf, sizeof(buf), "%p", sock);
+		obj = json_object_new_string(buf);
+		CHECKMEM(obj);
+		json_object_object_add(entry, "id", obj);
+
+		if (sock->name[0] != 0) {
+			obj = json_object_new_string(sock->name);
+			CHECKMEM(obj);
+			json_object_object_add(entry, "name", obj);
+		}
+
+		obj = json_object_new_int(sock->references);
+		CHECKMEM(obj);
+		json_object_object_add(entry, "references", obj);
+
+		obj = json_object_new_string(_socktype(sock->type));
+		CHECKMEM(obj);
+		json_object_object_add(entry, "type", obj);
+
+		if (sock->connected) {
+			isc_sockaddr_format(&sock->address, peerbuf,
+					    sizeof(peerbuf));
+			obj = json_object_new_string(peerbuf);
+			CHECKMEM(obj);
+			json_object_object_add(entry, "peer-address", obj);
+		}
+
+		len = sizeof(addr);
+		if (getsockname(sock->fd, &addr.type.sa, (void *)&len) == 0) {
+			isc_sockaddr_format(&addr, peerbuf, sizeof(peerbuf));
+			obj = json_object_new_string(peerbuf);
+			CHECKMEM(obj);
+			json_object_object_add(entry, "local-address", obj);
+		}
+
+		states = json_object_new_array();
+		CHECKMEM(states);
+		json_object_object_add(entry, "states", states);
+
+		if (sock->pending_recv) {
+			obj = json_object_new_string("pending-receive");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->pending_send) {
+			obj = json_object_new_string("pending-send");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->pending_accept) {
+			obj = json_object_new_string("pending-accept");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->listener) {
+			obj = json_object_new_string("listener");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->connected) {
+			obj = json_object_new_string("connected");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->pending_connect) {
+			obj = json_object_new_string("connecting");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		if (sock->bound) {
+			obj = json_object_new_string("bound");
+			CHECKMEM(obj);
+			json_object_array_add(states, obj);
+		}
+
+		UNLOCK(&sock->lock);
+		sock = ISC_LIST_NEXT(sock, link);
+	}
+
+	json_object_object_add(stats, "sockets", array);
+	array = NULL;
+	result = ISC_R_SUCCESS;
+
+ error:
+	if (array != NULL)
+		json_object_put(array);
+
+	if (sock != NULL)
+		UNLOCK(&sock->lock);
+
+	UNLOCK(&mgr->lock);
+
+	return (result);
+}
+#endif /* HAVE_JSON */
 
 /*
  * Replace ../socket_api.c

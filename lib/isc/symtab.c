@@ -1,27 +1,21 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2011-2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1996-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
 
 #include <ctype.h>
+#include <stdbool.h>
 
 #include <isc/magic.h>
 #include <isc/mem.h>
@@ -51,14 +45,14 @@ struct isc_symtab {
 	eltlist_t *			table;
 	isc_symtabaction_t		undefine_action;
 	void *				undefine_arg;
-	isc_boolean_t			case_sensitive;
+	bool			case_sensitive;
 };
 
 isc_result_t
 isc_symtab_create(isc_mem_t *mctx, unsigned int size,
 		  isc_symtabaction_t undefine_action,
 		  void *undefine_arg,
-		  isc_boolean_t case_sensitive,
+		  bool case_sensitive,
 		  isc_symtab_t **symtabp)
 {
 	isc_symtab_t *symtab;
@@ -125,7 +119,7 @@ isc_symtab_destroy(isc_symtab_t **symtabp) {
 }
 
 static inline unsigned int
-hash(const char *key, isc_boolean_t case_sensitive) {
+hash(const char *key, bool case_sensitive) {
 	const char *s;
 	unsigned int h = 0;
 	int c;

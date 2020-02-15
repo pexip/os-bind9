@@ -38,7 +38,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $Id: pkcs11-destroy.c,v 1.8 2010/01/13 21:19:52 fdupont Exp $ */
 
 /*
  * pkcs11-destroy [-m module] [-s $slot] [-i $id | -l $label]
@@ -153,8 +152,8 @@ main(int argc, char *argv[]) {
 	if (pin == NULL)
 		pin = getpassphrase("Enter Pin: ");
 
-	result = pk11_get_session(&pctx, OP_ANY, ISC_FALSE, ISC_TRUE,
-				  ISC_TRUE, (const char *) pin, slot);
+	result = pk11_get_session(&pctx, OP_ANY, false, true,
+				  true, (const char *) pin, slot);
 	if (result == PK11_R_NORANDOMSERVICE ||
 	    result == PK11_R_NODIGESTSERVICE ||
 	    result == PK11_R_NOAESSERVICE) {
@@ -232,7 +231,7 @@ main(int argc, char *argv[]) {
 
 	if (wait != 0) {
 		printf("WARNING: This action is irreversible! "
-		       "Destroying key objects in %d seconds\n  ", wait);
+		       "Destroying key objects in %u seconds\n  ", wait);
 		for (i = 0; i < wait; i++) {
 			printf(".");
 			fflush(stdout);

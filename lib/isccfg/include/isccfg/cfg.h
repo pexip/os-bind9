@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2007, 2010, 2013-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: cfg.h,v 1.46 2010/08/13 23:47:04 tbox Exp $ */
 
 #ifndef ISCCFG_CFG_H
 #define ISCCFG_CFG_H 1
@@ -33,12 +25,13 @@
  *** Imports
  ***/
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <isc/formatcheck.h>
 #include <isc/lang.h>
-#include <isc/refcount.h>
 #include <isc/types.h>
 #include <isc/list.h>
-
 
 /***
  *** Types
@@ -116,11 +109,25 @@ cfg_parser_setcallback(cfg_parser_t *pctx,
  */
 
 isc_result_t
-cfg_parse_file(cfg_parser_t *pctx, const char *filename,
+cfg_parse_file(cfg_parser_t *pctx, const char *file,
 	       const cfg_type_t *type, cfg_obj_t **ret);
+
 isc_result_t
 cfg_parse_buffer(cfg_parser_t *pctx, isc_buffer_t *buffer,
 		 const cfg_type_t *type, cfg_obj_t **ret);
+isc_result_t
+cfg_parse_buffer2(cfg_parser_t *pctx, isc_buffer_t *buffer,
+		  const char *file, const cfg_type_t *type,
+		  cfg_obj_t **ret);
+isc_result_t
+cfg_parse_buffer3(cfg_parser_t *pctx, isc_buffer_t *buffer,
+		  const char *file, unsigned int line,
+		  const cfg_type_t *type, cfg_obj_t **ret);
+isc_result_t
+cfg_parse_buffer4(cfg_parser_t *pctx, isc_buffer_t *buffer,
+		  const char *file, unsigned int line,
+		  const cfg_type_t *type, unsigned int flags,
+		  cfg_obj_t **ret);
 /*%<
  * Read a configuration containing data of type 'type'
  * and make '*ret' point to its parse tree.
@@ -129,19 +136,47 @@ cfg_parse_buffer(cfg_parser_t *pctx, isc_buffer_t *buffer,
  * (isc_parse_file()) or the buffer 'buffer'
  * (isc_parse_buffer()).
  *
- * Returns an error if the file does not parse correctly.
+ * If 'file' is not NULL, it is the name of the file, or a name to use
+ * for the buffer in place of the filename, when logging errors.
+ *
+ * If 'line' is not 0, then it is the beginning line number to report
+ * when logging errors. This is useful when passing text that has been
+ * read from the middle of a file.
+ *
+ * Returns an error if the file or buffer does not parse correctly.
  *
  * Requires:
  *\li 	"filename" is valid.
  *\li 	"mem" is valid.
  *\li	"type" is valid.
  *\li 	"cfg" is non-NULL and "*cfg" is NULL.
+ *\li   "flags" be one or more of CFG_PCTX_NODEPRECATED or zero.
  *
  * Returns:
  *     \li #ISC_R_SUCCESS                 - success
  *\li      #ISC_R_NOMEMORY                - no memory available
  *\li      #ISC_R_INVALIDFILE             - file doesn't exist or is unreadable
  *\li      others	                      - file contains errors
+ */
+
+isc_result_t
+cfg_parser_mapadd(cfg_parser_t *pctx, cfg_obj_t *mapobj,
+		  cfg_obj_t *obj, const char *clause);
+/*%<
+ * Add the object 'obj' to the specified clause in mapbody 'mapobj'.
+ * Used for adding new zones.
+ *
+ * Require:
+ * \li     'obj' is a valid cfg_obj_t.
+ * \li     'mapobj' is a valid cfg_obj_t of type map.
+ * \li     'pctx' is a valid cfg_parser_t.
+ */
+
+void
+cfg_parser_reset(cfg_parser_t *pctx);
+/*%<
+ * Reset an existing parser so it can be re-used for a new file or
+ * buffer.
  */
 
 void
@@ -151,17 +186,29 @@ cfg_parser_destroy(cfg_parser_t **pctxp);
  * more references.
  */
 
-isc_boolean_t
+bool
 cfg_obj_isvoid(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of void type (e.g., an optional
  * value not specified).
  */
 
-isc_boolean_t
+bool
 cfg_obj_ismap(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of a map type.
+ */
+
+bool
+cfg_obj_isfixedpoint(const cfg_obj_t *obj);
+/*%<
+ * Return true iff 'obj' is of a fixedpoint type.
+ */
+
+bool
+cfg_obj_ispercentage(const cfg_obj_t *obj);
+/*%<
+ * Return true iff 'obj' is of a percentage type.
  */
 
 isc_result_t
@@ -205,7 +252,7 @@ cfg_map_count(const cfg_obj_t *mapobj);
  * \li     The number of elements in the map object.
  */
 
-isc_boolean_t
+bool
 cfg_obj_istuple(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of a map type.
@@ -223,13 +270,13 @@ cfg_tuple_get(const cfg_obj_t *tupleobj, const char *name);
  *\li	fields of said tuple type.
  */
 
-isc_boolean_t
+bool
 cfg_obj_isuint32(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of integer type.
  */
 
-isc_uint32_t
+uint32_t
 cfg_obj_asuint32(const cfg_obj_t *obj);
 /*%<
  * Returns the value of a configuration object of 32-bit integer type.
@@ -241,13 +288,13 @@ cfg_obj_asuint32(const cfg_obj_t *obj);
  * \li     A 32-bit unsigned integer.
  */
 
-isc_boolean_t
+bool
 cfg_obj_isuint64(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of integer type.
  */
 
-isc_uint64_t
+uint64_t
 cfg_obj_asuint64(const cfg_obj_t *obj);
 /*%<
  * Returns the value of a configuration object of 64-bit integer type.
@@ -259,7 +306,7 @@ cfg_obj_asuint64(const cfg_obj_t *obj);
  * \li     A 64-bit unsigned integer.
  */
 
-isc_uint32_t
+uint32_t
 cfg_obj_asfixedpoint(const cfg_obj_t *obj);
 /*%<
  * Returns the value of a configuration object of fixed point number.
@@ -271,7 +318,19 @@ cfg_obj_asfixedpoint(const cfg_obj_t *obj);
  * \li     A 32-bit unsigned integer.
  */
 
-isc_boolean_t
+uint32_t
+cfg_obj_aspercentage(const cfg_obj_t *obj);
+/*%<
+ * Returns the value of a configuration object of percentage
+ *
+ * Requires:
+ * \li     'obj' points to a valid configuration object of percentage type.
+ *
+ * Returns:
+ * \li     A 32-bit unsigned integer.
+ */
+
+bool
 cfg_obj_isstring(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of string type.
@@ -290,13 +349,13 @@ cfg_obj_asstring(const cfg_obj_t *obj);
  * \li     A pointer to a null terminated string.
  */
 
-isc_boolean_t
+bool
 cfg_obj_isboolean(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of a boolean type.
  */
 
-isc_boolean_t
+bool
 cfg_obj_asboolean(const cfg_obj_t *obj);
 /*%<
  * Returns the value of a configuration object of a boolean type.
@@ -308,7 +367,7 @@ cfg_obj_asboolean(const cfg_obj_t *obj);
  * \li     A boolean value.
  */
 
-isc_boolean_t
+bool
 cfg_obj_issockaddr(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is a socket address.
@@ -341,7 +400,7 @@ cfg_obj_getdscp(const cfg_obj_t *obj);
  * \li     DSCP value associated with a sockaddr, or -1.
  */
 
-isc_boolean_t
+bool
 cfg_obj_isnetprefix(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is a network prefix.
@@ -360,7 +419,7 @@ cfg_obj_asnetprefix(const cfg_obj_t *obj, isc_netaddr_t *netaddr,
  *\li	'netaddr' and 'prefixlen' are non-NULL.
  */
 
-isc_boolean_t
+bool
 cfg_obj_islist(const cfg_obj_t *obj);
 /*%<
  * Return true iff 'obj' is of list type.
@@ -394,7 +453,7 @@ cfg_list_next(const cfg_listelt_t *elt);
  */
 
 unsigned int
-cfg_list_length(const cfg_obj_t *obj, isc_boolean_t recurse);
+cfg_list_length(const cfg_obj_t *obj, bool recurse);
 /*%<
  * Returns the length of a list of configure objects.  If obj is
  * not a list, returns 0.  If recurse is true, add in the length of
@@ -424,6 +483,7 @@ cfg_printx(const cfg_obj_t *obj, unsigned int flags,
 	   void *closure);
 
 #define CFG_PRINTER_XKEY        0x1     /* '?' out shared keys. */
+#define CFG_PRINTER_ONELINE     0x2     /* print config as a single line */
 
 /*%<
  * Print the configuration object 'obj' by repeatedly calling the
@@ -442,7 +502,7 @@ cfg_print_grammar(const cfg_type_t *type,
  * Print a summary of the grammar of the configuration type 'type'.
  */
 
-isc_boolean_t
+bool
 cfg_obj_istype(const cfg_obj_t *obj, const cfg_type_t *type);
 /*%<
  * Return true iff 'obj' is of type 'type'.
@@ -487,6 +547,12 @@ cfg_obj_line(const cfg_obj_t *obj);
  * Return the line in file where this object was defined.
  */
 
+const char *
+cfg_map_firstclause(const cfg_type_t *map, const void **clauses,
+		    unsigned int *idx);
+const char *
+cfg_map_nextclause(const cfg_type_t *map, const void **clauses,
+		   unsigned int *idx);
 
 ISC_LANG_ENDDECLS
 

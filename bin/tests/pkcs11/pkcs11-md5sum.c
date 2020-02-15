@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -38,8 +33,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $Id$ */
-
 /*
  * pkcs11-md5sum
  *
@@ -59,6 +52,7 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -96,7 +90,7 @@ main(int argc, char *argv[]) {
 	char *lib_name = NULL;
 	char *pin = NULL;
 	int error = 0;
-	isc_boolean_t logon = ISC_TRUE;
+	bool logon = true;
 	int c, errflg = 0;
 	size_t sum = 0;
 	unsigned int i;
@@ -111,7 +105,7 @@ main(int argc, char *argv[]) {
 			op_type = OP_ANY;
 			break;
 		case 'n':
-			logon = ISC_FALSE;
+			logon = false;
 			break;
 		case 'p':
 			pin = isc_commandline_argument;
@@ -146,7 +140,7 @@ main(int argc, char *argv[]) {
 	if (logon && pin == NULL)
 		pin = getpassphrase("Enter Pin: ");
 
-	result = pk11_get_session(&pctx, op_type, ISC_FALSE, ISC_FALSE, logon,
+	result = pk11_get_session(&pctx, op_type, false, false, logon,
 				  (const char *) pin, slot);
 	if ((result != ISC_R_SUCCESS) &&
 	    (result != PK11_R_NORANDOMSERVICE) &&

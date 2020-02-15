@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2009, 2011-2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: rdata.h,v 1.80 2011/03/20 02:31:53 marka Exp $ */
 
 #ifndef DNS_RDATA_H
 #define DNS_RDATA_H 1
@@ -91,6 +83,8 @@
  *** Imports
  ***/
 
+#include <stdbool.h>
+
 #include <isc/lang.h>
 
 #include <dns/types.h>
@@ -136,7 +130,7 @@ struct dns_rdata {
 #define DNS_RDATA_INITIALIZED(rdata) \
 	(!ISC_LINK_LINKED((rdata), link))
 #else
-#define DNS_RDATA_INITIALIZED(rdata) ISC_TRUE
+#define DNS_RDATA_INITIALIZED(rdata) true
 #endif
 #endif
 
@@ -165,14 +159,17 @@ struct dns_rdata {
 
 /*% Split the rdata into multiple lines to try to keep it
  within the "width". */
-#define DNS_STYLEFLAG_MULTILINE		0x00000001U
+#define DNS_STYLEFLAG_MULTILINE		0x00000001ULL
 
 /*% Output explanatory comments. */
-#define DNS_STYLEFLAG_COMMENT		0x00000002U
-#define DNS_STYLEFLAG_RRCOMMENT		0x00000004U
+#define DNS_STYLEFLAG_COMMENT		0x00000002ULL
+#define DNS_STYLEFLAG_RRCOMMENT		0x00000004ULL
 
 /*% Output KEYDATA in human readable format. */
-#define DNS_STYLEFLAG_KEYDATA		0x00000008U
+#define DNS_STYLEFLAG_KEYDATA		0x00000008ULL
+
+/*% Output textual RR type and RDATA in RFC 3597 unknown format */
+#define DNS_STYLEFLAG_UNKNOWNFORMAT	0x00000010ULL
 
 #define DNS_RDATA_DOWNCASE		DNS_NAME_DOWNCASE
 #define DNS_RDATA_CHECKNAMES		DNS_NAME_CHECKNAMES
@@ -502,7 +499,7 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
  */
 
 isc_result_t
-dns_rdata_tostruct(dns_rdata_t *rdata, void *target, isc_mem_t *mctx);
+dns_rdata_tostruct(const dns_rdata_t *rdata, void *target, isc_mem_t *mctx);
 /*%<
  * Convert an rdata into its C structure representation.
  *
@@ -532,14 +529,14 @@ dns_rdata_freestruct(void *source);
  *	dns_rdata_tostruct().
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_ismeta(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is a meta-type
  * like ANY or AXFR.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_issingleton(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is a singleton type,
@@ -550,14 +547,14 @@ dns_rdatatype_issingleton(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdataclass_ismeta(dns_rdataclass_t rdclass);
 /*%<
  * Return true iff the rdata class 'rdclass' is a meta-class
  * like ANY or NONE.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_isdnssec(dns_rdatatype_t type);
 /*%<
  * Return true iff 'type' is one of the DNSSEC
@@ -567,7 +564,7 @@ dns_rdatatype_isdnssec(dns_rdatatype_t type);
  * \li	'type' is a valid rdata type.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_iszonecutauth(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' is considered authoritative
@@ -579,7 +576,7 @@ dns_rdatatype_iszonecutauth(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_isknown(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is known.
@@ -649,7 +646,7 @@ dns_rdata_digest(dns_rdata_t *rdata, dns_digestfunc_t digest, void *arg);
  *\li	Many other results are possible if not successful.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_questiononly(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' can only appear in the question
@@ -660,7 +657,7 @@ dns_rdatatype_questiononly(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_notquestion(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' can not appear in the question
@@ -671,7 +668,7 @@ dns_rdatatype_notquestion(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_atparent(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' should appear at the parent of
@@ -729,9 +726,9 @@ dns_rdata_covers(dns_rdata_t *rdata);
  *\li	The type covered.
  */
 
-isc_boolean_t
+bool
 dns_rdata_checkowner(dns_name_t* name, dns_rdataclass_t rdclass,
-		     dns_rdatatype_t type, isc_boolean_t wildcard);
+		     dns_rdatatype_t type, bool wildcard);
 /*
  * Returns whether this is a valid ownername for this <type,class>.
  * If wildcard is true allow the first label to be a wildcard if
@@ -741,7 +738,7 @@ dns_rdata_checkowner(dns_name_t* name, dns_rdataclass_t rdclass,
  *	'name' is a valid name.
  */
 
-isc_boolean_t
+bool
 dns_rdata_checknames(dns_rdata_t *rdata, dns_name_t *owner, dns_name_t *bad);
 /*
  * Returns whether 'rdata' contains valid domain names.  The checks are

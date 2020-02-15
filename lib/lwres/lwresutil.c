@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: lwresutil.c,v 1.34 2007/06/19 23:47:22 tbox Exp $ */
@@ -42,13 +36,13 @@
  *
  * \code
  * typedef struct {
- *         lwres_uint32_t          flags;
- *         lwres_uint16_t          naliases;
- *         lwres_uint16_t          naddrs;
+ *         uint32_t          flags;
+ *         uint16_t          naliases;
+ *         uint16_t          naddrs;
  *         char                   *realname;
  *         char                  **aliases;
- *         lwres_uint16_t          realnamelen;
- *         lwres_uint16_t         *aliaslen;
+ *         uint16_t          realnamelen;
+ *         uint16_t         *aliaslen;
  *         lwres_addrlist_t        addrs;
  *         void                   *base;
  *         size_t                  baselen;
@@ -99,6 +93,7 @@
 #include <config.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -127,9 +122,9 @@
  *
  */
 lwres_result_t
-lwres_data_parse(lwres_buffer_t *b, unsigned char **p, lwres_uint16_t *len)
+lwres_data_parse(lwres_buffer_t *b, unsigned char **p, uint16_t *len)
 {
-	lwres_uint16_t datalen;
+	uint16_t datalen;
 	unsigned char *data;
 
 	REQUIRE(b != NULL);
@@ -175,9 +170,9 @@ lwres_data_parse(lwres_buffer_t *b, unsigned char **p, lwres_uint16_t *len)
  *
  */
 lwres_result_t
-lwres_string_parse(lwres_buffer_t *b, char **c, lwres_uint16_t *len)
+lwres_string_parse(lwres_buffer_t *b, char **c, uint16_t *len)
 {
-	lwres_uint16_t datalen;
+	uint16_t datalen;
 	char *string;
 
 	REQUIRE(b != NULL);
@@ -239,7 +234,7 @@ lwres_addr_parse(lwres_buffer_t *b, lwres_addr_t *addr)
 /*% Used to perform forward lookups. */
 lwres_result_t
 lwres_getaddrsbyname(lwres_context_t *ctx, const char *name,
-		     lwres_uint32_t addrtypes, lwres_gabnresponse_t **structp)
+		     uint32_t addrtypes, lwres_gabnresponse_t **structp)
 {
 	lwres_gabnrequest_t request;
 	lwres_gabnresponse_t *response;
@@ -247,7 +242,7 @@ lwres_getaddrsbyname(lwres_context_t *ctx, const char *name,
 	int recvlen;
 	lwres_buffer_t b_in, b_out;
 	lwres_lwpacket_t pkt;
-	lwres_uint32_t serial;
+	uint32_t serial;
 	char *buffer;
 	char target_name[1024];
 	unsigned int target_length;
@@ -353,8 +348,8 @@ lwres_getaddrsbyname(lwres_context_t *ctx, const char *name,
 
 /*% Used to perform reverse lookups. */
 lwres_result_t
-lwres_getnamebyaddr(lwres_context_t *ctx, lwres_uint32_t addrtype,
-		    lwres_uint16_t addrlen, const unsigned char *addr,
+lwres_getnamebyaddr(lwres_context_t *ctx, uint32_t addrtype,
+		    uint16_t addrlen, const unsigned char *addr,
 		    lwres_gnbaresponse_t **structp)
 {
 	lwres_gnbarequest_t request;
@@ -363,7 +358,7 @@ lwres_getnamebyaddr(lwres_context_t *ctx, lwres_uint32_t addrtype,
 	int recvlen;
 	lwres_buffer_t b_in, b_out;
 	lwres_lwpacket_t pkt;
-	lwres_uint32_t serial;
+	uint32_t serial;
 	char *buffer;
 
 	REQUIRE(ctx != NULL);
@@ -463,14 +458,14 @@ lwres_getnamebyaddr(lwres_context_t *ctx, lwres_uint32_t addrtype,
 /*% Get rdata by name. */
 lwres_result_t
 lwres_getrdatabyname(lwres_context_t *ctx, const char *name,
-		     lwres_uint16_t rdclass, lwres_uint16_t rdtype,
-		     lwres_uint32_t flags, lwres_grbnresponse_t **structp)
+		     uint16_t rdclass, uint16_t rdtype,
+		     uint32_t flags, lwres_grbnresponse_t **structp)
 {
 	int ret;
 	int recvlen;
 	lwres_buffer_t b_in, b_out;
 	lwres_lwpacket_t pkt;
-	lwres_uint32_t serial;
+	uint32_t serial;
 	char *buffer;
 	lwres_grbnrequest_t request;
 	lwres_grbnresponse_t *response;

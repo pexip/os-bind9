@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: byaddr.h,v 1.22 2007/06/19 23:47:16 tbox Exp $ */
 
 #ifndef DNS_BYADDR_H
 #define DNS_BYADDR_H 1
@@ -46,6 +39,8 @@
  *\li	RFCs:	1034, 1035, 2181, TBS
  *\li	Drafts:	TBS
  */
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/event.h>
@@ -147,7 +142,7 @@ dns_byaddr_destroy(dns_byaddr_t **byaddrp);
  */
 
 isc_result_t
-dns_byaddr_createptrname(isc_netaddr_t *address, isc_boolean_t nibble,
+dns_byaddr_createptrname(isc_netaddr_t *address, bool nibble,
 			 dns_name_t *name);
 
 isc_result_t
@@ -161,7 +156,7 @@ dns_byaddr_createptrname2(isc_netaddr_t *address, unsigned int options,
  * set.  'options' are the same as for dns_byaddr_create().
  *
  * Requires:
- * 
+ *
  * \li	'address' is a valid address.
  * \li	'name' is a valid name with a dedicated buffer.
  */

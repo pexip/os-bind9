@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /* ! \file */
 
@@ -56,11 +50,9 @@
 unsigned char digest[ISC_GOST_DIGESTLENGTH];
 unsigned char buffer[1024];
 const char *s;
-char str[2 * ISC_GOST_DIGESTLENGTH + 1];
+char str[2 * ISC_GOST_DIGESTLENGTH + 3];
 int i = 0;
 
-isc_result_t
-tohexstr(unsigned char *d, unsigned int len, char *out);
 /*
  * Precondition: a hexadecimal number in *d, the length of that number in len,
  *   and a pointer to a character array to put the output (*out).
@@ -71,19 +63,17 @@ tohexstr(unsigned char *d, unsigned int len, char *out);
  *
  * Return values: ISC_R_SUCCESS if the operation is sucessful
  */
-
-isc_result_t
-tohexstr(unsigned char *d, unsigned int len, char *out) {
-
-	out[0]='\0';
+static isc_result_t
+tohexstr(unsigned char *d, unsigned int len, char *out, size_t out_size) {
 	char c_ret[] = "AA";
 	unsigned int j;
-	strcat(out, "0x");
+
+	out[0] = '\0';
+	strlcat(out, "0x", out_size);
 	for (j = 0; j < len; j++) {
-		sprintf(c_ret, "%02X", d[j]);
-		strcat(out, c_ret);
+		snprintf(c_ret, sizeof(c_ret), "%02X", d[j]);
+		strlcat(out, c_ret, out_size);
 	}
-	strcat(out, "\0");
 	return (ISC_R_SUCCESS);
 }
 
@@ -200,7 +190,7 @@ ATF_TC_BODY(isc_gost_md, tc) {
 		{ NULL, 0, NULL, 1 }
 	};
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE(result == ISC_R_SUCCESS);
 
 	hash_testcase_t *testcase = testcases;
@@ -210,13 +200,13 @@ ATF_TC_BODY(isc_gost_md, tc) {
 		ATF_REQUIRE(result == ISC_R_SUCCESS);
 		for(i = 0; i < testcase->repeats; i++) {
 			result = isc_gost_update(&gost,
-					(const isc_uint8_t *) testcase->input,
+					(const uint8_t *) testcase->input,
 					testcase->input_len);
 			ATF_REQUIRE(result == ISC_R_SUCCESS);
 		}
 		result = isc_gost_final(&gost, digest);
 		ATF_REQUIRE(result == ISC_R_SUCCESS);
-		tohexstr(digest, ISC_GOST_DIGESTLENGTH, str);
+		tohexstr(digest, ISC_GOST_DIGESTLENGTH, str, sizeof(str));
 		ATF_CHECK_STREQ(str, testcase->result);
 
 		testcase++;
@@ -270,7 +260,7 @@ ATF_TC_BODY(isc_gost_private, tc) {
 	int len;
 	unsigned char *q;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE(result == ISC_R_SUCCESS);
 
 	/* raw parse */
@@ -334,17 +324,17 @@ ATF_TC_BODY(isc_gost_private, tc) {
 	CK_ULONG siglen;
 	pk11_context_t pk11_ctx;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE(result == ISC_R_SUCCESS);
 
 	/* create the private key */
 	memset(&pk11_ctx, 0, sizeof(pk11_ctx));
-	ATF_REQUIRE(pk11_get_session(&pk11_ctx, OP_GOST, ISC_TRUE,
-				     ISC_FALSE, ISC_FALSE, NULL,
+	ATF_REQUIRE(pk11_get_session(&pk11_ctx, OP_GOST, true,
+				     false, false, NULL,
 				     pk11_get_best_token(OP_GOST)) ==
 		    ISC_R_SUCCESS);
 	pk11_ctx.object = CK_INVALID_HANDLE;
-	pk11_ctx.ontoken = ISC_FALSE;
+	pk11_ctx.ontoken = false;
 	ATF_REQUIRE(pkcs_C_CreateObject(pk11_ctx.session, keyTemplate,
 					(CK_ULONG) 9, &pk11_ctx.object) ==
 		    CKR_OK);

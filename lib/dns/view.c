@@ -1,26 +1,29 @@
 /*
- * Copyright (C) 2004-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
 #include <config.h>
 
+#include <limits.h>
+#include <inttypes.h>
+#include <stdbool.h>
+
+#ifdef HAVE_LMDB
+ #include <lmdb.h>
+#endif
+
 #include <isc/file.h>
 #include <isc/hash.h>
+#include <isc/lex.h>
 #include <isc/print.h>
 #include <isc/sha2.h>
 #include <isc/stats.h>
@@ -31,6 +34,7 @@
 #include <dns/acache.h>
 #include <dns/acl.h>
 #include <dns/adb.h>
+#include <dns/badcache.h>
 #include <dns/cache.h>
 #include <dns/db.h>
 #include <dns/dispatch.h>
@@ -43,25 +47,33 @@
 #include <dns/keyvalues.h>
 #include <dns/master.h>
 #include <dns/masterdump.h>
+#include <dns/nta.h>
 #include <dns/order.h>
 #include <dns/peer.h>
-#include <dns/rrl.h>
 #include <dns/rbt.h>
 #include <dns/rdataset.h>
 #include <dns/request.h>
 #include <dns/resolver.h>
 #include <dns/result.h>
 #include <dns/rpz.h>
+#include <dns/rrl.h>
 #include <dns/stats.h>
+#include <dns/time.h>
 #include <dns/tsig.h>
 #include <dns/zone.h>
 #include <dns/zt.h>
+
+#define CHECK(op) \
+	do { result = (op);					 \
+	       if (result != ISC_R_SUCCESS) goto cleanup;	 \
+	} while (0)
 
 #define RESSHUTDOWN(v)	(((v)->attributes & DNS_VIEWATTR_RESSHUTDOWN) != 0)
 #define ADBSHUTDOWN(v)	(((v)->attributes & DNS_VIEWATTR_ADBSHUTDOWN) != 0)
 #define REQSHUTDOWN(v)	(((v)->attributes & DNS_VIEWATTR_REQSHUTDOWN) != 0)
 
 #define DNS_VIEW_DELONLYHASH 111
+#define DNS_VIEW_FAILCACHESIZE 1021
 
 static void resolver_shutdown(isc_task_t *task, isc_event_t *event);
 static void adb_shutdown(isc_task_t *task, isc_event_t *event);
@@ -73,6 +85,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 {
 	dns_view_t *view;
 	isc_result_t result;
+	char buffer[1024];
 
 	/*
 	 * Create a view.
@@ -85,6 +98,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 	if (view == NULL)
 		return (ISC_R_NOMEMORY);
 
+	view->nta_file = NULL;
 	view->mctx = NULL;
 	isc_mem_attach(mctx, &view->mctx);
 	view->name = isc_mem_strdup(mctx, name);
@@ -92,6 +106,17 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 		result = ISC_R_NOMEMORY;
 		goto cleanup_view;
 	}
+
+	result = isc_file_sanitize(NULL, view->name, "nta",
+				   buffer, sizeof(buffer));
+	if (result != ISC_R_SUCCESS)
+		goto cleanup_name;
+	view->nta_file = isc_mem_strdup(mctx, buffer);
+	if (view->nta_file == NULL) {
+		result = ISC_R_NOMEMORY;
+		goto cleanup_name;
+	}
+
 	result = isc_mutex_init(&view->lock);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_name;
@@ -108,6 +133,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 		}
 	}
 	view->secroots_priv = NULL;
+	view->ntatable_priv = NULL;
 	view->fwdtable = NULL;
 	result = dns_fwdtable_create(mctx, &view->fwdtable);
 	if (result != ISC_R_SUCCESS) {
@@ -128,7 +154,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 	view->adb = NULL;
 	view->requestmgr = NULL;
 	view->rdclass = rdclass;
-	view->frozen = ISC_FALSE;
+	view->frozen = false;
 	view->task = NULL;
 	result = isc_refcount_init(&view->references, 1);
 	if (result != ISC_R_SUCCESS)
@@ -140,33 +166,34 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 	view->dynamickeys = NULL;
 	view->matchclients = NULL;
 	view->matchdestinations = NULL;
-	view->matchrecursiveonly = ISC_FALSE;
+	view->matchrecursiveonly = false;
 	result = dns_tsigkeyring_create(view->mctx, &view->dynamickeys);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_references;
 	view->peers = NULL;
 	view->order = NULL;
 	view->delonly = NULL;
-	view->rootdelonly = ISC_FALSE;
+	view->rootdelonly = false;
 	view->rootexclude = NULL;
 	view->adbstats = NULL;
 	view->resstats = NULL;
 	view->resquerystats = NULL;
-	view->cacheshared = ISC_FALSE;
+	view->cacheshared = false;
 	ISC_LIST_INIT(view->dns64);
 	view->dns64cnt = 0;
 
 	/*
 	 * Initialize configuration data with default values.
 	 */
-	view->recursion = ISC_TRUE;
-	view->auth_nxdomain = ISC_FALSE; /* Was true in BIND 8 */
-	view->additionalfromcache = ISC_TRUE;
-	view->additionalfromauth = ISC_TRUE;
-	view->enablednssec = ISC_TRUE;
-	view->enablevalidation = ISC_TRUE;
-	view->acceptexpired = ISC_FALSE;
-	view->minimalresponses = ISC_FALSE;
+	view->recursion = true;
+	view->auth_nxdomain = false; /* Was true in BIND 8 */
+	view->additionalfromcache = true;
+	view->additionalfromauth = true;
+	view->enablednssec = true;
+	view->enablevalidation = true;
+	view->acceptexpired = false;
+	view->minimal_any = false;
+	view->minimalresponses = dns_minimal_no;
 	view->transfer_format = dns_one_answer;
 	view->cacheacl = NULL;
 	view->cacheonacl = NULL;
@@ -181,39 +208,62 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 	view->upfwdacl = NULL;
 	view->denyansweracl = NULL;
 	view->nocasecompress = NULL;
+	view->msgcompression = true;
 	view->answeracl_exclude = NULL;
 	view->denyanswernames = NULL;
 	view->answernames_exclude = NULL;
 	view->rrl = NULL;
-	view->provideixfr = ISC_TRUE;
+	view->provideixfr = true;
 	view->maxcachettl = 7 * 24 * 3600;
 	view->maxncachettl = 3 * 3600;
+	view->nta_lifetime = 0;
+	view->nta_recheck = 0;
 	view->prefetch_eligible = 0;
 	view->prefetch_trigger = 0;
 	view->dstport = 53;
 	view->preferred_glue = 0;
-	view->flush = ISC_FALSE;
+	view->flush = false;
 	view->dlv = NULL;
 	view->maxudp = 0;
-	view->situdp = 0;
+	view->nocookieudp = 0;
 	view->maxbits = 0;
 	view->v4_aaaa = dns_aaaa_ok;
 	view->v6_aaaa = dns_aaaa_ok;
 	view->aaaa_acl = NULL;
 	view->rpzs = NULL;
+	view->catzs = NULL;
 	dns_fixedname_init(&view->dlv_fixed);
 	view->managed_keys = NULL;
 	view->redirect = NULL;
-	view->requestnsid = ISC_FALSE;
-	view->requestsit = ISC_TRUE;
+	view->redirectzone = NULL;
+	dns_fixedname_init(&view->redirectfixed);
+	view->requestnsid = false;
+	view->sendcookie = true;
+	view->requireservercookie = false;
+	view->trust_anchor_telemetry = true;
+	view->root_key_sentinel = true;
 	view->new_zone_file = NULL;
+	view->new_zone_db = NULL;
+	view->new_zone_dbenv = NULL;
+	view->new_zone_mapsize = 0ULL;
 	view->new_zone_config = NULL;
 	view->cfg_destroy = NULL;
+	view->fail_ttl = 0;
+	view->failcache = NULL;
+	(void)dns_badcache_init(view->mctx, DNS_VIEW_FAILCACHESIZE,
+				   &view->failcache);
+	view->v6bias = 0;
+	view->dtenv = NULL;
+	view->dttypes = 0;
+
+	result = isc_mutex_init(&view->new_zone_lock);
+	if (result != ISC_R_SUCCESS)
+		goto cleanup_dynkeys;
 
 	if (isc_bind9) {
 		result = dns_order_create(view->mctx, &view->order);
 		if (result != ISC_R_SUCCESS)
-			goto cleanup_dynkeys;
+			goto cleanup_new_zone_lock;
 	}
 
 	result = dns_peerlist_new(view->mctx, &view->peers);
@@ -249,11 +299,15 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 	if (view->order != NULL)
 		dns_order_detach(&view->order);
 
+ cleanup_new_zone_lock:
+	DESTROYLOCK(&view->new_zone_lock);
+
  cleanup_dynkeys:
 	if (view->dynamickeys != NULL)
 		dns_tsigkeyring_detach(&view->dynamickeys);
 
  cleanup_references:
+	isc_refcount_decrement(&view->references, NULL);
 	isc_refcount_destroy(&view->references);
 
  cleanup_fwdtable:
@@ -266,6 +320,9 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 
  cleanup_mutex:
 	DESTROYLOCK(&view->lock);
+
+	if (view->nta_file != NULL)
+		isc_mem_free(mctx, view->nta_file);
 
  cleanup_name:
 	isc_mem_free(mctx, view->name);
@@ -295,28 +352,28 @@ destroy(dns_view_t *view) {
 
 	if (view->dynamickeys != NULL) {
 		isc_result_t result;
-		char template[20];
-		char keyfile[20];
+		char template[PATH_MAX];
+		char keyfile[PATH_MAX];
 		FILE *fp = NULL;
-		int n;
 
-		n = snprintf(keyfile, sizeof(keyfile), "%s.tsigkeys",
-			     view->name);
-		if (n > 0 && (size_t)n < sizeof(keyfile)) {
-			result = isc_file_mktemplate(keyfile, template,
-						     sizeof(template));
-			if (result == ISC_R_SUCCESS)
-				(void)isc_file_openuniqueprivate(template, &fp);
+		result = isc_file_mktemplate(NULL, template, sizeof(template));
+		if (result == ISC_R_SUCCESS) {
+			(void)isc_file_openuniqueprivate(template, &fp);
 		}
-		if (fp == NULL)
+		if (fp == NULL) {
 			dns_tsigkeyring_detach(&view->dynamickeys);
-		else {
-			result = dns_tsigkeyring_dumpanddetach(
-							&view->dynamickeys, fp);
+		} else {
+			result = dns_tsigkeyring_dumpanddetach
+				(&view->dynamickeys, fp);
 			if (result == ISC_R_SUCCESS) {
-				if (fclose(fp) == 0)
-					result = isc_file_rename(template,
-								 keyfile);
+				if (fclose(fp) == 0) {
+					result = isc_file_sanitize
+						(NULL, view->name, "tsigkeys",
+						 keyfile, sizeof(keyfile));
+					if (result == ISC_R_SUCCESS)
+						result = isc_file_rename
+							(template, keyfile);
+				}
 				if (result != ISC_R_SUCCESS)
 					(void)remove(template);
 			} else {
@@ -339,6 +396,8 @@ destroy(dns_view_t *view) {
 	dns_rrl_view_destroy(view);
 	if (view->rpzs != NULL)
 		dns_rpz_detach_rpzs(&view->rpzs);
+	if (view->catzs != NULL)
+		dns_catz_catzs_detach(&view->catzs);
 	for (dlzdb = ISC_LIST_HEAD(view->dlz_searched);
 	     dlzdb != NULL;
 	     dlzdb = ISC_LIST_HEAD(view->dlz_searched)) {
@@ -442,6 +501,8 @@ destroy(dns_view_t *view) {
 		dns_stats_detach(&view->resquerystats);
 	if (view->secroots_priv != NULL)
 		dns_keytable_detach(&view->secroots_priv);
+	if (view->ntatable_priv != NULL)
+		dns_ntatable_detach(&view->ntatable_priv);
 	for (dns64 = ISC_LIST_HEAD(view->dns64);
 	     dns64 != NULL;
 	     dns64 = ISC_LIST_HEAD(view->dns64)) {
@@ -452,11 +513,33 @@ destroy(dns_view_t *view) {
 		dns_zone_detach(&view->managed_keys);
 	if (view->redirect != NULL)
 		dns_zone_detach(&view->redirect);
-	dns_view_setnewzones(view, ISC_FALSE, NULL, NULL);
+#ifdef HAVE_DNSTAP
+	if (view->dtenv != NULL)
+		dns_dt_detach(&view->dtenv);
+#endif /* HAVE_DNSTAP */
+	dns_view_setnewzones(view, false, NULL, NULL, 0ULL);
+	if (view->new_zone_file != NULL) {
+		isc_mem_free(view->mctx, view->new_zone_file);
+		view->new_zone_file = NULL;
+	}
+#ifdef HAVE_LMDB
+	if (view->new_zone_dbenv != NULL) {
+		mdb_env_close((MDB_env *) view->new_zone_dbenv);
+		view->new_zone_dbenv = NULL;
+	}
+	if (view->new_zone_db != NULL) {
+		isc_mem_free(view->mctx, view->new_zone_db);
+		view->new_zone_db = NULL;
+	}
+#endif /* HAVE_LMDB */
 	dns_fwdtable_destroy(&view->fwdtable);
 	dns_aclenv_destroy(&view->aclenv);
+	if (view->failcache != NULL)
+		dns_badcache_destroy(&view->failcache);
+	DESTROYLOCK(&view->new_zone_lock);
 	DESTROYLOCK(&view->lock);
 	isc_refcount_destroy(&view->references);
+	isc_mem_free(view->mctx, view->nta_file);
 	isc_mem_free(view->mctx, view->name);
 	isc_mem_putanddetach(&view->mctx, view, sizeof(*view));
 }
@@ -465,15 +548,15 @@ destroy(dns_view_t *view) {
  * Return true iff 'view' may be freed.
  * The caller must be holding the view lock.
  */
-static isc_boolean_t
+static bool
 all_done(dns_view_t *view) {
 
 	if (isc_refcount_current(&view->references) == 0 &&
 	    view->weakrefs == 0 &&
 	    RESSHUTDOWN(view) && ADBSHUTDOWN(view) && REQSHUTDOWN(view))
-		return (ISC_TRUE);
+		return (true);
 
-	return (ISC_FALSE);
+	return (false);
 }
 
 void
@@ -488,17 +571,17 @@ dns_view_attach(dns_view_t *source, dns_view_t **targetp) {
 }
 
 static void
-view_flushanddetach(dns_view_t **viewp, isc_boolean_t flush) {
+view_flushanddetach(dns_view_t **viewp, bool flush) {
 	dns_view_t *view;
 	unsigned int refs;
-	isc_boolean_t done = ISC_FALSE;
+	bool done = false;
 
 	REQUIRE(viewp != NULL);
 	view = *viewp;
 	REQUIRE(DNS_VIEW_VALID(view));
 
 	if (flush)
-		view->flush = ISC_TRUE;
+		view->flush = true;
 	isc_refcount_decrement(&view->references, &refs);
 	if (refs == 0) {
 		dns_zone_t *mkzone = NULL, *rdzone = NULL;
@@ -530,6 +613,9 @@ view_flushanddetach(dns_view_t **viewp, isc_boolean_t flush) {
 			if (view->flush)
 				dns_zone_flush(rdzone);
 		}
+		if (view->catzs != NULL) {
+			dns_catz_catzs_detach(&view->catzs);
+		}
 		done = all_done(view);
 		UNLOCK(&view->lock);
 
@@ -549,12 +635,12 @@ view_flushanddetach(dns_view_t **viewp, isc_boolean_t flush) {
 
 void
 dns_view_flushanddetach(dns_view_t **viewp) {
-	view_flushanddetach(viewp, ISC_TRUE);
+	view_flushanddetach(viewp, true);
 }
 
 void
 dns_view_detach(dns_view_t **viewp) {
-	view_flushanddetach(viewp, ISC_FALSE);
+	view_flushanddetach(viewp, false);
 }
 
 static isc_result_t
@@ -569,7 +655,7 @@ dns_view_dialup(dns_view_t *view) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
 
-	(void)dns_zt_apply(view->zonetable, ISC_FALSE, dialup, NULL);
+	(void)dns_zt_apply(view->zonetable, false, dialup, NULL);
 }
 
 void
@@ -588,7 +674,7 @@ dns_view_weakattach(dns_view_t *source, dns_view_t **targetp) {
 void
 dns_view_weakdetach(dns_view_t **viewp) {
 	dns_view_t *view;
-	isc_boolean_t done = ISC_FALSE;
+	bool done = false;
 
 	REQUIRE(viewp != NULL);
 	view = *viewp;
@@ -611,7 +697,7 @@ dns_view_weakdetach(dns_view_t **viewp) {
 static void
 resolver_shutdown(isc_task_t *task, isc_event_t *event) {
 	dns_view_t *view = event->ev_arg;
-	isc_boolean_t done;
+	bool done;
 
 	REQUIRE(event->ev_type == DNS_EVENT_VIEWRESSHUTDOWN);
 	REQUIRE(DNS_VIEW_VALID(view));
@@ -635,7 +721,7 @@ resolver_shutdown(isc_task_t *task, isc_event_t *event) {
 static void
 adb_shutdown(isc_task_t *task, isc_event_t *event) {
 	dns_view_t *view = event->ev_arg;
-	isc_boolean_t done;
+	bool done;
 
 	REQUIRE(event->ev_type == DNS_EVENT_VIEWADBSHUTDOWN);
 	REQUIRE(DNS_VIEW_VALID(view));
@@ -659,7 +745,7 @@ adb_shutdown(isc_task_t *task, isc_event_t *event) {
 static void
 req_shutdown(isc_task_t *task, isc_event_t *event) {
 	dns_view_t *view = event->ev_arg;
-	isc_boolean_t done;
+	bool done;
 
 	REQUIRE(event->ev_type == DNS_EVENT_VIEWREQSHUTDOWN);
 	REQUIRE(DNS_VIEW_VALID(view));
@@ -763,11 +849,11 @@ dns_view_createresolver(dns_view_t *view,
 
 void
 dns_view_setcache(dns_view_t *view, dns_cache_t *cache) {
-	dns_view_setcache2(view, cache, ISC_FALSE);
+	dns_view_setcache2(view, cache, false);
 }
 
 void
-dns_view_setcache2(dns_view_t *view, dns_cache_t *cache, isc_boolean_t shared) {
+dns_view_setcache2(dns_view_t *view, dns_cache_t *cache, bool shared) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(!view->frozen);
 
@@ -786,7 +872,7 @@ dns_view_setcache2(dns_view_t *view, dns_cache_t *cache, isc_boolean_t shared) {
 		dns_acache_setdb(view->acache, view->cachedb);
 }
 
-isc_boolean_t
+bool
 dns_view_iscacheshared(dns_view_t *view) {
 	REQUIRE(DNS_VIEW_VALID(view));
 
@@ -832,15 +918,15 @@ dns_view_getdynamickeyring(dns_view_t *view, dns_tsig_keyring_t **ringp) {
 void
 dns_view_restorekeyring(dns_view_t *view) {
 	FILE *fp;
-	char keyfile[20];
-	int n;
+	char keyfile[PATH_MAX];
+	isc_result_t result;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 
 	if (view->dynamickeys != NULL) {
-		n = snprintf(keyfile, sizeof(keyfile), "%s.tsigkeys",
-			     view->name);
-		if (n > 0 && (size_t)n < sizeof(keyfile)) {
+		result = isc_file_sanitize(NULL, view->name, "tsigkeys",
+					   keyfile, sizeof(keyfile));
+		if (result == ISC_R_SUCCESS) {
 			fp = fopen(keyfile, "r");
 			if (fp != NULL) {
 				dns_keyring_restore(view->dynamickeys, fp);
@@ -865,7 +951,7 @@ dns_view_freeze(dns_view_t *view) {
 		INSIST(view->cachedb != NULL);
 		dns_resolver_freeze(view->resolver);
 	}
-	view->frozen = ISC_TRUE;
+	view->frozen = true;
 }
 
 void
@@ -873,7 +959,7 @@ dns_view_thaw(dns_view_t *view) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->frozen);
 
-	view->frozen = ISC_FALSE;
+	view->frozen = false;
 }
 
 isc_result_t
@@ -911,25 +997,25 @@ dns_view_findzone(dns_view_t *view, dns_name_t *name, dns_zone_t **zonep) {
 
 isc_result_t
 dns_view_find(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
-	      isc_stdtime_t now, unsigned int options, isc_boolean_t use_hints,
+	      isc_stdtime_t now, unsigned int options, bool use_hints,
 	      dns_db_t **dbp, dns_dbnode_t **nodep, dns_name_t *foundname,
 	      dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset) {
 	return (dns_view_find2(view, name, type, now, options, use_hints,
-			       ISC_FALSE, dbp, nodep, foundname, rdataset,
+			       false, dbp, nodep, foundname, rdataset,
 			       sigrdataset));
 }
 
 isc_result_t
 dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 	       isc_stdtime_t now, unsigned int options,
-	       isc_boolean_t use_hints, isc_boolean_t use_static_stub,
+	       bool use_hints, bool use_static_stub,
 	       dns_db_t **dbp, dns_dbnode_t **nodep, dns_name_t *foundname,
 	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
 {
 	isc_result_t result;
 	dns_db_t *db, *zdb;
 	dns_dbnode_t *node, *znode;
-	isc_boolean_t is_cache, is_staticstub_zone;
+	bool is_cache, is_staticstub_zone;
 	dns_rdataset_t zrdataset, zsigrdataset;
 	dns_zone_t *zone;
 
@@ -957,7 +1043,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 	 */
 	db = NULL;
 	node = NULL;
-	is_staticstub_zone = ISC_FALSE;
+	is_staticstub_zone = false;
 	zone = NULL;
 	LOCK(&view->lock);
 	if (view->zonetable != NULL)
@@ -976,7 +1062,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 			goto cleanup;
 		if (dns_zone_gettype(zone) == dns_zone_staticstub &&
 		    dns_name_equal(name, dns_zone_getorigin(zone))) {
-			is_staticstub_zone = ISC_TRUE;
+			is_staticstub_zone = true;
 		}
 	} else if (result == ISC_R_NOTFOUND && view->cachedb != NULL)
 		dns_db_attach(view->cachedb, &db);
@@ -1010,7 +1096,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 				 * static-stub zone we stop the search here
 				 * (see the function description in view.h).
 				 */
-				is_cache = ISC_TRUE;
+				is_cache = true;
 				dns_db_attach(view->cachedb, &db);
 				goto db_find;
 			}
@@ -1043,7 +1129,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 			 * We found an answer, but the cache may be better.
 			 * Remember what we've got and go look in the cache.
 			 */
-			is_cache = ISC_TRUE;
+			is_cache = true;
 			dns_rdataset_clone(rdataset, &zrdataset);
 			dns_rdataset_disassociate(rdataset);
 			if (sigrdataset != NULL &&
@@ -1135,7 +1221,7 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 isc_result_t
 dns_view_simplefind(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 		    isc_stdtime_t now, unsigned int options,
-		    isc_boolean_t use_hints,
+		    bool use_hints,
 		    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
 {
 	isc_result_t result;
@@ -1179,23 +1265,23 @@ dns_view_simplefind(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
 isc_result_t
 dns_view_findzonecut(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 		     isc_stdtime_t now, unsigned int options,
-		     isc_boolean_t use_hints,
+		     bool use_hints,
 		     dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
 {
 	return(dns_view_findzonecut2(view, name, fname, now, options,
-				     use_hints, ISC_TRUE,
+				     use_hints, true,
 				     rdataset, sigrdataset));
 }
 
 isc_result_t
 dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 		      isc_stdtime_t now, unsigned int options,
-		      isc_boolean_t use_hints,	isc_boolean_t use_cache,
+		      bool use_hints,	bool use_cache,
 		      dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
 {
 	isc_result_t result;
 	dns_db_t *db;
-	isc_boolean_t is_cache, use_zone, try_hints;
+	bool is_cache, use_zone, try_hints;
 	dns_zone_t *zone;
 	dns_name_t *zfname;
 	dns_rdataset_t zrdataset, zsigrdataset;
@@ -1206,8 +1292,8 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 	REQUIRE(view->frozen);
 
 	db = NULL;
-	use_zone = ISC_FALSE;
-	try_hints = ISC_FALSE;
+	use_zone = false;
+	try_hints = false;
 	zfname = NULL;
 
 	/*
@@ -1247,7 +1333,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 			/*
 			 * Maybe we have hints...
 			 */
-			try_hints = ISC_TRUE;
+			try_hints = true;
 			goto finish;
 		}
 	} else if (result != ISC_R_SUCCESS) {
@@ -1286,7 +1372,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 			}
 			dns_db_detach(&db);
 			dns_db_attach(view->cachedb, &db);
-			is_cache = ISC_TRUE;
+			is_cache = true;
 			goto db_find;
 		}
 	} else {
@@ -1301,7 +1387,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 				 * We found a zonecut in the cache, but our
 				 * zone delegation is better.
 				 */
-				use_zone = ISC_TRUE;
+				use_zone = true;
 			}
 		} else if (result == ISC_R_NOTFOUND) {
 			if (zfname != NULL) {
@@ -1309,12 +1395,12 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
 				 * We didn't find anything in the cache, but we
 				 * have a zone delegation, so use it.
 				 */
-				use_zone = ISC_TRUE;
+				use_zone = true;
 			} else {
 				/*
 				 * Maybe we have hints...
 				 */
-				try_hints = ISC_TRUE;
+				try_hints = true;
 			}
 		} else {
 			/*
@@ -1395,13 +1481,13 @@ dns_viewlist_find(dns_viewlist_t *list, const char *name,
 
 isc_result_t
 dns_viewlist_findzone(dns_viewlist_t *list, dns_name_t *name,
-		      isc_boolean_t allclasses, dns_rdataclass_t rdclass,
+		      bool allclasses, dns_rdataclass_t rdclass,
 		      dns_zone_t **zonep)
 {
 	dns_view_t *view;
 	isc_result_t result;
 	dns_zone_t *zone1 = NULL, *zone2 = NULL;
-	dns_zone_t **zp = NULL;;
+	dns_zone_t **zp = NULL;
 
 	REQUIRE(list != NULL);
 	REQUIRE(zonep != NULL && *zonep == NULL);
@@ -1409,7 +1495,7 @@ dns_viewlist_findzone(dns_viewlist_t *list, dns_name_t *name,
 	for (view = ISC_LIST_HEAD(*list);
 	     view != NULL;
 	     view = ISC_LIST_NEXT(view, link)) {
-		if (allclasses == ISC_FALSE && view->rdclass != rdclass)
+		if (allclasses == false && view->rdclass != rdclass)
 			continue;
 
 		/*
@@ -1452,7 +1538,7 @@ dns_viewlist_findzone(dns_viewlist_t *list, dns_name_t *name,
 }
 
 isc_result_t
-dns_view_load(dns_view_t *view, isc_boolean_t stop) {
+dns_view_load(dns_view_t *view, bool stop) {
 
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
@@ -1461,7 +1547,7 @@ dns_view_load(dns_view_t *view, isc_boolean_t stop) {
 }
 
 isc_result_t
-dns_view_loadnew(dns_view_t *view, isc_boolean_t stop) {
+dns_view_loadnew(dns_view_t *view, bool stop) {
 
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
@@ -1471,10 +1557,16 @@ dns_view_loadnew(dns_view_t *view, isc_boolean_t stop) {
 
 isc_result_t
 dns_view_asyncload(dns_view_t *view, dns_zt_allloaded_t callback, void *arg) {
+	return (dns_view_asyncload2(view, callback, arg, false));
+}
+
+isc_result_t
+dns_view_asyncload2(dns_view_t *view, dns_zt_allloaded_t callback, void *arg,
+		    bool newonly) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
 
-	return (dns_zt_asyncload(view->zonetable, callback, arg));
+	return (dns_zt_asyncload2(view->zonetable, callback, arg, newonly));
 }
 
 isc_result_t
@@ -1533,16 +1625,17 @@ dns_view_dumpdbtostream(dns_view_t *view, FILE *fp) {
 		return (result);
 	dns_adb_dump(view->adb, fp);
 	dns_resolver_printbadcache(view->resolver, fp);
+	dns_badcache_print(view->failcache, "SERVFAIL cache", fp);
 	return (ISC_R_SUCCESS);
 }
 
 isc_result_t
 dns_view_flushcache(dns_view_t *view) {
-	return (dns_view_flushcache2(view, ISC_FALSE));
+	return (dns_view_flushcache2(view, false));
 }
 
 isc_result_t
-dns_view_flushcache2(dns_view_t *view, isc_boolean_t fixuponly) {
+dns_view_flushcache2(dns_view_t *view, bool fixuponly) {
 	isc_result_t result;
 
 	REQUIRE(DNS_VIEW_VALID(view));
@@ -1562,6 +1655,8 @@ dns_view_flushcache2(dns_view_t *view, isc_boolean_t fixuponly) {
 		dns_acache_setdb(view->acache, view->cachedb);
 	if (view->resolver != NULL)
 		dns_resolver_flushbadcache(view->resolver, NULL);
+	if (view->failcache != NULL)
+		dns_badcache_flush(view->failcache);
 
 	dns_adb_flush(view->adb);
 	return (ISC_R_SUCCESS);
@@ -1569,11 +1664,11 @@ dns_view_flushcache2(dns_view_t *view, isc_boolean_t fixuponly) {
 
 isc_result_t
 dns_view_flushname(dns_view_t *view, dns_name_t *name) {
-	return (dns_view_flushnode(view, name, ISC_FALSE));
+	return (dns_view_flushnode(view, name, false));
 }
 
 isc_result_t
-dns_view_flushnode(dns_view_t *view, dns_name_t *name, isc_boolean_t tree) {
+dns_view_flushnode(dns_view_t *view, dns_name_t *name, bool tree) {
 	isc_result_t result = ISC_R_SUCCESS;
 
 	REQUIRE(DNS_VIEW_VALID(view));
@@ -1583,11 +1678,15 @@ dns_view_flushnode(dns_view_t *view, dns_name_t *name, isc_boolean_t tree) {
 			dns_adb_flushnames(view->adb, name);
 		if (view->resolver != NULL)
 			dns_resolver_flushbadnames(view->resolver, name);
+		if (view->failcache != NULL)
+			dns_badcache_flushtree(view->failcache, name);
 	} else {
 		if (view->adb != NULL)
 			dns_adb_flushname(view->adb, name);
 		if (view->resolver != NULL)
 			dns_resolver_flushbadcache(view->resolver, name);
+		if (view->failcache != NULL)
+			dns_badcache_flushname(view->failcache, name);
 	}
 
 	if (view->cache != NULL)
@@ -1599,8 +1698,8 @@ dns_view_flushnode(dns_view_t *view, dns_name_t *name, isc_boolean_t tree) {
 isc_result_t
 dns_view_adddelegationonly(dns_view_t *view, dns_name_t *name) {
 	isc_result_t result;
-	dns_name_t *new;
-	isc_uint32_t hash;
+	dns_name_t *item;
+	uint32_t hash;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 
@@ -1613,29 +1712,29 @@ dns_view_adddelegationonly(dns_view_t *view, dns_name_t *name) {
 		for (hash = 0; hash < DNS_VIEW_DELONLYHASH; hash++)
 			ISC_LIST_INIT(view->delonly[hash]);
 	}
-	hash = dns_name_hash(name, ISC_FALSE) % DNS_VIEW_DELONLYHASH;
-	new = ISC_LIST_HEAD(view->delonly[hash]);
-	while (new != NULL && !dns_name_equal(new, name))
-		new = ISC_LIST_NEXT(new, link);
-	if (new != NULL)
+	hash = dns_name_hash(name, false) % DNS_VIEW_DELONLYHASH;
+	item = ISC_LIST_HEAD(view->delonly[hash]);
+	while (item != NULL && !dns_name_equal(item, name))
+		item = ISC_LIST_NEXT(item, link);
+	if (item != NULL)
 		return (ISC_R_SUCCESS);
-	new = isc_mem_get(view->mctx, sizeof(*new));
-	if (new == NULL)
+	item = isc_mem_get(view->mctx, sizeof(*item));
+	if (item == NULL)
 		return (ISC_R_NOMEMORY);
-	dns_name_init(new, NULL);
-	result = dns_name_dup(name, view->mctx, new);
+	dns_name_init(item, NULL);
+	result = dns_name_dup(name, view->mctx, item);
 	if (result == ISC_R_SUCCESS)
-		ISC_LIST_APPEND(view->delonly[hash], new, link);
+		ISC_LIST_APPEND(view->delonly[hash], item, link);
 	else
-		isc_mem_put(view->mctx, new, sizeof(*new));
+		isc_mem_put(view->mctx, item, sizeof(*item));
 	return (result);
 }
 
 isc_result_t
 dns_view_excludedelegationonly(dns_view_t *view, dns_name_t *name) {
 	isc_result_t result;
-	dns_name_t *new;
-	isc_uint32_t hash;
+	dns_name_t *item;
+	uint32_t hash;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 
@@ -1648,70 +1747,70 @@ dns_view_excludedelegationonly(dns_view_t *view, dns_name_t *name) {
 		for (hash = 0; hash < DNS_VIEW_DELONLYHASH; hash++)
 			ISC_LIST_INIT(view->rootexclude[hash]);
 	}
-	hash = dns_name_hash(name, ISC_FALSE) % DNS_VIEW_DELONLYHASH;
-	new = ISC_LIST_HEAD(view->rootexclude[hash]);
-	while (new != NULL && !dns_name_equal(new, name))
-		new = ISC_LIST_NEXT(new, link);
-	if (new != NULL)
+	hash = dns_name_hash(name, false) % DNS_VIEW_DELONLYHASH;
+	item = ISC_LIST_HEAD(view->rootexclude[hash]);
+	while (item != NULL && !dns_name_equal(item, name))
+		item = ISC_LIST_NEXT(item, link);
+	if (item != NULL)
 		return (ISC_R_SUCCESS);
-	new = isc_mem_get(view->mctx, sizeof(*new));
-	if (new == NULL)
+	item = isc_mem_get(view->mctx, sizeof(*item));
+	if (item == NULL)
 		return (ISC_R_NOMEMORY);
-	dns_name_init(new, NULL);
-	result = dns_name_dup(name, view->mctx, new);
+	dns_name_init(item, NULL);
+	result = dns_name_dup(name, view->mctx, item);
 	if (result == ISC_R_SUCCESS)
-		ISC_LIST_APPEND(view->rootexclude[hash], new, link);
+		ISC_LIST_APPEND(view->rootexclude[hash], item, link);
 	else
-		isc_mem_put(view->mctx, new, sizeof(*new));
+		isc_mem_put(view->mctx, item, sizeof(*item));
 	return (result);
 }
 
-isc_boolean_t
+bool
 dns_view_isdelegationonly(dns_view_t *view, dns_name_t *name) {
-	dns_name_t *new;
-	isc_uint32_t hash;
+	dns_name_t *item;
+	uint32_t hash;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 
 	if (!view->rootdelonly && view->delonly == NULL)
-		return (ISC_FALSE);
+		return (false);
 
-	hash = dns_name_hash(name, ISC_FALSE) % DNS_VIEW_DELONLYHASH;
+	hash = dns_name_hash(name, false) % DNS_VIEW_DELONLYHASH;
 	if (view->rootdelonly && dns_name_countlabels(name) <= 2) {
 		if (view->rootexclude == NULL)
-			return (ISC_TRUE);
-		new = ISC_LIST_HEAD(view->rootexclude[hash]);
-		while (new != NULL && !dns_name_equal(new, name))
-			new = ISC_LIST_NEXT(new, link);
-		if (new == NULL)
-			return (ISC_TRUE);
+			return (true);
+		item = ISC_LIST_HEAD(view->rootexclude[hash]);
+		while (item != NULL && !dns_name_equal(item, name))
+			item = ISC_LIST_NEXT(item, link);
+		if (item == NULL)
+			return (true);
 	}
 
 	if (view->delonly == NULL)
-		return (ISC_FALSE);
+		return (false);
 
-	new = ISC_LIST_HEAD(view->delonly[hash]);
-	while (new != NULL && !dns_name_equal(new, name))
-		new = ISC_LIST_NEXT(new, link);
-	if (new == NULL)
-		return (ISC_FALSE);
-	return (ISC_TRUE);
+	item = ISC_LIST_HEAD(view->delonly[hash]);
+	while (item != NULL && !dns_name_equal(item, name))
+		item = ISC_LIST_NEXT(item, link);
+	if (item == NULL)
+		return (false);
+	return (true);
 }
 
 void
-dns_view_setrootdelonly(dns_view_t *view, isc_boolean_t value) {
+dns_view_setrootdelonly(dns_view_t *view, bool value) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	view->rootdelonly = value;
 }
 
-isc_boolean_t
+bool
 dns_view_getrootdelonly(dns_view_t *view) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	return (view->rootdelonly);
 }
 
 isc_result_t
-dns_view_freezezones(dns_view_t *view, isc_boolean_t value) {
+dns_view_freezezones(dns_view_t *view, bool value) {
 
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
@@ -1775,6 +1874,27 @@ dns_view_getresquerystats(dns_view_t *view, dns_stats_t **statsp) {
 }
 
 isc_result_t
+dns_view_initntatable(dns_view_t *view,
+		      isc_taskmgr_t *taskmgr, isc_timermgr_t *timermgr)
+{
+	REQUIRE(DNS_VIEW_VALID(view));
+	if (view->ntatable_priv != NULL)
+		dns_ntatable_detach(&view->ntatable_priv);
+	return (dns_ntatable_create(view, taskmgr, timermgr,
+				    &view->ntatable_priv));
+}
+
+isc_result_t
+dns_view_getntatable(dns_view_t *view, dns_ntatable_t **ntp) {
+	REQUIRE(DNS_VIEW_VALID(view));
+	REQUIRE(ntp != NULL && *ntp == NULL);
+	if (view->ntatable_priv == NULL)
+		return (ISC_R_NOTFOUND);
+	dns_ntatable_attach(view->ntatable_priv, ntp);
+	return (ISC_R_SUCCESS);
+}
+
+isc_result_t
 dns_view_initsecroots(dns_view_t *view, isc_mem_t *mctx) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	if (view->secroots_priv != NULL)
@@ -1792,15 +1912,46 @@ dns_view_getsecroots(dns_view_t *view, dns_keytable_t **ktp) {
 	return (ISC_R_SUCCESS);
 }
 
+bool
+dns_view_ntacovers(dns_view_t *view, isc_stdtime_t now,
+		   dns_name_t *name, dns_name_t *anchor)
+{
+	REQUIRE(DNS_VIEW_VALID(view));
+
+	if (view->ntatable_priv == NULL)
+		return (false);
+
+	return (dns_ntatable_covered(view->ntatable_priv, now, name, anchor));
+}
+
 isc_result_t
 dns_view_issecuredomain(dns_view_t *view, dns_name_t *name,
-			 isc_boolean_t *secure_domain) {
+			isc_stdtime_t now, bool checknta,
+			bool *secure_domain)
+{
+	isc_result_t result;
+	bool secure = false;
+	dns_fixedname_t fn;
+	dns_name_t *anchor;
+
 	REQUIRE(DNS_VIEW_VALID(view));
 
 	if (view->secroots_priv == NULL)
 		return (ISC_R_NOTFOUND);
-	return (dns_keytable_issecuredomain(view->secroots_priv, name,
-					    secure_domain));
+
+	anchor = dns_fixedname_initname(&fn);
+
+	result = dns_keytable_issecuredomain(view->secroots_priv, name,
+					     anchor, &secure);
+	if (result != ISC_R_SUCCESS)
+		return (result);
+
+	if (checknta && secure && view->ntatable_priv != NULL &&
+	    dns_ntatable_covered(view->ntatable_priv, now, name, anchor))
+		secure = false;
+
+	*secure_domain = secure;
+	return (ISC_R_SUCCESS);
 }
 
 void
@@ -1824,23 +1975,47 @@ dns_view_untrust(dns_view_t *view, dns_name_t *keyname,
 	isc_buffer_init(&buffer, data, sizeof(data));
 	dns_rdata_fromstruct(&rdata, dnskey->common.rdclass,
 			     dns_rdatatype_dnskey, dnskey, &buffer);
+
 	result = dns_dnssec_keyfromrdata(keyname, &rdata, mctx, &key);
 	if (result != ISC_R_SUCCESS)
 		return;
+
 	result = dns_view_getsecroots(view, &sr);
 	if (result == ISC_R_SUCCESS) {
-		dns_keytable_deletekeynode(sr, key);
+		result = dns_keytable_deletekeynode(sr, key);
+
+		/*
+		 * If key was found in secroots, then it was a
+		 * configured trust anchor, and we want to fail
+		 * secure. If there are no other configured keys,
+		 * then leave a null key so that we can't validate
+		 * anymore.
+		 */
+
+		if (result == ISC_R_SUCCESS)
+			dns_keytable_marksecure(sr, keyname);
+
 		dns_keytable_detach(&sr);
 	}
+
 	dst_key_free(&key);
 }
 
-#define NZF ".nzf"
-
-void
-dns_view_setnewzones(dns_view_t *view, isc_boolean_t allow, void *cfgctx,
-		     void (*cfg_destroy)(void **))
+isc_result_t
+dns_view_setnewzones(dns_view_t *view, bool allow, void *cfgctx,
+		     void (*cfg_destroy)(void **), uint64_t mapsize)
 {
+	isc_result_t result = ISC_R_SUCCESS;
+	char buffer[1024];
+#ifdef HAVE_LMDB
+	MDB_env *env = NULL;
+	int status;
+#endif
+
+#ifndef HAVE_LMDB
+	UNUSED(mapsize);
+#endif
+
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE((cfgctx != NULL && cfg_destroy != NULL) || !allow);
 
@@ -1849,20 +2024,101 @@ dns_view_setnewzones(dns_view_t *view, isc_boolean_t allow, void *cfgctx,
 		view->new_zone_file = NULL;
 	}
 
+#ifdef HAVE_LMDB
+	if (view->new_zone_dbenv != NULL) {
+		mdb_env_close((MDB_env *) view->new_zone_dbenv);
+		view->new_zone_dbenv = NULL;
+	}
+
+	if (view->new_zone_db != NULL) {
+		isc_mem_free(view->mctx, view->new_zone_db);
+		view->new_zone_db = NULL;
+	}
+#endif /* HAVE_LMDB */
+
 	if (view->new_zone_config != NULL) {
 		view->cfg_destroy(&view->new_zone_config);
 		view->cfg_destroy = NULL;
 	}
 
-	if (allow) {
-		char buffer[ISC_SHA256_DIGESTSTRINGLENGTH + sizeof(NZF)];
-		isc_sha256_data((void *)view->name, strlen(view->name), buffer);
-		/* Truncate the hash at 16 chars; full length is overkill */
-		isc_string_printf(buffer + 16, sizeof(NZF), "%s", NZF);
-		view->new_zone_file = isc_mem_strdup(view->mctx, buffer);
-		view->new_zone_config = cfgctx;
-		view->cfg_destroy = cfg_destroy;
+	if (!allow)
+		return (ISC_R_SUCCESS);
+
+	CHECK(isc_file_sanitize(NULL, view->name, "nzf",
+				buffer, sizeof(buffer)));
+
+	view->new_zone_file = isc_mem_strdup(view->mctx, buffer);
+	if (view->new_zone_file == NULL) {
+		CHECK(ISC_R_NOMEMORY);
 	}
+
+#ifdef HAVE_LMDB
+	CHECK(isc_file_sanitize(NULL, view->name, "nzd",
+				buffer, sizeof(buffer)));
+
+	view->new_zone_db = isc_mem_strdup(view->mctx, buffer);
+	if (view->new_zone_db == NULL) {
+		CHECK(ISC_R_NOMEMORY);
+	}
+
+	status = mdb_env_create(&env);
+	if (status != MDB_SUCCESS) {
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
+			      ISC_LOGMODULE_OTHER, ISC_LOG_ERROR,
+			      "mdb_env_create failed: %s",
+			      mdb_strerror(status));
+		CHECK(ISC_R_FAILURE);
+	}
+
+	if (mapsize != 0ULL) {
+		status = mdb_env_set_mapsize(env, mapsize);
+		if (status != MDB_SUCCESS) {
+			isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
+				      ISC_LOGMODULE_OTHER, ISC_LOG_ERROR,
+				      "mdb_env_set_mapsize failed: %s",
+				      mdb_strerror(status));
+			CHECK(ISC_R_FAILURE);
+		}
+		view->new_zone_mapsize = mapsize;
+	}
+
+	status = mdb_env_open(env, view->new_zone_db, DNS_LMDB_FLAGS, 0600);
+	if (status != MDB_SUCCESS) {
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
+			      ISC_LOGMODULE_OTHER, ISC_LOG_ERROR,
+			      "mdb_env_open of '%s' failed: %s",
+			      view->new_zone_db, mdb_strerror(status));
+		CHECK(ISC_R_FAILURE);
+	}
+
+	view->new_zone_dbenv = env;
+	env = NULL;
+#endif /* HAVE_LMDB */
+
+	view->new_zone_config = cfgctx;
+	view->cfg_destroy = cfg_destroy;
+
+ cleanup:
+	if (result != ISC_R_SUCCESS) {
+		if (view->new_zone_file != NULL) {
+			isc_mem_free(view->mctx, view->new_zone_file);
+			view->new_zone_file = NULL;
+		}
+
+#ifdef HAVE_LMDB
+		if (view->new_zone_db != NULL) {
+			isc_mem_free(view->mctx, view->new_zone_db);
+			view->new_zone_db = NULL;
+		}
+		if (env != NULL) {
+			mdb_env_close(env);
+		}
+#endif /* HAVE_LMDB */
+		view->new_zone_config = NULL;
+		view->cfg_destroy = NULL;
+	}
+
+	return (result);
 }
 
 isc_result_t
@@ -1888,8 +2144,7 @@ dns_view_searchdlz(dns_view_t *view, dns_name_t *name, unsigned int minlabels,
 	REQUIRE(dbp != NULL && *dbp == NULL);
 
 	/* setup a "fixed" dns name */
-	dns_fixedname_init(&fname);
-	zonename = dns_fixedname_name(&fname);
+	zonename = dns_fixedname_initname(&fname);
 
 	/* count the number of labels in the name */
 	namelabels = dns_name_countlabels(name);
@@ -1951,4 +2206,206 @@ dns_view_searchdlz(dns_view_t *view, dns_name_t *name, unsigned int minlabels,
 	}
 
 	return (ISC_R_NOTFOUND);
+}
+
+uint32_t
+dns_view_getfailttl(dns_view_t *view) {
+	REQUIRE(DNS_VIEW_VALID(view));
+	return (view->fail_ttl);
+}
+
+void
+dns_view_setfailttl(dns_view_t *view, uint32_t fail_ttl) {
+	REQUIRE(DNS_VIEW_VALID(view));
+	view->fail_ttl = fail_ttl;
+}
+
+isc_result_t
+dns_view_saventa(dns_view_t *view) {
+	isc_result_t result;
+	bool removefile = false;
+	dns_ntatable_t *ntatable = NULL;
+	FILE *fp = NULL;
+
+	REQUIRE(DNS_VIEW_VALID(view));
+
+	if (view->nta_lifetime == 0)
+		return (ISC_R_SUCCESS);
+
+	/* Open NTA save file for overwrite. */
+	CHECK(isc_stdio_open(view->nta_file, "w", &fp));
+
+	result = dns_view_getntatable(view, &ntatable);
+	if (result == ISC_R_NOTFOUND) {
+		removefile = true;
+		result = ISC_R_SUCCESS;
+		goto cleanup;
+	} else
+		CHECK(result);
+
+	result = dns_ntatable_save(ntatable, fp);
+	if (result == ISC_R_NOTFOUND) {
+		removefile = true;
+		result = ISC_R_SUCCESS;
+	} else if (result == ISC_R_SUCCESS) {
+		result = isc_stdio_close(fp);
+		fp = NULL;
+	}
+
+ cleanup:
+	if (ntatable != NULL)
+		dns_ntatable_detach(&ntatable);
+
+	if (fp != NULL)
+		(void)isc_stdio_close(fp);
+
+	/* Don't leave half-baked NTA save files lying around. */
+	if (result != ISC_R_SUCCESS || removefile)
+		(void) isc_file_remove(view->nta_file);
+
+	return (result);
+}
+
+#define TSTR(t) ((t).value.as_textregion.base)
+#define TLEN(t) ((t).value.as_textregion.length)
+
+isc_result_t
+dns_view_loadnta(dns_view_t *view) {
+	isc_result_t result;
+	dns_ntatable_t *ntatable = NULL;
+	isc_lex_t *lex = NULL;
+	isc_token_t token;
+	isc_stdtime_t now;
+
+	REQUIRE(DNS_VIEW_VALID(view));
+
+	if (view->nta_lifetime == 0)
+		return (ISC_R_SUCCESS);
+
+	CHECK(isc_lex_create(view->mctx, 1025, &lex));
+	CHECK(isc_lex_openfile(lex, view->nta_file));
+	CHECK(dns_view_getntatable(view, &ntatable));
+	isc_stdtime_get(&now);
+
+	for (;;) {
+		int options = (ISC_LEXOPT_EOL | ISC_LEXOPT_EOF);
+		char *name, *type, *timestamp;
+		size_t len;
+		dns_fixedname_t fn;
+		dns_name_t *ntaname;
+		isc_buffer_t b;
+		isc_stdtime_t t;
+		bool forced;
+
+		CHECK(isc_lex_gettoken(lex, options, &token));
+		if (token.type == isc_tokentype_eof)
+			break;
+		else if (token.type != isc_tokentype_string)
+			CHECK(ISC_R_UNEXPECTEDTOKEN);
+		name = TSTR(token);
+		len = TLEN(token);
+
+		if (strcmp(name, ".") == 0)
+			ntaname = dns_rootname;
+		else {
+			ntaname = dns_fixedname_initname(&fn);
+
+			isc_buffer_init(&b, name, (unsigned int)len);
+			isc_buffer_add(&b, (unsigned int)len);
+			CHECK(dns_name_fromtext(ntaname, &b, dns_rootname,
+						0, NULL));
+		}
+
+		CHECK(isc_lex_gettoken(lex, options, &token));
+		if (token.type != isc_tokentype_string)
+			CHECK(ISC_R_UNEXPECTEDTOKEN);
+		type = TSTR(token);
+
+		if (strcmp(type, "regular") == 0)
+			forced = false;
+		else if (strcmp(type, "forced") == 0)
+			forced = true;
+		else
+			CHECK(ISC_R_UNEXPECTEDTOKEN);
+
+		CHECK(isc_lex_gettoken(lex, options, &token));
+		if (token.type != isc_tokentype_string)
+			CHECK(ISC_R_UNEXPECTEDTOKEN);
+		timestamp = TSTR(token);
+		CHECK(dns_time32_fromtext(timestamp, &t));
+
+		CHECK(isc_lex_gettoken(lex, options, &token));
+		if (token.type != isc_tokentype_eol &&
+		    token.type != isc_tokentype_eof)
+			CHECK(ISC_R_UNEXPECTEDTOKEN);
+
+		if (now <= t) {
+			if (t > (now + 604800))
+				t = now + 604800;
+
+			(void) dns_ntatable_add(ntatable, ntaname,
+						forced, 0, t);
+		} else {
+			char nb[DNS_NAME_FORMATSIZE];
+			dns_name_format(ntaname, nb, sizeof(nb));
+			isc_log_write(dns_lctx, DNS_LOGCATEGORY_DNSSEC,
+				      DNS_LOGMODULE_NTA, ISC_LOG_INFO,
+				      "ignoring expired NTA at %s", nb);
+		}
+	};
+
+ cleanup:
+	if (ntatable != NULL)
+		dns_ntatable_detach(&ntatable);
+
+	if (lex != NULL) {
+		isc_lex_close(lex);
+		isc_lex_destroy(&lex);
+	}
+
+	return (result);
+}
+
+void
+dns_view_setviewcommit(dns_view_t *view) {
+	REQUIRE(DNS_VIEW_VALID(view));
+
+	LOCK(&view->lock);
+
+	if (view->redirect != NULL) {
+		dns_zone_setviewcommit(view->redirect);
+	}
+	if (view->managed_keys != NULL) {
+		dns_zone_setviewcommit(view->managed_keys);
+	}
+	if (view->zonetable != NULL) {
+		dns_zt_setviewcommit(view->zonetable);
+	}
+
+	UNLOCK(&view->lock);
+}
+
+void
+dns_view_setviewrevert(dns_view_t *view) {
+	dns_zt_t *zonetable;
+
+	REQUIRE(DNS_VIEW_VALID(view));
+
+	/*
+	 * dns_zt_setviewrevert() attempts to lock this view, so we must
+	 * release the lock.
+	 */
+	LOCK(&view->lock);
+	if (view->redirect != NULL) {
+		dns_zone_setviewrevert(view->redirect);
+	}
+	if (view->managed_keys != NULL) {
+		dns_zone_setviewrevert(view->managed_keys);
+	}
+	zonetable = view->zonetable;
+	UNLOCK(&view->lock);
+
+	if (zonetable != NULL) {
+		dns_zt_setviewrevert(zonetable);
+	}
 }

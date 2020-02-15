@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2007, 2009, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: ntpaths.c,v 1.15 2009/07/14 22:54:57 each Exp $ */
 
 /*
  * This module fetches the required path information that is specific
@@ -26,8 +19,10 @@
  */
 
 #include <config.h>
+
 #include <isc/bind_registry.h>
 #include <isc/ntpaths.h>
+#include <isc/string.h>
 
 /*
  * Module Variables
@@ -41,6 +36,7 @@ static char lwresd_resolvconfFile[MAX_PATH];
 static char rndc_confFile[MAX_PATH];
 static char ns_defaultpidfile[MAX_PATH];
 static char lwresd_defaultpidfile[MAX_PATH];
+static char ns_lockfile[MAX_PATH];
 static char local_state_dir[MAX_PATH];
 static char sys_conf_dir[MAX_PATH];
 static char rndc_keyFile[MAX_PATH];
@@ -54,7 +50,7 @@ isc_ntpaths_init(void) {
 	HKEY hKey;
 	BOOL keyFound = TRUE;
 
-	memset(namedBase, 0, MAX_PATH);
+	memset(namedBase, 0, sizeof(namedBase));
 	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, BIND_SUBKEY, 0, KEY_READ, &hKey)
 		!= ERROR_SUCCESS)
 		keyFound = FALSE;
@@ -69,38 +65,49 @@ isc_ntpaths_init(void) {
 
 	GetSystemDirectory(systemDir, MAX_PATH);
 
-	if (keyFound == FALSE)
+	if (keyFound == FALSE) {
 		/* Use the System Directory as a default */
-		strcpy(namedBase, systemDir);
+		strlcpy(namedBase, systemDir, sizeof(namedBase));
+	}
 
-	strcpy(ns_confFile, namedBase);
-	strcat(ns_confFile, "\\etc\\named.conf");
+	strlcpy(lwresd_confFile, namedBase, sizeof(lwresd_confFile)) ;
+	strlcat(lwresd_confFile, "\\etc\\lwresd.conf",
+		sizeof(lwresd_confFile));
 
-	strcpy(lwresd_confFile, namedBase);
-	strcat(lwresd_confFile, "\\etc\\lwresd.conf");
+	strlcpy(lwresd_defaultpidfile, namedBase,
+		sizeof(lwresd_defaultpidfile));
+	strlcat(lwresd_defaultpidfile, "\\etc\\lwresd.pid",
+		sizeof(lwresd_defaultpidfile));
 
-	strcpy(lwresd_resolvconfFile, systemDir);
-	strcat(lwresd_resolvconfFile, "\\Drivers\\etc\\resolv.conf");
+	strlcpy(lwresd_resolvconfFile, systemDir,
+		sizeof(lwresd_resolvconfFile));
+	strlcat(lwresd_resolvconfFile, "\\Drivers\\etc\\resolv.conf",
+		sizeof(lwresd_resolvconfFile));
 
-	strcpy(rndc_keyFile, namedBase);
-	strcat(rndc_keyFile, "\\etc\\rndc.key");
+	strlcpy(ns_confFile, namedBase, sizeof(ns_confFile));
+	strlcat(ns_confFile, "\\etc\\named.conf", sizeof(ns_confFile));
 
-	strcpy(session_keyFile, namedBase);
-	strcat(session_keyFile, "\\etc\\session.key");
+	strlcpy(rndc_keyFile, namedBase, sizeof(rndc_keyFile));
+	strlcat(rndc_keyFile, "\\etc\\rndc.key", sizeof(rndc_keyFile));
 
-	strcpy(rndc_confFile, namedBase);
-	strcat(rndc_confFile, "\\etc\\rndc.conf");
-	strcpy(ns_defaultpidfile, namedBase);
-	strcat(ns_defaultpidfile, "\\etc\\named.pid");
+	strlcpy(session_keyFile, namedBase, sizeof(session_keyFile));
+	strlcat(session_keyFile, "\\etc\\session.key", sizeof(session_keyFile));
 
-	strcpy(lwresd_defaultpidfile, namedBase);
-	strcat(lwresd_defaultpidfile, "\\etc\\lwresd.pid");
+	strlcpy(rndc_confFile, namedBase, sizeof(rndc_confFile));
+	strlcat(rndc_confFile, "\\etc\\rndc.conf", sizeof(rndc_confFile));
 
-	strcpy(local_state_dir, namedBase);
-	strcat(local_state_dir, "\\bin");
+	strlcpy(ns_defaultpidfile, namedBase, sizeof(ns_defaultpidfile));
+	strlcat(ns_defaultpidfile, "\\etc\\named.pid",
+		sizeof(ns_defaultpidfile));
 
-	strcpy(sys_conf_dir, namedBase);
-	strcat(sys_conf_dir, "\\etc");
+	strlcpy(ns_lockfile, namedBase, sizeof(ns_lockfile));
+	strlcat(ns_lockfile, "\\etc\\named.lock", sizeof(ns_lockfile));
+
+	strlcpy(local_state_dir, namedBase, sizeof(local_state_dir));
+	strlcat(local_state_dir, "\\bin", sizeof(local_state_dir));
+
+	strlcpy(sys_conf_dir, namedBase, sizeof(sys_conf_dir));
+	strlcat(sys_conf_dir, "\\etc", sizeof(sys_conf_dir));
 
 	Initialized = TRUE;
 }
@@ -128,6 +135,9 @@ isc_ntpaths_get(int ind) {
 		break;
 	case LWRESD_PID_PATH:
 		return (lwresd_defaultpidfile);
+		break;
+	case NAMED_LOCK_PATH:
+		return (ns_lockfile);
 		break;
 	case LOCAL_STATE_DIR:
 		return (local_state_dir);

@@ -1,18 +1,12 @@
 /*
- * Portions Copyright (C) 2004, 2005, 2007, 2012-2014  Internet Systems Consortium, Inc. ("ISC")
- * Portions Copyright (C) 1996-2001, 2003  Internet Software Consortium.
+ * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -74,10 +68,9 @@ static char rcsid[] = "$Id: lwinetaton.c,v 1.16 2007/06/19 23:47:22 tbox Exp $";
 #include <config.h>
 
 #include <ctype.h>
-
+#include <inttypes.h>
 #include <stddef.h>
 
-#include <lwres/int.h>
 #include <lwres/net.h>
 
 #include "assert_p.h"
@@ -91,12 +84,12 @@ static char rcsid[] = "$Id: lwinetaton.c,v 1.16 2007/06/19 23:47:22 tbox Exp $";
  */
 int
 lwres_net_aton(const char *cp, struct in_addr *addr) {
-	lwres_uint32_t val;
+	uint32_t val;
 	int base;
 	ptrdiff_t n;
 	unsigned char c;
-	lwres_uint8_t parts[4];
-	lwres_uint8_t *pp = parts;
+	uint8_t parts[4];
+	uint8_t *pp = parts;
 	int digit;
 
 	REQUIRE(cp != NULL);
@@ -153,7 +146,7 @@ lwres_net_aton(const char *cp, struct in_addr *addr) {
 			 */
 			if (pp >= parts + 3 || val > 0xffU)
 				return (0);
-			*pp++ = (lwres_uint8_t)val;
+			*pp++ = (uint8_t)val;
 			c = *++cp;
 		} else
 			break;

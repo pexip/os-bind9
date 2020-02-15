@@ -1,23 +1,19 @@
 /*
- * Copyright (C) 2010, 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: dns64.h,v 1.3 2010/12/08 23:51:56 tbox Exp $ */
 
 #ifndef DNS_DNS64_H
 #define DNS_DNS64_H 1
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 
@@ -147,22 +143,22 @@ dns_dns64_unlink(dns_dns64list_t *list, dns_dns64_t *dns64);
  * Unlink the dns64 record from the list.
  */
 
-isc_boolean_t
+bool
 dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
 		 const dns_name_t *reqsigner, const dns_aclenv_t *env,
 		 unsigned int flags, dns_rdataset_t *rdataset,
-		 isc_boolean_t *aaaaok, size_t aaaaoklen);
+		 bool *aaaaok, size_t aaaaoklen);
 /*
  * Determine if there are any non-excluded AAAA records in from the
  * matching dns64 records in the list starting at 'dns64'.  If there
- * is a non-exluded address return ISC_TRUE.  If all addresses are
- * excluded in the matched records return ISC_FALSE.   If no records
- * match then return ISC_TRUE.
+ * is a non-exluded address return true.  If all addresses are
+ * excluded in the matched records return false.   If no records
+ * match then return true.
  *
  * If aaaaok is defined then dns_dns64_aaaaok() return a array of which
  * addresses in 'rdataset' were deemed to not be exclude by any matching
  * record.  If there are no matching records then all entries are set
- * to ISC_TRUE.
+ * to true.
  *
  * Requires
  * 	'rdataset'	to be valid and to be for type AAAA and class IN.

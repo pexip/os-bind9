@@ -1,20 +1,14 @@
 /*
- * Portions Copyright (C) 2004-2015  Internet Systems Consortium, Inc. ("ISC")
- * Portions Copyright (C) 1999-2003  Internet Software Consortium.
+ * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC AND NETWORK ASSOCIATES DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE
- * FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
- * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  *
- * Portions Copyright (C) 1995-2000 by Network Associates, Inc.
+ * Portions Copyright (C) Network Associates, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +28,8 @@
 #include <config.h>
 
 #include <ctype.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -45,6 +41,8 @@
 #include <isc/region.h>
 #include <isc/string.h>
 #include <isc/util.h>
+
+#include <pk11/site.h>
 
 #include <dns/dnssec.h>
 #include <dns/fixedname.h>
@@ -89,7 +87,8 @@ usage(void) {
 				" | NSEC3DSA |\n");
 	fprintf(stderr, "        RSASHA256 | RSASHA512 | ECCGOST |\n");
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
-	fprintf(stderr, "        DH | HMAC-MD5 | HMAC-SHA1 | HMAC-SHA224 | "
+	fprintf(stderr, "        ED25519 | ED448 | DH |\n");
+	fprintf(stderr, "        HMAC-MD5 | HMAC-SHA1 | HMAC-SHA224 | "
 				"HMAC-SHA256 | \n");
 	fprintf(stderr, "        HMAC-SHA384 | HMAC-SHA512\n");
 	fprintf(stderr, "       (default: RSASHA1, or "
@@ -108,6 +107,8 @@ usage(void) {
 	fprintf(stderr, "        ECCGOST:\tignored\n");
 	fprintf(stderr, "        ECDSAP256SHA256:\tignored\n");
 	fprintf(stderr, "        ECDSAP384SHA384:\tignored\n");
+	fprintf(stderr, "        ED25519:\tignored\n");
+	fprintf(stderr, "        ED448:\tignored\n");
 	fprintf(stderr, "        HMAC-MD5:\t[1..512]\n");
 	fprintf(stderr, "        HMAC-SHA1:\t[1..160]\n");
 	fprintf(stderr, "        HMAC-SHA224:\t[1..224]\n");
@@ -153,13 +154,18 @@ usage(void) {
 	fprintf(stderr, "Timing options:\n");
 	fprintf(stderr, "    -P date/[+-]offset/none: set key publication date "
 						"(default: now)\n");
+	fprintf(stderr, "    -P sync date/[+-]offset/none: set CDS and CDNSKEY "
+						"publication date\n");
 	fprintf(stderr, "    -A date/[+-]offset/none: set key activation date "
 						"(default: now)\n");
 	fprintf(stderr, "    -R date/[+-]offset/none: set key "
-						     "revocation date\n");
+						"revocation date\n");
 	fprintf(stderr, "    -I date/[+-]offset/none: set key "
-						     "inactivation date\n");
+						"inactivation date\n");
 	fprintf(stderr, "    -D date/[+-]offset/none: set key deletion date\n");
+	fprintf(stderr, "    -D sync date/[+-]offset/none: set CDS and CDNSKEY "
+						"deletion date\n");
+
 	fprintf(stderr, "    -G: generate key only; do not set -P or -A\n");
 	fprintf(stderr, "    -C: generate a backward-compatible key, omitting "
 			"all dates\n");
@@ -175,9 +181,9 @@ usage(void) {
 	exit (-1);
 }
 
-static isc_boolean_t
+static bool
 dsa_size_ok(int size) {
-	return (ISC_TF(size >= 512 && size <= 1024 && size % 64 == 0));
+	return (size >= 512 && size <= 1024 && size % 64 == 0);
 }
 
 static void
@@ -214,10 +220,10 @@ main(int argc, char **argv) {
 	dst_key_t	*key = NULL;
 	dns_fixedname_t	fname;
 	dns_name_t	*name;
-	isc_uint16_t	flags = 0, kskflag = 0, revflag = 0;
+	uint16_t	flags = 0, kskflag = 0, revflag = 0;
 	dns_secalg_t	alg;
-	isc_boolean_t	conflict = ISC_FALSE, null_key = ISC_FALSE;
-	isc_boolean_t	oldstyle = ISC_FALSE;
+	bool	conflict = false, null_key = false;
+	bool	oldstyle = false;
 	isc_mem_t	*mctx = NULL;
 	int		ch, generator = 0, param = 0;
 	int		protocol = -1, size = -1, signatory = 0;
@@ -239,21 +245,24 @@ main(int argc, char **argv) {
 	int		options = DST_TYPE_PRIVATE | DST_TYPE_PUBLIC;
 	int		dbits = 0;
 	dns_ttl_t	ttl = 0;
-	isc_boolean_t	use_default = ISC_FALSE, use_nsec3 = ISC_FALSE;
+	bool	use_default = false, use_nsec3 = false;
 	isc_stdtime_t	publish = 0, activate = 0, revokekey = 0;
-	isc_stdtime_t	inactive = 0, delete = 0;
+	isc_stdtime_t	inactive = 0, deltime = 0;
 	isc_stdtime_t	now;
 	int		prepub = -1;
-	isc_boolean_t	setpub = ISC_FALSE, setact = ISC_FALSE;
-	isc_boolean_t	setrev = ISC_FALSE, setinact = ISC_FALSE;
-	isc_boolean_t	setdel = ISC_FALSE, setttl = ISC_FALSE;
-	isc_boolean_t	unsetpub = ISC_FALSE, unsetact = ISC_FALSE;
-	isc_boolean_t	unsetrev = ISC_FALSE, unsetinact = ISC_FALSE;
-	isc_boolean_t	unsetdel = ISC_FALSE;
-	isc_boolean_t	genonly = ISC_FALSE;
-	isc_boolean_t	quiet = ISC_FALSE;
-	isc_boolean_t	show_progress = ISC_FALSE;
+	bool	setpub = false, setact = false;
+	bool	setrev = false, setinact = false;
+	bool	setdel = false, setttl = false;
+	bool	unsetpub = false, unsetact = false;
+	bool	unsetrev = false, unsetinact = false;
+	bool	unsetdel = false;
+	bool	genonly = false;
+	bool	quiet = false;
+	bool	show_progress = false;
 	unsigned char	c;
+	isc_stdtime_t	syncadd = 0, syncdel = 0;
+	bool	setsyncadd = false;
+	bool	setsyncdel = false;
 
 	if (argc == 1)
 		usage();
@@ -263,7 +272,7 @@ main(int argc, char **argv) {
 #endif
 	dns_result_register();
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 	/*
 	 * Process memory debugging argument first.
@@ -288,7 +297,7 @@ main(int argc, char **argv) {
 			break;
 		}
 	}
-	isc_commandline_reset = ISC_TRUE;
+	isc_commandline_reset = true;
 
 	RUNTIME_CHECK(isc_mem_create(0, 0, &mctx) == ISC_R_SUCCESS);
 
@@ -297,7 +306,7 @@ main(int argc, char **argv) {
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 	    switch (ch) {
 		case '3':
-			use_nsec3 = ISC_TRUE;
+			use_nsec3 = true;
 			break;
 		case 'a':
 			algname = isc_commandline_argument;
@@ -308,7 +317,7 @@ main(int argc, char **argv) {
 				fatal("-b requires a non-negative number");
 			break;
 		case 'C':
-			oldstyle = ISC_TRUE;
+			oldstyle = true;
 			break;
 		case 'c':
 			classname = isc_commandline_argument;
@@ -324,7 +333,7 @@ main(int argc, char **argv) {
 		case 'e':
 			fprintf(stderr,
 				"phased-out option -e "
-				"(was 'use (RSA) large exponent)\n");
+				"(was 'use (RSA) large exponent')\n");
 			break;
 		case 'f':
 			c = (unsigned char)(isc_commandline_argument[0]);
@@ -356,7 +365,7 @@ main(int argc, char **argv) {
 			break;
 		case 'L':
 			ttl = strtottl(isc_commandline_argument);
-			setttl = ISC_TRUE;
+			setttl = true;
 			break;
 		case 'n':
 			nametype = isc_commandline_argument;
@@ -370,7 +379,7 @@ main(int argc, char **argv) {
 				      "[0..255]");
 			break;
 		case 'q':
-			quiet = ISC_TRUE;
+			quiet = true;
 			break;
 		case 'r':
 			setup_entropy(mctx, isc_commandline_argument, &ectx);
@@ -406,9 +415,20 @@ main(int argc, char **argv) {
 			/* already the default */
 			break;
 		case 'G':
-			genonly = ISC_TRUE;
+			genonly = true;
 			break;
 		case 'P':
+			/* -Psync ? */
+			if (isoptarg("sync", argv, usage)) {
+				if (setsyncadd)
+					fatal("-P sync specified more than "
+					      "once");
+
+				syncadd = strtotime(isc_commandline_argument,
+						   now, now, &setsyncadd);
+				break;
+			}
+			(void)isoptarg("dnskey", argv, usage);
 			if (setpub || unsetpub)
 				fatal("-P specified more than once");
 
@@ -441,11 +461,22 @@ main(int argc, char **argv) {
 			unsetinact = !setinact;
 			break;
 		case 'D':
+			/* -Dsync ? */
+			if (isoptarg("sync", argv, usage)) {
+				if (setsyncdel)
+					fatal("-D sync specified more than "
+					      "once");
+
+				syncdel = strtotime(isc_commandline_argument,
+						   now, now, &setsyncdel);
+				break;
+			}
+			(void)isoptarg("dnskey", argv, usage);
 			if (setdel || unsetdel)
 				fatal("-D specified more than once");
 
-			delete = strtotime(isc_commandline_argument,
-					   now, now, &setdel);
+			deltime = strtotime(isc_commandline_argument,
+					    now, now, &setdel);
 			unsetdel = !setdel;
 			break;
 		case 'S':
@@ -478,7 +509,7 @@ main(int argc, char **argv) {
 	}
 
 	if (!isatty(0))
-		quiet = ISC_TRUE;
+		quiet = true;
 
 	if (ectx == NULL)
 		setup_entropy(mctx, NULL, &ectx);
@@ -499,8 +530,7 @@ main(int argc, char **argv) {
 		if (argc > isc_commandline_index + 1)
 			fatal("extraneous arguments");
 
-		dns_fixedname_init(&fname);
-		name = dns_fixedname_name(&fname);
+		name = dns_fixedname_initname(&fname);
 		isc_buffer_init(&buf, argv[isc_commandline_index],
 				strlen(argv[isc_commandline_index]));
 		isc_buffer_add(&buf, strlen(argv[isc_commandline_index]));
@@ -511,7 +541,7 @@ main(int argc, char **argv) {
 			      isc_result_totext(ret));
 
 		if (algname == NULL) {
-			use_default = ISC_TRUE;
+			use_default = true;
 			if (use_nsec3)
 				algname = strdup(DEFAULT_NSEC3_ALGORITHM);
 			else
@@ -525,15 +555,30 @@ main(int argc, char **argv) {
 		}
 
 		if (strcasecmp(algname, "RSA") == 0) {
+#ifndef PK11_MD5_DISABLE
 			fprintf(stderr, "The use of RSA (RSAMD5) is not "
 					"recommended.\nIf you still wish to "
 					"use RSA (RSAMD5) please specify "
 					"\"-a RSAMD5\"\n");
 			INSIST(freeit == NULL);
 			return (1);
-		} else if (strcasecmp(algname, "HMAC-MD5") == 0)
+		} else if (strcasecmp(algname, "HMAC-MD5") == 0) {
 			alg = DST_ALG_HMACMD5;
-		else if (strcasecmp(algname, "HMAC-SHA1") == 0)
+#else
+			fprintf(stderr,
+				"The use of RSA (RSAMD5) was disabled\n");
+			INSIST(freeit == NULL);
+			return (1);
+		} else if (strcasecmp(algname, "RSAMD5") == 0) {
+			fprintf(stderr, "The use of RSAMD5 was disabled\n");
+			INSIST(freeit == NULL);
+			return (1);
+		} else if (strcasecmp(algname, "HMAC-MD5") == 0) {
+			fprintf(stderr,
+				"The use of HMAC-MD5 was disabled\n");
+			return (1);
+#endif
+		} else if (strcasecmp(algname, "HMAC-SHA1") == 0)
 			alg = DST_ALG_HMACSHA1;
 		else if (strcasecmp(algname, "HMAC-SHA224") == 0)
 			alg = DST_ALG_HMACSHA224;
@@ -553,6 +598,10 @@ main(int argc, char **argv) {
 				options |= DST_TYPE_KEY;
 		}
 
+#ifdef PK11_MD5_DISABLE
+		INSIST((alg != DNS_KEYALG_RSAMD5) && (alg != DST_ALG_HMACMD5));
+#endif
+
 		if (!dst_algorithm_supported(alg))
 			fatal("unsupported algorithm: %d", alg);
 
@@ -560,7 +609,8 @@ main(int argc, char **argv) {
 		    alg != DST_ALG_NSEC3DSA && alg != DST_ALG_NSEC3RSASHA1 &&
 		    alg != DST_ALG_RSASHA256 && alg!= DST_ALG_RSASHA512 &&
 		    alg != DST_ALG_ECCGOST &&
-		    alg != DST_ALG_ECDSA256 && alg != DST_ALG_ECDSA384) {
+		    alg != DST_ALG_ECDSA256 && alg != DST_ALG_ECDSA384 &&
+		    alg != DST_ALG_ED25519 && alg != DST_ALG_ED448) {
 			fatal("%s is incompatible with NSEC3; "
 			      "do not use the -3 option", algname);
 		}
@@ -594,7 +644,9 @@ main(int argc, char **argv) {
 							" to %d\n", size);
 			} else if (alg != DST_ALG_ECCGOST &&
 				   alg != DST_ALG_ECDSA256 &&
-				   alg != DST_ALG_ECDSA384)
+				   alg != DST_ALG_ECDSA384 &&
+				   alg != DST_ALG_ED25519 &&
+				   alg != DST_ALG_ED448)
 				fatal("key size not specified (-b option)");
 		}
 
@@ -605,14 +657,14 @@ main(int argc, char **argv) {
 				      "prepublication interval.");
 
 			if (!setpub && !setact) {
-				setpub = setact = ISC_TRUE;
+				setpub = setact = true;
 				publish = now;
 				activate = now + prepub;
 			} else if (setpub && !setact) {
-				setact = ISC_TRUE;
+				setact = true;
 				activate = publish + prepub;
 			} else if (setact && !setpub) {
-				setpub = ISC_TRUE;
+				setpub = true;
 				publish = activate - prepub;
 			}
 
@@ -698,7 +750,7 @@ main(int argc, char **argv) {
 					"You can use dnssec-settime -D to "
 					"change this.\n", program, keystr);
 
-		setpub = setact = ISC_TRUE;
+		setpub = setact = true;
 	}
 
 	switch (alg) {
@@ -730,6 +782,12 @@ main(int argc, char **argv) {
 		break;
 	case DST_ALG_ECDSA384:
 		size = 384;
+		break;
+	case DST_ALG_ED25519:
+		size = 256;
+		break;
+	case DST_ALG_ED448:
+		size = 456;
 		break;
 	case DST_ALG_HMACMD5:
 		options |= DST_TYPE_KEY;
@@ -852,7 +910,7 @@ main(int argc, char **argv) {
 	case DNS_KEYALG_NSEC3RSASHA1:
 	case DNS_KEYALG_RSASHA256:
 	case DNS_KEYALG_RSASHA512:
-		show_progress = ISC_TRUE;
+		show_progress = true;
 		break;
 
 	case DNS_KEYALG_DH:
@@ -864,7 +922,9 @@ main(int argc, char **argv) {
 	case DST_ALG_ECCGOST:
 	case DST_ALG_ECDSA256:
 	case DST_ALG_ECDSA384:
-		show_progress = ISC_TRUE;
+	case DST_ALG_ED25519:
+	case DST_ALG_ED448:
+		show_progress = true;
 		/* fall through */
 
 	case DST_ALG_HMACMD5:
@@ -878,12 +938,12 @@ main(int argc, char **argv) {
 	}
 
 	if ((flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY)
-		null_key = ISC_TRUE;
+		null_key = true;
 
 	isc_buffer_init(&buf, filename, sizeof(filename) - 1);
 
 	do {
-		conflict = ISC_FALSE;
+		conflict = false;
 
 		if (!quiet && show_progress) {
 			fprintf(stderr, "Generating key pair.");
@@ -965,18 +1025,28 @@ main(int argc, char **argv) {
 						inactive);
 
 			if (setdel) {
-				if (setinact && delete < inactive)
+				if (setinact && deltime < inactive)
 					fprintf(stderr, "%s: warning: Key is "
 						"scheduled to be deleted "
 						"before it is scheduled to be "
 						"made inactive.\n",
 						program);
-				dst_key_settime(key, DST_TIME_DELETE, delete);
+				dst_key_settime(key, DST_TIME_DELETE, deltime);
 			}
+
+			if (setsyncadd)
+				dst_key_settime(key, DST_TIME_SYNCPUBLISH,
+						syncadd);
+
+			if (setsyncdel)
+				dst_key_settime(key, DST_TIME_SYNCDELETE,
+						syncdel);
+
 		} else {
 			if (setpub || setact || setrev || setinact ||
 			    setdel || unsetpub || unsetact ||
-			    unsetrev || unsetinact || unsetdel || genonly)
+			    unsetrev || unsetinact || unsetdel || genonly ||
+			    setsyncadd || setsyncdel)
 				fatal("cannot use -C together with "
 				      "-P, -A, -R, -I, -D, or -G options");
 			/*
@@ -996,7 +1066,7 @@ main(int argc, char **argv) {
 		 * or another key being revoked.
 		 */
 		if (key_collision(key, name, directory, mctx, NULL)) {
-			conflict = ISC_TRUE;
+			conflict = true;
 			if (null_key) {
 				dst_key_free(&key);
 				break;
@@ -1017,7 +1087,7 @@ main(int argc, char **argv) {
 
 			dst_key_free(&key);
 		}
-	} while (conflict == ISC_TRUE);
+	} while (conflict == true);
 
 	if (conflict)
 		fatal("cannot generate a null key due to possible key ID "

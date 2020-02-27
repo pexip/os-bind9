@@ -1,22 +1,14 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 /*
- * Copyright (C) 2004, 2005, 2007, 2008, 2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: acconfig.h,v 1.53 2008/12/01 23:47:44 tbox Exp $ */
 
 /*! \file */
 
@@ -69,12 +61,6 @@
 
 /** define if gai_strerror() exists */
 #undef HAVE_GAISTRERROR
-
-/** define if arc4random() exists */
-#undef HAVE_ARC4RANDOM
-
-/** define if arc4random_addrandom() exists */
-#undef HAVE_ARC4RANDOM_ADDRANDOM
 
 /**
  * define if pthread_setconcurrency() should be called to tell the
@@ -147,11 +133,14 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define if threads need PTHREAD_SCOPE_SYSTEM */
 #undef NEED_PTHREAD_SCOPE_SYSTEM
 
+/* Define to 1 if you have the uname library function. */
+#undef HAVE_UNAME
+
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
-/* Use AES for Source Identity Token generation */
-#undef AES_SIT
+/* Use AES for Client Cookie generation */
+#undef AES_CC
 
 /* Define to enable the "filter-aaaa-on-v4" and "filter-aaaa-on-v6" options.
    */
@@ -170,9 +159,8 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to enable "rrset-order fixed" syntax. */
 #undef DNS_RDATASET_FIXED
 
-/* Define to enable the "fetches-per-server" and "fetches-per-zone" options.
-   */
-#undef ENABLE_FETCHLIMIT
+/* Define to enable American Fuzzy Lop test harness */
+#undef ENABLE_AFL
 
 /* Define to enable rpz-nsdname rules. */
 #undef ENABLE_RPZ_NSDNAME
@@ -192,6 +180,21 @@ int sigwait(const unsigned int *set, int *sig);
    MSVC and with C++ compilers. */
 #undef FLEXIBLE_ARRAY_MEMBER
 
+/* Define to 1 if you have the `arc4random' function. */
+#undef HAVE_ARC4RANDOM
+
+/* Define to 1 if you have the `arc4random_addrandom' function. */
+#undef HAVE_ARC4RANDOM_ADDRANDOM
+
+/* Define to 1 if you have the `arc4random_stir' function. */
+#undef HAVE_ARC4RANDOM_STIR
+
+/* Define to 1 if the compiler supports __builtin_clz. */
+#undef HAVE_BUILTIN_CLZ
+
+/* Define to 1 if the compiler supports __builtin_expect. */
+#undef HAVE_BUILTIN_EXPECT
+
 /* Define to 1 if you have the `chroot' function. */
 #undef HAVE_CHROOT
 
@@ -200,6 +203,9 @@ int sigwait(const unsigned int *set, int *sig);
 
 /* Define to 1 if you have the <devpoll.h> header file. */
 #undef HAVE_DEVPOLL_H
+
+/* Define to 1 if you have the `DH_get0_key' function. */
+#undef HAVE_DH_GET0_KEY
 
 /* Define to 1 if you have the `dlclose' function. */
 #undef HAVE_DLCLOSE
@@ -213,6 +219,24 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to 1 if you have the `dlsym' function. */
 #undef HAVE_DLSYM
 
+/* Define to 1 to enable dnstap support */
+#undef HAVE_DNSTAP
+
+/* Define to 1 if you have the `DSA_get0_pqg' function. */
+#undef HAVE_DSA_GET0_PQG
+
+/* Define to 1 if you have the `ECDSA_SIG_get0' function. */
+#undef HAVE_ECDSA_SIG_GET0
+
+/* Define to 1 if you have the <editline/readline.h> header file. */
+#undef HAVE_EDITLINE_READLINE_H
+
+/* Define to 1 if you have the <edit/readline/history.h> header file. */
+#undef HAVE_EDIT_READLINE_HISTORY_H
+
+/* Define to 1 if you have the <edit/readline/readline.h> header file. */
+#undef HAVE_EDIT_READLINE_READLINE_H
+
 /* Define to 1 if you have the `EVP_sha256' function. */
 #undef HAVE_EVP_SHA256
 
@@ -222,8 +246,14 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to 1 if you have the `EVP_sha512' function. */
 #undef HAVE_EVP_SHA512
 
+/* Define to 1 if you have the `explicit_bzero' function. */
+#undef HAVE_EXPLICIT_BZERO
+
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
+
+/* Define if OpenSSL provides FIPS_mode() */
+#undef HAVE_FIPS_MODE
 
 /* Define to 1 if you have the `fseeko' function. */
 #undef HAVE_FSEEKO
@@ -239,6 +269,9 @@ int sigwait(const unsigned int *set, int *sig);
 
 /* Build with GeoIP Country IPv6 support */
 #undef HAVE_GEOIP_V6
+
+/* Define to 1 if you have the `getrandom' function. */
+#undef HAVE_GETRANDOM
 
 /* Define to use gperftools CPU profiler. */
 #undef HAVE_GPERFTOOLS_PROFILER
@@ -324,6 +357,9 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to 1 if you have the <linux/types.h> header file. */
 #undef HAVE_LINUX_TYPES_H
 
+/* Define if lmdb was found */
+#undef HAVE_LMDB
+
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
 
@@ -348,6 +384,12 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define if your OpenSSL version supports ECDSA. */
 #undef HAVE_OPENSSL_ECDSA
 
+/* Define if your OpenSSL version supports Ed25519. */
+#undef HAVE_OPENSSL_ED25519
+
+/* Define if your OpenSSL version supports Ed448. */
+#undef HAVE_OPENSSL_ED448
+
 /* Define if your OpenSSL version supports EVP AES */
 #undef HAVE_OPENSSL_EVP_AES
 
@@ -357,11 +399,26 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define if your PKCS11 provider supports ECDSA. */
 #undef HAVE_PKCS11_ECDSA
 
+/* Define if your PKCS11 provider supports Ed25519. */
+#undef HAVE_PKCS11_ED25519
+
+/* Define if your PKCS11 provider supports Ed448. */
+#undef HAVE_PKCS11_ED448
+
 /* Define if your PKCS11 provider supports GOST. */
 #undef HAVE_PKCS11_GOST
 
 /* Support for PTHREAD_MUTEX_ADAPTIVE_NP */
 #undef HAVE_PTHREAD_MUTEX_ADAPTIVE_NP
+
+/* Define to 1 if you have the <pthread_np.h> header file. */
+#undef HAVE_PTHREAD_NP_H
+
+/* Define to 1 if you have the `pthread_setname_np' function. */
+#undef HAVE_PTHREAD_SETNAME_NP
+
+/* Define to 1 if you have the `pthread_set_name_np' function. */
+#undef HAVE_PTHREAD_SET_NAME_NP
 
 /* Define to 1 if you have the `pthread_yield' function. */
 #undef HAVE_PTHREAD_YIELD
@@ -372,8 +429,17 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to 1 if you have the `readline' function. */
 #undef HAVE_READLINE
 
+/* Define to 1 if you have the <readline/history.h> header file. */
+#undef HAVE_READLINE_HISTORY_H
+
+/* Define to 1 if you have the <readline/readline.h> header file. */
+#undef HAVE_READLINE_READLINE_H
+
 /* Define to 1 if you have the <regex.h> header file. */
 #undef HAVE_REGEX_H
+
+/* Define to 1 if you have the `RSA_set0_key' function. */
+#undef HAVE_RSA_SET0_KEY
 
 /* Define to 1 if you have the <sched.h> header file. */
 #undef HAVE_SCHED_H
@@ -453,20 +519,23 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define if running under Compaq TruCluster */
 #undef HAVE_TRUCLUSTER
 
+/* Define to 1 if the system has the type `uintptr_t'. */
+#undef HAVE_UINTPTR_T
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
 /* Define to 1 if you have the `usleep' function. */
 #undef HAVE_USLEEP
 
-/* HMAC_*() return ints */
-#undef HMAC_RETURN_INT
+/* Define if zlib was found */
+#undef HAVE_ZLIB
 
-/* Use HMAC-SHA1 for Source Identity Token generation */
-#undef HMAC_SHA1_SIT
+/* Use HMAC-SHA1 for Client Cookie generation */
+#undef HMAC_SHA1_CC
 
-/* Use HMAC-SHA256 for Source Identity Token generation */
-#undef HMAC_SHA256_SIT
+/* Use HMAC-SHA256 for Client Cookie generation */
+#undef HMAC_SHA256_CC
 
 /* return type of gai_strerror */
 #undef IRS_GAISTRERROR_RETURN_T
@@ -480,11 +549,13 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to the sockaddr length type used by getnameinfo(3). */
 #undef IRS_GETNAMEINFO_SOCKLEN_T
 
+/* Define if you want to use inline buffers */
+#undef ISC_BUFFER_USEINLINE
+
 /* Define to allow building of objects for dlopen(). */
 #undef ISC_DLZ_DLOPEN
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Defined if extern char *optarg is not declared. */
@@ -539,7 +610,16 @@ int sigwait(const unsigned int *set, int *sig);
 #undef WANT_QUERYTRACE
 
 /* define if idnkit support is to be included. */
-#undef WITH_IDN
+#undef WITH_IDNKIT
+
+/* define if IDN output support is to be included. */
+#undef WITH_IDN_OUT_SUPPORT
+
+/* define if IDN input support is to be included. */
+#undef WITH_IDN_SUPPORT
+
+/* define if libidn2 support is to be included. */
+#undef WITH_LIBIDN2
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
@@ -565,7 +645,8 @@ int sigwait(const unsigned int *set, int *sig);
 /* Define to `int' if <sys/types.h> does not define. */
 #undef ssize_t
 
-/* Define to `unsigned long' if <sys/types.h> does not define. */
+/* Define to the type of an unsigned integer type wide enough to hold a
+   pointer, if such a type exists, and if the system does not define it. */
 #undef uintptr_t
 
 /* Define to empty if the keyword `volatile' does not work. Warning: valid

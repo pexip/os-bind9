@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: gen-unix.h,v 1.21 2009/01/17 23:47:42 tbox Exp $ */
 
 /*! \file
  * \brief
@@ -36,9 +29,9 @@
 #include <sys/types.h>          /* Required on some systems for dirent.h. */
 
 #include <dirent.h>
+#include <stdbool.h>
 #include <unistd.h>		/* XXXDCL Required for ?. */
 
-#include <isc/boolean.h>
 #include <isc/lang.h>
 
 #ifdef NEED_OPTARG
@@ -55,18 +48,18 @@ typedef struct {
 
 ISC_LANG_BEGINDECLS
 
-static isc_boolean_t
+static bool
 start_directory(const char *path, isc_dir_t *dir) {
 	dir->handle = opendir(path);
 
 	if (dir->handle != NULL)
-		return (ISC_TRUE);
+		return (true);
 	else
-		return (ISC_FALSE);
+		return (false);
 
 }
 
-static isc_boolean_t
+static bool
 next_file(isc_dir_t *dir) {
 	struct dirent *dirent;
 
@@ -79,9 +72,9 @@ next_file(isc_dir_t *dir) {
 	}
 
 	if (dir->filename != NULL)
-		return (ISC_TRUE);
+		return (true);
 	else
-		return (ISC_FALSE);
+		return (false);
 }
 
 static void

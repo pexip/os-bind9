@@ -1,18 +1,12 @@
 /*
- * Portions Copyright (C) 2004, 2005, 2007, 2008, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Portions Copyright (C) 1999-2001  Internet Software Consortium.
+ * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -44,7 +38,6 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: commandline.c,v 1.22 2008/09/25 04:02:39 tbox Exp $ */
 
 /*! \file
  * This file was adapted from the NetBSD project's source tree, RCS ID:
@@ -54,16 +47,13 @@
  * and format in the ISC coding style.
  */
 
-/*
- * \author Principal Authors: Computer Systems Research Group at UC Berkeley
- * \author Principal ISC caretaker: DCL
- */
-
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/commandline.h>
+#include <isc/mem.h>
 #include <isc/msgs.h>
 #include <isc/print.h>
 #include <isc/string.h>
@@ -78,9 +68,9 @@ LIBISC_EXTERNAL_DATA char *isc_commandline_argument;
 /*% For printing error messages. */
 LIBISC_EXTERNAL_DATA char *isc_commandline_progname;
 /*% Print error messages. */
-LIBISC_EXTERNAL_DATA isc_boolean_t isc_commandline_errprint = ISC_TRUE;
+LIBISC_EXTERNAL_DATA bool isc_commandline_errprint = true;
 /*% Reset processing. */
-LIBISC_EXTERNAL_DATA isc_boolean_t isc_commandline_reset = ISC_TRUE;
+LIBISC_EXTERNAL_DATA bool isc_commandline_reset = true;
 
 static char endopt = '\0';
 
@@ -95,7 +85,7 @@ static char endopt = '\0';
 int
 isc_commandline_parse(int argc, char * const *argv, const char *options) {
 	static char *place = ENDOPT;
-	char *option;			/* Index into *options of option. */
+	const char *option;		/* Index into *options of option. */
 
 	REQUIRE(argc >= 0 && argv != NULL && options != NULL);
 
@@ -106,7 +96,7 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 	if (isc_commandline_reset || *place == '\0') {
 		if (isc_commandline_reset) {
 			isc_commandline_index = 1;
-			isc_commandline_reset = ISC_FALSE;
+			isc_commandline_reset = false;
 		}
 
 		if (isc_commandline_progname == NULL)
@@ -219,4 +209,63 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 	}
 
 	return (isc_commandline_option);
+}
+
+isc_result_t
+isc_commandline_strtoargv(isc_mem_t *mctx, char *s, unsigned int *argcp,
+			  char ***argvp, unsigned int n)
+{
+	isc_result_t result;
+
+ restart:
+	/* Discard leading whitespace. */
+	while (*s == ' ' || *s == '\t')
+		s++;
+
+	if (*s == '\0') {
+		/* We have reached the end of the string. */
+		*argcp = n;
+		*argvp = isc_mem_get(mctx, n * sizeof(char *));
+		if (*argvp == NULL)
+			return (ISC_R_NOMEMORY);
+	} else {
+		char *p = s;
+		while (*p != ' ' && *p != '\t' && *p != '\0' && *p != '{') {
+			if (*p == '\n') {
+				*p = ' ';
+				goto restart;
+			}
+			p++;
+		}
+
+		/* do "grouping", items between { and } are one arg */
+		if (*p == '{') {
+			char *t = p;
+			/*
+			 * shift all characters to left by 1 to get rid of '{'
+			 */
+			while (*t != '\0') {
+				t++;
+				*(t-1) = *t;
+			}
+			while (*p != '\0' && *p != '}') {
+				p++;
+			}
+			/* get rid of '}' character */
+			if (*p == '}') {
+				*p = '\0';
+				p++;
+			}
+			/* normal case, no "grouping" */
+		} else if (*p != '\0')
+			*p++ = '\0';
+
+		result = isc_commandline_strtoargv(mctx, p,
+						   argcp, argvp, n + 1);
+		if (result != ISC_R_SUCCESS)
+			return (result);
+		(*argvp)[n] = s;
+	}
+
+	return (ISC_R_SUCCESS);
 }

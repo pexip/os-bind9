@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #ifndef PK11_PK11_H
 #define PK11_PK11_H 1
 
 /*! \file pk11/pk11.h */
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/magic.h>
@@ -28,6 +25,7 @@
 		 ((pk11_error_fatalcheck)(__FILE__, __LINE__, #func, rv), 0)))
 
 #include <pkcs11/cryptoki.h>
+#include <pk11/site.h>
 
 ISC_LANG_BEGINDECLS
 
@@ -53,7 +51,9 @@ struct pk11_context {
 	CK_SESSION_HANDLE	session;
 	CK_BBOOL		ontoken;
 	CK_OBJECT_HANDLE	object;
-#ifndef PKCS11CRYPTOWITHHMAC
+#if defined(PK11_MD5_HMAC_REPLACE) ||  defined(PK11_SHA_1_HMAC_REPLACE) || \
+    defined(PK11_SHA224_HMAC_REPLACE) || defined(PK11_SHA256_HMAC_REPLACE) || \
+    defined(PK11_SHA384_HMAC_REPLACE) || defined(PK11_SHA512_HMAC_REPLACE)
 	unsigned char		*key;
 #endif
 };
@@ -72,6 +72,11 @@ typedef enum {
 	OP_AES = 8,
 	OP_MAX = 9
 } pk11_optype_t;
+
+/*%
+ * Global flag to make choose_slots() verbose
+ */
+LIBISC_EXTERNAL_DATA extern bool pk11_verbose_init;
 
 /*%
  * Function prototypes
@@ -100,22 +105,22 @@ isc_result_t pk11_initialize(isc_mem_t *mctx, const char *engine);
 
 isc_result_t pk11_get_session(pk11_context_t *ctx,
 			      pk11_optype_t optype,
-			      isc_boolean_t need_services,
-			      isc_boolean_t rw,
-			      isc_boolean_t logon,
+			      bool need_services,
+			      bool rw,
+			      bool logon,
 			      const char *pin,
 			      CK_SLOT_ID slot);
 /*%<
  * Initialize PKCS#11 device and acquire a session.
  *
  * need_services:
- * 	  if ISC_TRUE, this session requires full PKCS#11 API
+ * 	  if true, this session requires full PKCS#11 API
  * 	  support including random and digest services, and
  * 	  the lack of these services will cause the session not
- * 	  to be initialized.  If ISC_FALSE, the function will return
+ * 	  to be initialized.  If false, the function will return
  * 	  an error code indicating the missing service, but the
  * 	  session will be usable for other purposes.
- * rw:    if ISC_TRUE, session will be read/write (useful for
+ * rw:    if true, session will be read/write (useful for
  *        generating or destroying keys); otherwise read-only.
  * login: indicates whether to log in to the device
  * pin:   optional PIN, overriding any PIN currently associated
@@ -149,6 +154,8 @@ void pk11_dump_tokens(void);
 
 CK_RV
 pkcs_C_Initialize(CK_VOID_PTR pReserved);
+
+char *pk11_get_load_error_message(void);
 
 CK_RV
 pkcs_C_Finalize(CK_VOID_PTR pReserved);

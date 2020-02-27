@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2011, 2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id$ */
@@ -37,8 +31,11 @@
 
 #include "config.h"
 
+#include <stdbool.h>
+
 #include <isc/assertions.h>
 #include <isc/platform.h>
+#include <isc/safe.h>
 #include <isc/sha1.h>
 #include <isc/string.h>
 #include <isc/types.h>
@@ -50,17 +47,27 @@
 #endif
 
 #ifdef ISC_PLATFORM_OPENSSLHASH
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#define EVP_MD_CTX_new() &(context->_ctx)
+#define EVP_MD_CTX_free(ptr) EVP_MD_CTX_cleanup(ptr)
+#endif
+
 void
 isc_sha1_init(isc_sha1_t *context)
 {
 	INSIST(context != NULL);
 
-	RUNTIME_CHECK(EVP_DigestInit(context, EVP_sha1()) == 1);
+	context->ctx = EVP_MD_CTX_new();
+	RUNTIME_CHECK(context->ctx != NULL);
+	if (EVP_DigestInit(context->ctx, EVP_sha1()) != 1) {
+		FATAL_ERROR(__FILE__, __LINE__, "Cannot initialize SHA1.");
+	}
 }
 
 void
 isc_sha1_invalidate(isc_sha1_t *context) {
-	EVP_MD_CTX_cleanup(context);
+	EVP_MD_CTX_free(context->ctx);
+	context->ctx = NULL;
 }
 
 void
@@ -68,9 +75,10 @@ isc_sha1_update(isc_sha1_t *context, const unsigned char *data,
 		unsigned int len)
 {
 	INSIST(context != 0);
+	INSIST(context->ctx != 0);
 	INSIST(data != 0);
 
-	RUNTIME_CHECK(EVP_DigestUpdate(context,
+	RUNTIME_CHECK(EVP_DigestUpdate(context->ctx,
 				       (const void *) data,
 				       (size_t) len) == 1);
 }
@@ -79,8 +87,11 @@ void
 isc_sha1_final(isc_sha1_t *context, unsigned char *digest) {
 	INSIST(digest != 0);
 	INSIST(context != 0);
+	INSIST(context->ctx != 0);
 
-	RUNTIME_CHECK(EVP_DigestFinal(context, digest, NULL) == 1);
+	RUNTIME_CHECK(EVP_DigestFinal(context->ctx, digest, NULL) == 1);
+	EVP_MD_CTX_free(context->ctx);
+	context->ctx = NULL;
 }
 
 #elif PKCS11CRYPTO
@@ -90,8 +101,8 @@ isc_sha1_init(isc_sha1_t *ctx) {
 	CK_RV rv;
 	CK_MECHANISM mech = { CKM_SHA_1, NULL, 0 };
 
-	RUNTIME_CHECK(pk11_get_session(ctx, OP_DIGEST, ISC_TRUE, ISC_FALSE,
-				       ISC_FALSE, NULL, 0) == ISC_R_SUCCESS);
+	RUNTIME_CHECK(pk11_get_session(ctx, OP_DIGEST, true, false,
+				       false, NULL, 0) == ISC_R_SUCCESS);
 	PK11_FATALCHECK(pkcs_C_DigestInit, (ctx->session, &mech));
 }
 
@@ -103,7 +114,7 @@ isc_sha1_invalidate(isc_sha1_t *ctx) {
 	if (ctx->handle == NULL)
 		return;
 	(void) pkcs_C_DigestFinal(ctx->session, garbage, &len);
-	memset(garbage, 0, sizeof(garbage));
+	isc_safe_memwipe(garbage, sizeof(garbage));
 	pk11_return_session(ctx);
 }
 
@@ -178,14 +189,14 @@ typedef union {
 } CHAR64LONG16;
 
 #ifdef __sparc_v9__
-static void do_R01(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c,
-		   isc_uint32_t *d, isc_uint32_t *e, CHAR64LONG16 *);
-static void do_R2(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c,
-		  isc_uint32_t *d, isc_uint32_t *e, CHAR64LONG16 *);
-static void do_R3(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c,
-		  isc_uint32_t *d, isc_uint32_t *e, CHAR64LONG16 *);
-static void do_R4(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c,
-		  isc_uint32_t *d, isc_uint32_t *e, CHAR64LONG16 *);
+static void do_R01(uint32_t *a, uint32_t *b, uint32_t *c,
+		   uint32_t *d, uint32_t *e, CHAR64LONG16 *);
+static void do_R2(uint32_t *a, uint32_t *b, uint32_t *c,
+		  uint32_t *d, uint32_t *e, CHAR64LONG16 *);
+static void do_R3(uint32_t *a, uint32_t *b, uint32_t *c,
+		  uint32_t *d, uint32_t *e, CHAR64LONG16 *);
+static void do_R4(uint32_t *a, uint32_t *b, uint32_t *c,
+		  uint32_t *d, uint32_t *e, CHAR64LONG16 *);
 
 #define nR0(v,w,x,y,z,i) R0(*v,*w,*x,*y,*z,i)
 #define nR1(v,w,x,y,z,i) R1(*v,*w,*x,*y,*z,i)
@@ -194,8 +205,8 @@ static void do_R4(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c,
 #define nR4(v,w,x,y,z,i) R4(*v,*w,*x,*y,*z,i)
 
 static void
-do_R01(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
-       isc_uint32_t *e, CHAR64LONG16 *block)
+do_R01(uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d,
+       uint32_t *e, CHAR64LONG16 *block)
 {
 	nR0(a,b,c,d,e, 0); nR0(e,a,b,c,d, 1); nR0(d,e,a,b,c, 2);
 	nR0(c,d,e,a,b, 3); nR0(b,c,d,e,a, 4); nR0(a,b,c,d,e, 5);
@@ -207,8 +218,8 @@ do_R01(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
 }
 
 static void
-do_R2(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
-      isc_uint32_t *e, CHAR64LONG16 *block)
+do_R2(uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d,
+      uint32_t *e, CHAR64LONG16 *block)
 {
 	nR2(a,b,c,d,e,20); nR2(e,a,b,c,d,21); nR2(d,e,a,b,c,22);
 	nR2(c,d,e,a,b,23); nR2(b,c,d,e,a,24); nR2(a,b,c,d,e,25);
@@ -220,8 +231,8 @@ do_R2(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
 }
 
 static void
-do_R3(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
-      isc_uint32_t *e, CHAR64LONG16 *block)
+do_R3(uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d,
+      uint32_t *e, CHAR64LONG16 *block)
 {
 	nR3(a,b,c,d,e,40); nR3(e,a,b,c,d,41); nR3(d,e,a,b,c,42);
 	nR3(c,d,e,a,b,43); nR3(b,c,d,e,a,44); nR3(a,b,c,d,e,45);
@@ -233,8 +244,8 @@ do_R3(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
 }
 
 static void
-do_R4(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
-      isc_uint32_t *e, CHAR64LONG16 *block)
+do_R4(uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d,
+      uint32_t *e, CHAR64LONG16 *block)
 {
 	nR4(a,b,c,d,e,60); nR4(e,a,b,c,d,61); nR4(d,e,a,b,c,62);
 	nR4(c,d,e,a,b,63); nR4(b,c,d,e,a,64); nR4(a,b,c,d,e,65);
@@ -250,8 +261,8 @@ do_R4(isc_uint32_t *a, isc_uint32_t *b, isc_uint32_t *c, isc_uint32_t *d,
  * Hash a single 512-bit block. This is the core of the algorithm.
  */
 static void
-transform(isc_uint32_t state[5], const unsigned char buffer[64]) {
-	isc_uint32_t a, b, c, d, e;
+transform(uint32_t state[5], const unsigned char buffer[64]) {
+	uint32_t a, b, c, d, e;
 	CHAR64LONG16 *block;
 	CHAR64LONG16 workspace;
 
@@ -331,7 +342,7 @@ isc_sha1_init(isc_sha1_t *context)
 
 void
 isc_sha1_invalidate(isc_sha1_t *context) {
-	memset(context, 0, sizeof(isc_sha1_t));
+	isc_safe_memwipe(context, sizeof(*context));
 }
 
 /*!
@@ -399,6 +410,47 @@ isc_sha1_final(isc_sha1_t *context, unsigned char *digest) {
 				  >> ((3 - (i & 3)) * 8)) & 255);
 	}
 
-	memset(context, 0, sizeof(isc_sha1_t));
+	isc_safe_memwipe(context, sizeof(*context));
 }
 #endif
+
+/*
+ * Check for SHA-1 support; if it does not work, raise a fatal error.
+ *
+ * Use "a" as the test vector.
+ *
+ * Standard use is testing false and result true.
+ * Testing use is testing true and result false;
+ */
+bool
+isc_sha1_check(bool testing) {
+	isc_sha1_t ctx;
+	unsigned char input = 'a';
+	unsigned char digest[ISC_SHA1_DIGESTLENGTH];
+	unsigned char expected[] = {
+		0x86, 0xf7, 0xe4, 0x37, 0xfa, 0xa5, 0xa7, 0xfc,
+		0xe1, 0x5d, 0x1d, 0xdc, 0xb9, 0xea, 0xea, 0xea,
+		0x37, 0x76, 0x67, 0xb8
+	};
+
+	INSIST(sizeof(expected) == ISC_SHA1_DIGESTLENGTH);
+
+	/*
+	 * Introduce a fault for testing.
+	 */
+	if (testing) {
+		input ^= 0x01;
+	}
+
+	/*
+	 * These functions do not return anything; any failure will be fatal.
+	 */
+	isc_sha1_init(&ctx);
+	isc_sha1_update(&ctx, &input, 1U);
+	isc_sha1_final(&ctx, digest);
+
+	/*
+	 * Must return true in standard case, should return false for testing.
+	 */
+	return (memcmp(digest, expected, ISC_SHA1_DIGESTLENGTH) == 0);
+}

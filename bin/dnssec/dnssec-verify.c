@@ -1,23 +1,19 @@
 /*
- * Copyright (C) 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -84,8 +80,8 @@ static dns_db_t *gdb;			/* The database */
 static dns_dbversion_t *gversion;	/* The database version */
 static dns_rdataclass_t gclass;		/* The class */
 static dns_name_t *gorigin;		/* The database origin */
-static isc_boolean_t ignore_kskflag = ISC_FALSE;
-static isc_boolean_t keyset_kskonly = ISC_FALSE;
+static bool ignore_kskflag = false;
+static bool keyset_kskonly = false;
 
 /*%
  * Load the zone file from disk
@@ -102,8 +98,7 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 	isc_buffer_init(&b, origin, len);
 	isc_buffer_add(&b, len);
 
-	dns_fixedname_init(&fname);
-	name = dns_fixedname_name(&fname);
+	name = dns_fixedname_initname(&fname);
 	result = dns_name_fromtext(name, &b, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS)
 		fatal("failed converting name '%s' to dns format: %s",
@@ -114,9 +109,26 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_load2(*db, file, inputformat);
-	if (result != ISC_R_SUCCESS && result != DNS_R_SEENINCLUDE)
+	switch (result) {
+	case DNS_R_SEENINCLUDE:
+	case ISC_R_SUCCESS:
+		break;
+	case DNS_R_NOTZONETOP:
+		/*
+		 * Comparing pointers (vs. using strcmp()) is intentional: we
+		 * want to check whether -o was supplied on the command line,
+		 * not whether origin and file contain the same string.
+		 */
+		if (origin == file) {
+			fatal("failed loading zone '%s' from file '%s': "
+			      "use -o to specify a different zone origin",
+			      origin, file);
+		}
+		/* FALLTHROUGH */
+	default:
 		fatal("failed loading zone from '%s': %s",
 		      file, isc_result_totext(result));
+	}
 }
 
 ISC_PLATFORM_NORETURN_PRE static void
@@ -195,7 +207,7 @@ main(int argc, char *argv[]) {
 			break;
 		}
 	}
-	isc_commandline_reset = ISC_TRUE;
+	isc_commandline_reset = true;
 	check_result(isc_app_start(), "isc_app_start");
 
 	result = isc_mem_create(0, 0, &mctx);
@@ -207,7 +219,7 @@ main(int argc, char *argv[]) {
 #endif
 	dns_result_register();
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 		switch (ch) {
@@ -238,11 +250,11 @@ main(int argc, char *argv[]) {
 			break;
 
 		case 'x':
-			keyset_kskonly = ISC_TRUE;
+			keyset_kskonly = true;
 			break;
 
 		case 'z':
-			ignore_kskflag = ISC_TRUE;
+			ignore_kskflag = true;
 			break;
 
 		case '?':
@@ -323,7 +335,7 @@ main(int argc, char *argv[]) {
 	verifyzone(gdb, gversion, gorigin, mctx,
 		   ignore_kskflag, keyset_kskonly);
 
-	dns_db_closeversion(gdb, &gversion, ISC_FALSE);
+	dns_db_closeversion(gdb, &gversion, false);
 	dns_db_detach(&gdb);
 
 	cleanup_logging(&log);

@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: master.h,v 1.57.8.1 2012/02/07 00:44:16 each Exp $ */
 
 #ifndef DNS_MASTER_H
 #define DNS_MASTER_H 1
@@ -79,31 +72,31 @@ ISC_LANG_BEGINDECLS
 
 /* Common header */
 struct dns_masterrawheader {
-	isc_uint32_t		format;		/* must be
+	uint32_t		format;		/* must be
 						 * dns_masterformat_raw
 						 * or
 						 * dns_masterformat_map */
-	isc_uint32_t		version;	/* compatibility for future
+	uint32_t		version;	/* compatibility for future
 						 * extensions */
-	isc_uint32_t		dumptime;	/* timestamp on creation
+	uint32_t		dumptime;	/* timestamp on creation
 						 * (currently unused) */
-	isc_uint32_t		flags;		/* Flags */
-	isc_uint32_t		sourceserial;	/* Source serial number (used
+	uint32_t		flags;		/* Flags */
+	uint32_t		sourceserial;	/* Source serial number (used
 						 * by inline-signing zones) */
-	isc_uint32_t		lastxfrin;	/* timestamp of last transfer
+	uint32_t		lastxfrin;	/* timestamp of last transfer
 						 * (used by slave zones) */
 };
 
 /* The structure for each RRset */
 typedef struct {
-	isc_uint32_t		totallen;	/* length of the data for this
+	uint32_t		totallen;	/* length of the data for this
 						 * RRset, including the
 						 * "header" part */
 	dns_rdataclass_t	rdclass;	/* 16-bit class */
 	dns_rdatatype_t		type;		/* 16-bit type */
 	dns_rdatatype_t		covers;		/* same as type */
 	dns_ttl_t		ttl;		/* 32-bit TTL */
-	isc_uint32_t		nrdata;		/* number of RRs in this set */
+	uint32_t		nrdata;		/* number of RRs in this set */
 	/* followed by encoded owner name, and then rdata */
 } dns_masterrawrdataset_t;
 
@@ -143,7 +136,7 @@ dns_master_loadfile3(const char *master_file,
 		     dns_name_t *origin,
 		     dns_rdataclass_t zclass,
 		     unsigned int options,
-		     isc_uint32_t resign,
+		     uint32_t resign,
 		     dns_rdatacallbacks_t *callbacks,
 		     isc_mem_t *mctx,
 		     dns_masterformat_t format);
@@ -154,7 +147,7 @@ dns_master_loadfile4(const char *master_file,
 		     dns_name_t *origin,
 		     dns_rdataclass_t zclass,
 		     unsigned int options,
-		     isc_uint32_t resign,
+		     uint32_t resign,
 		     dns_rdatacallbacks_t *callbacks,
 		     dns_masterincludecb_t include_cb,
 		     void *include_arg, isc_mem_t *mctx,
@@ -166,7 +159,7 @@ dns_master_loadfile5(const char *master_file,
 		     dns_name_t *origin,
 		     dns_rdataclass_t zclass,
 		     unsigned int options,
-		     isc_uint32_t resign,
+		     uint32_t resign,
 		     dns_rdatacallbacks_t *callbacks,
 		     dns_masterincludecb_t include_cb,
 		     void *include_arg, isc_mem_t *mctx,
@@ -229,7 +222,7 @@ dns_master_loadfileinc3(const char *master_file,
 			dns_name_t *origin,
 			dns_rdataclass_t zclass,
 			unsigned int options,
-			isc_uint32_t resign,
+			uint32_t resign,
 			dns_rdatacallbacks_t *callbacks,
 			isc_task_t *task,
 			dns_loaddonefunc_t done, void *done_arg,
@@ -242,7 +235,7 @@ dns_master_loadfileinc4(const char *master_file,
 			dns_name_t *origin,
 			dns_rdataclass_t zclass,
 			unsigned int options,
-			isc_uint32_t resign,
+			uint32_t resign,
 			dns_rdatacallbacks_t *callbacks,
 			isc_task_t *task,
 			dns_loaddonefunc_t done, void *done_arg,
@@ -256,14 +249,14 @@ dns_master_loadfileinc5(const char *master_file,
 			dns_name_t *origin,
 			dns_rdataclass_t zclass,
 			unsigned int options,
-			isc_uint32_t resign,
+			uint32_t resign,
 			dns_rdatacallbacks_t *callbacks,
 			isc_task_t *task,
 			dns_loaddonefunc_t done, void *done_arg,
 			dns_loadctx_t **ctxp,
 			dns_masterincludecb_t include_cb, void *include_arg,
 			isc_mem_t *mctx, dns_masterformat_t format,
-			isc_uint32_t maxttl);
+			uint32_t maxttl);
 
 isc_result_t
 dns_master_loadstreaminc(FILE *stream,

@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: log.h,v 1.27 2009/01/07 23:47:46 tbox Exp $ */
@@ -36,7 +30,8 @@
 #define NS_LOGCATEGORY_QUERIES		(&ns_g_categories[4])
 #define NS_LOGCATEGORY_UNMATCHED	(&ns_g_categories[5])
 #define NS_LOGCATEGORY_UPDATE_SECURITY	(&ns_g_categories[6])
-#define NS_LOGCATEGORY_QUERY_EERRORS	(&ns_g_categories[7])
+#define NS_LOGCATEGORY_QUERY_ERRORS	(&ns_g_categories[7])
+#define NS_LOGCATEGORY_TAT		(&ns_g_categories[8])
 
 /*
  * Backwards compatibility.
@@ -56,7 +51,7 @@
 #define NS_LOGMODULE_LWRESD		(&ns_g_modules[10])
 
 isc_result_t
-ns_log_init(isc_boolean_t safe);
+ns_log_init(bool safe);
 /*%
  * Initialize the logging system and set up an initial default
  * logging default configuration that will be used until the

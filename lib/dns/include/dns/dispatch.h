@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2009, 2011-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: dispatch.h,v 1.64 2011/07/28 23:47:58 tbox Exp $ */
 
 #ifndef DNS_DISPATCH_H
 #define DNS_DISPATCH_H 1
@@ -52,6 +44,8 @@
  *** Imports
  ***/
 
+#include <stdbool.h>
+
 #include <isc/buffer.h>
 #include <isc/lang.h>
 #include <isc/mutex.h>
@@ -82,11 +76,11 @@ ISC_LANG_BEGINDECLS
 struct dns_dispatchevent {
 	ISC_EVENT_COMMON(dns_dispatchevent_t);	/*%< standard event common */
 	isc_result_t		result;		/*%< result code */
-	isc_int32_t		id;		/*%< message id */
+	int32_t		id;		/*%< message id */
 	isc_sockaddr_t		addr;		/*%< address recv'd from */
 	struct in6_pktinfo	pktinfo;	/*%< reply info for v6 */
 	isc_buffer_t	        buffer;		/*%< data buffer */
-	isc_uint32_t		attributes;	/*%< mirrored from socket.h */
+	uint32_t		attributes;	/*%< mirrored from socket.h */
 };
 
 /*%
@@ -302,6 +296,13 @@ dns_dispatch_createtcp(dns_dispatchmgr_t *mgr, isc_socket_t *sock,
 		       unsigned int maxbuffers, unsigned int maxrequests,
 		       unsigned int buckets, unsigned int increment,
 		       unsigned int attributes, dns_dispatch_t **dispp);
+isc_result_t
+dns_dispatch_createtcp2(dns_dispatchmgr_t *mgr, isc_socket_t *sock,
+			isc_taskmgr_t *taskmgr, isc_sockaddr_t *localaddr,
+			isc_sockaddr_t *destaddr, unsigned int buffersize,
+			unsigned int maxbuffers, unsigned int maxrequests,
+			unsigned int buckets, unsigned int increment,
+			unsigned int attributes, dns_dispatch_t **dispp);
 /*%<
  * Create a new dns_dispatch and attach it to the provided isc_socket_t.
  *
@@ -374,22 +375,35 @@ dns_dispatch_starttcp(dns_dispatch_t *disp);
  */
 
 isc_result_t
+dns_dispatch_gettcp(dns_dispatchmgr_t *mgr, isc_sockaddr_t *destaddr,
+		    isc_sockaddr_t *localaddr, dns_dispatch_t **dispp);
+isc_result_t
+dns_dispatch_gettcp2(dns_dispatchmgr_t *mgr, isc_sockaddr_t *destaddr,
+		     isc_sockaddr_t *localaddr, bool *connected,
+		     dns_dispatch_t **dispp);
+/*
+ * Attempt to connect to a existing TCP connection (connection completed
+ * for dns_dispatch_gettcp()).
+ */
+
+
+isc_result_t
 dns_dispatch_addresponse3(dns_dispatch_t *disp, unsigned int options,
 			  isc_sockaddr_t *dest, isc_task_t *task,
 			  isc_taskaction_t action, void *arg,
-			  isc_uint16_t *idp, dns_dispentry_t **resp,
+			  uint16_t *idp, dns_dispentry_t **resp,
 			  isc_socketmgr_t *sockmgr);
 
 isc_result_t
 dns_dispatch_addresponse2(dns_dispatch_t *disp, isc_sockaddr_t *dest,
 			  isc_task_t *task, isc_taskaction_t action, void *arg,
-			  isc_uint16_t *idp, dns_dispentry_t **resp,
+			  uint16_t *idp, dns_dispentry_t **resp,
 			  isc_socketmgr_t *sockmgr);
 
 isc_result_t
 dns_dispatch_addresponse(dns_dispatch_t *disp, isc_sockaddr_t *dest,
 			 isc_task_t *task, isc_taskaction_t action, void *arg,
-			 isc_uint16_t *idp, dns_dispentry_t **resp);
+			 uint16_t *idp, dns_dispentry_t **resp);
 /*%<
  * Add a response entry for this dispatch.
  *
@@ -524,6 +538,9 @@ dns_dispatch_importrecv(dns_dispatch_t *disp, isc_event_t *event);
  * shared between dispatchers and clients.  If the dispatcher fails to copy
  * or send the event, nothing happens.
  *
+ * If the attribute DNS_DISPATCHATTR_NOLISTEN is not set, then
+ * the dispatch is already handling a recv; return immediately.
+ *
  * Requires:
  *\li 	disp is valid, and the attribute DNS_DISPATCHATTR_NOLISTEN is set.
  * 	event != NULL
@@ -579,6 +596,17 @@ dns_dispatch_getdscp(dns_dispatch_t *disp);
  *
  * Requires:
  *\li	disp is valid.
+ */
+
+isc_result_t
+dns_dispatch_getnext(dns_dispentry_t *resp, dns_dispatchevent_t **sockevent);
+/*%<
+ * Free the sockevent and trigger the sending of the next item off the
+ * dispatch queue if present.
+ *
+ * Requires:
+ *\li	resp is valid
+ *\li	*sockevent to be valid
  */
 
 ISC_LANG_ENDDECLS

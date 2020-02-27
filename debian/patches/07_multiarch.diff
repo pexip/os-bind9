@@ -1,8 +1,16 @@
-Index: bind9/isc-config.sh.in
-===================================================================
---- bind9.orig/isc-config.sh.in	2016-02-17 09:00:05.621005508 -0700
-+++ bind9/isc-config.sh.in	2016-02-17 09:02:09.713203148 -0700
-@@ -21,7 +21,6 @@
+From: Debian DNS Packaging <pkg-dns-devel@lists.alioth.debian.org>
+Date: Fri, 24 Nov 2017 16:26:53 +0000
+Subject: _multiarch
+
+---
+ isc-config.sh.in | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/isc-config.sh.in b/isc-config.sh.in
+index a8a0a89..1e7903e 100644
+--- a/isc-config.sh.in
++++ b/isc-config.sh.in
+@@ -13,7 +13,6 @@ prefix=@prefix@
  exec_prefix=@exec_prefix@
  exec_prefix_set=
  includedir=@includedir@
@@ -10,7 +18,7 @@ Index: bind9/isc-config.sh.in
  
  usage()
  {
-@@ -140,7 +139,7 @@
+@@ -132,7 +131,7 @@ if test x"$echo_libs" = x"true"; then
  	if test x"${exec_prefix_set}" = x"true"; then
  		libs="-L${exec_prefix}/lib"
  	else

@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2007, 2010-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1997-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file
  * Heap implementation of priority queues adapted from the following:
@@ -28,6 +21,8 @@
  */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/heap.h>
 #include <isc/magic.h>
@@ -71,6 +66,18 @@ struct isc_heap {
 	isc_heapcompare_t		compare;
 	isc_heapindex_t			index;
 };
+
+#ifdef ISC_HEAP_CHECK
+static void
+heap_check(isc_heap_t *heap) {
+	unsigned int i;
+	for (i = 1; i <= heap->last; i++) {
+		INSIST(HEAPCONDITION(i));
+	}
+}
+#else
+#define heap_check(x) (void)0
+#endif
 
 isc_result_t
 isc_heap_create(isc_mem_t *mctx, isc_heapcompare_t compare,
@@ -120,7 +127,7 @@ isc_heap_destroy(isc_heap_t **heapp) {
 	*heapp = NULL;
 }
 
-static isc_boolean_t
+static bool
 resize(isc_heap_t *heap) {
 	void **new_array;
 	unsigned int new_size;
@@ -130,7 +137,7 @@ resize(isc_heap_t *heap) {
 	new_size = heap->size + heap->size_increment;
 	new_array = isc_mem_get(heap->mctx, new_size * sizeof(void *));
 	if (new_array == NULL)
-		return (ISC_FALSE);
+		return (false);
 	if (heap->array != NULL) {
 		memmove(new_array, heap->array, heap->size * sizeof(void *));
 		isc_mem_put(heap->mctx, heap->array,
@@ -139,7 +146,7 @@ resize(isc_heap_t *heap) {
 	heap->size = new_size;
 	heap->array = new_array;
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static void
@@ -158,6 +165,7 @@ float_up(isc_heap_t *heap, unsigned int i, void *elt) {
 		(heap->index)(heap->array[i], i);
 
 	INSIST(HEAPCONDITION(i));
+	heap_check(heap);
 }
 
 static void
@@ -183,6 +191,7 @@ sink_down(isc_heap_t *heap, unsigned int i, void *elt) {
 		(heap->index)(heap->array[i], i);
 
 	INSIST(HEAPCONDITION(i));
+	heap_check(heap);
 }
 
 isc_result_t
@@ -191,6 +200,7 @@ isc_heap_insert(isc_heap_t *heap, void *elt) {
 
 	REQUIRE(VALID_HEAP(heap));
 
+	heap_check(heap);
 	new_last = heap->last + 1;
 	RUNTIME_CHECK(new_last > 0); /* overflow check */
 	if (new_last >= heap->size && !resize(heap))
@@ -205,14 +215,18 @@ isc_heap_insert(isc_heap_t *heap, void *elt) {
 void
 isc_heap_delete(isc_heap_t *heap, unsigned int idx) {
 	void *elt;
-	isc_boolean_t less;
+	bool less;
 
 	REQUIRE(VALID_HEAP(heap));
 	REQUIRE(idx >= 1 && idx <= heap->last);
 
+	heap_check(heap);
+	if (heap->index != NULL)
+		(heap->index)(heap->array[idx], 0);
 	if (idx == heap->last) {
 		heap->array[heap->last] = NULL;
 		heap->last--;
+		heap_check(heap);
 	} else {
 		elt = heap->array[heap->last];
 		heap->array[heap->last] = NULL;
@@ -248,6 +262,7 @@ isc_heap_element(isc_heap_t *heap, unsigned int idx) {
 	REQUIRE(VALID_HEAP(heap));
 	REQUIRE(idx >= 1);
 
+	heap_check(heap);
 	if (idx <= heap->last)
 		return (heap->array[idx]);
 	return (NULL);

@@ -123,6 +123,7 @@ CLEAN :
 	-@erase "$(INTDIR)\acache.obj"
 	-@erase "$(INTDIR)\acl.obj"
 	-@erase "$(INTDIR)\adb.obj"
+	-@erase "$(INTDIR)\badcache.obj"
 	-@erase "$(INTDIR)\byaddr.obj"
 	-@erase "$(INTDIR)\cache.obj"
 	-@erase "$(INTDIR)\callbacks.obj"
@@ -143,6 +144,7 @@ CLEAN :
 	-@erase "$(INTDIR)\dst_lib.obj"
 	-@erase "$(INTDIR)\dst_parse.obj"
 	-@erase "$(INTDIR)\dst_result.obj"
+	-@erase "$(INTDIR)\dyndb.obj"
 	-@erase "$(INTDIR)\ecdb.obj"
 	-@erase "$(INTDIR)\forward.obj"
 @IF GEOIP
@@ -152,6 +154,7 @@ CLEAN :
 	-@erase "$(INTDIR)\gssapictx.obj"
 	-@erase "$(INTDIR)\spnego.obj"
 	-@erase "$(INTDIR)\hmac_link.obj"
+	-@erase "$(INTDIR)\ipkeylist.obj"
 	-@erase "$(INTDIR)\iptable.obj"
 	-@erase "$(INTDIR)\journal.obj"
 	-@erase "$(INTDIR)\key.obj"
@@ -166,11 +169,13 @@ CLEAN :
 	-@erase "$(INTDIR)\ncache.obj"
 	-@erase "$(INTDIR)\nsec.obj"
 	-@erase "$(INTDIR)\nsec3.obj"
+	-@erase "$(INTDIR)\nta.obj"
 @IF OPENSSL
 	-@erase "$(INTDIR)\openssl_link.obj"
 	-@erase "$(INTDIR)\openssldh_link.obj"
 	-@erase "$(INTDIR)\openssldsa_link.obj"
 	-@erase "$(INTDIR)\opensslecdsa_link.obj"
+	-@erase "$(INTDIR)\openssleddsa_link.obj"
 	-@erase "$(INTDIR)\opensslgost_link.obj"
 	-@erase "$(INTDIR)\opensslrsa_link.obj"
 @END OPENSSL
@@ -181,6 +186,7 @@ CLEAN :
 	-@erase "$(INTDIR)\pkcs11dh_link.obj"
 	-@erase "$(INTDIR)\pkcs11dsa_link.obj"
 	-@erase "$(INTDIR)\pkcs11ecdsa_link.obj"
+	-@erase "$(INTDIR)\pkcs11eddsa_link.obj"
 	-@erase "$(INTDIR)\pkcs11gost_link.obj"
 	-@erase "$(INTDIR)\pkcs11rsa_link.obj"
 @END PKCS11
@@ -280,6 +286,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\acache.obj" \
 	"$(INTDIR)\acl.obj" \
 	"$(INTDIR)\adb.obj" \
+	"$(INTDIR)\badcache.obj" \
 	"$(INTDIR)\byaddr.obj" \
 	"$(INTDIR)\cache.obj" \
 	"$(INTDIR)\callbacks.obj" \
@@ -296,11 +303,13 @@ LINK32_OBJS= \
 	"$(INTDIR)\dns64.obj" \
 	"$(INTDIR)\dnssec.obj" \
 	"$(INTDIR)\ds.obj" \
+	"$(INTDIR)\dyndb.obj" \
 	"$(INTDIR)\ecdb.obj" \
 	"$(INTDIR)\forward.obj" \
 @IF GEOIP
 	"$(INTDIR)\geoip.obj" \
 @END GEOIP
+	"$(INTDIR)\ipkeylist.obj" \
 	"$(INTDIR)\iptable.obj" \
 	"$(INTDIR)\journal.obj" \
 	"$(INTDIR)\keydata.obj" \
@@ -315,6 +324,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\ncache.obj" \
 	"$(INTDIR)\nsec.obj" \
 	"$(INTDIR)\nsec3.obj" \
+	"$(INTDIR)\nta.obj" \
 	"$(INTDIR)\order.obj" \
 	"$(INTDIR)\peer.obj" \
 	"$(INTDIR)\portlist.obj" \
@@ -370,6 +380,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\openssldh_link.obj" \
 	"$(INTDIR)\openssldsa_link.obj" \
 	"$(INTDIR)\opensslecdsa_link.obj" \
+	"$(INTDIR)\openssleddsa_link.obj" \
 	"$(INTDIR)\opensslgost_link.obj" \
 	"$(INTDIR)\opensslrsa_link.obj" \
 @END OPENSSL
@@ -378,6 +389,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\pkcs11dh_link.obj" \
 	"$(INTDIR)\pkcs11dsa_link.obj" \
 	"$(INTDIR)\pkcs11ecdsa_link.obj" \
+	"$(INTDIR)\pkcs11eddsa_link.obj" \
 	"$(INTDIR)\pkcs11gost_link.obj" \
 	"$(INTDIR)\pkcs11rsa_link.obj" \
 @END PKCS11
@@ -418,6 +430,8 @@ CLEAN :
 	-@erase "$(INTDIR)\acl.sbr"
 	-@erase "$(INTDIR)\adb.obj"
 	-@erase "$(INTDIR)\adb.sbr"
+	-@erase "$(INTDIR)\badcache.obj"
+	-@erase "$(INTDIR)\badcache.sbr"
 	-@erase "$(INTDIR)\byaddr.obj"
 	-@erase "$(INTDIR)\byaddr.sbr"
 	-@erase "$(INTDIR)\cache.obj"
@@ -458,6 +472,8 @@ CLEAN :
 	-@erase "$(INTDIR)\dst_parse.sbr"
 	-@erase "$(INTDIR)\dst_result.obj"
 	-@erase "$(INTDIR)\dst_result.sbr"
+	-@erase "$(INTDIR)\dyndb.obj"
+	-@erase "$(INTDIR)\dyndb.sbr"
 	-@erase "$(INTDIR)\ecdb.obj"
 	-@erase "$(INTDIR)\ecdb.sbr"
 	-@erase "$(INTDIR)\forward.obj"
@@ -474,6 +490,8 @@ CLEAN :
 	-@erase "$(INTDIR)\spnego.sbr"
 	-@erase "$(INTDIR)\hmac_link.obj"
 	-@erase "$(INTDIR)\hmac_link.sbr"
+	-@erase "$(INTDIR)\ipkeylist.obj"
+	-@erase "$(INTDIR)\ipkeylist.sbr"
 	-@erase "$(INTDIR)\iptable.obj"
 	-@erase "$(INTDIR)\iptable.sbr"
 	-@erase "$(INTDIR)\journal.obj"
@@ -504,6 +522,8 @@ CLEAN :
 	-@erase "$(INTDIR)\nsec.sbr"
 	-@erase "$(INTDIR)\nsec3.obj"
 	-@erase "$(INTDIR)\nsec3.sbr"
+	-@erase "$(INTDIR)\nta.obj"
+	-@erase "$(INTDIR)\nta.sbr"
 @IF OPENSSL
 	-@erase "$(INTDIR)\openssl_link.obj"
 	-@erase "$(INTDIR)\openssl_link.sbr"
@@ -513,6 +533,8 @@ CLEAN :
 	-@erase "$(INTDIR)\openssldsa_link.sbr"
 	-@erase "$(INTDIR)\opensslecdsa_link.obj"
 	-@erase "$(INTDIR)\opensslecdsa_link.sbr"
+	-@erase "$(INTDIR)\openssleddsa_link.obj"
+	-@erase "$(INTDIR)\openssleddsa_link.sbr"
 	-@erase "$(INTDIR)\opensslgost_link.obj"
 	-@erase "$(INTDIR)\opensslgost_link.sbr"
 	-@erase "$(INTDIR)\opensslrsa_link.obj"
@@ -531,6 +553,8 @@ CLEAN :
 	-@erase "$(INTDIR)\pkcs11dsa_link.sbr"
 	-@erase "$(INTDIR)\pkcs11ecdsa_link.obj"
 	-@erase "$(INTDIR)\pkcs11ecdsa_link.sbr"
+	-@erase "$(INTDIR)\pkcs11eddsa_link.obj"
+	-@erase "$(INTDIR)\pkcs11eddsa_link.sbr"
 	-@erase "$(INTDIR)\pkcs11gost_link.obj"
 	-@erase "$(INTDIR)\pkcs11gost_link.sbr"
 	-@erase "$(INTDIR)\pkcs11rsa_link.obj"
@@ -670,6 +694,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\acache.sbr" \
 	"$(INTDIR)\acl.sbr" \
 	"$(INTDIR)\adb.sbr" \
+	"$(INTDIR)\badcache.sbr" \
 	"$(INTDIR)\byaddr.sbr" \
 	"$(INTDIR)\cache.sbr" \
 	"$(INTDIR)\callbacks.sbr" \
@@ -686,11 +711,13 @@ BSC32_SBRS= \
 	"$(INTDIR)\dns64.sbr" \
 	"$(INTDIR)\dnssec.sbr" \
 	"$(INTDIR)\ds.sbr" \
+	"$(INTDIR)\dyndb.sbr" \
 	"$(INTDIR)\ecdb.sbr" \
 	"$(INTDIR)\forward.sbr" \
 @IF GEOIP
 	"$(INTDIR)\geoip.sbr" \
 @END GEOIP
+	"$(INTDIR)\ipkeylist.sbr" \
 	"$(INTDIR)\iptable.sbr" \
 	"$(INTDIR)\journal.sbr" \
 	"$(INTDIR)\keydata.sbr" \
@@ -705,6 +732,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\ncache.sbr" \
 	"$(INTDIR)\nsec.sbr" \
 	"$(INTDIR)\nsec3.sbr" \
+	"$(INTDIR)\nta.sbr" \
 	"$(INTDIR)\order.sbr" \
 	"$(INTDIR)\peer.sbr" \
 	"$(INTDIR)\portlist.sbr" \
@@ -760,6 +788,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\openssldh_link.sbr" \
 	"$(INTDIR)\openssldsa_link.sbr" \
 	"$(INTDIR)\opensslecdsa_link.sbr" \
+	"$(INTDIR)\openssleddsa_link.sbr" \
 	"$(INTDIR)\opensslgost_link.sbr" \
 	"$(INTDIR)\opensslrsa_link.sbr" \
 @END OPENSSL
@@ -768,6 +797,7 @@ BSC32_SBRS= \
 	"$(INTDIR)\pkcs11dh_link.sbr" \
 	"$(INTDIR)\pkcs11dsa_link.sbr" \
 	"$(INTDIR)\pkcs11ecdsa_link.sbr" \
+	"$(INTDIR)\pkcs11eddsa_link.sbr" \
 	"$(INTDIR)\pkcs11gost_link.sbr" \
 	"$(INTDIR)\pkcs11rsa_link.sbr"
 @END PKCS11
@@ -785,6 +815,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\acache.obj" \
 	"$(INTDIR)\acl.obj" \
 	"$(INTDIR)\adb.obj" \
+	"$(INTDIR)\badcache.obj" \
 	"$(INTDIR)\byaddr.obj" \
 	"$(INTDIR)\cache.obj" \
 	"$(INTDIR)\callbacks.obj" \
@@ -801,11 +832,13 @@ LINK32_OBJS= \
 	"$(INTDIR)\dns64.obj" \
 	"$(INTDIR)\dnssec.obj" \
 	"$(INTDIR)\ds.obj" \
+	"$(INTDIR)\dyndb.obj" \
 	"$(INTDIR)\ecdb.obj" \
 	"$(INTDIR)\forward.obj" \
 @IF GEOIP
 	"$(INTDIR)\geoip.obj" \
 @END GEOIP
+	"$(INTDIR)\ipkeylist.obj" \
 	"$(INTDIR)\iptable.obj" \
 	"$(INTDIR)\journal.obj" \
 	"$(INTDIR)\key.obj" \
@@ -820,6 +853,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\ncache.obj" \
 	"$(INTDIR)\nsec.obj" \
 	"$(INTDIR)\nsec3.obj" \
+	"$(INTDIR)\nta.obj" \
 	"$(INTDIR)\order.obj" \
 	"$(INTDIR)\peer.obj" \
 	"$(INTDIR)\portlist.obj" \
@@ -875,6 +909,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\openssldh_link.obj" \
 	"$(INTDIR)\openssldsa_link.obj" \
 	"$(INTDIR)\opensslecdsa_link.obj" \
+	"$(INTDIR)\openssleddsa_link.obj" \
 	"$(INTDIR)\opensslgost_link.obj" \
 	"$(INTDIR)\opensslrsa_link.obj" \
 @END OPENSSL
@@ -883,6 +918,7 @@ LINK32_OBJS= \
 	"$(INTDIR)\pkcs11dh_link.obj" \
 	"$(INTDIR)\pkcs11dsa_link.obj" \
 	"$(INTDIR)\pkcs11ecdsa_link.obj" \
+	"$(INTDIR)\pkcs11eddsa_link.obj" \
 	"$(INTDIR)\pkcs11gost_link.obj" \
 	"$(INTDIR)\pkcs11rsa_link.obj" \
 @END PKCS11
@@ -961,6 +997,24 @@ SOURCE=..\adb.c
 
 !ENDIF 
 
+SOURCE=..\badcache.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\badcache.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\badcache.obj"	"$(INTDIR)\badcache.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
 SOURCE=..\byaddr.c
 
 !IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
@@ -1010,6 +1064,24 @@ SOURCE=..\callbacks.c
 
 
 "$(INTDIR)\callbacks.obj"	"$(INTDIR)\callbacks.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
+SOURCE=..\catz.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\catz.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\catz.obj"	"$(INTDIR)\catz.sbr" : $(SOURCE) "$(INTDIR)"
 	$(CPP) $(CPP_PROJ) $(SOURCE)
 
 
@@ -1251,6 +1323,24 @@ SOURCE=..\ds.c
 
 !ENDIF 
 
+SOURCE=..\dyndb.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\dyndb.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\dyndb.obj"	"$(INTDIR)\dyndb.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
 SOURCE=..\ecdb.c
 
 !IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
@@ -1306,6 +1396,24 @@ SOURCE=..\geoip.c
 
 !ENDIF 
 @END GEOIP
+
+SOURCE=..\ipkeylist.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\ipkeylist.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\ipkeylist.obj" "$(INTDIR)\ipkeylist.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
 
 SOURCE=..\iptable.c
 
@@ -1554,6 +1662,24 @@ SOURCE=..\nsec3.c
 
 
 "$(INTDIR)\nsec3.obj"	"$(INTDIR)\nsec3.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
+SOURCE=..\nta.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\nta.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\nta.obj"	"$(INTDIR)\nta.sbr" : $(SOURCE) "$(INTDIR)"
 	$(CPP) $(CPP_PROJ) $(SOURCE)
 
 
@@ -2532,6 +2658,24 @@ SOURCE=..\opensslecdsa_link.c
 
 !ENDIF 
 
+SOURCE=..\openssleddsa_link.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\openssleddsa_link.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\openssleddsa_link.obj"	"$(INTDIR)\openssleddsa_link.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
 SOURCE=..\opensslgost_link.c
 
 !IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
@@ -2637,6 +2781,24 @@ SOURCE=..\pkcs11ecdsa_link.c
 
 
 "$(INTDIR)\pkcs11ecdsa_link.obj"	"$(INTDIR)\pkcs11ecdsa_link.sbr" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ENDIF 
+
+SOURCE=..\pkcs11eddsa_link.c
+
+!IF  "$(CFG)" == "libdns - @PLATFORM@ Release"
+
+
+"$(INTDIR)\pkcs11eddsa_link.obj" : $(SOURCE) "$(INTDIR)"
+	$(CPP) $(CPP_PROJ) $(SOURCE)
+
+
+!ELSEIF  "$(CFG)" == "libdns - @PLATFORM@ Debug"
+
+
+"$(INTDIR)\pkcs11eddsa_link.obj"	"$(INTDIR)\pkcs11eddsa_link.sbr" : $(SOURCE) "$(INTDIR)"
 	$(CPP) $(CPP_PROJ) $(SOURCE)
 
 

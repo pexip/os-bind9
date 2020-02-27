@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: rdataset.h,v 1.72 2011/06/08 22:13:51 each Exp $ */
 
 #ifndef DNS_RDATASET_H
 #define DNS_RDATASET_H 1
@@ -50,6 +42,9 @@
  * Standards:
  *\li	None.
  */
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/magic.h>
@@ -115,6 +110,9 @@ typedef struct dns_rdatasetmethods {
 					    dns_trust_t trust);
 	void			(*expire)(dns_rdataset_t *rdataset);
 	void			(*clearprefetch)(dns_rdataset_t *rdataset);
+	void			(*setownercase)(dns_rdataset_t *rdataset,
+						const dns_name_t *name);
+	void			(*getownercase)(const dns_rdataset_t *rdataset,							dns_name_t *name);
 } dns_rdatasetmethods_t;
 
 #define DNS_RDATASET_MAGIC	       ISC_MAGIC('D','N','S','R')
@@ -146,11 +144,11 @@ struct dns_rdataset {
 	unsigned int			attributes;
 	/*%
 	 * the counter provides the starting point in the "cyclic" order.
-	 * The value ISC_UINT32_MAX has a special meaning of "picking up a
+	 * The value UINT32_MAX has a special meaning of "picking up a
 	 * random value." in order to take care of databases that do not
 	 * increment the counter.
 	 */
-	isc_uint32_t			count;
+	uint32_t			count;
 	/*
 	 * This RRSIG RRset should be re-generated around this time.
 	 * Only valid if DNS_RDATASETATTR_RESIGN is set in attributes.
@@ -256,7 +254,7 @@ dns_rdataset_disassociate(dns_rdataset_t *rdataset);
  *\li	'rdataset' is a valid, disassociated rdataset.
  */
 
-isc_boolean_t
+bool
 dns_rdataset_isassociated(dns_rdataset_t *rdataset);
 /*%<
  * Is 'rdataset' associated?
@@ -265,8 +263,8 @@ dns_rdataset_isassociated(dns_rdataset_t *rdataset);
  *\li	'rdataset' is a valid rdataset.
  *
  * Returns:
- *\li	#ISC_TRUE			'rdataset' is associated.
- *\li	#ISC_FALSE			'rdataset' is not associated.
+ *\li	#true			'rdataset' is associated.
+ *\li	#false			'rdataset' is not associated.
  */
 
 void
@@ -363,8 +361,8 @@ dns_rdataset_current(dns_rdataset_t *rdataset, dns_rdata_t *rdata);
 isc_result_t
 dns_rdataset_totext(dns_rdataset_t *rdataset,
 		    dns_name_t *owner_name,
-		    isc_boolean_t omit_final_dot,
-		    isc_boolean_t question,
+		    bool omit_final_dot,
+		    bool question,
 		    isc_buffer_t *target);
 /*%<
  * Convert 'rdataset' to text format, storing the result in 'target'.
@@ -372,8 +370,8 @@ dns_rdataset_totext(dns_rdataset_t *rdataset,
  * Notes:
  *\li	The rdata cursor position will be changed.
  *
- *\li	The 'question' flag should normally be #ISC_FALSE.  If it is
- *	#ISC_TRUE, the TTL and rdata fields are not printed.  This is
+ *\li	The 'question' flag should normally be #false.  If it is
+ *	#true, the TTL and rdata fields are not printed.  This is
  *	for use when printing an rdata representing a question section.
  *
  *\li	This interface is deprecated; use dns_master_rdatasettottext()
@@ -667,9 +665,25 @@ dns_rdataset_clearprefetch(dns_rdataset_t *rdataset);
  */
 
 void
+dns_rdataset_setownercase(dns_rdataset_t *rdataset, const dns_name_t *name);
+/*%<
+ * Store the casing of 'name', the owner name of 'rdataset', into
+ * a bitfield so that the name can be capitalized the same when when
+ * the rdataset is used later. This sets the CASESET attribute.
+ */
+
+void
+dns_rdataset_getownercase(const dns_rdataset_t *rdataset, dns_name_t *name);
+/*%<
+ * If the CASESET attribute is set, retrieve the case bitfield that was
+ * previously stored by dns_rdataset_getownername(), and capitalize 'name'
+ * according to it. If CASESET is not set, do nothing.
+ */
+
+void
 dns_rdataset_trimttl(dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset,
 		     dns_rdata_rrsig_t *rrsig, isc_stdtime_t now,
-		     isc_boolean_t acceptexpired);
+		     bool acceptexpired);
 /*%<
  * Trim the ttl of 'rdataset' and 'sigrdataset' so that they will expire
  * at or before 'rrsig->expiretime'.  If 'acceptexpired' is true and the

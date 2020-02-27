@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2007, 2009-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #ifndef ISC_TASK_H
 #define ISC_TASK_H 1
@@ -80,6 +73,8 @@
  *** Imports.
  ***/
 
+#include <stdbool.h>
+
 #include <isc/eventclass.h>
 #include <isc/json.h>
 #include <isc/lang.h>
@@ -139,8 +134,8 @@ typedef struct isc_taskmethods {
 				   void *tag);
 	isc_result_t (*beginexclusive)(isc_task_t *task);
 	void (*endexclusive)(isc_task_t *task);
-    void (*setprivilege)(isc_task_t *task, isc_boolean_t priv);
-    isc_boolean_t (*privilege)(isc_task_t *task);
+    void (*setprivilege)(isc_task_t *task, bool priv);
+    bool (*privilege)(isc_task_t *task);
 } isc_taskmethods_t;
 
 /*%
@@ -349,7 +344,7 @@ isc_task_purge(isc_task_t *task, void *sender, isc_eventtype_t type,
  *\li	The number of events purged.
  */
 
-isc_boolean_t
+bool
 isc_task_purgeevent(isc_task_t *task, isc_event_t *event);
 /*%<
  * Purge 'event' from a task's event queue.
@@ -376,8 +371,8 @@ isc_task_purgeevent(isc_task_t *task, isc_event_t *event);
  *
  * Returns:
  *
- *\li	#ISC_TRUE			The event was purged.
- *\li	#ISC_FALSE			The event was not in the event queue,
+ *\li	#true			The event was purged.
+ *\li	#false			The event was not in the event queue,
  *					or was marked unpurgeable.
  */
 
@@ -467,7 +462,7 @@ isc_task_onshutdown(isc_task_t *task, isc_taskaction_t action,
  *
  *\li	#ISC_R_SUCCESS
  *\li	#ISC_R_NOMEMORY
- *\li	#ISC_R_TASKSHUTTINGDOWN			Task is shutting down.
+ *\li	#ISC_R_SHUTTINGDOWN			Task is shutting down.
  */
 
 void
@@ -603,9 +598,14 @@ isc_task_endexclusive(isc_task_t *task);
 
 void
 isc_task_getcurrenttime(isc_task_t *task, isc_stdtime_t *t);
+void
+isc_task_getcurrenttimex(isc_task_t *task, isc_time_t *t);
 /*%<
  * Provide the most recent timestamp on the task.  The timestamp is considered
- * as the "current time" in the second-order granularity.
+ * as the "current time".
+ *
+ * isc_task_getcurrentime() returns the time in one-second granularity;
+ * isc_task_getcurrentimex() returns it in nanosecond granularity.
  *
  * Requires:
  *\li	'task' is a valid task.
@@ -615,18 +615,18 @@ isc_task_getcurrenttime(isc_task_t *task, isc_stdtime_t *t);
  *\li	'*t' has the "current time".
  */
 
-isc_boolean_t
+bool
 isc_task_exiting(isc_task_t *t);
 /*%<
- * Returns ISC_TRUE if the task is in the process of shutting down,
- * ISC_FALSE otherwise.
+ * Returns true if the task is in the process of shutting down,
+ * false otherwise.
  *
  * Requires:
  *\li	'task' is a valid task.
  */
 
 void
-isc_task_setprivilege(isc_task_t *task, isc_boolean_t priv);
+isc_task_setprivilege(isc_task_t *task, bool priv);
 /*%<
  * Set or unset the task's "privileged" flag depending on the value of
  * 'priv'.
@@ -642,7 +642,7 @@ isc_task_setprivilege(isc_task_t *task, isc_boolean_t priv);
  *\li	'task' is a valid task.
  */
 
-isc_boolean_t
+bool
 isc_task_privilege(isc_task_t *task);
 /*%<
  * Returns the current value of the task's privilege flag.

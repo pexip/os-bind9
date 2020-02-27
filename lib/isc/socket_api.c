@@ -1,22 +1,19 @@
 /*
- * Copyright (C) 2009, 2011-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 #include <config.h>
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/app.h>
 #include <isc/magic.h>
@@ -208,7 +205,7 @@ isc_socket_getsockname(isc_socket_t *sock, isc_sockaddr_t *addressp) {
 }
 
 void
-isc_socket_ipv6only(isc_socket_t *sock, isc_boolean_t yes) {
+isc_socket_ipv6only(isc_socket_t *sock, bool yes) {
 	REQUIRE(ISCAPI_SOCKET_VALID(sock));
 
 	if (isc_bind9)
@@ -369,13 +366,13 @@ isc_socket_sendto2(isc_socket_t *sock, isc_region_t *region,
 }
 
 void
-isc_socket_cleanunix(isc_sockaddr_t *sockaddr, isc_boolean_t active) {
+isc_socket_cleanunix(isc_sockaddr_t *sockaddr, bool active) {
 	isc__socket_cleanunix(sockaddr, active);
 }
 
 isc_result_t
-isc_socket_permunix(isc_sockaddr_t *sockaddr, isc_uint32_t perm,
-		     isc_uint32_t owner, isc_uint32_t group)
+isc_socket_permunix(isc_sockaddr_t *sockaddr, uint32_t perm,
+		     uint32_t owner, uint32_t group)
 {
 	return (isc__socket_permunix(sockaddr, perm, owner, group));
 }

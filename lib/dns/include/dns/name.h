@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2007, 2009-2013, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: name.h,v 1.137 2011/01/13 04:59:26 tbox Exp $ */
 
 #ifndef DNS_NAME_H
 #define DNS_NAME_H 1
@@ -72,8 +65,9 @@
  ***/
 
 #include <stdio.h>
+#include <inttypes.h>
+#include <stdbool.h>
 
-#include <isc/boolean.h>
 #include <isc/lang.h>
 #include <isc/magic.h>
 #include <isc/region.h>		/* Required for storage size of dns_label_t. */
@@ -152,6 +146,42 @@ struct dns_name {
 LIBDNS_EXTERNAL_DATA extern dns_name_t *dns_rootname;
 LIBDNS_EXTERNAL_DATA extern dns_name_t *dns_wildcardname;
 
+/*%<
+ * DNS_NAME_INITNONABSOLUTE and DNS_NAME_INITABSOLUTE are macros for
+ * initializing dns_name_t structures.
+ *
+ * Note[1]: 'length' is set to (sizeof(A) - 1) in DNS_NAME_INITNONABSOLUTE
+ * and sizeof(A) in DNS_NAME_INITABSOLUTE to allow C strings to be used
+ * to initialize 'ndata'.
+ *
+ * Note[2]: The final value of offsets for DNS_NAME_INITABSOLUTE should
+ * match (sizeof(A) - 1) which is the offset of the root label.
+ *
+ * Typical usage:
+ *	unsigned char data[] = "\005value";
+ *	unsigned char offsets[] = { 0 };
+ *	dns_name_t value = DNS_NAME_INITNONABSOLUTE(data, offsets);
+ *
+ *	unsigned char data[] = "\005value";
+ *	unsigned char offsets[] = { 0, 6 };
+ *	dns_name_t value = DNS_NAME_INITABSOLUTE(data, offsets);
+ */
+#define DNS_NAME_INITNONABSOLUTE(A,B) { \
+	DNS_NAME_MAGIC, \
+	A, (sizeof(A) - 1), sizeof(B), \
+	DNS_NAMEATTR_READONLY, \
+	B, NULL, { (void *)-1, (void *)-1}, \
+	{NULL, NULL} \
+}
+
+#define DNS_NAME_INITABSOLUTE(A,B) { \
+	DNS_NAME_MAGIC, \
+	A, sizeof(A), sizeof(B), \
+	DNS_NAMEATTR_READONLY | DNS_NAMEATTR_ABSOLUTE, \
+	B, NULL, { (void *)-1, (void *)-1}, \
+	{NULL, NULL} \
+}
+
 /*%
  * Standard size of a wire format name
  */
@@ -164,7 +194,7 @@ LIBDNS_EXTERNAL_DATA extern dns_name_t *dns_wildcardname;
  */
 typedef isc_result_t (*dns_name_totextfilter_t)(isc_buffer_t *target,
 						unsigned int used_org,
-						isc_boolean_t absolute);
+						bool absolute);
 
 /***
  *** Initialization
@@ -188,7 +218,7 @@ dns_name_init(dns_name_t *name, unsigned char *offsets);
  * Ensures:
  * \li	'name' is a valid name.
  * \li	dns_name_countlabels(name) == 0
- * \li	dns_name_isabsolute(name) == ISC_FALSE
+ * \li	dns_name_isabsolute(name) == false
  */
 
 void
@@ -213,7 +243,7 @@ dns_name_reset(dns_name_t *name);
  * Ensures:
  * \li	'name' is a valid name.
  * \li	dns_name_countlabels(name) == 0
- * \li	dns_name_isabsolute(name) == ISC_FALSE
+ * \li	dns_name_isabsolute(name) == false
  */
 
 void
@@ -231,7 +261,7 @@ dns_name_invalidate(dns_name_t *name);
  * \li	If the name had a dedicated buffer, that association is ended.
  */
 
-isc_boolean_t
+bool
 dns_name_isvalid(const dns_name_t *name);
 /*%<
  * Check whether 'name' points to a valid dns_name
@@ -266,7 +296,7 @@ dns_name_setbuffer(dns_name_t *name, isc_buffer_t *buffer);
  *	dedicated buffer already, or 'buffer' is NULL.
  */
 
-isc_boolean_t
+bool
 dns_name_hasbuffer(const dns_name_t *name);
 /*%<
  * Does 'name' have a dedicated buffer?
@@ -275,15 +305,15 @@ dns_name_hasbuffer(const dns_name_t *name);
  * \li	'name' is a valid name.
  *
  * Returns:
- * \li	ISC_TRUE	'name' has a dedicated buffer.
- * \li	ISC_FALSE	'name' does not have a dedicated buffer.
+ * \li	true	'name' has a dedicated buffer.
+ * \li	false	'name' does not have a dedicated buffer.
  */
 
 /***
  *** Properties
  ***/
 
-isc_boolean_t
+bool
 dns_name_isabsolute(const dns_name_t *name);
 /*%<
  * Does 'name' end in the root label?
@@ -296,7 +326,7 @@ dns_name_isabsolute(const dns_name_t *name);
  * \li	FALSE		The last label in 'name' is not the root label.
  */
 
-isc_boolean_t
+bool
 dns_name_iswildcard(const dns_name_t *name);
 /*%<
  * Is 'name' a wildcard name?
@@ -312,11 +342,11 @@ dns_name_iswildcard(const dns_name_t *name);
  */
 
 unsigned int
-dns_name_hash(dns_name_t *name, isc_boolean_t case_sensitive);
+dns_name_hash(dns_name_t *name, bool case_sensitive);
 /*%<
  * Provide a hash value for 'name'.
  *
- * Note: if 'case_sensitive' is ISC_FALSE, then names which differ only in
+ * Note: if 'case_sensitive' is false, then names which differ only in
  * case will have the same hash value.
  *
  * Requires:
@@ -327,12 +357,12 @@ dns_name_hash(dns_name_t *name, isc_boolean_t case_sensitive);
  */
 
 unsigned int
-dns_name_fullhash(dns_name_t *name, isc_boolean_t case_sensitive);
+dns_name_fullhash(dns_name_t *name, bool case_sensitive);
 /*%<
  * Provide a hash value for 'name'.  Unlike dns_name_hash(), this function
  * always takes into account of the entire name to calculate the hash value.
  *
- * Note: if 'case_sensitive' is ISC_FALSE, then names which differ only in
+ * Note: if 'case_sensitive' is false, then names which differ only in
  * case will have the same hash value.
  *
  * Requires:
@@ -343,12 +373,16 @@ dns_name_fullhash(dns_name_t *name, isc_boolean_t case_sensitive);
  */
 
 unsigned int
-dns_name_hashbylabel(dns_name_t *name, isc_boolean_t case_sensitive);
+dns_name_hashbylabel(dns_name_t *name, bool case_sensitive);
 /*%<
  * Provide a hash value for 'name', where the hash value is the sum
- * of the hash values of each label.
+ * of the hash values of each label.  This function should only be used
+ * when incremental hashing is necessary, for example, during RBT
+ * traversal. It is not currently used in BIND. Generally,
+ * dns_name_fullhash() is the correct function to use for name
+ * hashing.
  *
- * Note: if 'case_sensitive' is ISC_FALSE, then names which differ only in
+ * Note: if 'case_sensitive' is false, then names which differ only in
  * case will have the same hash value.
  *
  * Requires:
@@ -430,7 +464,7 @@ dns_name_compare(const dns_name_t *name1, const dns_name_t *name2);
  * \li	> 0		'name1' is greater than 'name2'
  */
 
-isc_boolean_t
+bool
 dns_name_equal(const dns_name_t *name1, const dns_name_t *name2);
 /*%<
  * Are 'name1' and 'name2' equal?
@@ -454,11 +488,11 @@ dns_name_equal(const dns_name_t *name1, const dns_name_t *name2);
  * \li	Either name1 is absolute and name2 is absolute, or neither is.
  *
  * Returns:
- * \li	ISC_TRUE	'name1' and 'name2' are equal
- * \li	ISC_FALSE	'name1' and 'name2' are not equal
+ * \li	true	'name1' and 'name2' are equal
+ * \li	false	'name1' and 'name2' are not equal
  */
 
-isc_boolean_t
+bool
 dns_name_caseequal(const dns_name_t *name1, const dns_name_t *name2);
 /*%<
  * Case sensitive version of dns_name_equal().
@@ -485,7 +519,7 @@ dns_name_rdatacompare(const dns_name_t *name1, const dns_name_t *name2);
  * \li	> 0		'name1' is greater than 'name2'
  */
 
-isc_boolean_t
+bool
 dns_name_issubdomain(const dns_name_t *name1, const dns_name_t *name2);
 /*%<
  * Is 'name1' a subdomain of 'name2'?
@@ -511,7 +545,7 @@ dns_name_issubdomain(const dns_name_t *name1, const dns_name_t *name2);
  * \li	FALSE		'name1' is not a subdomain of 'name2'
  */
 
-isc_boolean_t
+bool
 dns_name_matcheswildcard(const dns_name_t *name, const dns_name_t *wname);
 /*%<
  * Does 'name' match the wildcard specified in 'wname'?
@@ -800,8 +834,6 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
  *\li	#DNS_R_EMPTYLABEL
  *\li	#DNS_R_LABELTOOLONG
  *\li	#DNS_R_BADESCAPE
- *\li	(#DNS_R_BADBITSTRING: should not be returned)
- *\li	(#DNS_R_BITSTRINGTOOLONG: should not be returned)
  *\li	#DNS_R_BADDOTTEDQUAD
  *\li	#ISC_R_NOSPACE
  *\li	#ISC_R_UNEXPECTEDEND
@@ -811,14 +843,15 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
 #define DNS_NAME_MASTERFILE	0x02U	/* escape $ and @ */
 
 isc_result_t
-dns_name_toprincipal(dns_name_t *name, isc_buffer_t *target);
+dns_name_toprincipal(const dns_name_t *name, isc_buffer_t *target);
 
 isc_result_t
-dns_name_totext(dns_name_t *name, isc_boolean_t omit_final_dot,
+dns_name_totext(const dns_name_t *name, bool omit_final_dot,
 		isc_buffer_t *target);
 
 isc_result_t
-dns_name_totext2(dns_name_t *name, unsigned int options, isc_buffer_t *target);
+dns_name_totext2(const dns_name_t *name, unsigned int options,
+		 isc_buffer_t *target);
 /*%<
  * Convert 'name' into text format, storing the result in 'target'.
  *
@@ -879,7 +912,7 @@ dns_name_totext2(dns_name_t *name, unsigned int options, isc_buffer_t *target);
  */
 
 isc_result_t
-dns_name_tofilenametext(dns_name_t *name, isc_boolean_t omit_final_dot,
+dns_name_tofilenametext(dns_name_t *name, bool omit_final_dot,
 			isc_buffer_t *target);
 /*%<
  * Convert 'name' into an alternate text format appropriate for filenames,
@@ -1088,7 +1121,7 @@ dns_name_digest(dns_name_t *name, dns_digestfunc_t digest, void *arg);
  *
  */
 
-isc_boolean_t
+bool
 dns_name_dynamic(dns_name_t *name);
 /*%<
  * Returns whether there is dynamic memory associated with this name.
@@ -1099,7 +1132,7 @@ dns_name_dynamic(dns_name_t *name);
  *
  * Returns:
  *
- *\li	'ISC_TRUE' if the name is dynamic otherwise 'ISC_FALSE'.
+ *\li	'true' if the name is dynamic otherwise 'false'.
  */
 
 isc_result_t
@@ -1121,7 +1154,7 @@ dns_name_print(dns_name_t *name, FILE *stream);
  */
 
 void
-dns_name_format(dns_name_t *name, char *cp, unsigned int size);
+dns_name_format(const dns_name_t *name, char *cp, unsigned int size);
 /*%<
  * Format 'name' as text appropriate for use in log messages.
  *
@@ -1219,7 +1252,7 @@ dns_name_settotextfilter(dns_name_totextfilter_t proc);
  */
 
 isc_result_t
-dns_name_copy(dns_name_t *source, dns_name_t *dest, isc_buffer_t *target);
+dns_name_copy(const dns_name_t *source, dns_name_t *dest, isc_buffer_t *target);
 /*%<
  * Makes 'dest' refer to a copy of the name in 'source'.  The data are
  * either copied to 'target' or the dedicated buffer in 'dest'.
@@ -1242,11 +1275,11 @@ dns_name_copy(dns_name_t *source, dns_name_t *dest, isc_buffer_t *target);
  *\li	#ISC_R_NOSPACE
  */
 
-isc_boolean_t
-dns_name_ishostname(const dns_name_t *name, isc_boolean_t wildcard);
+bool
+dns_name_ishostname(const dns_name_t *name, bool wildcard);
 /*%<
  * Return if 'name' is a valid hostname.  RFC 952 / RFC 1123.
- * If 'wildcard' is ISC_TRUE then allow the first label of name to
+ * If 'wildcard' is true then allow the first label of name to
  * be a wildcard.
  * The root is also accepted.
  *
@@ -1255,7 +1288,7 @@ dns_name_ishostname(const dns_name_t *name, isc_boolean_t wildcard);
  */
 
 
-isc_boolean_t
+bool
 dns_name_ismailbox(const dns_name_t *name);
 /*%<
  * Return if 'name' is a valid mailbox.  RFC 821.
@@ -1264,7 +1297,7 @@ dns_name_ismailbox(const dns_name_t *name);
  * \li	'name' to be valid.
  */
 
-isc_boolean_t
+bool
 dns_name_internalwildcard(const dns_name_t *name);
 /*%<
  * Return if 'name' contains a internal wildcard name.
@@ -1285,10 +1318,28 @@ dns_name_destroy(void);
  * non-NULL argument prior to calling dns_name_destroy();
  */
 
-isc_boolean_t
+bool
 dns_name_isdnssd(const dns_name_t *owner);
 /*%<
  * Determine if the 'owner' is a DNS-SD prefix.
+ */
+
+bool
+dns_name_isrfc1918(const dns_name_t *owner);
+/*%<
+ * Determine if the 'name' is in the RFC 1918 reverse namespace.
+ */
+
+bool
+dns_name_isula(const dns_name_t *owner);
+/*%<
+ * Determine if the 'name' is in the ULA reverse namespace.
+ */
+
+bool
+dns_name_istat(const dns_name_t *name);
+/*
+ * Determine if 'name' is a potential 'trust-anchor-telemetry' name.
  */
 
 ISC_LANG_ENDDECLS
@@ -1334,7 +1385,7 @@ do { \
 	(n)->buffer = (b)
 
 #define DNS_NAME_ISABSOLUTE(n) \
-	(((n)->attributes & DNS_NAMEATTR_ABSOLUTE) != 0 ? ISC_TRUE : ISC_FALSE)
+	(((n)->attributes & DNS_NAMEATTR_ABSOLUTE) != 0 ? true : false)
 
 #define DNS_NAME_COUNTLABELS(n) \
 	((n)->labels)

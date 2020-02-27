@@ -1,25 +1,19 @@
 /*
- * Copyright (C) 2004-2009, 2011-2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: interfacemgr.c,v 1.101 2011/11/09 18:44:03 each Exp $ */
 
 /*! \file */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/interfaceiter.h>
 #include <isc/os.h>
@@ -104,7 +98,7 @@ route_event(isc_task_t *task, isc_event_t *event) {
 	isc_region_t r;
 	isc_result_t result;
 	struct MSGHDR *rtm;
-	isc_boolean_t done = ISC_TRUE;
+	bool done = true;
 
 	UNUSED(task);
 
@@ -157,7 +151,7 @@ route_event(isc_task_t *task, isc_event_t *event) {
 		result = isc_socket_recv(mgr->route, &r, 1, mgr->task,
 					 route_event, mgr);
 		if (result == ISC_R_SUCCESS)
-			done = ISC_FALSE;
+			done = false;
 	}
 	UNLOCK(&mgr->lock);
 
@@ -308,7 +302,7 @@ ns_interfacemgr_attach(ns_interfacemgr_t *source, ns_interfacemgr_t **target) {
 
 void
 ns_interfacemgr_detach(ns_interfacemgr_t **targetp) {
-	isc_result_t need_destroy = ISC_FALSE;
+	isc_result_t need_destroy = false;
 	ns_interfacemgr_t *target = *targetp;
 	REQUIRE(target != NULL);
 	REQUIRE(NS_INTERFACEMGR_VALID(target));
@@ -316,7 +310,7 @@ ns_interfacemgr_detach(ns_interfacemgr_t **targetp) {
 	REQUIRE(target->references > 0);
 	target->references--;
 	if (target->references == 0)
-		need_destroy = ISC_TRUE;
+		need_destroy = true;
 	UNLOCK(&target->lock);
 	if (need_destroy)
 		ns_interfacemgr_destroy(target);
@@ -364,8 +358,7 @@ ns_interface_create(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr,
 	ifp->generation = mgr->generation;
 	ifp->addr = *addr;
 	ifp->flags = 0;
-	strncpy(ifp->name, name, sizeof(ifp->name));
-	ifp->name[sizeof(ifp->name)-1] = '\0';
+	strlcpy(ifp->name, name, sizeof(ifp->name));
 	ifp->clientmgr = NULL;
 
 	result = isc_mutex_init(&ifp->lock);
@@ -460,7 +453,7 @@ ns_interface_listenudp(ns_interface_t *ifp) {
 	}
 
 	result = ns_clientmgr_createclients(ifp->clientmgr, ifp->nudpdispatch,
-					    ifp, ISC_FALSE);
+					    ifp, false);
 	if (result != ISC_R_SUCCESS) {
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
 				 "UDP ns_clientmgr_createclients(): %s",
@@ -501,7 +494,7 @@ ns_interface_accepttcp(ns_interface_t *ifp) {
 	}
 	isc_socket_setname(ifp->tcpsocket, "dispatcher", NULL);
 #ifndef ISC_ALLOW_MAPPED
-	isc_socket_ipv6only(ifp->tcpsocket, ISC_TRUE);
+	isc_socket_ipv6only(ifp->tcpsocket, true);
 #endif
 	result = isc_socket_bind(ifp->tcpsocket, &ifp->addr,
 				 ISC_SOCKET_REUSEADDRESS);
@@ -531,7 +524,7 @@ ns_interface_accepttcp(ns_interface_t *ifp) {
 
 	result = ns_clientmgr_createclients(ifp->clientmgr,
 					    ifp->ntcptarget, ifp,
-					    ISC_TRUE);
+					    true);
 	if (result != ISC_R_SUCCESS) {
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
 				 "TCP ns_clientmgr_createclients(): %s",
@@ -545,17 +538,19 @@ ns_interface_accepttcp(ns_interface_t *ifp) {
  tcp_bind_failure:
 	isc_socket_detach(&ifp->tcpsocket);
  tcp_socket_failure:
-	return (ISC_R_SUCCESS);
+	return (result);
 }
 
 static isc_result_t
 ns_interface_setup(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr,
 		   const char *name, ns_interface_t **ifpret,
-		   isc_boolean_t accept_tcp, isc_dscp_t dscp)
+		   bool accept_tcp, isc_dscp_t dscp,
+		   bool *addr_in_use)
 {
 	isc_result_t result;
 	ns_interface_t *ifp = NULL;
 	REQUIRE(ifpret != NULL && *ifpret == NULL);
+	REQUIRE(addr_in_use == NULL || *addr_in_use == false);
 
 	result = ns_interface_create(mgr, addr, name, &ifp);
 	if (result != ISC_R_SUCCESS)
@@ -564,12 +559,19 @@ ns_interface_setup(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr,
 	ifp->dscp = dscp;
 
 	result = ns_interface_listenudp(ifp);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
+		if ((result == ISC_R_ADDRINUSE) && (addr_in_use != NULL))
+			*addr_in_use = true;
 		goto cleanup_interface;
+	}
 
-	if (!ns_g_notcp && accept_tcp == ISC_TRUE) {
+	if (!ns_g_notcp && accept_tcp == true) {
 		result = ns_interface_accepttcp(ifp);
 		if (result != ISC_R_SUCCESS) {
+			if ((result == ISC_R_ADDRINUSE) &&
+			    (addr_in_use != NULL))
+				*addr_in_use = true;
+
 			/*
 			 * XXXRTH We don't currently have a way to easily stop
 			 * dispatch service, so we currently return
@@ -633,7 +635,7 @@ ns_interface_attach(ns_interface_t *source, ns_interface_t **target) {
 
 void
 ns_interface_detach(ns_interface_t **targetp) {
-	isc_result_t need_destroy = ISC_FALSE;
+	isc_result_t need_destroy = false;
 	ns_interface_t *target = *targetp;
 	REQUIRE(target != NULL);
 	REQUIRE(NS_INTERFACE_VALID(target));
@@ -641,7 +643,7 @@ ns_interface_detach(ns_interface_t **targetp) {
 	REQUIRE(target->references > 0);
 	target->references--;
 	if (target->references == 0)
-		need_destroy = ISC_TRUE;
+		need_destroy = true;
 	UNLOCK(&target->lock);
 	if (need_destroy)
 		ns_interface_destroy(target);
@@ -698,7 +700,7 @@ clearacl(isc_mem_t *mctx, dns_acl_t **aclp) {
 	return (ISC_R_SUCCESS);
 }
 
-static isc_boolean_t
+static bool
 listenon_is_ip6_any(ns_listenelt_t *elt) {
 	REQUIRE(elt && elt->acl);
 	return dns_acl_isany(elt->acl);
@@ -715,7 +717,7 @@ setup_locals(ns_interfacemgr_t *mgr, isc_interface_t *interface) {
 	/* First add localhost address */
 	prefixlen = (netaddr->family == AF_INET) ? 32 : 128;
 	result = dns_iptable_addprefix(mgr->aclenv.localhost->iptable,
-				       netaddr, prefixlen, ISC_TRUE);
+				       netaddr, prefixlen, true);
 	if (result != ISC_R_SUCCESS)
 		return (result);
 
@@ -745,7 +747,7 @@ setup_locals(ns_interfacemgr_t *mgr, isc_interface_t *interface) {
 	}
 
 	result = dns_iptable_addprefix(mgr->aclenv.localnets->iptable,
-				       netaddr, prefixlen, ISC_TRUE);
+				       netaddr, prefixlen, true);
 	if (result != ISC_R_SUCCESS)
 		return (result);
 
@@ -791,28 +793,30 @@ clearlistenon(ns_interfacemgr_t *mgr) {
 
 static isc_result_t
 do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
-	isc_boolean_t verbose)
+	bool verbose)
 {
 	isc_interfaceiter_t *iter = NULL;
-	isc_boolean_t scan_ipv4 = ISC_FALSE;
-	isc_boolean_t scan_ipv6 = ISC_FALSE;
-	isc_boolean_t adjusting = ISC_FALSE;
-	isc_boolean_t ipv6only = ISC_TRUE;
-	isc_boolean_t ipv6pktinfo = ISC_TRUE;
+	bool scan_ipv4 = false;
+	bool scan_ipv6 = false;
+	bool adjusting = false;
+	bool ipv6only = true;
+	bool ipv6pktinfo = true;
 	isc_result_t result;
 	isc_netaddr_t zero_address, zero_address6;
 	ns_listenelt_t *le;
 	isc_sockaddr_t listen_addr;
 	ns_interface_t *ifp;
-	isc_boolean_t log_explicit = ISC_FALSE;
-	isc_boolean_t dolistenon;
+	bool log_explicit = false;
+	bool dolistenon;
 	char sabuf[ISC_SOCKADDR_FORMATSIZE];
+	bool tried_listening;
+	bool all_addresses_in_use;
 
 	if (ext_listen != NULL)
-		adjusting = ISC_TRUE;
+		adjusting = true;
 
 	if (isc_net_probeipv6() == ISC_R_SUCCESS)
-		scan_ipv6 = ISC_TRUE;
+		scan_ipv6 = true;
 #ifdef WANT_IPV6
 	else if (!ns_g_disable6)
 		isc_log_write(IFMGR_COMMON_LOGARGS,
@@ -821,7 +825,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 #endif
 
 	if (isc_net_probeipv4() == ISC_R_SUCCESS)
-		scan_ipv4 = ISC_TRUE;
+		scan_ipv4 = true;
 	else if (!ns_g_disable4)
 		isc_log_write(IFMGR_COMMON_LOGARGS,
 			      verbose ? ISC_LOG_INFO : ISC_LOG_DEBUG(1),
@@ -836,18 +840,18 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 	 * allowed.
 	 */
 #ifndef ISC_ALLOW_MAPPED
-	if (scan_ipv6 == ISC_TRUE &&
+	if (scan_ipv6 == true &&
 	    isc_net_probe_ipv6only() != ISC_R_SUCCESS) {
-		ipv6only = ISC_FALSE;
-		log_explicit = ISC_TRUE;
+		ipv6only = false;
+		log_explicit = true;
 	}
 #endif
-	if (scan_ipv6 == ISC_TRUE &&
+	if (scan_ipv6 == true &&
 	    isc_net_probe_ipv6pktinfo() != ISC_R_SUCCESS) {
-		ipv6pktinfo = ISC_FALSE;
-		log_explicit = ISC_TRUE;
+		ipv6pktinfo = false;
+		log_explicit = true;
 	}
-	if (scan_ipv6 == ISC_TRUE && ipv6only && ipv6pktinfo) {
+	if (scan_ipv6 == true && ipv6only && ipv6pktinfo) {
 		for (le = ISC_LIST_HEAD(mgr->listenon6->elts);
 		     le != NULL;
 		     le = ISC_LIST_NEXT(le, link)) {
@@ -882,8 +886,9 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 					      le->port);
 				result = ns_interface_setup(mgr, &listen_addr,
 							    "<any>", &ifp,
-							    ISC_TRUE,
-							    le->dscp);
+							    true,
+							    le->dscp,
+							    NULL);
 				if (result == ISC_R_SUCCESS)
 					ifp->flags |= NS_INTERFACEFLAG_ANYADDR;
 				else
@@ -903,7 +908,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 	if (result != ISC_R_SUCCESS)
 		return (result);
 
-	if (adjusting == ISC_FALSE) {
+	if (adjusting == false) {
 		result = clearacl(mgr->mctx, &mgr->aclenv.localhost);
 		if (result != ISC_R_SUCCESS)
 			goto cleanup_iter;
@@ -913,6 +918,8 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 		clearlistenon(mgr);
 	}
 
+	tried_listening = false;
+	all_addresses_in_use = true;
 	for (result = isc_interfaceiter_first(iter);
 	     result == ISC_R_SUCCESS;
 	     result = isc_interfaceiter_next(iter))
@@ -928,9 +935,9 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 		family = interface.address.family;
 		if (family != AF_INET && family != AF_INET6)
 			continue;
-		if (scan_ipv4 == ISC_FALSE && family == AF_INET)
+		if (scan_ipv4 == false && family == AF_INET)
 			continue;
-		if (scan_ipv6 == ISC_FALSE && family == AF_INET6)
+		if (scan_ipv6 == false && family == AF_INET6)
 			continue;
 
 		/*
@@ -949,20 +956,31 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 			continue;
 		}
 
-		if (adjusting == ISC_FALSE) {
+		if (adjusting == false) {
+			/*
+			 * If running with -T fixedlocal, then we only
+			 * want 127.0.0.1 and ::1 in the localhost ACL.
+			 */
+			if (ns_g_fixedlocal &&
+			    !isc_netaddr_isloopback(&interface.address))
+			{
+				goto listenon;
+			}
+
 			result = setup_locals(mgr, &interface);
 			if (result != ISC_R_SUCCESS)
 				goto ignore_interface;
 		}
 
+ listenon:
 		ll = (family == AF_INET) ? mgr->listenon4 : mgr->listenon6;
-		dolistenon = ISC_TRUE;
+		dolistenon = true;
 		for (le = ISC_LIST_HEAD(ll->elts);
 		     le != NULL;
 		     le = ISC_LIST_NEXT(le, link))
 		{
 			int match;
-			isc_boolean_t ipv6_wildcard = ISC_FALSE;
+			bool ipv6_wildcard = false;
 			isc_netaddr_t listen_netaddr;
 			isc_sockaddr_t listen_sockaddr;
 
@@ -992,9 +1010,9 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 			if (match <= 0)
 				continue;
 
-			if (adjusting == ISC_FALSE && dolistenon == ISC_TRUE) {
+			if (adjusting == false && dolistenon == true) {
 				setup_listenon(mgr, &interface, le->port);
-				dolistenon = ISC_FALSE;
+				dolistenon = false;
 			}
 
 			/*
@@ -1003,7 +1021,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 			 */
 			if (family == AF_INET6 && ipv6only && ipv6pktinfo &&
 			    listenon_is_ip6_any(le))
-				ipv6_wildcard = ISC_TRUE;
+				ipv6_wildcard = true;
 
 			/*
 			 * When adjusting interfaces with extra a listening
@@ -1012,7 +1030,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 			 * interface, we need to listen on the address
 			 * explicitly.
 			 */
-			if (adjusting == ISC_TRUE) {
+			if (adjusting == true) {
 				ns_listenelt_t *ele;
 
 				match = 0;
@@ -1029,7 +1047,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 					else
 						match = 0;
 				}
-				if (ipv6_wildcard == ISC_TRUE && match == 0)
+				if (ipv6_wildcard == true && match == 0)
 					continue;
 			}
 
@@ -1049,8 +1067,10 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 						      sabuf, ifp->dscp);
 				}
 			} else {
-				if (adjusting == ISC_FALSE &&
-				    ipv6_wildcard == ISC_TRUE)
+				bool addr_in_use = false;
+
+				if (adjusting == false &&
+				    ipv6_wildcard == true)
 					continue;
 
 				if (log_explicit && family == AF_INET6 &&
@@ -1062,7 +1082,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 						      "incomplete; explicitly "
 						      "binding to each IPv6 "
 						      "address separately");
-					log_explicit = ISC_FALSE;
+					log_explicit = false;
 				}
 				isc_sockaddr_format(&listen_sockaddr,
 						    sabuf, sizeof(sabuf));
@@ -1071,7 +1091,7 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 					      "%s"
 					      "listening on %s interface "
 					      "%s, %s",
-					      (adjusting == ISC_TRUE) ?
+					      (adjusting == true) ?
 					      "additionally " : "",
 					      (family == AF_INET) ?
 					      "IPv4" : "IPv6",
@@ -1081,9 +1101,14 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 						    &listen_sockaddr,
 						    interface.name,
 						    &ifp,
-						    (adjusting == ISC_TRUE) ?
-						    ISC_FALSE : ISC_TRUE,
-						    le->dscp);
+						    (adjusting == true) ?
+						    false : true,
+						    le->dscp,
+						    &addr_in_use);
+
+				tried_listening = true;
+				if (!addr_in_use)
+					all_addresses_in_use = false;
 
 				if (result != ISC_R_SUCCESS) {
 					isc_log_write(IFMGR_COMMON_LOGARGS,
@@ -1114,24 +1139,27 @@ do_scan(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 				 "interface iteration failed: %s",
 				 isc_result_totext(result));
 	else
-		result = ISC_R_SUCCESS;
+		result = ((tried_listening && all_addresses_in_use) ?
+			  ISC_R_ADDRINUSE : ISC_R_SUCCESS);
  cleanup_iter:
 	isc_interfaceiter_destroy(&iter);
 	return (result);
 }
 
-static void
+static isc_result_t
 ns_interfacemgr_scan0(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
-		      isc_boolean_t verbose)
+		      bool verbose)
 {
-	isc_boolean_t purge = ISC_TRUE;
+	isc_result_t result;
+	bool purge = true;
 
 	REQUIRE(NS_INTERFACEMGR_VALID(mgr));
 
 	mgr->generation++;	/* Increment the generation count. */
 
-	if (do_scan(mgr, ext_listen, verbose) != ISC_R_SUCCESS)
-		purge = ISC_FALSE;
+	result = do_scan(mgr, ext_listen, verbose);
+	if ((result != ISC_R_SUCCESS) && (result != ISC_R_ADDRINUSE))
+		purge = false;
 
 	/*
 	 * Now go through the interface list and delete anything that
@@ -1152,18 +1180,27 @@ ns_interfacemgr_scan0(ns_interfacemgr_t *mgr, ns_listenlist_t *ext_listen,
 		isc_log_write(IFMGR_COMMON_LOGARGS, ISC_LOG_WARNING,
 			      "not listening on any interfaces");
 	}
+
+	return (result);
 }
 
-void
-ns_interfacemgr_scan(ns_interfacemgr_t *mgr, isc_boolean_t verbose) {
-	ns_interfacemgr_scan0(mgr, NULL, verbose);
+bool
+ns_interfacemgr_islistening(ns_interfacemgr_t *mgr) {
+	REQUIRE(NS_INTERFACEMGR_VALID(mgr));
+
+	return (ISC_LIST_EMPTY(mgr->interfaces) ? false : true);
 }
 
-void
+isc_result_t
+ns_interfacemgr_scan(ns_interfacemgr_t *mgr, bool verbose) {
+	return (ns_interfacemgr_scan0(mgr, NULL, verbose));
+}
+
+isc_result_t
 ns_interfacemgr_adjust(ns_interfacemgr_t *mgr, ns_listenlist_t *list,
-		       isc_boolean_t verbose)
+		       bool verbose)
 {
-	ns_interfacemgr_scan0(mgr, list, verbose);
+	return (ns_interfacemgr_scan0(mgr, list, verbose));
 }
 
 void
@@ -1196,7 +1233,7 @@ ns_interfacemgr_dumprecursing(FILE *f, ns_interfacemgr_t *mgr) {
 	UNLOCK(&mgr->lock);
 }
 
-isc_boolean_t
+bool
 ns_interfacemgr_listeningon(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr) {
 	isc_sockaddr_t *old;
 
@@ -1204,6 +1241,6 @@ ns_interfacemgr_listeningon(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr) {
 	     old != NULL;
 	     old = ISC_LIST_NEXT(old, link))
 		if (isc_sockaddr_equal(old, addr))
-			return (ISC_TRUE);
-	return (ISC_FALSE);
+			return (true);
+	return (false);
 }

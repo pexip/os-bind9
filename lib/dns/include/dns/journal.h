@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2009, 2011, 2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: journal.h,v 1.43 2011/12/22 07:32:41 each Exp $ */
 
 #ifndef DNS_JOURNAL_H
 #define DNS_JOURNAL_H 1
@@ -33,6 +26,9 @@
  *** Imports
  ***/
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <isc/lang.h>
 #include <isc/magic.h>
 
@@ -46,8 +42,8 @@
  ***/
 #define DNS_JOURNALOPT_RESIGN	0x00000001
 
-#define DNS_JOURNAL_READ	0x00000000	/* ISC_FALSE */
-#define DNS_JOURNAL_CREATE	0x00000001	/* ISC_TRUE */
+#define DNS_JOURNAL_READ	0x00000000	/* false */
+#define DNS_JOURNAL_CREATE	0x00000001	/* true */
 #define DNS_JOURNAL_WRITE	0x00000002
 
 /***
@@ -178,9 +174,9 @@ dns_journal_write_transaction(dns_journal_t *j, dns_diff_t *diff);
  * Reading transactions from journals.
  */
 
-isc_uint32_t
+uint32_t
 dns_journal_first_serial(dns_journal_t *j);
-isc_uint32_t
+uint32_t
 dns_journal_last_serial(dns_journal_t *j);
 /*%<
  * Get the first and last addressable serial number in the journal.
@@ -188,7 +184,7 @@ dns_journal_last_serial(dns_journal_t *j);
 
 isc_result_t
 dns_journal_iter_init(dns_journal_t *j,
-		      isc_uint32_t begin_serial, isc_uint32_t end_serial);
+		      uint32_t begin_serial, uint32_t end_serial);
 /*%<
  * Prepare to iterate over the transactions that will bring the database
  * from SOA serial number 'begin_serial' to 'end_serial'.
@@ -217,7 +213,7 @@ dns_journal_next_rr(dns_journal_t *j);
 /*@}*/
 
 void
-dns_journal_current_rr(dns_journal_t *j, dns_name_t **name, isc_uint32_t *ttl,
+dns_journal_current_rr(dns_journal_t *j, dns_name_t **name, uint32_t *ttl,
 		       dns_rdata_t **rdata);
 /*%<
  * Get the name, ttl, and rdata of the current journal RR.
@@ -278,23 +274,23 @@ dns_db_diffx(dns_diff_t *diff, dns_db_t *dba, dns_dbversion_t *dbvera,
  */
 
 isc_result_t
-dns_journal_compact(isc_mem_t *mctx, char *filename, isc_uint32_t serial,
-		    isc_uint32_t target_size);
+dns_journal_compact(isc_mem_t *mctx, char *filename, uint32_t serial,
+		    uint32_t target_size);
 /*%<
  * Attempt to compact the journal if it is greater that 'target_size'.
  * Changes from 'serial' onwards will be preserved.  If the journal
  * exists and is non-empty 'serial' must exist in the journal.
  */
 
-isc_boolean_t
-dns_journal_get_sourceserial(dns_journal_t *j, isc_uint32_t *sourceserial);
+bool
+dns_journal_get_sourceserial(dns_journal_t *j, uint32_t *sourceserial);
 void
-dns_journal_set_sourceserial(dns_journal_t *j, isc_uint32_t sourceserial);
+dns_journal_set_sourceserial(dns_journal_t *j, uint32_t sourceserial);
 /*%<
  * Get and set source serial.
  *
  * Returns:
- *	 ISC_TRUE if sourceserial has previously been set.
+ *	 true if sourceserial has previously been set.
  */
 
 ISC_LANG_ENDDECLS

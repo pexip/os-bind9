@@ -1,26 +1,22 @@
 /*
- * Copyright (C) 2004-2009, 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: time.h,v 1.40 2009/01/05 23:47:54 tbox Exp $ */
 
 #ifndef ISC_TIME_H
 #define ISC_TIME_H 1
 
 /*! \file */
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/types.h>
@@ -66,10 +62,10 @@ isc_interval_set(isc_interval_t *i,
  *\li	nanoseconds < 1000000000.
  */
 
-isc_boolean_t
+bool
 isc_interval_iszero(const isc_interval_t *i);
 /*%<
- * Returns ISC_TRUE iff. 'i' is the zero interval.
+ * Returns true iff. 'i' is the zero interval.
  *
  * Requires:
  *
@@ -126,10 +122,10 @@ isc_time_settoepoch(isc_time_t *t);
  *\li	't' is a valid pointer.
  */
 
-isc_boolean_t
+bool
 isc_time_isepoch(const isc_time_t *t);
 /*%<
- * Returns ISC_TRUE iff. 't' is the epoch ("time zero").
+ * Returns true iff. 't' is the epoch ("time zero").
  *
  * Requires:
  *
@@ -230,7 +226,7 @@ isc_time_subtract(const isc_time_t *t, const isc_interval_t *i,
  *		The interval is larger than the time since the epoch.
  */
 
-isc_uint64_t
+uint64_t
 isc_time_microdiff(const isc_time_t *t1, const isc_time_t *t2);
 /*%<
  * Find the difference in microseconds between time t1 and time t2.
@@ -244,7 +240,7 @@ isc_time_microdiff(const isc_time_t *t1, const isc_time_t *t2);
  *\li	The difference of t1 - t2, or 0 if t1 <= t2.
  */
 
-isc_uint32_t
+uint32_t
 isc_time_seconds(const isc_time_t *t);
 /*%<
  * Return the number of seconds since the epoch stored in a time structure.
@@ -277,7 +273,7 @@ isc_time_secondsastimet(const isc_time_t *t, time_t *secondsp);
  *\li	Out of range
  */
 
-isc_uint32_t
+uint32_t
 isc_time_nanoseconds(const isc_time_t *t);
 /*%<
  * Return the number of nanoseconds stored in a time structure.
@@ -337,6 +333,20 @@ isc_time_formatISO8601(const isc_time_t *t, char *buf, unsigned int len);
 /*%<
  * Format the time 't' into the buffer 'buf' of length 'len',
  * using the ISO8601 format: "yyyy-mm-ddThh:mm:ssZ"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
+isc_time_formatISO8601ms(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss.sssZ"
  * If the text does not fit in the buffer, the result is indeterminate,
  * but is always guaranteed to be null terminated.
  *

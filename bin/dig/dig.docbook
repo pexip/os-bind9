@@ -1,27 +1,24 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-	       "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
-	       [<!ENTITY mdash "&#8212;">]>
+<!DOCTYPE book [
+<!ENTITY mdash "&#8212;">]>
 <!--
- - Copyright (C) 2004-2011, 2013-2015  Internet Systems Consortium, Inc. ("ISC")
- - Copyright (C) 2000-2003  Internet Software Consortium.
+ - Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  -
- - Permission to use, copy, modify, and/or distribute this software for any
- - purpose with or without fee is hereby granted, provided that the above
- - copyright notice and this permission notice appear in all copies.
+ - This Source Code Form is subject to the terms of the Mozilla Public
+ - License, v. 2.0. If a copy of the MPL was not distributed with this
+ - file, You can obtain one at http://mozilla.org/MPL/2.0/.
  -
- - THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- - REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- - AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- - INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- - LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- - OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- - PERFORMANCE OF THIS SOFTWARE.
+ - See the COPYRIGHT file distributed with this work for additional
+ - information regarding copyright ownership.
 -->
 
-<refentry id="man.dig">
-
+<!-- Converted by db4-upgrade version 1.0 -->
+<refentry xmlns:db="http://docbook.org/ns/docbook" version="5.0" xml:id="man.dig">
+  <info>
+    <date>2014-02-19</date>
+  </info>
   <refentryinfo>
-    <date>February 19, 2014</date>
+    <corpname>ISC</corpname>
+    <corpauthor>Internet Systems Consortium, Inc.</corpauthor>
   </refentryinfo>
 
   <refmeta>
@@ -37,6 +34,10 @@
 
   <docinfo>
     <copyright>
+      <year>2000</year>
+      <year>2001</year>
+      <year>2002</year>
+      <year>2003</year>
       <year>2004</year>
       <year>2005</year>
       <year>2006</year>
@@ -48,56 +49,54 @@
       <year>2013</year>
       <year>2014</year>
       <year>2015</year>
+      <year>2016</year>
+      <year>2017</year>
+      <year>2018</year>
+      <year>2019</year>
       <holder>Internet Systems Consortium, Inc. ("ISC")</holder>
-    </copyright>
-    <copyright>
-      <year>2000</year>
-      <year>2001</year>
-      <year>2002</year>
-      <year>2003</year>
-      <holder>Internet Software Consortium.</holder>
     </copyright>
   </docinfo>
 
   <refsynopsisdiv>
-    <cmdsynopsis>
+    <cmdsynopsis sepchar=" ">
       <command>dig</command>
-      <arg choice="opt">@server</arg>
-      <arg><option>-b <replaceable class="parameter">address</replaceable></option></arg>
-      <arg><option>-c <replaceable class="parameter">class</replaceable></option></arg>
-      <arg><option>-f <replaceable class="parameter">filename</replaceable></option></arg>
-      <arg><option>-k <replaceable class="parameter">filename</replaceable></option></arg>
-      <arg><option>-m</option></arg>
-      <arg><option>-p <replaceable class="parameter">port#</replaceable></option></arg>
-      <arg><option>-q <replaceable class="parameter">name</replaceable></option></arg>
-      <arg><option>-t <replaceable class="parameter">type</replaceable></option></arg>
-      <arg><option>-v</option></arg>
-      <arg><option>-x <replaceable class="parameter">addr</replaceable></option></arg>
-      <arg><option>-y <replaceable class="parameter"><optional>hmac:</optional>name:key</replaceable></option></arg>
-      <arg><option>-4</option></arg>
-      <arg><option>-6</option></arg>
-      <arg choice="opt">name</arg>
-      <arg choice="opt">type</arg>
-      <arg choice="opt">class</arg>
+      <arg choice="opt" rep="norepeat">@server</arg>
+      <arg choice="opt" rep="norepeat"><option>-b <replaceable class="parameter">address</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-c <replaceable class="parameter">class</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-f <replaceable class="parameter">filename</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-k <replaceable class="parameter">filename</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-m</option></arg>
+      <arg choice="opt" rep="norepeat"><option>-p <replaceable class="parameter">port#</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-q <replaceable class="parameter">name</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-t <replaceable class="parameter">type</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-v</option></arg>
+      <arg choice="opt" rep="norepeat"><option>-x <replaceable class="parameter">addr</replaceable></option></arg>
+      <arg choice="opt" rep="norepeat"><option>-y <replaceable class="parameter"><optional>hmac:</optional>name:key</replaceable></option></arg>
+      <group choice="opt" rep="norepeat">
+	<arg choice="opt" rep="norepeat"><option>-4</option></arg>
+	<arg choice="opt" rep="norepeat"><option>-6</option></arg>
+      </group>
+      <arg choice="opt" rep="norepeat">name</arg>
+      <arg choice="opt" rep="norepeat">type</arg>
+      <arg choice="opt" rep="norepeat">class</arg>
       <arg choice="opt" rep="repeat">queryopt</arg>
     </cmdsynopsis>
 
-    <cmdsynopsis>
+    <cmdsynopsis sepchar=" ">
       <command>dig</command>
-      <arg><option>-h</option></arg>
+      <arg choice="opt" rep="norepeat"><option>-h</option></arg>
     </cmdsynopsis>
 
-    <cmdsynopsis>
+    <cmdsynopsis sepchar=" ">
       <command>dig</command>
       <arg choice="opt" rep="repeat">global-queryopt</arg>
       <arg choice="opt" rep="repeat">query</arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
-  <refsect1>
-    <title>DESCRIPTION</title>
-    <para><command>dig</command>
-      (domain information groper) is a flexible tool
+  <refsection><info><title>DESCRIPTION</title></info>
+
+    <para><command>dig</command> is a flexible tool
       for interrogating DNS name servers.  It performs DNS lookups and
       displays the answers that are returned from the name server(s) that
       were queried.  Most DNS administrators use <command>dig</command> to
@@ -141,15 +140,15 @@
     <para>
       The IN and CH class names overlap with the IN and CH top level
       domain names.  Either use the <option>-t</option> and
-      <option>-c</option> options to specify the type and class, 
+      <option>-c</option> options to specify the type and class,
       use the <option>-q</option> the specify the domain name, or
       use "IN." and "CH." when looking up these top level domains.
     </para>
 
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>SIMPLE USAGE</title>
+  <refsection><info><title>SIMPLE USAGE</title></info>
+
 
     <para>
       A typical invocation of <command>dig</command> looks like:
@@ -212,56 +211,56 @@
       </variablelist>
     </para>
 
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>OPTIONS</title>
+  <refsection><info><title>OPTIONS</title></info>
+
 
     <variablelist>
       <varlistentry>
-        <term>-4</term>
-        <listitem>
+	<term>-4</term>
+	<listitem>
 	  <para>
 	    Use IPv4 only.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-6</term>
-        <listitem>
+	<term>-6</term>
+	<listitem>
 	  <para>
 	    Use IPv6 only.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-b <replaceable class="parameter">address<optional>#port</optional></replaceable></term>
-        <listitem>
+	<term>-b <replaceable class="parameter">address<optional>#port</optional></replaceable></term>
+	<listitem>
 	  <para>
 	    Set the source IP address of the query.
 	    The <parameter>address</parameter> must be a valid address on
 	    one of the host's network interfaces, or "0.0.0.0" or "::". An
 	    optional port may be specified by appending "#&lt;port&gt;"
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-c <replaceable class="parameter">class</replaceable></term>
-        <listitem>
+	<term>-c <replaceable class="parameter">class</replaceable></term>
+	<listitem>
 	  <para>
 	    Set the query class. The
 	    default <parameter>class</parameter> is IN; other classes
 	    are HS for Hesiod records or CH for Chaosnet records.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-f <replaceable class="parameter">file</replaceable></term>
-        <listitem>
+	<term>-f <replaceable class="parameter">file</replaceable></term>
+	<listitem>
 	  <para>
 	    Batch mode: <command>dig</command> reads a list of lookup
 	    requests to process from the
@@ -270,23 +269,23 @@
 	    presented as queries to
 	    <command>dig</command> using the command-line interface.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-i</term>
-        <listitem>
+	<term>-i</term>
+	<listitem>
 	  <para>
-	    Do reverse IPv6 lookups using the obsolete RFC1886 IP6.INT
+	    Do reverse IPv6 lookups using the obsolete RFC 1886 IP6.INT
 	    domain, which is no longer in use. Obsolete bit string
-	    label queries (RFC2874) are not attempted.
+	    label queries (RFC 2874) are not attempted.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-k <replaceable class="parameter">keyfile</replaceable></term>
-        <listitem>
+	<term>-k <replaceable class="parameter">keyfile</replaceable></term>
+	<listitem>
 	  <para>
 	    Sign queries using TSIG using a key read from the given file.
 	    Key files can be generated using
@@ -300,51 +299,52 @@
 	    and <command>server</command> statements in
 	    <filename>named.conf</filename>.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-m</term>
-        <listitem>
+	<term>-m</term>
+	<listitem>
 	  <para>
 	    Enable memory usage debugging.
 	    <!-- It enables ISC_MEM_DEBUGTRACE and ISC_MEM_DEBUGRECORD
 		 documented in include/isc/mem.h -->
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-p <replaceable class="parameter">port</replaceable></term>
-        <listitem>
+	<term>-p <replaceable class="parameter">port</replaceable></term>
+	<listitem>
 	  <para>
 	    Send the query to a non-standard port on the server,
-	    instead of the defaut port 53. This option would be used
+	    instead of the default port 53. This option would be used
 	    to test a name server that has been configured to listen
 	    for queries on a non-standard port number.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-q <replaceable class="parameter">name</replaceable></term>
-        <listitem>
+	<term>-q <replaceable class="parameter">name</replaceable></term>
+	<listitem>
 	  <para>
 	    The domain name to query. This is useful to distinguish
 	    the <parameter>name</parameter> from other arguments.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-t <replaceable class="parameter">type</replaceable></term>
-        <listitem>
+	<term>-t <replaceable class="parameter">type</replaceable></term>
+	<listitem>
 	  <para>
-	    The resource record type to query. It can be any valid query type
-	    which is
-	    supported in BIND 9.  The default query type is "A", unless the
-	    <option>-x</option> option is supplied to indicate a reverse lookup.
-	    A zone transfer can be requested by specifying a type of AXFR.  When
+	    The resource record type to query. It can be any valid query
+	    type.  If it is a resource record type supported in BIND 9, it
+	    can be given by the type mnemonic (such as "NS" or "AAAA").
+	    The default query type is "A", unless the <option>-x</option>
+	    option is supplied to indicate a reverse lookup.  A zone
+	    transfer can be requested by specifying a type of AXFR.  When
 	    an incremental zone transfer (IXFR) is required, set the
 	    <parameter>type</parameter> to <literal>ixfr=N</literal>.
 	    The incremental zone transfer will contain the changes
@@ -352,21 +352,36 @@
 	    record was
 	    <parameter>N</parameter>.
 	  </para>
-        </listitem>
+	  <para>
+	    All resource record types can be expressed as "TYPEnn", where
+	    "nn" is the number of the type. If the resource record type is
+	    not supported in BIND 9, the result will be displayed as
+	    described in RFC 3597.
+	  </para>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-v</term>
-        <listitem>
+	<term>-u</term>
+	<listitem>
+	  <para>
+	    Print query times in microseconds instead of milliseconds.
+	  </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>-v</term>
+	<listitem>
 	  <para>
 	    Print the version number and exit.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-x <replaceable class="parameter">addr</replaceable></term>
-        <listitem>
+	<term>-x <replaceable class="parameter">addr</replaceable></term>
+	<listitem>
 	  <para>
 	    Simplified reverse lookups, for mapping addresses to
 	    names. The <parameter>addr</parameter> is an IPv4 address
@@ -383,12 +398,12 @@
 	    IP6.ARPA domain (but see also the <option>-i</option>
 	    option).
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
-        <term>-y <replaceable class="parameter"><optional>hmac:</optional>keyname:secret</replaceable></term>
-        <listitem>
+	<term>-y <replaceable class="parameter"><optional>hmac:</optional>keyname:secret</replaceable></term>
+	<listitem>
 	  <para>
 	    Sign queries using TSIG with the given authentication key.
 	    <parameter>keyname</parameter> is the name of the key, and
@@ -398,7 +413,8 @@
 	    <literal>hmac-sha1</literal>, <literal>hmac-sha224</literal>,
 	    <literal>hmac-sha256</literal>, <literal>hmac-sha384</literal>, or
 	    <literal>hmac-sha512</literal>.  If <parameter>hmac</parameter>
-	    is not specified, the default is <literal>hmac-md5</literal>.
+	    is not specified, the default is <literal>hmac-md5</literal>
+	    or if MD5 was disabled <literal>hmac-sha256</literal>.
 	  </para>
 	  <para>
 	    NOTE: You should use the <option>-k</option> option and
@@ -407,18 +423,18 @@
 	    a command line argument in clear text. This may be visible
 	    in the output from
 	    <citerefentry>
-              <refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum>
+	      <refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum>
 	    </citerefentry>
 	    or in a history file maintained by the user's shell.
 	  </para>
-        </listitem>
+	</listitem>
       </varlistentry>
 
     </variablelist>
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>QUERY OPTIONS</title>
+  <refsection><info><title>QUERY OPTIONS</title></info>
+
 
     <para><command>dig</command>
       provides a number of query options which affect
@@ -518,6 +534,16 @@
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>+[no]badcookie</option></term>
+	  <listitem>
+	    <para>
+	      Retry lookup with the new server cookie if a
+	      BADCOOKIE response is received.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>+[no]besteffort</option></term>
 	  <listitem>
 	    <para>
@@ -586,6 +612,23 @@
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>+[no]cookie<optional>=####</optional></option></term>
+	  <listitem>
+	    <para>
+	      Send a COOKIE EDNS option, with optional
+	      value.  Replaying a COOKIE from a previous response will
+	      allow the server to identify a previous client.  The
+	      default is <option>+cookie</option>.
+	    </para>
+	    <para>
+	      <command>+cookie</command> is also set when +trace
+	      is set to better emulate the default queries from a
+	      nameserver.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>+[no]crypto</option></term>
 	  <listitem>
 	    <para>
@@ -637,6 +680,16 @@
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>+dscp=value</option></term> <listitem>
+	    <para>
+	      Set the DSCP code point to be used when sending the
+	      query.  Valid DSCP code points are in the range
+	      [0..63].  By default no code point is explicitly set.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>+[no]edns[=#]</option></term>
 	  <listitem>
 	    <para>
@@ -677,8 +730,11 @@
 	    <para>
 	      Specify EDNS option with code point <option>code</option>
 	      and optionally payload of <option>value</option> as a
-	      hexadecimal string.  <option>+noednsopt</option>
-	      clears the EDNS options to to be sent.
+	      hexadecimal string.  <option>code</option> can be
+	      either an EDNS option name (for example,
+	      <literal>NSID</literal> or <literal>ECS</literal>),
+	      or an arbitrary numeric value.  <option>+noednsopt</option>
+	      clears the EDNS options to be sent.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -704,6 +760,17 @@
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>+[no]header-only</option></term>
+	  <listitem>
+	    <para>
+	      Send a query with a DNS header without a question section.
+	      The default is to add a question section.  The query type
+	      and query name are ignored when this is set.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>+[no]identify</option></term>
 	  <listitem>
 	    <para>
@@ -713,6 +780,28 @@
 	      short form answers are requested, the default is not
 	      to show the source address and port number of the
 	      server that provided the answer.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>+[no]idnin</option></term>
+	  <listitem>
+	    <para>
+	      Process [do not process] IDN domain names on input.
+	      This requires IDN SUPPORT to have been enabled at
+	      compile time.  The default is to process IDN input.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>+[no]idnout</option></term>
+	  <listitem>
+	    <para>
+	      Convert [do not convert] puny code on output.
+	      This requires IDN SUPPORT to have been enabled at
+	      compile time.  The default is to convert output.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -734,6 +823,16 @@
 	      Keep the TCP socket open between queries and reuse
 	      it rather than creating a new TCP socket for each
 	      lookup.  The default is <option>+nokeepopen</option>.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>+[no]mapped</option></term>
+	  <listitem>
+	    <para>
+	      Allow mapped IPv4 over IPv6 addresses to be used.  The
+	      default is <option>+mapped</option>.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -925,21 +1024,9 @@
 	  <term><option>+[no]sigchase</option></term>
 	  <listitem>
 	    <para>
-	      Chase DNSSEC signature chains.  Requires dig be
-	      compiled with -DDIG_SIGCHASE.
-	    </para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><option>+[no]sit<optional>=####</optional></option></term>
-	  <listitem>
-	    <para>
-	      Send a Source Identity Token EDNS option, with optional
-	      value.  Replaying a SIT from a previous response will
-	      allow the server to identify a previous client.  The
-	      default is <option>+nosit</option>.  Currently using
-	      experimental value 65001 for the option code.
+	      Chase DNSSEC signature chains. Requires dig be compiled
+	      with -DDIG_SIGCHASE. This feature is deprecated.
+	      Use <command>delv</command> instead.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -973,11 +1060,20 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>+[no]subnet=addr/prefix</option></term>
+	  <term><option>+[no]subnet=addr[/prefix-length]</option></term>
 	  <listitem>
 	    <para>
-	      Send an EDNS Client Subnet option with the specified
-	      IP address or network prefix.
+	      Send (don't send) an EDNS Client Subnet option with the
+	      specified IP address or network prefix.
+	    </para>
+	    <para>
+              <command>dig +subnet=0.0.0.0/0</command>, or simply
+              <command>dig +subnet=0</command> for short, sends an EDNS
+              CLIENT-SUBNET option with an empty address and a source
+              prefix-length of zero, which signals a resolver that
+              the client's address information must
+              <emphasis>not</emphasis> be used when resolving
+              this query.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -987,16 +1083,16 @@
 	  <listitem>
 	    <para>
 	      Use [do not use] TCP when querying name servers. The
-	      default behavior is to use UDP unless an
-	      <literal>ixfr=N</literal> query is requested, in which
-	      case the default is TCP.  AXFR queries always use
-	      TCP.
+	      default behavior is to use UDP unless a type
+	      <literal>any</literal> or <literal>ixfr=N</literal>
+	      query is requested, in which case the default is TCP.
+	      AXFR queries always use TCP.
 	    </para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>+time=T</option></term>
+	  <term><option>+timeout=T</option></term>
 	  <listitem>
 	    <para>
 
@@ -1016,6 +1112,7 @@
 	    <para>
 	      When chasing DNSSEC signature chains perform a top-down
 	      validation.  Requires dig be compiled with -DDIG_SIGCHASE.
+	      This feature is deprecated. Use <command>delv</command> instead.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -1069,6 +1166,7 @@
 	      directory.
 	    </para> <para>
 	      Requires dig be compiled with -DDIG_SIGCHASE.
+	      This feature is deprecated. Use <command>delv</command> instead.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -1079,6 +1177,28 @@
 	    <para>
 	      Display [do not display] the TTL when printing the
 	      record.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>+[no]ttlunits</option></term>
+	  <listitem>
+	    <para>
+	      Display [do not display] the TTL in friendly human-readable
+	      time units of "s", "m", "h", "d", and "w", representing
+	      seconds, minutes, hours, days and weeks.  Implies +ttlid.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>+[no]unknownformat</option></term>
+	  <listitem>
+	    <para>
+	      Print all RDATA in unknown RR type presentation format
+	      (RFC 3597). The default is to print RDATA for known types
+	      in the type's presentation format.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -1095,13 +1215,23 @@
 	  </listitem>
 	</varlistentry>
 
+	<varlistentry>
+	  <term><option>+[no]zflag</option></term>
+	  <listitem>
+	    <para>
+	      Set [do not set] the last unassigned DNS header flag in a
+	      DNS query.  This flag is off by default.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
       </variablelist>
 
     </para>
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>MULTIPLE QUERIES</title>
+  <refsection><info><title>MULTIPLE QUERIES</title></info>
+
 
     <para>
       The BIND 9 implementation of <command>dig </command>
@@ -1147,34 +1277,36 @@ dig +qr www.isc.org any -x 127.0.0.1 isc.org ns +noqr
       <literal>isc.org</literal>.
     </para>
 
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>IDN SUPPORT</title>
+  <refsection><info><title>IDN SUPPORT</title></info>
+
     <para>
       If <command>dig</command> has been built with IDN (internationalized
       domain name) support, it can accept and display non-ASCII domain names.
       <command>dig</command> appropriately converts character encoding of
       domain name before sending a request to DNS server or displaying a
       reply from the server.
-      If you'd like to turn off the IDN support for some reason, defines
-      the <envar>IDN_DISABLE</envar> environment variable.
-      The IDN support is disabled if the variable is set when 
-      <command>dig</command> runs.
+      If you'd like to turn off the IDN support for some reason, use
+      parameters <parameter>+noidnin</parameter> and
+      <parameter>+noidnout</parameter>.
     </para>
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>FILES</title>
+  <refsection><info><title>FILES</title></info>
+
     <para><filename>/etc/resolv.conf</filename>
     </para>
     <para><filename>${HOME}/.digrc</filename>
     </para>
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>SEE ALSO</title>
+  <refsection><info><title>SEE ALSO</title></info>
+
     <para><citerefentry>
+	<refentrytitle>delv</refentrytitle><manvolnum>1</manvolnum>
+      </citerefentry>,
+      <citerefentry>
 	<refentrytitle>host</refentrytitle><manvolnum>1</manvolnum>
       </citerefentry>,
       <citerefentry>
@@ -1183,18 +1315,15 @@ dig +qr www.isc.org any -x 127.0.0.1 isc.org ns +noqr
       <citerefentry>
 	<refentrytitle>dnssec-keygen</refentrytitle><manvolnum>8</manvolnum>
       </citerefentry>,
-      <citetitle>RFC1035</citetitle>.
+      <citetitle>RFC 1035</citetitle>.
     </para>
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>BUGS</title>
+  <refsection><info><title>BUGS</title></info>
+
     <para>
       There are probably too many query options.
     </para>
-  </refsect1>
-</refentry><!--
- - Local variables:
- - mode: sgml
- - End:
--->
+  </refsection>
+
+</refentry>

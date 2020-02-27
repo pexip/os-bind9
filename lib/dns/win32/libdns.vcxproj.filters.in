@@ -39,6 +39,9 @@
     <ClCompile Include="..\adb.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\badcache.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\byaddr.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
@@ -46,6 +49,9 @@
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\callbacks.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\catz.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\client.c">
@@ -84,7 +90,13 @@
     <ClCompile Include="..\ds.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\dyndb.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\ecdb.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fixedname.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\forward.c">
@@ -95,6 +107,9 @@
       <Filter>Library Source Files</Filter>
     </ClCompile>
 @END GEOIP
+    <ClCompile Include="..\ipkeylist.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\iptable.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
@@ -135,6 +150,9 @@
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\nsec3.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nta.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\order.c">
@@ -294,6 +312,9 @@
     <ClCompile Include="..\opensslecdsa_link.c">
       <Filter>Dst Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\openssleddsa_link.c">
+      <Filter>Dst Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\opensslgost_link.c">
       <Filter>Dst Source Files</Filter>
     </ClCompile>
@@ -312,6 +333,9 @@
       <Filter>Dst Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pkcs11ecdsa_link.c">
+      <Filter>Dst Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pkcs11eddsa_link.c">
       <Filter>Dst Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pkcs11gost_link.c">
@@ -335,6 +359,9 @@
     <ClInclude Include="..\rbtdb64.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\rdatalist_p.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\dns\acache.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
@@ -342,6 +369,9 @@
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\adb.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\dns\badcache.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\bit.h">
@@ -354,6 +384,9 @@
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\callbacks.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\dns\catz.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\cert.h">
@@ -392,13 +425,22 @@
     <ClInclude Include="..\include\dns\dnssec.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\dns\dnstap.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\dns\ds.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\dsdigest.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\dns\dyndb.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\dns\ecdb.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\dns\edns.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\enumclass.h">
@@ -421,6 +463,9 @@
       <Filter>Library Header Files</Filter>
     </ClInclude>
 @END GEOIP
+    <ClInclude Include="..\include\dns\ipkeylist.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\dns\iptable.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
@@ -467,6 +512,9 @@
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\nsec3.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\dns\nta.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dns\opcode.h">

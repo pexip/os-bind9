@@ -1,22 +1,18 @@
 /*
- * Copyright (C) 2010, 2011, 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: dns64.c,v 1.8 2011/03/12 04:59:47 tbox Exp $ */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/list.h>
 #include <isc/mem.h>
@@ -57,9 +53,9 @@ isc_result_t
 dns_dns64_create(isc_mem_t *mctx, isc_netaddr_t *prefix,
 		 unsigned int prefixlen, isc_netaddr_t *suffix,
 		 dns_acl_t *clients, dns_acl_t *mapped, dns_acl_t *excluded,
-		 unsigned int flags, dns_dns64_t **dns64)
+		 unsigned int flags, dns_dns64_t **dns64p)
 {
-	dns_dns64_t *new;
+	dns_dns64_t *dns64;
 	unsigned int nbytes = 16;
 
 	REQUIRE(prefix != NULL && prefix->family == AF_INET6);
@@ -67,7 +63,7 @@ dns_dns64_create(isc_mem_t *mctx, isc_netaddr_t *prefix,
 	REQUIRE(prefixlen == 32 || prefixlen == 40 || prefixlen == 48 ||
 		prefixlen == 56 || prefixlen == 64 || prefixlen == 96);
 	REQUIRE(isc_netaddr_prefixok(prefix, prefixlen) == ISC_R_SUCCESS);
-	REQUIRE(dns64 != NULL && *dns64 == NULL);
+	REQUIRE(dns64p != NULL && *dns64p == NULL);
 
 	if (suffix != NULL) {
 		static const unsigned char zeros[16];
@@ -79,29 +75,29 @@ dns_dns64_create(isc_mem_t *mctx, isc_netaddr_t *prefix,
 		REQUIRE(memcmp(suffix->type.in6.s6_addr, zeros, nbytes) == 0);
 	}
 
-	new = isc_mem_get(mctx, sizeof(dns_dns64_t));
-	if (new == NULL)
+	dns64 = isc_mem_get(mctx, sizeof(dns_dns64_t));
+	if (dns64 == NULL)
 		return (ISC_R_NOMEMORY);
-	memset(new->bits, 0, sizeof(new->bits));
-	memmove(new->bits, prefix->type.in6.s6_addr, prefixlen / 8);
+	memset(dns64->bits, 0, sizeof(dns64->bits));
+	memmove(dns64->bits, prefix->type.in6.s6_addr, prefixlen / 8);
 	if (suffix != NULL)
-		memmove(new->bits + nbytes, suffix->type.in6.s6_addr + nbytes,
+		memmove(dns64->bits + nbytes, suffix->type.in6.s6_addr + nbytes,
 			16 - nbytes);
-	new->clients = NULL;
+	dns64->clients = NULL;
 	if (clients != NULL)
-		dns_acl_attach(clients, &new->clients);
-	new->mapped = NULL;
+		dns_acl_attach(clients, &dns64->clients);
+	dns64->mapped = NULL;
 	if (mapped != NULL)
-		dns_acl_attach(mapped, &new->mapped);
-	new->excluded = NULL;
+		dns_acl_attach(mapped, &dns64->mapped);
+	dns64->excluded = NULL;
 	if (excluded != NULL)
-		dns_acl_attach(excluded, &new->excluded);
-	new->prefixlen = prefixlen;
-	new->flags = flags;
-	ISC_LINK_INIT(new, link);
-	new->mctx = NULL;
-	isc_mem_attach(mctx, &new->mctx);
-	*dns64 = new;
+		dns_acl_attach(excluded, &dns64->excluded);
+	dns64->prefixlen = prefixlen;
+	dns64->flags = flags;
+	ISC_LINK_INIT(dns64, link);
+	dns64->mctx = NULL;
+	isc_mem_attach(mctx, &dns64->mctx);
+	*dns64p = dns64;
 	return (ISC_R_SUCCESS);
 }
 
@@ -200,18 +196,18 @@ dns_dns64_unlink(dns_dns64list_t *list, dns_dns64_t *dns64) {
 	ISC_LIST_UNLINK(*list, dns64, link);
 }
 
-isc_boolean_t
+bool
 dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
 		 const dns_name_t *reqsigner, const dns_aclenv_t *env,
 		 unsigned int flags, dns_rdataset_t *rdataset,
-		 isc_boolean_t *aaaaok, size_t aaaaoklen)
+		 bool *aaaaok, size_t aaaaoklen)
 {
 	struct in6_addr in6;
 	isc_netaddr_t netaddr;
 	isc_result_t result;
 	int match;
-	isc_boolean_t answer = ISC_FALSE;
-	isc_boolean_t found = ISC_FALSE;
+	bool answer = false;
+	bool found = false;
 	unsigned int i, ok;
 
 	REQUIRE(rdataset != NULL);
@@ -243,20 +239,20 @@ dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
 
 		if (!found && aaaaok != NULL) {
 			for (i = 0; i < aaaaoklen; i++)
-				aaaaok[i] = ISC_FALSE;
+				aaaaok[i] = false;
 		}
-		found = ISC_TRUE;
+		found = true;
 
 		/*
 		 * If we are not excluding any addresses then any AAAA
 		 * will do.
 		 */
 		if (dns64->excluded == NULL) {
-			answer = ISC_TRUE;
+			answer = true;
 			if (aaaaok == NULL)
 				goto done;
 			for (i = 0; i < aaaaoklen; i++)
-				aaaaok[i] = ISC_TRUE;
+				aaaaok[i] = true;
 			goto done;
 		}
 
@@ -275,10 +271,10 @@ dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
 						       dns64->excluded,
 						       env, &match, NULL);
 				if (result == ISC_R_SUCCESS && match <= 0) {
-					answer = ISC_TRUE;
+					answer = true;
 					if (aaaaok == NULL)
 						goto done;
-					aaaaok[i] = ISC_TRUE;
+					aaaaok[i] = true;
 					ok++;
 				}
 			} else
@@ -295,7 +291,7 @@ dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
  done:
 	if (!found && aaaaok != NULL) {
 		for (i = 0; i < aaaaoklen; i++)
-			aaaaok[i] = ISC_TRUE;
+			aaaaok[i] = true;
 	}
-	return (found ? answer : ISC_TRUE);
+	return (found ? answer : true);
 }

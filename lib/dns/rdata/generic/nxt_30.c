@@ -1,23 +1,13 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: nxt_30.c,v 1.65 2009/12/04 22:06:37 tbox Exp $ */
-
-/* reviewed: Wed Mar 15 18:21:15 PST 2000 by brister */
 
 /* RFC2535 */
 
@@ -39,7 +29,7 @@ fromtext_nxt(ARGS_FROMTEXT) {
 	unsigned char bm[8*1024]; /* 64k bits */
 	dns_rdatatype_t covered;
 	dns_rdatatype_t maxcovered = 0;
-	isc_boolean_t first = ISC_TRUE;
+	bool first = true;
 	long n;
 
 	REQUIRE(type == dns_rdatatype_nxt);
@@ -52,16 +42,17 @@ fromtext_nxt(ARGS_FROMTEXT) {
 	 * Next domain.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	origin = (origin != NULL) ? origin : dns_rootname;
+	if (origin == NULL)
+		origin = dns_rootname;
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 
 	memset(bm, 0, sizeof(bm));
 	do {
 		RETERR(isc_lex_getmastertoken(lexer, &token,
-					      isc_tokentype_string, ISC_TRUE));
+					      isc_tokentype_string, true));
 		if (token.type != isc_tokentype_string)
 			break;
 		n = strtol(DNS_AS_STR(token), &e, 10);
@@ -77,7 +68,7 @@ fromtext_nxt(ARGS_FROMTEXT) {
 			return (ISC_R_RANGE);
 		if (first || covered > maxcovered)
 			maxcovered = covered;
-		first = ISC_FALSE;
+		first = false;
 		bm[covered/8] |= (0x80>>(covered%8));
 	} while (1);
 	isc_lex_ungettoken(lexer, &token);
@@ -93,7 +84,7 @@ totext_nxt(ARGS_TOTEXT) {
 	unsigned int i, j;
 	dns_name_t name;
 	dns_name_t prefix;
-	isc_boolean_t sub;
+	bool sub;
 
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 	REQUIRE(rdata->length != 0);
@@ -117,7 +108,8 @@ totext_nxt(ARGS_TOTEXT) {
 								      target));
 					} else {
 						char buf[sizeof("65535")];
-						sprintf(buf, "%u", t);
+						snprintf(buf, sizeof(buf),
+							 "%u", t);
 						RETERR(str_totext(buf,
 								  target));
 					}
@@ -301,7 +293,7 @@ digest_nxt(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_nxt(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_nxt);
@@ -311,10 +303,10 @@ checkowner_nxt(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_nxt(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
@@ -323,7 +315,7 @@ checknames_nxt(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

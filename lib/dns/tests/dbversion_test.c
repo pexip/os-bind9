@@ -1,30 +1,25 @@
 /*
- * Copyright (C) 2011, 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
 
-#include <atf-c.h>
-
+#include <inttypes.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <atf-c.h>
 
 #include <isc/file.h>
 #include <isc/result.h>
@@ -73,7 +68,7 @@ setup_db(void) {
 static void
 close_db(void) {
 	if (v1 != NULL) {
-		dns_db_closeversion(db1, &v1, ISC_FALSE);
+		dns_db_closeversion(db1, &v1, false);
 		ATF_REQUIRE_EQ(v1, NULL);
 	}
 	if (db1 != NULL) {
@@ -82,7 +77,7 @@ close_db(void) {
 	}
 
 	if (v2 != NULL) {
-		dns_db_closeversion(db2, &v2, ISC_FALSE);
+		dns_db_closeversion(db2, &v2, false);
 		ATF_REQUIRE_EQ(v2, NULL);
 	}
 	if (db2 != NULL) {
@@ -101,7 +96,7 @@ attachversion(isc_assertioncallback_t callback) {
 	isc_result_t result;
 	dns_dbversion_t *v = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -112,7 +107,7 @@ attachversion(isc_assertioncallback_t callback) {
 		atf_tc_fail("dns_db_attachversion did not assert");
 
 	ATF_REQUIRE_EQ(v, v1);
-	dns_db_closeversion(db1, &v, ISC_FALSE);
+	dns_db_closeversion(db1, &v, false);
 	ATF_REQUIRE_EQ(v, NULL);
 
 	close_db();
@@ -145,13 +140,13 @@ static void
 closeversion(isc_assertioncallback_t callback) {
 	isc_result_t result;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
 
 	isc_assertion_setcallback(callback);
-	dns_db_closeversion(db1, VERSIONP(callback), ISC_FALSE);
+	dns_db_closeversion(db1, VERSIONP(callback), false);
 	if (callback != NULL)
 		atf_tc_fail("dns_db_closeversion did not assert");
 	ATF_REQUIRE_EQ(v1, NULL);
@@ -188,7 +183,7 @@ find(isc_assertioncallback_t callback) {
 	dns_rdataset_t rdataset;
 	dns_fixedname_t fixed;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -236,12 +231,12 @@ allrdatasets(isc_assertioncallback_t callback) {
 	dns_dbnode_t *node = NULL;
 	dns_rdatasetiter_t *iterator = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	isc_assertion_setcallback(callback);
@@ -291,7 +286,7 @@ findrdataset(isc_assertioncallback_t callback) {
 	dns_fixedname_t fixed;
 	dns_dbnode_t *node = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -299,7 +294,7 @@ findrdataset(isc_assertioncallback_t callback) {
 	dns_rdataset_init(&rdataset);
 	dns_fixedname_init(&fixed);
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	isc_assertion_setcallback(callback);
@@ -346,7 +341,7 @@ deleterdataset(isc_assertioncallback_t callback) {
 	dns_fixedname_t fixed;
 	dns_dbnode_t *node = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -354,7 +349,7 @@ deleterdataset(isc_assertioncallback_t callback) {
 	dns_rdataset_init(&rdataset);
 	dns_fixedname_init(&fixed);
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	isc_assertion_setcallback(callback);
@@ -402,7 +397,7 @@ subtract(isc_assertioncallback_t callback) {
 	dns_dbnode_t *node = NULL;
 	dns_rdatalist_t rdatalist;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -416,14 +411,14 @@ subtract(isc_assertioncallback_t callback) {
 	result = dns_rdatalist_tordataset(&rdatalist, &rdataset);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	isc_assertion_setcallback(callback);
 	result = dns_db_subtractrdataset(db1, node, VERSION(callback),
 					 &rdataset, 0, NULL);
 	if (callback != NULL)
-		atf_tc_fail("dns_db_dns_db_subtractrdataset did not assert");
+		atf_tc_fail("dns_db_subtractrdataset did not assert");
 	ATF_REQUIRE_EQ(result, DNS_R_UNCHANGED);
 
 	dns_db_detachnode(db1, &node);
@@ -461,7 +456,7 @@ dump(isc_assertioncallback_t callback) {
 	isc_result_t result;
 	FILE *f = NULL;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -512,7 +507,7 @@ addrdataset(isc_assertioncallback_t callback) {
 	dns_dbnode_t *node = NULL;
 	dns_rdatalist_t rdatalist;
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -526,7 +521,7 @@ addrdataset(isc_assertioncallback_t callback) {
 	result = dns_rdatalist_tordataset(&rdatalist, &rdataset);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	isc_assertion_setcallback(callback);
@@ -570,12 +565,12 @@ static void
 getnsec3parameters(isc_assertioncallback_t callback) {
 	isc_result_t result;
 	dns_hash_t hash;
-	isc_uint8_t flags;
-	isc_uint16_t iterations;
+	uint8_t flags;
+	uint16_t iterations;
 	unsigned char salt[DNS_NSEC3_SALTSIZE];
 	size_t salt_length = sizeof(salt);
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -626,7 +621,7 @@ resigned(isc_assertioncallback_t callback) {
 	isc_buffer_t b;
 	unsigned char buf[1024];
 
-	result = dns_test_begin(NULL, ISC_FALSE);
+	result = dns_test_begin(NULL, false);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	setup_db();
@@ -666,7 +661,7 @@ resigned(isc_assertioncallback_t callback) {
 	rdataset.attributes |= DNS_RDATASETATTR_RESIGN;
 	rdataset.resign = 7200;
 
-	result = dns_db_findnode(db1, dns_rootname, ISC_FALSE, &node);
+	result = dns_db_findnode(db1, dns_rootname, false, &node);
 	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
 
 	result = dns_db_addrdataset(db1, node, v1, 0, &rdataset, 0, &added);

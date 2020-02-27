@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2008, 2009, 2011, 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
 /*
  * Copyright (C) 2004  Nominet, Ltd.
@@ -45,13 +39,10 @@
 static inline isc_result_t
 fromtext_nsec3(ARGS_FROMTEXT) {
 	isc_token_t token;
-	unsigned char bm[8*1024]; /* 64k bits */
-	dns_rdatatype_t covered;
-	int octet;
-	int window;
 	unsigned int flags;
 	unsigned char hashalg;
 	isc_buffer_t b;
+	unsigned char buf[256];
 
 	REQUIRE(type == dns_rdatatype_nsec3);
 
@@ -63,13 +54,13 @@ fromtext_nsec3(ARGS_FROMTEXT) {
 
 	/* Hash. */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_hashalg_fromtext(&hashalg, &token.value.as_textregion));
 	RETERR(uint8_tobuffer(hashalg, target));
 
 	/* Flags. */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	flags = token.value.as_ulong;
 	if (flags > 255U)
 		RETTOK(ISC_R_RANGE);
@@ -77,14 +68,14 @@ fromtext_nsec3(ARGS_FROMTEXT) {
 
 	/* Iterations. */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_ulong > 0xffffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
 
 	/* salt */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	if (token.value.as_textregion.length > (255*2))
 		RETTOK(DNS_R_TEXTTOOLONG);
 	if (strcmp(DNS_AS_STR(token), "-") == 0) {
@@ -98,51 +89,25 @@ fromtext_nsec3(ARGS_FROMTEXT) {
 	 * Next hash a single base32hex word.
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
-	isc_buffer_init(&b, bm, sizeof(bm));
+				      false));
+	isc_buffer_init(&b, buf, sizeof(buf));
 	RETTOK(isc_base32hexnp_decodestring(DNS_AS_STR(token), &b));
 	if (isc_buffer_usedlength(&b) > 0xffU)
 		RETTOK(ISC_R_RANGE);
 	RETERR(uint8_tobuffer(isc_buffer_usedlength(&b), target));
-	RETERR(mem_tobuffer(target, &bm, isc_buffer_usedlength(&b)));
+	RETERR(mem_tobuffer(target, &buf, isc_buffer_usedlength(&b)));
 
-	memset(bm, 0, sizeof(bm));
-	do {
-		RETERR(isc_lex_getmastertoken(lexer, &token,
-					      isc_tokentype_string, ISC_TRUE));
-		if (token.type != isc_tokentype_string)
-			break;
-		RETTOK(dns_rdatatype_fromtext(&covered,
-					      &token.value.as_textregion));
-		bm[covered/8] |= (0x80>>(covered%8));
-	} while (1);
-	isc_lex_ungettoken(lexer, &token);
-	for (window = 0; window < 256 ; window++) {
-		/*
-		 * Find if we have a type in this window.
-		 */
-		for (octet = 31; octet >= 0; octet--)
-			if (bm[window * 32 + octet] != 0)
-				break;
-		if (octet < 0)
-			continue;
-		RETERR(uint8_tobuffer(window, target));
-		RETERR(uint8_tobuffer(octet + 1, target));
-		RETERR(mem_tobuffer(target, &bm[window * 32], octet + 1));
-	}
-	return (ISC_R_SUCCESS);
+	return (typemap_fromtext(lexer, target, true));
 }
 
 static inline isc_result_t
 totext_nsec3(ARGS_TOTEXT) {
 	isc_region_t sr;
-	unsigned int i, j, k;
-	unsigned int window, len;
+	unsigned int i, j;
 	unsigned char hash;
 	unsigned char flags;
 	char buf[sizeof("TYPE65535")];
-	isc_uint32_t iterations;
-	isc_boolean_t first;
+	uint32_t iterations;
 
 	REQUIRE(rdata->type == dns_rdatatype_nsec3);
 	REQUIRE(rdata->length != 0);
@@ -152,19 +117,19 @@ totext_nsec3(ARGS_TOTEXT) {
 	/* Hash */
 	hash = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
-	sprintf(buf, "%u ", hash);
+	snprintf(buf, sizeof(buf), "%u ", hash);
 	RETERR(str_totext(buf, target));
 
 	/* Flags */
 	flags = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
-	sprintf(buf, "%u ", flags);
+	snprintf(buf, sizeof(buf), "%u ", flags);
 	RETERR(str_totext(buf, target));
 
 	/* Iterations */
 	iterations = uint16_fromregion(&sr);
 	isc_region_consume(&sr, 2);
-	sprintf(buf, "%u ", iterations);
+	snprintf(buf, sizeof(buf), "%u ", iterations);
 	RETERR(str_totext(buf, target));
 
 	/* Salt */
@@ -194,42 +159,13 @@ totext_nsec3(ARGS_TOTEXT) {
 	RETERR(isc_base32hexnp_totext(&sr, 1, "", target));
 	sr.length = i - j;
 
-	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) == 0)
+	/*
+	 * Don't leave a trailing space when there's no typemap present.
+	 */
+	if (((tctx->flags & DNS_STYLEFLAG_MULTILINE) == 0) && (sr.length > 0)) {
 		RETERR(str_totext(" ", target));
-
-	/* Types covered */
-	first = ISC_TRUE;
-	for (i = 0; i < sr.length; i += len) {
-		if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
-			RETERR(str_totext(tctx->linebreak, target));
-			first = ISC_TRUE;
-		}
-		INSIST(i + 2 <= sr.length);
-		window = sr.base[i];
-		len = sr.base[i + 1];
-		INSIST(len > 0 && len <= 32);
-		i += 2;
-		INSIST(i + len <= sr.length);
-		for (j = 0; j < len; j++) {
-			dns_rdatatype_t t;
-			if (sr.base[i + j] == 0)
-				continue;
-			for (k = 0; k < 8; k++) {
-				if ((sr.base[i + j] & (0x80 >> k)) == 0)
-					continue;
-				t = window * 256 + j * 8 + k;
-				if (!first)
-					RETERR(str_totext(" ", target));
-				first = ISC_FALSE;
-				if (dns_rdatatype_isknown(t)) {
-					RETERR(dns_rdatatype_totext(t, target));
-				} else {
-					sprintf(buf, "TYPE%u", t);
-					RETERR(str_totext(buf, target));
-				}
-			}
-		}
 	}
+	RETERR(typemap_totext(&sr, tctx, target));
 
 	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
 		RETERR(str_totext(" )", target));
@@ -240,11 +176,7 @@ totext_nsec3(ARGS_TOTEXT) {
 static inline isc_result_t
 fromwire_nsec3(ARGS_FROMWIRE) {
 	isc_region_t sr, rr;
-	unsigned int window, lastwindow = 0;
-	unsigned int len;
 	unsigned int saltlen, hashlen;
-	isc_boolean_t first = ISC_TRUE;
-	unsigned int i;
 
 	REQUIRE(type == dns_rdatatype_nsec3);
 
@@ -275,40 +207,8 @@ fromwire_nsec3(ARGS_FROMWIRE) {
 		RETERR(DNS_R_FORMERR);
 	isc_region_consume(&sr, hashlen);
 
-	for (i = 0; i < sr.length; i += len) {
-		/*
-		 * Check for overflow.
-		 */
-		if (i + 2 > sr.length)
-			RETERR(DNS_R_FORMERR);
-		window = sr.base[i];
-		len = sr.base[i + 1];
-		i += 2;
-		/*
-		 * Check that bitmap windows are in the correct order.
-		 */
-		if (!first && window <= lastwindow)
-			RETERR(DNS_R_FORMERR);
-		/*
-		 * Check for legal lengths.
-		 */
-		if (len < 1 || len > 32)
-			RETERR(DNS_R_FORMERR);
-		/*
-		 * Check for overflow.
-		 */
-		if (i + len > sr.length)
-			RETERR(DNS_R_FORMERR);
-		/*
-		 * The last octet of the bitmap must be non zero.
-		 */
-		if (sr.base[i + len - 1] == 0)
-			RETERR(DNS_R_FORMERR);
-		lastwindow = window;
-		first = ISC_FALSE;
-	}
-	if (i != sr.length)
-		return (DNS_R_EXTRADATA);
+	RETERR(typemap_test(&sr, true));
+
 	RETERR(mem_tobuffer(target, rr.base, rr.length));
 	isc_buffer_forward(source, rr.length);
 	return (ISC_R_SUCCESS);
@@ -346,8 +246,7 @@ compare_nsec3(ARGS_COMPARE) {
 static inline isc_result_t
 fromstruct_nsec3(ARGS_FROMSTRUCT) {
 	dns_rdata_nsec3_t *nsec3 = source;
-	unsigned int i, len, window, lastwindow = 0;
-	isc_boolean_t first = ISC_TRUE;
+	isc_region_t region;
 
 	REQUIRE(type == dns_rdatatype_nsec3);
 	REQUIRE(source != NULL);
@@ -367,21 +266,9 @@ fromstruct_nsec3(ARGS_FROMSTRUCT) {
 	RETERR(uint8_tobuffer(nsec3->next_length, target));
 	RETERR(mem_tobuffer(target, nsec3->next, nsec3->next_length));
 
-	/*
-	 * Perform sanity check.
-	 */
-	for (i = 0; i < nsec3->len ; i += len) {
-		INSIST(i + 2 <= nsec3->len);
-		window = nsec3->typebits[i];
-		len = nsec3->typebits[i+1];
-		i += 2;
-		INSIST(first || window > lastwindow);
-		INSIST(len > 0 && len <= 32);
-		INSIST(i + len <= nsec3->len);
-		INSIST(nsec3->typebits[i + len - 1] != 0);
-		lastwindow = window;
-		first = ISC_FALSE;
-	}
+	region.base = nsec3->typebits;
+	region.length = nsec3->len;
+	RETERR(typemap_test(&region, true));
 	return (mem_tobuffer(target, nsec3->typebits, nsec3->len));
 }
 
@@ -471,7 +358,7 @@ digest_nsec3(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_nsec3(ARGS_CHECKOWNER) {
 	unsigned char owner[NSEC3_MAX_HASH_LENGTH];
 	isc_buffer_t buffer;
@@ -490,12 +377,12 @@ checkowner_nsec3(ARGS_CHECKOWNER) {
 	isc_region_consume(&label, 1);
 	isc_buffer_init(&buffer, owner, sizeof(owner));
 	if (isc_base32hexnp_decoderegion(&label, &buffer) == ISC_R_SUCCESS)
-		return (ISC_TRUE);
+		return (true);
 
-	return (ISC_FALSE);
+	return (false);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_nsec3(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_nsec3);
@@ -504,7 +391,7 @@ checknames_nsec3(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

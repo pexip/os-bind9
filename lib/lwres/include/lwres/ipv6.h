@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: ipv6.h,v 1.16 2007/06/19 23:47:23 tbox Exp $ */
@@ -32,7 +26,8 @@
  *** Imports.
  ***/
 
-#include <lwres/int.h>
+#include <inttypes.h>
+
 #include <lwres/platform.h>
 
 /***
@@ -41,11 +36,11 @@
 
 /*% in6_addr structure */
 struct in6_addr {
-        union {
-		lwres_uint8_t	_S6_u8[16];
-		lwres_uint16_t	_S6_u16[8];
-		lwres_uint32_t	_S6_u32[4];
-        } _S6_un;
+	union {
+		uint8_t	_S6_u8[16];
+		uint16_t	_S6_u16[8];
+		uint32_t	_S6_u32[4];
+	} _S6_un;
 };
 /*@{*/
 /*% IP v6 types */
@@ -64,15 +59,15 @@ LIBLWRES_EXTERNAL_DATA extern const struct in6_addr in6addr_loopback;
 /*% used in getaddrinfo.c and getnameinfo.c */
 struct sockaddr_in6 {
 #ifdef LWRES_PLATFORM_HAVESALEN
-	lwres_uint8_t		sin6_len;
-	lwres_uint8_t		sin6_family;
+	uint8_t		sin6_len;
+	uint8_t		sin6_family;
 #else
-	lwres_uint16_t		sin6_family;
+	uint16_t		sin6_family;
 #endif
-	lwres_uint16_t		sin6_port;
-	lwres_uint32_t		sin6_flowinfo;
+	uint16_t		sin6_port;
+	uint32_t		sin6_flowinfo;
 	struct in6_addr		sin6_addr;
-	lwres_uint32_t		sin6_scope_id;
+	uint32_t		sin6_scope_id;
 };
 
 #ifdef LWRES_PLATFORM_HAVESALEN
@@ -89,36 +84,36 @@ struct in6_pktinfo {
  * Unspecified IPv6 address
  */
 #define IN6_IS_ADDR_UNSPECIFIED(a)      \
-        (((a)->s6_addr32[0] == 0) &&    \
-         ((a)->s6_addr32[1] == 0) &&    \
-         ((a)->s6_addr32[2] == 0) &&    \
-         ((a)->s6_addr32[3] == 0))
+	(((a)->s6_addr32[0] == 0) &&    \
+	 ((a)->s6_addr32[1] == 0) &&    \
+	 ((a)->s6_addr32[2] == 0) &&    \
+	 ((a)->s6_addr32[3] == 0))
 
 /*
  * Loopback
  */
 #define IN6_IS_ADDR_LOOPBACK(a)         \
-        (((a)->s6_addr32[0] == 0) &&    \
-         ((a)->s6_addr32[1] == 0) &&    \
-         ((a)->s6_addr32[2] == 0) &&    \
-         ((a)->s6_addr32[3] == htonl(1)))
+	(((a)->s6_addr32[0] == 0) &&    \
+	 ((a)->s6_addr32[1] == 0) &&    \
+	 ((a)->s6_addr32[2] == 0) &&    \
+	 ((a)->s6_addr32[3] == htonl(1)))
 
 /*
  * IPv4 compatible
  */
 #define IN6_IS_ADDR_V4COMPAT(a)         \
-        (((a)->s6_addr32[0] == 0) &&    \
-         ((a)->s6_addr32[1] == 0) &&    \
-         ((a)->s6_addr32[2] == 0) &&    \
-         ((a)->s6_addr32[3] != 0) &&    \
-         ((a)->s6_addr32[3] != htonl(1)))
+	(((a)->s6_addr32[0] == 0) &&    \
+	 ((a)->s6_addr32[1] == 0) &&    \
+	 ((a)->s6_addr32[2] == 0) &&    \
+	 ((a)->s6_addr32[3] != 0) &&    \
+	 ((a)->s6_addr32[3] != htonl(1)))
 
 /*
  * Mapped
  */
 #define IN6_IS_ADDR_V4MAPPED(a)               \
-        (((a)->s6_addr32[0] == 0) &&          \
-         ((a)->s6_addr32[1] == 0) &&          \
-         ((a)->s6_addr32[2] == htonl(0x0000ffff)))
+	(((a)->s6_addr32[0] == 0) &&          \
+	 ((a)->s6_addr32[1] == 0) &&          \
+	 ((a)->s6_addr32[2] == htonl(0x0000ffff)))
 
 #endif /* LWRES_IPV6_H */

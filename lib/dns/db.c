@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004, 2005, 2007-2009, 2011-2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 /*! \file */
 
@@ -24,6 +16,9 @@
  ***/
 
 #include <config.h>
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/buffer.h>
 #include <isc/mem.h>
@@ -186,7 +181,7 @@ dns_db_ondestroy(dns_db_t *db, isc_task_t *task, isc_event_t **eventp)
 }
 
 
-isc_boolean_t
+bool
 dns_db_iscache(dns_db_t *db) {
 
 	/*
@@ -196,12 +191,12 @@ dns_db_iscache(dns_db_t *db) {
 	REQUIRE(DNS_DB_VALID(db));
 
 	if ((db->attributes & DNS_DBATTR_CACHE) != 0)
-		return (ISC_TRUE);
+		return (true);
 
-	return (ISC_FALSE);
+	return (false);
 }
 
-isc_boolean_t
+bool
 dns_db_iszone(dns_db_t *db) {
 
 	/*
@@ -211,12 +206,12 @@ dns_db_iszone(dns_db_t *db) {
 	REQUIRE(DNS_DB_VALID(db));
 
 	if ((db->attributes & (DNS_DBATTR_CACHE|DNS_DBATTR_STUB)) == 0)
-		return (ISC_TRUE);
+		return (true);
 
-	return (ISC_FALSE);
+	return (false);
 }
 
-isc_boolean_t
+bool
 dns_db_isstub(dns_db_t *db) {
 
 	/*
@@ -226,12 +221,12 @@ dns_db_isstub(dns_db_t *db) {
 	REQUIRE(DNS_DB_VALID(db));
 
 	if ((db->attributes & DNS_DBATTR_STUB) != 0)
-		return (ISC_TRUE);
+		return (true);
 
-	return (ISC_FALSE);
+	return (false);
 }
 
-isc_boolean_t
+bool
 dns_db_isdnssec(dns_db_t *db) {
 
 	/*
@@ -246,7 +241,7 @@ dns_db_isdnssec(dns_db_t *db) {
 	return ((db->methods->issecure)(db));
 }
 
-isc_boolean_t
+bool
 dns_db_issecure(dns_db_t *db) {
 
 	/*
@@ -259,7 +254,7 @@ dns_db_issecure(dns_db_t *db) {
 	return ((db->methods->issecure)(db));
 }
 
-isc_boolean_t
+bool
 dns_db_ispersistent(dns_db_t *db) {
 
 	/*
@@ -307,6 +302,8 @@ dns_db_beginload(dns_db_t *db, dns_rdatacallbacks_t *callbacks) {
 
 isc_result_t
 dns_db_endload(dns_db_t *db, dns_rdatacallbacks_t *callbacks) {
+	dns_dbonupdatelistener_t *listener;
+
 	/*
 	 * Finish loading 'db'.
 	 */
@@ -314,6 +311,11 @@ dns_db_endload(dns_db_t *db, dns_rdatacallbacks_t *callbacks) {
 	REQUIRE(DNS_DB_VALID(db));
 	REQUIRE(DNS_CALLBACK_VALID(callbacks));
 	REQUIRE(callbacks->add_private != NULL);
+
+	for (listener = ISC_LIST_HEAD(db->update_listeners);
+	     listener != NULL;
+	     listener = ISC_LIST_NEXT(listener, link))
+		listener->onupdate(db, listener->onupdate_arg);
 
 	return ((db->methods->endload)(db, callbacks));
 }
@@ -330,7 +332,8 @@ dns_db_load2(dns_db_t *db, const char *filename, dns_masterformat_t format) {
 
 isc_result_t
 dns_db_load3(dns_db_t *db, const char *filename, dns_masterformat_t format,
-	     unsigned int options) {
+	     unsigned int options)
+{
 	isc_result_t result, eresult;
 	dns_rdatacallbacks_t callbacks;
 
@@ -443,8 +446,9 @@ dns_db_attachversion(dns_db_t *db, dns_dbversion_t *source,
 
 void
 dns_db_closeversion(dns_db_t *db, dns_dbversion_t **versionp,
-		    isc_boolean_t commit)
+		    bool commit)
 {
+	dns_dbonupdatelistener_t *listener;
 
 	/*
 	 * Close version '*versionp'.
@@ -456,6 +460,13 @@ dns_db_closeversion(dns_db_t *db, dns_dbversion_t **versionp,
 
 	(db->methods->closeversion)(db, versionp, commit);
 
+	if (commit == true) {
+		for (listener = ISC_LIST_HEAD(db->update_listeners);
+		     listener != NULL;
+		     listener = ISC_LIST_NEXT(listener, link))
+			listener->onupdate(db, listener->onupdate_arg);
+	}
+
 	ENSURE(*versionp == NULL);
 }
 
@@ -465,7 +476,7 @@ dns_db_closeversion(dns_db_t *db, dns_dbversion_t **versionp,
 
 isc_result_t
 dns_db_findnode(dns_db_t *db, dns_name_t *name,
-		isc_boolean_t create, dns_dbnode_t **nodep)
+		bool create, dns_dbnode_t **nodep)
 {
 
 	/*
@@ -484,7 +495,7 @@ dns_db_findnode(dns_db_t *db, dns_name_t *name,
 
 isc_result_t
 dns_db_findnodeext(dns_db_t *db, dns_name_t *name,
-		   isc_boolean_t create, dns_clientinfomethods_t *methods,
+		   bool create, dns_clientinfomethods_t *methods,
 		   dns_clientinfo_t *clientinfo, dns_dbnode_t **nodep)
 {
 	/*
@@ -504,7 +515,7 @@ dns_db_findnodeext(dns_db_t *db, dns_name_t *name,
 
 isc_result_t
 dns_db_findnsec3node(dns_db_t *db, dns_name_t *name,
-		     isc_boolean_t create, dns_dbnode_t **nodep)
+		     bool create, dns_dbnode_t **nodep)
 {
 
 	/*
@@ -530,7 +541,7 @@ dns_db_find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 
 	REQUIRE(DNS_DB_VALID(db));
 	REQUIRE(type != dns_rdatatype_rrsig);
-	REQUIRE(nodep == NULL || (nodep != NULL && *nodep == NULL));
+	REQUIRE(nodep == NULL || *nodep == NULL);
 	REQUIRE(dns_name_hasbuffer(foundname));
 	REQUIRE(rdataset == NULL ||
 		(DNS_RDATASET_VALID(rdataset) &&
@@ -565,7 +576,7 @@ dns_db_findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
 
 	REQUIRE(DNS_DB_VALID(db));
 	REQUIRE(type != dns_rdatatype_rrsig);
-	REQUIRE(nodep == NULL || (nodep != NULL && *nodep == NULL));
+	REQUIRE(nodep == NULL || *nodep == NULL);
 	REQUIRE(dns_name_hasbuffer(foundname));
 	REQUIRE(rdataset == NULL ||
 		(DNS_RDATASET_VALID(rdataset) &&
@@ -597,7 +608,7 @@ dns_db_findzonecut(dns_db_t *db, dns_name_t *name,
 
 	REQUIRE(DNS_DB_VALID(db));
 	REQUIRE((db->attributes & DNS_DBATTR_CACHE) != 0);
-	REQUIRE(nodep == NULL || (nodep != NULL && *nodep == NULL));
+	REQUIRE(nodep == NULL || *nodep == NULL);
 	REQUIRE(dns_name_hasbuffer(foundname));
 	REQUIRE(sigrdataset == NULL ||
 		(DNS_RDATASET_VALID(sigrdataset) &&
@@ -817,7 +828,7 @@ dns_db_deleterdataset(dns_db_t *db, dns_dbnode_t *node,
 }
 
 void
-dns_db_overmem(dns_db_t *db, isc_boolean_t overmem) {
+dns_db_overmem(dns_db_t *db, bool overmem) {
 
 	REQUIRE(DNS_DB_VALID(db));
 
@@ -825,7 +836,7 @@ dns_db_overmem(dns_db_t *db, isc_boolean_t overmem) {
 }
 
 isc_result_t
-dns_db_getsoaserial(dns_db_t *db, dns_dbversion_t *ver, isc_uint32_t *serialp)
+dns_db_getsoaserial(dns_db_t *db, dns_dbversion_t *ver, uint32_t *serialp)
 {
 	isc_result_t result;
 	dns_dbnode_t *node = NULL;
@@ -835,7 +846,7 @@ dns_db_getsoaserial(dns_db_t *db, dns_dbversion_t *ver, isc_uint32_t *serialp)
 
 	REQUIRE(dns_db_iszone(db) || dns_db_isstub(db));
 
-	result = dns_db_findnode(db, dns_db_origin(db), ISC_FALSE, &node);
+	result = dns_db_findnode(db, dns_db_origin(db), false, &node);
 	if (result != ISC_R_SUCCESS)
 		return (result);
 
@@ -875,12 +886,12 @@ dns_db_nodecount(dns_db_t *db) {
 	return ((db->methods->nodecount)(db));
 }
 
-unsigned int
+size_t
 dns_db_hashsize(dns_db_t *db) {
 	REQUIRE(DNS_DB_VALID(db));
 
 	if (db->methods->hashsize == NULL)
-		return (ISC_R_NOTIMPLEMENTED);
+		return (0);
 
 	return ((db->methods->hashsize)(db));
 }
@@ -952,7 +963,7 @@ dns_db_unregister(dns_dbimplementation_t **dbimp) {
 isc_result_t
 dns_db_getoriginnode(dns_db_t *db, dns_dbnode_t **nodep) {
 	REQUIRE(DNS_DB_VALID(db));
-	REQUIRE(dns_db_iszone(db) == ISC_TRUE);
+	REQUIRE(dns_db_iszone(db) == true);
 	REQUIRE(nodep != NULL && *nodep == NULL);
 
 	if (db->methods->getoriginnode != NULL)
@@ -983,17 +994,30 @@ dns_db_setcachestats(dns_db_t *db, isc_stats_t *stats) {
 
 isc_result_t
 dns_db_getnsec3parameters(dns_db_t *db, dns_dbversion_t *version,
-			  dns_hash_t *hash, isc_uint8_t *flags,
-			  isc_uint16_t *iterations,
+			  dns_hash_t *hash, uint8_t *flags,
+			  uint16_t *iterations,
 			  unsigned char *salt, size_t *salt_length)
 {
 	REQUIRE(DNS_DB_VALID(db));
-	REQUIRE(dns_db_iszone(db) == ISC_TRUE);
+	REQUIRE(dns_db_iszone(db) == true);
 
 	if (db->methods->getnsec3parameters != NULL)
 		return ((db->methods->getnsec3parameters)(db, version, hash,
 							  flags, iterations,
 							  salt, salt_length));
+
+	return (ISC_R_NOTFOUND);
+}
+
+isc_result_t
+dns_db_getsize(dns_db_t *db, dns_dbversion_t *version, uint64_t *records,
+	       uint64_t *bytes)
+{
+	REQUIRE(DNS_DB_VALID(db));
+	REQUIRE(dns_db_iszone(db) == true);
+
+	if (db->methods->getsize != NULL)
+		return ((db->methods->getsize)(db, version, records, bytes));
 
 	return (ISC_R_NOTFOUND);
 }
@@ -1042,4 +1066,67 @@ dns_db_rpz_ready(dns_db_t *db) {
 	if (db->methods->rpz_ready == NULL)
 		return (ISC_R_SUCCESS);
 	return ((db->methods->rpz_ready)(db));
+}
+
+/**
+ * Attach a notify-on-update function the database
+ */
+isc_result_t
+dns_db_updatenotify_register(dns_db_t *db,
+			     dns_dbupdate_callback_t fn,
+			     void *fn_arg)
+{
+	dns_dbonupdatelistener_t *listener;
+
+	REQUIRE(db != NULL);
+	REQUIRE(fn != NULL);
+
+	listener = isc_mem_get(db->mctx, sizeof(dns_dbonupdatelistener_t));
+	if (listener == NULL)
+		return (ISC_R_NOMEMORY);
+
+	listener->onupdate = fn;
+	listener->onupdate_arg = fn_arg;
+
+	ISC_LINK_INIT(listener, link);
+	ISC_LIST_APPEND(db->update_listeners, listener, link);
+
+	return (ISC_R_SUCCESS);
+}
+
+isc_result_t
+dns_db_updatenotify_unregister(dns_db_t *db,
+			       dns_dbupdate_callback_t fn,
+			       void *fn_arg)
+{
+	dns_dbonupdatelistener_t *listener;
+
+	REQUIRE(db != NULL);
+
+	for (listener = ISC_LIST_HEAD(db->update_listeners);
+	     listener != NULL;
+	     listener = ISC_LIST_NEXT(listener, link))
+	{
+		if ((listener->onupdate == fn) &&
+		    (listener->onupdate_arg == fn_arg))
+		{
+			ISC_LIST_UNLINK(db->update_listeners, listener, link);
+			isc_mem_put(db->mctx, listener,
+				    sizeof(dns_dbonupdatelistener_t));
+			return (ISC_R_SUCCESS);
+		}
+	}
+
+	return (ISC_R_NOTFOUND);
+}
+
+isc_result_t
+dns_db_nodefullname(dns_db_t *db, dns_dbnode_t *node, dns_name_t *name) {
+	REQUIRE(db != NULL);
+	REQUIRE(node != NULL);
+	REQUIRE(name != NULL);
+
+	if (db->methods->nodefullname == NULL)
+		return (ISC_R_NOTIMPLEMENTED);
+	return ((db->methods->nodefullname)(db, node, name));
 }

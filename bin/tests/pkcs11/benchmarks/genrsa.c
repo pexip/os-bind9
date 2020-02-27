@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
@@ -38,8 +33,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $Id$ */
-
 /* genrsa [-m module] [-s $slot] [-p pin] [-t] [-b bits] [-n count] */
 
 /*! \file */
@@ -47,6 +40,7 @@
 #include <config.h>
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -56,6 +50,7 @@
 #include <isc/print.h>
 #include <isc/result.h>
 #include <isc/types.h>
+#include <isc/util.h>
 
 #include <pk11/pk11.h>
 #include <pk11/result.h>
@@ -65,15 +60,22 @@
 #endif
 
 #ifndef HAVE_CLOCK_GETTIME
+
+#include <sys/time.h>
+
 #ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 0
 #endif
 
-int
+static int clock_gettime(int32_t id, struct timespec *tp);
+
+static int
 clock_gettime(int32_t id, struct timespec *tp)
 {
 	struct timeval tv;
 	int result;
+
+	UNUSED(id);
 
 	result = gettimeofday(&tv, NULL);
 	if (result)
@@ -202,8 +204,8 @@ main(int argc, char *argv[]) {
 	if (pin == NULL)
 		pin = getpassphrase("Enter Pin: ");
 
-	result = pk11_get_session(&pctx, op_type, ISC_FALSE, ISC_TRUE,
-				  ISC_TRUE, (const char *) pin, slot);
+	result = pk11_get_session(&pctx, op_type, false, true,
+				  true, (const char *) pin, slot);
 	if ((result != ISC_R_SUCCESS) &&
 	    (result != PK11_R_NORANDOMSERVICE) &&
 	    (result != PK11_R_NODIGESTSERVICE) &&

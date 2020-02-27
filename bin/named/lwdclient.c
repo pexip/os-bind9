@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: lwdclient.c,v 1.22 2007/06/18 23:47:18 tbox Exp $ */
@@ -269,9 +263,9 @@ ns_lwdclient_recv(isc_task_t *task, isc_event_t *ev) {
 	client->address = dev->address;
 	if ((dev->attributes & ISC_SOCKEVENTATTR_PKTINFO) != 0) {
 		client->pktinfo = dev->pktinfo;
-		client->pktinfo_valid = ISC_TRUE;
+		client->pktinfo_valid = true;
 	} else
-		client->pktinfo_valid = ISC_FALSE;
+		client->pktinfo_valid = false;
 	isc_event_free(&ev);
 	dev = NULL;
 
@@ -294,12 +288,12 @@ ns_lwdclient_startrecv(ns_lwdclientmgr_t *cm) {
 	ns_lwdclient_t *client;
 	isc_result_t result;
 	isc_region_t r;
-	isc_boolean_t destroy = ISC_FALSE;
+	bool destroy = false;
 
 
 	LOCK(&cm->lock);
 	if (SHUTTINGDOWN(cm)) {
-		destroy = ISC_TRUE;
+		destroy = true;
 		result = ISC_R_SUCCESS;
 		goto unlock;
 	}
@@ -508,7 +502,7 @@ ns_lwdclient_initialize(ns_lwdclient_t *client, ns_lwdclientmgr_t *cmgr) {
 
 	client->lookup = NULL;
 
-	client->pktinfo_valid = ISC_FALSE;
+	client->pktinfo_valid = false;
 
 	LOCK(&cmgr->lock);
 	ISC_LIST_APPEND(cmgr->idle, client, link);

@@ -1,23 +1,18 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2011, 2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
 
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>		/* for sprintf */
 #include <string.h>
 
@@ -28,8 +23,6 @@
 
 #include "assert_p.h"
 #include "print_p.h"
-
-#define LWRES_PRINT_QUADFORMAT LWRES_PLATFORM_QUADFORMAT
 
 int
 lwres__print_sprintf(char *str, const char *format, ...) {
@@ -255,7 +248,7 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 						head = "";
 					tmpui = tmpi;
 				}
-				sprintf(buf, "%" LWRES_PRINT_QUADFORMAT "u",
+				sprintf(buf, "%llu",
 					tmpui);
 				goto printint;
 			case 'o':
@@ -269,8 +262,8 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 				else
 					tmpui = va_arg(ap, int);
 				sprintf(buf,
-					alt ? "%#" LWRES_PRINT_QUADFORMAT "o"
-					    : "%" LWRES_PRINT_QUADFORMAT "o",
+					alt ? "%#llo"
+					    : "%llo",
 					tmpui);
 				goto printint;
 			case 'u':
@@ -283,7 +276,7 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 					tmpui = va_arg(ap, size_t);
 				else
 					tmpui = va_arg(ap, unsigned int);
-				sprintf(buf, "%" LWRES_PRINT_QUADFORMAT "u",
+				sprintf(buf, "%llu",
 					tmpui);
 				goto printint;
 			case 'x':
@@ -301,7 +294,7 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 					if (precision > 2U)
 						precision -= 2;
 				}
-				sprintf(buf, "%" LWRES_PRINT_QUADFORMAT "x",
+				sprintf(buf, "%llx",
 					tmpui);
 				goto printint;
 			case 'X':
@@ -319,7 +312,7 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 					if (precision > 2U)
 						precision -= 2;
 				}
-				sprintf(buf, "%" LWRES_PRINT_QUADFORMAT "X",
+				sprintf(buf, "%llX",
 					tmpui);
 				goto printint;
 			printint:
@@ -506,7 +499,7 @@ lwres__print_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 #else
 			INSIST("long doubles are not supported" == NULL);
 #endif
-			/*FALLTHROUGH*/
+			/* FALLTHROUGH */
 		case 'e':
 		case 'E':
 		case 'f':

@@ -1,24 +1,15 @@
 /*
- * Copyright (C) 2004, 2005, 2007-2009, 2011, 2012  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
-
-/*! \file
- * \author  Principal Authors: DCL */
+/*! \file */
 
 #include <config.h>
 
@@ -31,6 +22,8 @@
 
 #include <isc/dir.h>
 #include <isc/magic.h>
+#include <isc/netdb.h>
+#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -67,10 +60,11 @@ isc_dir_open(isc_dir_t *dir, const char *dirname) {
 	 * Copy directory name.  Need to have enough space for the name,
 	 * a possible path separator, the wildcard, and the final NUL.
 	 */
-	if (strlen(dirname) + 3 > sizeof(dir->dirname))
+	if (strlen(dirname) + 3 > sizeof(dir->dirname)) {
 		/* XXXDCL ? */
 		return (ISC_R_NOSPACE);
-	strcpy(dir->dirname, dirname);
+	}
+	strlcpy(dir->dirname, dirname, sizeof(dir->dirname));
 
 	/*
 	 * Append path separator, if needed, and "*".
@@ -86,8 +80,9 @@ isc_dir_open(isc_dir_t *dir, const char *dirname) {
 	 */
 	dir->handle = opendir(dirname);
 
-	if (dir->handle == NULL)
-		return isc__errno2result(errno);
+	if (dir->handle == NULL) {
+		return (isc__errno2result(errno));
+	}
 
 	return (result);
 }
@@ -117,9 +112,9 @@ isc_dir_read(isc_dir_t *dir) {
 	 * Make sure that the space for the name is long enough.
 	 */
 	if (sizeof(dir->entry.name) <= strlen(entry->d_name))
-	    return (ISC_R_UNEXPECTED);
+		return (ISC_R_UNEXPECTED);
 
-	strcpy(dir->entry.name, entry->d_name);
+	strlcpy(dir->entry.name, entry->d_name, sizeof(dir->entry.name));
 
 	/*
 	 * Some dirents have d_namlen, but it is not portable.
@@ -168,10 +163,23 @@ isc_dir_chdir(const char *dirname) {
 
 isc_result_t
 isc_dir_chroot(const char *dirname) {
+#ifdef HAVE_CHROOT
+	void *tmp;
+#endif
 
 	REQUIRE(dirname != NULL);
 
 #ifdef HAVE_CHROOT
+	/*
+	 * Try to use getservbyname and getprotobyname before chroot.
+	 * If WKS records are used in a zone under chroot, Name Service Switch
+	 * may fail to load library in chroot.
+	 * Do not report errors if it fails, we do not need any result now.
+	 */
+	tmp = getprotobyname("udp");
+	if (tmp != NULL)
+		(void) getservbyname("domain", "udp");
+
 	if (chroot(dirname) < 0 || chdir("/") < 0)
 		return (isc__errno2result(errno));
 

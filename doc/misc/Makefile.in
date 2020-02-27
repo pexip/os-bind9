@@ -1,19 +1,11 @@
-# Copyright (C) 2004, 2007, 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
-# Copyright (C) 2001  Internet Software Consortium.
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
-
-# $Id: Makefile.in,v 1.9 2009/07/10 23:47:58 tbox Exp $
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 srcdir =	@srcdir@
 VPATH =		@srcdir@
@@ -41,6 +33,15 @@ options: FORCE
 	if test -x ${CFG_TEST} ; \
 	then \
 		${CFG_TEST} --named --grammar > $@.raw ; \
+		${CFG_TEST} --zonegrammar master > master.zoneopt ; \
+		${CFG_TEST} --zonegrammar slave > slave.zoneopt ; \
+		${CFG_TEST} --zonegrammar forward > forward.zoneopt ; \
+		${CFG_TEST} --zonegrammar hint > hint.zoneopt ; \
+		${CFG_TEST} --zonegrammar stub > stub.zoneopt ; \
+		${CFG_TEST} --zonegrammar static-stub > static-stub.zoneopt ; \
+		${CFG_TEST} --zonegrammar redirect > redirect.zoneopt ; \
+		${CFG_TEST} --zonegrammar delegation-only > delegation-only.zoneopt ; \
+		${CFG_TEST} --zonegrammar in-view > in-view.zoneopt ; \
 		${PERL} ${srcdir}/sort-options.pl < $@.raw > $@.sorted ; \
 		${PERL} ${srcdir}/format-options.pl < $@.sorted > $@.new ; \
 		mv -f $@.new $@ ; \
@@ -48,3 +49,25 @@ options: FORCE
 	else \
 		rm -f $@.new $@.raw $@.sorted ; \
 	fi
+
+docbook: options
+	${PERL} docbook-options.pl options > ${top_srcdir}/bin/named/named.conf.docbook
+	${PERL} docbook-zoneopt.pl master.zoneopt > ${top_srcdir}/doc/arm/master.zoneopt.xml
+	${PERL} docbook-zoneopt.pl slave.zoneopt > ${top_srcdir}/doc/arm/slave.zoneopt.xml
+	${PERL} docbook-zoneopt.pl forward.zoneopt > ${top_srcdir}/doc/arm/forward.zoneopt.xml
+	${PERL} docbook-zoneopt.pl hint.zoneopt > ${top_srcdir}/doc/arm/hint.zoneopt.xml
+	${PERL} docbook-zoneopt.pl stub.zoneopt > ${top_srcdir}/doc/arm/stub.zoneopt.xml
+	${PERL} docbook-zoneopt.pl static-stub.zoneopt > ${top_srcdir}/doc/arm/static-stub.zoneopt.xml
+	${PERL} docbook-zoneopt.pl redirect.zoneopt > ${top_srcdir}/doc/arm/redirect.zoneopt.xml
+	${PERL} docbook-zoneopt.pl delegation-only.zoneopt > ${top_srcdir}/doc/arm/delegation-only.zoneopt.xml
+	${PERL} docbook-zoneopt.pl in-view.zoneopt > ${top_srcdir}/doc/arm/in-view.zoneopt.xml
+	${PERL} docbook-grammars.pl options acl > ${top_srcdir}/doc/arm/acl.grammar.xml
+	${PERL} docbook-grammars.pl options controls > ${top_srcdir}/doc/arm/controls.grammar.xml
+	${PERL} docbook-grammars.pl options key > ${top_srcdir}/doc/arm/key.grammar.xml
+	${PERL} docbook-grammars.pl options logging > ${top_srcdir}/doc/arm/logging.grammar.xml
+	${PERL} docbook-grammars.pl options masters > ${top_srcdir}/doc/arm/masters.grammar.xml
+	${PERL} docbook-grammars.pl options options > ${top_srcdir}/doc/arm/options.grammar.xml
+	${PERL} docbook-grammars.pl options server > ${top_srcdir}/doc/arm/server.grammar.xml
+	${PERL} docbook-grammars.pl options statistics-channels > ${top_srcdir}/doc/arm/statistics-channels.grammar.xml
+	${PERL} docbook-grammars.pl options trusted-keys > ${top_srcdir}/doc/arm/trusted-keys.grammar.xml
+	${PERL} docbook-grammars.pl options managed-keys > ${top_srcdir}/doc/arm/managed-keys.grammar.xml

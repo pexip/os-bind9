@@ -1,26 +1,21 @@
 /*
- * Copyright (C) 2004-2007, 2009, 2012  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: sockaddr.h,v 1.57 2009/01/18 23:48:14 tbox Exp $ */
 
 #ifndef ISC_SOCKADDR_H
 #define ISC_SOCKADDR_H 1
 
 /*! \file isc/sockaddr.h */
+
+#include <stdbool.h>
 
 #include <isc/lang.h>
 #include <isc/net.h>
@@ -43,8 +38,6 @@ struct isc_sockaddr {
 	ISC_LINK(struct isc_sockaddr)	link;
 };
 
-typedef ISC_LIST(struct isc_sockaddr)	isc_sockaddrlist_t;
-
 #define ISC_SOCKADDR_CMPADDR	  0x0001	/*%< compare the address
 						 *   sin_addr/sin6_addr */
 #define ISC_SOCKADDR_CMPPORT 	  0x0002	/*%< compare the port
@@ -56,7 +49,7 @@ typedef ISC_LIST(struct isc_sockaddr)	isc_sockaddrlist_t;
 
 ISC_LANG_BEGINDECLS
 
-isc_boolean_t
+bool
 isc_sockaddr_compare(const isc_sockaddr_t *a, const isc_sockaddr_t *b,
 		     unsigned int flags);
 /*%<
@@ -66,33 +59,33 @@ isc_sockaddr_compare(const isc_sockaddr_t *a, const isc_sockaddr_t *b,
  * 'flags' is set from ISC_SOCKADDR_CMP*.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_equal(const isc_sockaddr_t *a, const isc_sockaddr_t *b);
 /*%<
- * Return ISC_TRUE iff the socket addresses 'a' and 'b' are equal.
+ * Return true iff the socket addresses 'a' and 'b' are equal.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_eqaddr(const isc_sockaddr_t *a, const isc_sockaddr_t *b);
 /*%<
- * Return ISC_TRUE iff the address parts of the socket addresses
+ * Return true iff the address parts of the socket addresses
  * 'a' and 'b' are equal, ignoring the ports.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_eqaddrprefix(const isc_sockaddr_t *a, const isc_sockaddr_t *b,
 			  unsigned int prefixlen);
 /*%<
- * Return ISC_TRUE iff the most significant 'prefixlen' bits of the
+ * Return true iff the most significant 'prefixlen' bits of the
  * socket addresses 'a' and 'b' are equal, ignoring the ports.
  * If 'b''s scope is zero then 'a''s scope will be ignored.
  */
 
 unsigned int
-isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, isc_boolean_t address_only);
+isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, bool address_only);
 /*%<
  * Return a hash value for the socket address 'sockaddr'.  If 'address_only'
- * is ISC_TRUE, the hash value will not depend on the port.
+ * is true, the hash value will not depend on the port.
  *
  * IPv6 addresses containing mapped IPv4 addresses generate the same hash
  * value as the equivalent IPv4 address.
@@ -196,28 +189,34 @@ isc_sockaddr_format(const isc_sockaddr_t *sa, char *array, unsigned int size);
  * The resulting string is guaranteed to be null-terminated.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_ismulticast(const isc_sockaddr_t *sa);
 /*%<
- * Returns #ISC_TRUE if the address is a multicast address.
+ * Returns #true if the address is a multicast address.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_isexperimental(const isc_sockaddr_t *sa);
 /*
- * Returns ISC_TRUE if the address is a experimental (CLASS E) address.
+ * Returns true if the address is a experimental (CLASS E) address.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_islinklocal(const isc_sockaddr_t *sa);
 /*%<
- * Returns ISC_TRUE if the address is a link local address.
+ * Returns true if the address is a link local address.
  */
 
-isc_boolean_t
+bool
 isc_sockaddr_issitelocal(const isc_sockaddr_t *sa);
 /*%<
- * Returns ISC_TRUE if the address is a sitelocal address.
+ * Returns true if the address is a sitelocal address.
+ */
+
+bool
+isc_sockaddr_isnetzero(const isc_sockaddr_t *sa);
+/*%<
+ * Returns true if the address is in net zero.
  */
 
 isc_result_t

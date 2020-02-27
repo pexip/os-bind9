@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2007, 2011, 2013, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: logconf.c,v 1.45 2011/03/05 23:52:29 tbox Exp $ */
@@ -21,6 +15,9 @@
 
 #include <config.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <isc/file.h>
 #include <isc/offset.h>
 #include <isc/print.h>
@@ -28,6 +25,7 @@
 #include <isc/stdio.h>
 #include <isc/string.h>
 #include <isc/syslog.h>
+#include <isc/util.h>
 
 #include <isccfg/cfg.h>
 #include <isccfg/log.h>
@@ -142,8 +140,24 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig)
 		const cfg_obj_t *sizeobj = cfg_tuple_get(fileobj, "size");
 		const cfg_obj_t *versionsobj =
 				 cfg_tuple_get(fileobj, "versions");
-		isc_int32_t versions = ISC_LOG_ROLLNEVER;
+		int32_t versions = ISC_LOG_ROLLNEVER;
 		isc_offset_t size = 0;
+		uint64_t maxoffset;
+
+		/*
+		 * isc_offset_t is a signed integer type, so the maximum
+		 * value is all 1s except for the MSB.
+		 */
+		switch (sizeof(isc_offset_t)) {
+		case 4:
+			maxoffset = 0x7fffffffULL;
+			break;
+		case 8:
+			maxoffset = 0x7fffffffffffffffULL;
+			break;
+		default:
+			INSIST(0);
+		}
 
 		type = ISC_LOG_TOFILE;
 
@@ -154,7 +168,7 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig)
 			versions = ISC_LOG_ROLLINFINITE;
 		if (sizeobj != NULL &&
 		    cfg_obj_isuint64(sizeobj) &&
-		    cfg_obj_asuint64(sizeobj) < ISC_OFFSET_MAXIMUM)
+		    cfg_obj_asuint64(sizeobj) < maxoffset)
 			size = (isc_offset_t)cfg_obj_asuint64(sizeobj);
 		dest.file.stream = NULL;
 		dest.file.name = cfg_obj_asstring(pathobj);
@@ -186,10 +200,12 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig)
 		const cfg_obj_t *printcat = NULL;
 		const cfg_obj_t *printsev = NULL;
 		const cfg_obj_t *printtime = NULL;
+		const cfg_obj_t *buffered = NULL;
 
 		(void)cfg_map_get(channel, "print-category", &printcat);
 		(void)cfg_map_get(channel, "print-severity", &printsev);
 		(void)cfg_map_get(channel, "print-time", &printtime);
+		(void)cfg_map_get(channel, "buffered", &buffered);
 
 		if (printcat != NULL && cfg_obj_asboolean(printcat))
 			flags |= ISC_LOG_PRINTCATEGORY;
@@ -197,6 +213,8 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig)
 			flags |= ISC_LOG_PRINTTIME;
 		if (printsev != NULL && cfg_obj_asboolean(printsev))
 			flags |= ISC_LOG_PRINTLEVEL;
+		if (buffered != NULL && cfg_obj_asboolean(buffered))
+			flags |= ISC_LOG_BUFFERED;
 	}
 
 	level = ISC_LOG_INFO;
@@ -272,8 +290,8 @@ ns_log_configure(isc_logconfig_t *logconfig, const cfg_obj_t *logstmt) {
 	const cfg_obj_t *channels = NULL;
 	const cfg_obj_t *categories = NULL;
 	const cfg_listelt_t *element;
-	isc_boolean_t default_set = ISC_FALSE;
-	isc_boolean_t unmatched_set = ISC_FALSE;
+	bool default_set = false;
+	bool unmatched_set = false;
 	const cfg_obj_t *catname;
 
 	if (logconfig != NULL)
@@ -298,12 +316,12 @@ ns_log_configure(isc_logconfig_t *logconfig, const cfg_obj_t *logstmt) {
 		if (!default_set) {
 			catname = cfg_tuple_get(category, "name");
 			if (strcmp(cfg_obj_asstring(catname), "default") == 0)
-				default_set = ISC_TRUE;
+				default_set = true;
 		}
 		if (!unmatched_set) {
 			catname = cfg_tuple_get(category, "name");
 			if (strcmp(cfg_obj_asstring(catname), "unmatched") == 0)
-				unmatched_set = ISC_TRUE;
+				unmatched_set = true;
 		}
 	}
 

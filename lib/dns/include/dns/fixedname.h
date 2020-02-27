@@ -1,21 +1,14 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: fixedname.h,v 1.19 2007/06/19 23:47:16 tbox Exp $ */
 
 #ifndef DNS_FIXEDNAME_H
 #define DNS_FIXEDNAME_H 1
@@ -28,8 +21,9 @@
  * \brief
  * Fixed-size Names
  *
- * dns_fixedname_t is a convenience type containing a name, an offsets table,
- * and a dedicated buffer big enough for the longest possible name.
+ * dns_fixedname_t is a convenience type containing a name, an offsets
+ * table, and a dedicated buffer big enough for the longest possible
+ * name. This is typically used for stack-allocated names.
  *
  * MP:
  *\li	The caller must ensure any required synchronization.
@@ -56,6 +50,7 @@
  *****/
 
 #include <isc/buffer.h>
+#include <isc/lang.h>
 
 #include <dns/name.h>
 
@@ -70,17 +65,20 @@ struct dns_fixedname {
 	unsigned char			data[DNS_NAME_MAXWIRE];
 };
 
-#define dns_fixedname_init(fn) \
-	do { \
-		dns_name_init(&((fn)->name), (fn)->offsets); \
-		isc_buffer_init(&((fn)->buffer), (fn)->data, \
-                                  DNS_NAME_MAXWIRE); \
-		dns_name_setbuffer(&((fn)->name), &((fn)->buffer)); \
-	} while (0)
+ISC_LANG_BEGINDECLS
 
-#define dns_fixedname_invalidate(fn) \
-	dns_name_invalidate(&((fn)->name))
+void
+dns_fixedname_init(dns_fixedname_t *fixed);
 
-#define dns_fixedname_name(fn)		(&((fn)->name))
+void
+dns_fixedname_invalidate(dns_fixedname_t *fixed);
+
+dns_name_t *
+dns_fixedname_name(dns_fixedname_t *fixed);
+
+dns_name_t *
+dns_fixedname_initname(dns_fixedname_t *fixed);
+
+ISC_LANG_ENDDECLS
 
 #endif /* DNS_FIXEDNAME_H */

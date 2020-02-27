@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2009-2012, 2014, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
 #include <config.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -86,18 +83,19 @@ main(int argc, char **argv) {
 #else
 	const char *engine = NULL;
 #endif
-	char *filename = NULL, *dir = NULL;
+	char const *filename = NULL;
+	char *dir = NULL;
 	char newname[1024], oldname[1024];
 	char keystr[DST_KEY_FORMATSIZE];
 	char *endp;
 	int ch;
 	isc_entropy_t *ectx = NULL;
 	dst_key_t *key = NULL;
-	isc_uint32_t flags;
+	uint32_t flags;
 	isc_buffer_t buf;
-	isc_boolean_t force = ISC_FALSE;
-	isc_boolean_t removefile = ISC_FALSE;
-	isc_boolean_t id = ISC_FALSE;
+	bool force = false;
+	bool removefile = false;
+	bool id = false;
 
 	if (argc == 1)
 		usage();
@@ -111,7 +109,7 @@ main(int argc, char **argv) {
 #endif
 	dns_result_register();
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 	while ((ch = isc_commandline_parse(argc, argv, "E:fK:rRhv:V")) != -1) {
 		switch (ch) {
@@ -119,7 +117,7 @@ main(int argc, char **argv) {
 			engine = isc_commandline_argument;
 			break;
 		    case 'f':
-			force = ISC_TRUE;
+			force = true;
 			break;
 		    case 'K':
 			/*
@@ -133,10 +131,10 @@ main(int argc, char **argv) {
 			}
 			break;
 		    case 'r':
-			removefile = ISC_TRUE;
+			removefile = true;
 			break;
 		    case 'R':
-			id = ISC_TRUE;
+			id = true;
 			break;
 		    case 'v':
 			verbose = strtol(isc_commandline_argument, &endp, 0);
@@ -147,7 +145,7 @@ main(int argc, char **argv) {
 			if (isc_commandline_option != '?')
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
-			/* Falls into */
+			/* FALLTHROUGH */
 		    case 'h':
 			/* Does not return. */
 			usage();

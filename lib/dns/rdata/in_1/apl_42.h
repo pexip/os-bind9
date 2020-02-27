@@ -1,31 +1,24 @@
 /*
- * Copyright (C) 2004, 2005, 2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2002  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* */
 #ifndef IN_1_APL_42_H
 #define IN_1_APL_42_H 1
 
-/* $Id: apl_42.h,v 1.6 2007/06/19 23:47:17 tbox Exp $ */
 
 typedef struct dns_rdata_apl_ent {
-	isc_boolean_t	negative;
-	isc_uint16_t	family;
-	isc_uint8_t	prefix;
-	isc_uint8_t	length;
+	bool	negative;
+	uint16_t	family;
+	uint8_t	prefix;
+	uint8_t	length;
 	unsigned char	*data;
 } dns_rdata_apl_ent_t;
 
@@ -34,9 +27,9 @@ typedef struct dns_rdata_in_apl {
 	isc_mem_t		*mctx;
 	/* type & class specific elements */
 	unsigned char           *apl;
-        isc_uint16_t            apl_len;
-        /* private */
-        isc_uint16_t            offset;
+	uint16_t            apl_len;
+	/* private */
+	uint16_t            offset;
 } dns_rdata_in_apl_t;
 
 /*
@@ -52,5 +45,8 @@ dns_rdata_apl_next(dns_rdata_in_apl_t *);
 
 isc_result_t
 dns_rdata_apl_current(dns_rdata_in_apl_t *, dns_rdata_apl_ent_t *);
+
+unsigned int
+dns_rdata_apl_count(const dns_rdata_in_apl_t *apl);
 
 #endif /* IN_1_APL_42_H */

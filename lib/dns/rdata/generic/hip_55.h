@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2009  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: hip_55.h,v 1.2 2009/02/26 06:09:19 marka Exp $ */
 
 #ifndef GENERIC_HIP_5_H
 #define GENERIC_HIP_5_H 1
@@ -27,12 +21,12 @@ typedef struct dns_rdata_hip {
 	unsigned char *		hit;
 	unsigned char *		key;
 	unsigned char *		servers;
-	isc_uint8_t		algorithm;
-	isc_uint8_t		hit_len;
-	isc_uint16_t		key_len;
-	isc_uint16_t		servers_len;
+	uint8_t		algorithm;
+	uint8_t		hit_len;
+	uint16_t		key_len;
+	uint16_t		servers_len;
 	/* Private */
-	isc_uint16_t		offset;
+	uint16_t		offset;
 } dns_rdata_hip_t;
 
 isc_result_t

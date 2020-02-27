@@ -1,22 +1,19 @@
 /*
- * Copyright (C) 2010-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 #include <config.h>
 
 #if defined(OPENSSL) && defined(HAVE_OPENSSL_GOST)
+
+#include <stdbool.h>
 
 #include <isc/entropy.h>
 #include <isc/mem.h>
@@ -35,6 +32,11 @@
 #include <openssl/objects.h>
 #include <openssl/rsa.h>
 #include <openssl/engine.h>
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#define EVP_MD_CTX_new() &(ctx->_ctx), EVP_MD_CTX_init(&(ctx->_ctx))
+#define EVP_MD_CTX_free(ptr) EVP_MD_CTX_cleanup(ptr)
+#endif
 
 static ENGINE *e = NULL;
 static const EVP_MD *opensslgost_digest;
@@ -56,8 +58,10 @@ isc_gost_init(isc_gost_t *ctx) {
 	md = EVP_gost();
 	if (md == NULL)
 		return (DST_R_CRYPTOFAILURE);
-	EVP_MD_CTX_init(ctx);
-	ret = EVP_DigestInit(ctx, md);
+	ctx->ctx = EVP_MD_CTX_new();
+	if (ctx->ctx == NULL)
+		return (ISC_R_NOMEMORY);
+	ret = EVP_DigestInit(ctx->ctx, md);
 	if (ret != 1)
 		return (DST_R_CRYPTOFAILURE);
 	return (ISC_R_SUCCESS);
@@ -65,7 +69,8 @@ isc_gost_init(isc_gost_t *ctx) {
 
 void
 isc_gost_invalidate(isc_gost_t *ctx) {
-	EVP_MD_CTX_cleanup(ctx);
+	EVP_MD_CTX_free(ctx->ctx);
+	ctx->ctx = NULL;
 }
 
 isc_result_t
@@ -75,9 +80,10 @@ isc_gost_update(isc_gost_t *ctx, const unsigned char *data,
 	int ret;
 
 	INSIST(ctx != NULL);
+	INSIST(ctx->ctx != NULL);
 	INSIST(data != NULL);
 
-	ret = EVP_DigestUpdate(ctx, (const void *) data, (size_t) len);
+	ret = EVP_DigestUpdate(ctx->ctx, (const void *) data, (size_t) len);
 	if (ret != 1)
 		return (DST_R_CRYPTOFAILURE);
 	return (ISC_R_SUCCESS);
@@ -88,9 +94,12 @@ isc_gost_final(isc_gost_t *ctx, unsigned char *digest) {
 	int ret;
 
 	INSIST(ctx != NULL);
+	INSIST(ctx->ctx != NULL);
 	INSIST(digest != NULL);
 
-	ret = EVP_DigestFinal(ctx, digest, NULL);
+	ret = EVP_DigestFinal(ctx->ctx, digest, NULL);
+	EVP_MD_CTX_free(ctx->ctx);
+	ctx->ctx = NULL;
 	if (ret != 1)
 		return (DST_R_CRYPTOFAILURE);
 	return (ISC_R_SUCCESS);
@@ -187,7 +196,7 @@ opensslgost_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	}
 }
 
-static isc_boolean_t
+static bool
 opensslgost_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	EVP_PKEY *pkey1, *pkey2;
 
@@ -195,13 +204,13 @@ opensslgost_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	pkey2 = key2->keydata.pkey;
 
 	if (pkey1 == NULL && pkey2 == NULL)
-		return (ISC_TRUE);
+		return (true);
 	else if (pkey1 == NULL || pkey2 == NULL)
-		return (ISC_FALSE);
+		return (false);
 
 	if (EVP_PKEY_cmp(pkey1, pkey2) != 1)
-		return (ISC_FALSE);
-	return (ISC_TRUE);
+		return (false);
+	return (true);
 }
 
 static int
@@ -262,7 +271,7 @@ err:
 	return (ret);
 }
 
-static isc_boolean_t
+static bool
 opensslgost_isprivate(const dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	EC_KEY *ec;
@@ -270,7 +279,7 @@ opensslgost_isprivate(const dst_key_t *key) {
 	INSIST(pkey != NULL);
 
 	ec = EVP_PKEY_get0(pkey);
-	return (ISC_TF(ec != NULL && EC_KEY_get0_private_key(ec) != NULL));
+	return (ec != NULL && EC_KEY_get0_private_key(ec) != NULL);
 }
 
 static void
@@ -281,7 +290,7 @@ opensslgost_destroy(dst_key_t *key) {
 	key->keydata.pkey = NULL;
 }
 
-unsigned char gost_prefix[37] = {
+static const unsigned char gost_prefix[37] = {
 	0x30, 0x63, 0x30, 0x1c, 0x06, 0x06, 0x2a, 0x85,
 	0x03, 0x02, 0x02, 0x13, 0x30, 0x12, 0x06, 0x07,
 	0x2a, 0x85, 0x03, 0x02, 0x02, 0x23, 0x01, 0x06,
@@ -467,7 +476,7 @@ opensslgost_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		pub->keydata.pkey = NULL;
 		key->key_size = pub->key_size;
 		dst__privstruct_free(&priv, mctx);
-		memset(&priv, 0, sizeof(priv));
+		isc_safe_memwipe(&priv, sizeof(priv));
 		return (ISC_R_SUCCESS);
 	}
 
@@ -519,7 +528,7 @@ opensslgost_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	key->keydata.pkey = pkey;
 	key->key_size = EVP_PKEY_bits(pkey);
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 	return (ISC_R_SUCCESS);
 
  err:
@@ -529,7 +538,7 @@ opensslgost_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		EVP_PKEY_free(pkey);
 	opensslgost_destroy(key);
 	dst__privstruct_free(&priv, mctx);
-	memset(&priv, 0, sizeof(priv));
+	isc_safe_memwipe(&priv, sizeof(priv));
 	return (ret);
 }
 

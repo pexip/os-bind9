@@ -1,5 +1,6 @@
-Author: Michael Milligan <milli@acmeps.com>
-Date:   Fri Mar 20 15:01:03 2009 -0600
+From: Debian DNS Packaging <pkg-dns-devel@lists.alioth.debian.org>
+Date: Fri, 24 Nov 2017 16:26:54 +0000
+Subject: _min-cache-ttl
 
     Add min-cache-ttl and min-ncache-ttl keywords
 
@@ -9,21 +10,35 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
 
     Signed-off-by: Michael Milligan <milli@acmeps.com>
     Signed-off-by: LaMont Jones <lamont@debian.org>
+---
+ bin/named/config.c           |  2 ++
+ bin/named/server.c           | 12 ++++++++++++
+ bin/tests/named.conf         |  2 ++
+ lib/dns/include/dns/ncache.h |  6 ++++--
+ lib/dns/include/dns/view.h   |  2 ++
+ lib/dns/ncache.c             | 18 ++++++++++++------
+ lib/dns/resolver.c           | 22 ++++++++++++++++------
+ lib/isccfg/namedconf.c       |  2 ++
+ 8 files changed, 52 insertions(+), 14 deletions(-)
 
+diff --git a/bin/named/config.c b/bin/named/config.c
+index 2732a8f..d22ee4b 100644
 --- a/bin/named/config.c
 +++ b/bin/named/config.c
-@@ -152,6 +152,8 @@
- 	lame-ttl 600;\n\
- 	max-ncache-ttl 10800; /* 3 hours */\n\
- 	max-cache-ttl 604800; /* 1 week */\n\
+@@ -182,6 +182,8 @@ options {\n\
+ 	max-recursion-depth 7;\n\
+ 	max-recursion-queries 75;\n\
+ 	message-compression yes;\n\
 +	min-ncache-ttl 0; /* 0 hours */\n\
 +	min-cache-ttl 0; /* 0 seconds */\n\
- 	transfer-format many-answers;\n\
- 	max-cache-size 0;\n\
- 	check-names master fail;\n\
+ #	min-roots <obsolete>;\n\
+ 	minimal-any false;\n\
+ 	minimal-responses false;\n\
+diff --git a/bin/named/server.c b/bin/named/server.c
+index 7f87ccf..149458e 100644
 --- a/bin/named/server.c
 +++ b/bin/named/server.c
-@@ -2808,6 +2808,18 @@
+@@ -3706,6 +3706,18 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist,
  	if (view->maxncachettl > 7 * 24 * 3600)
  		view->maxncachettl = 7 * 24 * 3600;
  
@@ -42,9 +57,11 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
  	/*
  	 * Configure the view's cache.
  	 *
+diff --git a/bin/tests/named.conf b/bin/tests/named.conf
+index 5673e98..34435b6 100644
 --- a/bin/tests/named.conf
 +++ b/bin/tests/named.conf
-@@ -54,6 +54,7 @@
+@@ -46,6 +46,7 @@ options {
  	memstatistics-file "named.memstats";	// _PATH_MEMSTATS
  
  	max-cache-ttl 999;
@@ -52,86 +69,98 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
  	auth-nxdomain yes;		// always set AA on NXDOMAIN.
  					// don't set this to 'no' unless
  					// you know what you're doing -- older
-@@ -155,6 +156,7 @@
+@@ -148,6 +149,7 @@ options {
  	min-refresh-time 777;
-  
+ 
  	max-ncache-ttl 333;
 +	min-ncache-ttl 222;
  	min-roots 15;
  	serial-queries 34;
  
+diff --git a/lib/dns/include/dns/ncache.h b/lib/dns/include/dns/ncache.h
+index 2942c26..c2e1e7b 100644
 --- a/lib/dns/include/dns/ncache.h
 +++ b/lib/dns/include/dns/ncache.h
-@@ -61,12 +61,12 @@
+@@ -56,12 +56,14 @@ ISC_LANG_BEGINDECLS
  
  isc_result_t
  dns_ncache_add(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 -	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
-+	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
++	       dns_rdatatype_t covers, isc_stdtime_t now,
++	       dns_ttl_t minttl, dns_ttl_t maxttl,
  	       dns_rdataset_t *addedrdataset);
  isc_result_t
  dns_ncache_addoptout(dns_message_t *message, dns_db_t *cache,
  		     dns_dbnode_t *node, dns_rdatatype_t covers,
 -		     isc_stdtime_t now, dns_ttl_t maxttl,
-+		     isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
- 		     isc_boolean_t optout, dns_rdataset_t *addedrdataset);
++		     isc_stdtime_t now,
++		     dns_ttl_t minttl, dns_ttl_t maxttl,
+ 		     bool optout, dns_rdataset_t *addedrdataset);
  /*%<
   * Convert the authority data from 'message' into a negative cache
+diff --git a/lib/dns/include/dns/view.h b/lib/dns/include/dns/view.h
+index 8e21298..3b3ecc9 100644
 --- a/lib/dns/include/dns/view.h
 +++ b/lib/dns/include/dns/view.h
-@@ -151,6 +151,8 @@
- 	isc_boolean_t			requestsit;
+@@ -153,6 +153,8 @@ struct dns_view {
+ 	bool			sendcookie;
  	dns_ttl_t			maxcachettl;
  	dns_ttl_t			maxncachettl;
 +	dns_ttl_t			mincachettl;
 +	dns_ttl_t			minncachettl;
- 	dns_ttl_t			prefetch_trigger;
- 	dns_ttl_t			prefetch_eligible;
- 	in_port_t			dstport;
+ 	uint32_t			nta_lifetime;
+ 	uint32_t			nta_recheck;
+ 	char				*nta_file;
+diff --git a/lib/dns/ncache.c b/lib/dns/ncache.c
+index c5078de..9cde098 100644
 --- a/lib/dns/ncache.c
 +++ b/lib/dns/ncache.c
-@@ -49,7 +49,7 @@
+@@ -45,7 +45,8 @@
  
  static isc_result_t
  addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 -	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
-+	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
- 	  isc_boolean_t optout, isc_boolean_t secure,
++	  dns_rdatatype_t covers, isc_stdtime_t now,
++	  dns_ttl_t minttl, dns_ttl_t maxttl,
+ 	  bool optout, bool secure,
  	  dns_rdataset_t *addedrdataset);
  
-@@ -99,26 +99,26 @@
+@@ -95,26 +96,29 @@ copy_rdataset(dns_rdataset_t *rdataset, isc_buffer_t *buffer) {
  
  isc_result_t
  dns_ncache_add(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 -	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
-+	       dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
++	       dns_rdatatype_t covers, isc_stdtime_t now,
++	       dns_ttl_t minttl, dns_ttl_t maxttl,
  	       dns_rdataset_t *addedrdataset)
  {
 -	return (addoptout(message, cache, node, covers, now, maxttl,
 +	return (addoptout(message, cache, node, covers, now, minttl, maxttl,
- 			  ISC_FALSE, ISC_FALSE, addedrdataset));
+ 			  false, false, addedrdataset));
  }
  
  isc_result_t
  dns_ncache_addoptout(dns_message_t *message, dns_db_t *cache,
  		     dns_dbnode_t *node, dns_rdatatype_t covers,
 -		     isc_stdtime_t now, dns_ttl_t maxttl,
-+		     isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
- 		     isc_boolean_t optout, dns_rdataset_t *addedrdataset)
++		     isc_stdtime_t now,
++		     dns_ttl_t minttl, dns_ttl_t maxttl,
+ 		     bool optout, dns_rdataset_t *addedrdataset)
  {
 -	return (addoptout(message, cache, node, covers, now, maxttl,
 +	return (addoptout(message, cache, node, covers, now, minttl, maxttl,
- 			  optout, ISC_TRUE, addedrdataset));
+ 			  optout, true, addedrdataset));
  }
  
  static isc_result_t
  addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 -	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
-+	  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
- 	  isc_boolean_t optout, isc_boolean_t secure,
++	  dns_rdatatype_t covers, isc_stdtime_t now,
++	  dns_ttl_t minttl, dns_ttl_t maxttl,
+ 	  bool optout, bool secure,
  	  dns_rdataset_t *addedrdataset)
  {
-@@ -185,6 +185,8 @@
+@@ -181,6 +185,8 @@ addoptout(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
  				    type == dns_rdatatype_nsec3) {
  					if (ttl > rdataset->ttl)
  						ttl = rdataset->ttl;
@@ -140,9 +169,11 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
  					if (trust > rdataset->trust)
  						trust = rdataset->trust;
  					/*
+diff --git a/lib/dns/resolver.c b/lib/dns/resolver.c
+index 0abf4de..1d76504 100644
 --- a/lib/dns/resolver.c
 +++ b/lib/dns/resolver.c
-@@ -564,7 +564,9 @@
+@@ -564,7 +564,9 @@ static bool fctx_unlink(fetchctx_t *fctx);
  static isc_result_t ncache_adderesult(dns_message_t *message,
  				      dns_db_t *cache, dns_dbnode_t *node,
  				      dns_rdatatype_t covers,
@@ -150,10 +181,10 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
 +				      isc_stdtime_t now,
 +				      dns_ttl_t minttl,
 +				      dns_ttl_t maxttl,
- 				      isc_boolean_t optout,
- 				      isc_boolean_t secure,
+ 				      bool optout,
+ 				      bool secure,
  				      dns_rdataset_t *ardataset,
-@@ -4888,7 +4890,7 @@
+@@ -5015,7 +5017,7 @@ validated(isc_task_t *task, isc_event_t *event) {
  			ttl = 0;
  
  		result = ncache_adderesult(fctx->rmessage, fctx->cache, node,
@@ -162,29 +193,30 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
  					   vevent->secure, ardataset, &eresult);
  		if (result != ISC_R_SUCCESS)
  			goto noanswer_response;
-@@ -5351,6 +5353,12 @@
+@@ -5480,6 +5482,12 @@ cache_name(fetchctx_t *fctx, dns_name_t *name, dns_adbaddrinfo_t *addrinfo,
  			rdataset->ttl = res->view->maxcachettl;
+ 		}
  
- 		/*
++		/*
 +		 * Enforce configured minimum cache TTL.
 +		 */
 +		if (rdataset->ttl < res->view->mincachettl)
 +			rdataset->ttl = res->view->mincachettl;
 +
-+		/*
+ 		/*
  		 * Mark the rdataset as being prefetch eligible.
  		 */
- 		if (rdataset->ttl > fctx->res->view->prefetch_eligible)
-@@ -5703,7 +5711,7 @@
+@@ -5868,7 +5876,8 @@ cache_message(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo, isc_stdtime_t now)
   */
  static isc_result_t
  ncache_adderesult(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
 -		  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t maxttl,
-+		  dns_rdatatype_t covers, isc_stdtime_t now, dns_ttl_t minttl, dns_ttl_t maxttl,
- 		  isc_boolean_t optout, isc_boolean_t secure,
++		  dns_rdatatype_t covers, isc_stdtime_t now,
++		  dns_ttl_t minttl, dns_ttl_t maxttl,
+ 		  bool optout, bool secure,
  		  dns_rdataset_t *ardataset, isc_result_t *eresultp)
  {
-@@ -5716,10 +5724,10 @@
+@@ -5881,10 +5890,10 @@ ncache_adderesult(dns_message_t *message, dns_db_t *cache, dns_dbnode_t *node,
  	}
  	if (secure)
  		result = dns_ncache_addoptout(message, cache, node, covers,
@@ -197,23 +229,26 @@ Date:   Fri Mar 20 15:01:03 2009 -0600
  	if (result == DNS_R_UNCHANGED || result == ISC_R_SUCCESS) {
  		/*
  		 * If the cache now contains a negative entry and we
-@@ -5888,7 +5896,7 @@
+@@ -6059,7 +6068,8 @@ ncache_message(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo,
  		ttl = 0;
  
  	result = ncache_adderesult(fctx->rmessage, fctx->cache, node,
--				   covers, now, ttl, ISC_FALSE,
-+				   covers, now, fctx->res->view->minncachettl, ttl, ISC_FALSE,
- 				   ISC_FALSE, ardataset, &eresult);
+-				   covers, now, ttl, false,
++				   covers, now, ttl,
++				   fctx->res->view->minncachettl, false,
+ 				   false, ardataset, &eresult);
  	if (result != ISC_R_SUCCESS)
  		goto unlock;
+diff --git a/lib/isccfg/namedconf.c b/lib/isccfg/namedconf.c
+index cd797a6..fdaf8ff 100644
 --- a/lib/isccfg/namedconf.c
 +++ b/lib/isccfg/namedconf.c
-@@ -1567,6 +1567,8 @@
- 	{ "max-recursion-depth", &cfg_type_uint32, 0 },
+@@ -1780,6 +1780,8 @@ view_clauses[] = {
  	{ "max-recursion-queries", &cfg_type_uint32, 0 },
  	{ "max-udp-size", &cfg_type_uint32, 0 },
+ 	{ "message-compression", &cfg_type_boolean, 0 },
 +	{ "min-cache-ttl", &cfg_type_uint32, 0 },
 +	{ "min-ncache-ttl", &cfg_type_uint32, 0 },
  	{ "min-roots", &cfg_type_uint32, CFG_CLAUSEFLAG_NOTIMP },
- 	{ "minimal-responses", &cfg_type_boolean, 0 },
- 	{ "prefetch", &cfg_type_prefetch, 0 },
+ 	{ "minimal-any", &cfg_type_boolean, 0 },
+ 	{ "minimal-responses", &cfg_type_minimal, 0 },

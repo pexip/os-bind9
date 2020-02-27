@@ -1,28 +1,20 @@
 /*
- * Copyright (C) 2004-2016  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 
-/*
- * Principal Author: DCL
- */
-
 #include <config.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include <isc/app.h>
@@ -40,6 +32,8 @@
 #include <isc/task.h>
 #include <isc/thread.h>
 #include <isc/util.h>
+
+#include <pk11/site.h>
 
 #include <isccfg/namedconf.h>
 
@@ -61,7 +55,7 @@
 #define SERVERADDRS 10
 
 const char *progname;
-isc_boolean_t verbose;
+bool verbose;
 
 static const char *admin_conffile;
 static const char *admin_keyfile;
@@ -69,25 +63,26 @@ static const char *version = VERSION;
 static const char *servername = NULL;
 static isc_sockaddr_t serveraddrs[SERVERADDRS];
 static isc_sockaddr_t local4, local6;
-static isc_boolean_t local4set = ISC_FALSE, local6set = ISC_FALSE;
+static bool local4set = false, local6set = false;
 static int nserveraddrs;
 static int currentaddr = 0;
 static unsigned int remoteport = 0;
 static isc_socketmgr_t *socketmgr = NULL;
-static unsigned char databuf[2048];
+static isc_buffer_t *databuf;
 static isccc_ccmsg_t ccmsg;
-static isc_uint32_t algorithm;
+static uint32_t algorithm;
 static isccc_region_t secret;
-static isc_boolean_t failed = ISC_FALSE;
-static isc_boolean_t c_flag = ISC_FALSE;
+static bool failed = false;
+static bool c_flag = false;
 static isc_mem_t *rndc_mctx;
 static int sends, recvs, connects;
 static char *command;
 static char *args;
 static char program[256];
 static isc_socket_t *sock = NULL;
-static isc_uint32_t serial;
-static isc_boolean_t quiet = ISC_FALSE;
+static uint32_t serial;
+static bool quiet = false;
+static bool showresult = false;
 
 static void rndc_startconnect(isc_sockaddr_t *addr, isc_task_t *task);
 
@@ -98,14 +93,18 @@ static void
 usage(int status) {
 	fprintf(stderr, "\
 Usage: %s [-b address] [-c config] [-s server] [-p port]\n\
-	[-k key-file ] [-y key] [-V] command\n\
+	[-k key-file ] [-y key] [-r] [-V] command\n\
 \n\
 command is one of the following:\n\
 \n\
   addzone zone [class [view]] { zone-options }\n\
-		Add zone to given view. Requires new-zone-file option.\n\
+		Add zone to given view. Requires allow-new-zones option.\n\
   delzone [-clean] zone [class [view]]\n\
-		Removes zone from given view. Requires new-zone-file option.\n\
+		Removes zone from given view.\n\
+  dnstap -reopen\n\
+		Close, truncate and re-open the DNSTAP output file.\n\
+  dnstap -roll count\n\
+		Close, rename and re-open the DNSTAP output file(s).\n\
   dumpdb [-all|-cache|-zones|-adb|-bad|-fail] [view ...]\n\
 		Dump cache(s) to the dump file (named_dump.db).\n\
   flush 	Flushes all of the server's caches.\n\
@@ -122,10 +121,31 @@ command is one of the following:\n\
 		process id.\n\
   loadkeys zone [class [view]]\n\
 		Update keys without signing immediately.\n\
+  managed-keys refresh [class [view]]\n\
+		Check trust anchor for RFC 5011 key changes\n\
+  managed-keys status [class [view]]\n\
+		Display RFC 5011 managed keys information\n\
+  managed-keys sync [class [view]]\n\
+		Write RFC 5011 managed keys to disk\n\
+  modzone zone [class [view]] { zone-options }\n\
+		Modify a zone's configuration.\n\
+		Requires allow-new-zones option.\n\
   notify zone [class [view]]\n\
 		Resend NOTIFY messages for the zone.\n\
   notrace	Set debugging level to 0.\n\
-  querylog newstate\n\
+  nta -dump\n\
+		List all negative trust anchors.\n\
+  nta [-lifetime duration] [-force] domain [view]\n\
+		Set a negative trust anchor, disabling DNSSEC validation\n\
+		for the given domain.\n\
+		Using -lifetime specifies the duration of the NTA, up\n\
+		to one week.\n\
+		Using -force prevents the NTA from expiring before its\n\
+		full lifetime, even if the domain can validate sooner.\n\
+  nta -remove domain [view]\n\
+		Remove a negative trust anchor, re-enabling validation\n\
+		for the given domain.\n\
+  querylog [ on | off ]\n\
 		Enable / disable query logging.\n\
   reconfig	Reload configuration file and new zones only.\n\
   recursing	Dump the queries that are currently recursing (named.recursing)\n\
@@ -139,6 +159,8 @@ command is one of the following:\n\
   scan		Scan available network interfaces for changes.\n\
   secroots [view ...]\n\
 		Write security roots to the secroots file.\n\
+  showzone zone [class [view]]\n\
+		Print a zone's configuration.\n\
   sign zone [class [view]]\n\
 		Update zone keys, and sign as needed.\n\
   signing -clear all zone [class [view]]\n\
@@ -155,6 +177,8 @@ command is one of the following:\n\
 		Prime zone with NSEC3 chain if not yet signed.\n\
   signing -nsec3param none zone [class [view]]\n\
 		Remove NSEC3 chains from zone.\n\
+  signing -serial <value> zone [class [view]]\n\
+		Set the zones's serial to <value>.\n\
   stats		Write server statistics to the statistics file.\n\
   status	Display status of the server.\n\
   stop		Save pending updates to master files and stop the server.\n\
@@ -174,7 +198,7 @@ command is one of the following:\n\
 		Delete a TKEY-negotiated TSIG key.\n\
   tsig-list	List all currently active TSIG keys, including both statically\n\
 		configured and TKEY-negotiated keys.\n\
-  validation newstate [view]\n\
+  validation [ yes | no | status ] [view]\n\
 		Enable / disable DNSSEC validation.\n\
   zonestatus zone [class [view]]\n\
 		Display the current status of a zone.\n\
@@ -259,7 +283,7 @@ rndc_recvdone(isc_task_t *task, isc_event_t *event) {
 		fatal("bad or missing data section in response");
 	result = isccc_cc_lookupstring(data, "err", &errormsg);
 	if (result == ISC_R_SUCCESS) {
-		failed = ISC_TRUE;
+		failed = true;
 		fprintf(stderr, "%s: '%s' failed: %s\n",
 			progname, command, errormsg);
 	}
@@ -274,6 +298,16 @@ rndc_recvdone(isc_task_t *task, isc_event_t *event) {
 	} else if (result != ISC_R_NOTFOUND)
 		fprintf(stderr, "%s: parsing response failed: %s\n",
 			progname, isc_result_totext(result));
+
+	if (showresult) {
+		isc_result_t eresult;
+
+		result = isccc_cc_lookupuint32(data, "result", &eresult);
+		if (result == ISC_R_SUCCESS)
+			printf("%s %u\n", isc_result_toid(eresult), eresult);
+		else
+			printf("NONE -1\n");
+	}
 
 	isc_event_free(&event);
 	isccc_sexpr_free(&response);
@@ -290,13 +324,11 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
 	isccc_sexpr_t *_ctrl;
 	isccc_region_t source;
 	isc_result_t result;
-	isc_uint32_t nonce;
+	uint32_t nonce;
 	isccc_sexpr_t *request = NULL;
 	isccc_time_t now;
 	isc_region_t r;
 	isccc_sexpr_t *data;
-	isccc_region_t message;
-	isc_uint32_t len;
 	isc_buffer_t b;
 
 	recvs--;
@@ -343,15 +375,19 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
 		if (isccc_cc_defineuint32(_ctrl, "_nonce", nonce) == NULL)
 			fatal("out of memory");
 	}
-	message.rstart = databuf + 4;
-	message.rend = databuf + sizeof(databuf);
+
+	isc_buffer_clear(databuf);
+	/* Skip the length field (4 bytes) */
+	isc_buffer_add(databuf, 4);
+
 	DO("render message",
-	   isccc_cc_towire(request, &message, algorithm, &secret));
-	len = sizeof(databuf) - REGION_SIZE(message);
-	isc_buffer_init(&b, databuf, 4);
-	isc_buffer_putuint32(&b, len - 4);
-	r.length = len;
-	r.base = databuf;
+	   isccc_cc_towire(request, &databuf, algorithm, &secret));
+
+	isc_buffer_init(&b, databuf->base, 4);
+	isc_buffer_putuint32(&b, databuf->used - 4);
+
+	r.base = databuf->base;
+	r.length = databuf->used;
 
 	isccc_ccmsg_cancelread(&ccmsg);
 	DO("schedule recv", isccc_ccmsg_readmessage(&ccmsg, task,
@@ -363,6 +399,7 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
 
 	isc_event_free(&event);
 	isccc_sexpr_free(&response);
+	isccc_sexpr_free(&request);
 	return;
 }
 
@@ -373,9 +410,7 @@ rndc_connected(isc_task_t *task, isc_event_t *event) {
 	isccc_sexpr_t *request = NULL;
 	isccc_sexpr_t *data;
 	isccc_time_t now;
-	isccc_region_t message;
 	isc_region_t r;
-	isc_uint32_t len;
 	isc_buffer_t b;
 	isc_result_t result;
 
@@ -406,15 +441,19 @@ rndc_connected(isc_task_t *task, isc_event_t *event) {
 		fatal("_data section missing");
 	if (isccc_cc_definestring(data, "type", "null") == NULL)
 		fatal("out of memory");
-	message.rstart = databuf + 4;
-	message.rend = databuf + sizeof(databuf);
+
+	isc_buffer_clear(databuf);
+	/* Skip the length field (4 bytes) */
+	isc_buffer_add(databuf, 4);
+
 	DO("render message",
-	   isccc_cc_towire(request, &message, algorithm, &secret));
-	len = sizeof(databuf) - REGION_SIZE(message);
-	isc_buffer_init(&b, databuf, 4);
-	isc_buffer_putuint32(&b, len - 4);
-	r.length = len;
-	r.base = databuf;
+	   isccc_cc_towire(request, &databuf, algorithm, &secret));
+
+	isc_buffer_init(&b, databuf->base, 4);
+	isc_buffer_putuint32(&b, databuf->used - 4);
+
+	r.base = databuf->base;
+	r.length = databuf->used;
 
 	isccc_ccmsg_init(rndc_mctx, sock, &ccmsg);
 	isccc_ccmsg_setmaxsize(&ccmsg, 1024 * 1024);
@@ -426,6 +465,7 @@ rndc_connected(isc_task_t *task, isc_event_t *event) {
 					   NULL));
 	sends++;
 	isc_event_free(&event);
+	isccc_sexpr_free(&request);
 }
 
 static void
@@ -492,7 +532,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 	const char *algorithmstr;
 	static char secretarray[1024];
 	const cfg_type_t *conftype = &cfg_type_rndcconf;
-	isc_boolean_t key_only = ISC_FALSE;
+	bool key_only = false;
 	const cfg_listelt_t *element;
 
 	if (! isc_file_exists(conffile)) {
@@ -505,7 +545,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		if (! isc_file_exists(conffile))
 			fatal("neither %s nor %s was found",
 			      admin_conffile, admin_keyfile);
-		key_only = ISC_TRUE;
+		key_only = true;
 	} else if (! c_flag && isc_file_exists(admin_keyfile)) {
 		fprintf(stderr, "WARNING: key file (%s) exists, but using "
 			"default configuration file (%s)\n",
@@ -595,9 +635,12 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 	secretstr = cfg_obj_asstring(secretobj);
 	algorithmstr = cfg_obj_asstring(algorithmobj);
 
+#ifndef PK11_MD5_DISABLE
 	if (strcasecmp(algorithmstr, "hmac-md5") == 0)
 		algorithm = ISCCC_ALG_HMACMD5;
-	else if (strcasecmp(algorithmstr, "hmac-sha1") == 0)
+	else
+#endif
+	if (strcasecmp(algorithmstr, "hmac-sha1") == 0)
 		algorithm = ISCCC_ALG_HMACSHA1;
 	else if (strcasecmp(algorithmstr, "hmac-sha224") == 0)
 		algorithm = ISCCC_ALG_HMACSHA224;
@@ -656,7 +699,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 				obj = cfg_tuple_get(address, "port");
 				if (cfg_obj_isuint32(obj)) {
 					myport = cfg_obj_asuint32(obj);
-					if (myport > ISC_UINT16_MAX ||
+					if (myport > UINT16_MAX ||
 					    myport == 0)
 						fatal("port %u out of range",
 						      myport);
@@ -691,7 +734,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		cfg_map_get(server, "source-address", &address);
 		if (address != NULL) {
 			local4 = *cfg_obj_assockaddr(address);
-			local4set = ISC_TRUE;
+			local4set = true;
 		}
 	}
 	if (!local4set && options != NULL) {
@@ -699,7 +742,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		cfg_map_get(options, "default-source-address", &address);
 		if (address != NULL) {
 			local4 = *cfg_obj_assockaddr(address);
-			local4set = ISC_TRUE;
+			local4set = true;
 		}
 	}
 
@@ -708,7 +751,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		cfg_map_get(server, "source-address-v6", &address);
 		if (address != NULL) {
 			local6 = *cfg_obj_assockaddr(address);
-			local6set = ISC_TRUE;
+			local6set = true;
 		}
 	}
 	if (!local6set && options != NULL) {
@@ -716,7 +759,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		cfg_map_get(options, "default-source-address-v6", &address);
 		if (address != NULL) {
 			local6 = *cfg_obj_assockaddr(address);
-			local6set = ISC_TRUE;
+			local6set = true;
 		}
 	}
 
@@ -726,7 +769,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 int
 main(int argc, char **argv) {
 	isc_result_t result = ISC_R_SUCCESS;
-	isc_boolean_t show_final_mem = ISC_FALSE;
+	bool show_final_mem = false;
 	isc_taskmgr_t *taskmgr = NULL;
 	isc_task_t *task = NULL;
 	isc_log_t *log = NULL;
@@ -757,26 +800,26 @@ main(int argc, char **argv) {
 	if (result != ISC_R_SUCCESS)
 		fatal("isc_app_start() failed: %s", isc_result_totext(result));
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
-	while ((ch = isc_commandline_parse(argc, argv, "b:c:hk:Mmp:qs:Vy:"))
+	while ((ch = isc_commandline_parse(argc, argv, "b:c:hk:Mmp:qrs:Vy:"))
 	       != -1) {
 		switch (ch) {
 		case 'b':
 			if (inet_pton(AF_INET, isc_commandline_argument,
 				      &in) == 1) {
 				isc_sockaddr_fromin(&local4, &in, 0);
-				local4set = ISC_TRUE;
+				local4set = true;
 			} else if (inet_pton(AF_INET6, isc_commandline_argument,
 					     &in6) == 1) {
 				isc_sockaddr_fromin6(&local6, &in6, 0);
-				local6set = ISC_TRUE;
+				local6set = true;
 			}
 			break;
 
 		case 'c':
 			admin_conffile = isc_commandline_argument;
-			c_flag = ISC_TRUE;
+			c_flag = true;
 			break;
 
 		case 'k':
@@ -788,7 +831,7 @@ main(int argc, char **argv) {
 			break;
 
 		case 'm':
-			show_final_mem = ISC_TRUE;
+			show_final_mem = true;
 			break;
 
 		case 'p':
@@ -799,7 +842,11 @@ main(int argc, char **argv) {
 			break;
 
 		case 'q':
-			quiet = ISC_TRUE;
+			quiet = true;
+			break;
+
+		case 'r':
+			showresult = true;
 			break;
 
 		case 's':
@@ -807,7 +854,7 @@ main(int argc, char **argv) {
 			break;
 
 		case 'V':
-			verbose = ISC_TRUE;
+			verbose = true;
 			break;
 
 		case 'y':
@@ -864,6 +911,9 @@ main(int argc, char **argv) {
 
 	command = *argv;
 
+	DO("allocate data buffer",
+	   isc_buffer_allocate(rndc_mctx, &databuf, 2048));
+
 	/*
 	 * Convert argc/argv into a space-delimited command string
 	 * similar to what the user might enter in interactive mode
@@ -919,6 +969,8 @@ main(int argc, char **argv) {
 	isccc_ccmsg_invalidate(&ccmsg);
 
 	dns_name_destroy();
+
+	isc_buffer_free(&databuf);
 
 	if (show_final_mem)
 		isc_mem_stats(rndc_mctx, stderr);

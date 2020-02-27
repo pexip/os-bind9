@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2009, 2011, 2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
@@ -24,6 +19,7 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
 
@@ -62,7 +58,7 @@
 static char program[256];
 const char *progname;
 static enum { progmode_keygen, progmode_confgen} progmode;
-isc_boolean_t verbose = ISC_FALSE; /* needed by util.c but not used here */
+bool verbose = false; /* needed by util.c but not used here */
 
 ISC_PLATFORM_NORETURN_PRE static void
 usage(int status) ISC_PLATFORM_NORETURN_POST;
@@ -95,8 +91,8 @@ Usage:\n\
 int
 main(int argc, char **argv) {
 	isc_result_t result = ISC_R_SUCCESS;
-	isc_boolean_t show_final_mem = ISC_FALSE;
-	isc_boolean_t quiet = ISC_FALSE;
+	bool show_final_mem = false;
+	bool quiet = false;
 	isc_buffer_t key_txtbuffer;
 	char key_txtsecret[256];
 	isc_mem_t *mctx = NULL;
@@ -133,13 +129,13 @@ main(int argc, char **argv) {
 
 	if (PROGCMP("tsig-keygen")) {
 		progmode = progmode_keygen;
-		quiet = ISC_TRUE;
+		quiet = true;
 	} else if (PROGCMP("ddns-confgen"))
 		progmode = progmode_confgen;
 	else
 		INSIST(0);
 
-	isc_commandline_errprint = ISC_FALSE;
+	isc_commandline_errprint = false;
 
 	while ((ch = isc_commandline_parse(argc, argv,
 					   "a:hk:Mmr:qs:y:z:")) != -1) {
@@ -164,11 +160,11 @@ main(int argc, char **argv) {
 			isc_mem_debugging = ISC_MEM_DEBUGTRACE;
 			break;
 		case 'm':
-			show_final_mem = ISC_TRUE;
+			show_final_mem = true;
 			break;
 		case 'q':
 			if (progmode == progmode_confgen)
-				quiet = ISC_TRUE;
+				quiet = true;
 			else
 				usage(1);
 			break;

@@ -1,23 +1,13 @@
 /*
- * Copyright (C) 2004, 2007-2009, 2011-2013  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
-
-/* Principal Authors: DCL */
 
 #include <config.h>
 
@@ -28,9 +18,11 @@
 
 #include <sys/stat.h>
 
+#include <isc/assertions.h>
 #include <isc/dir.h>
 #include <isc/magic.h>
-#include <isc/assertions.h>
+#include <isc/print.h>
+#include <isc/string.h>
 #include <isc/util.h>
 
 #include "errno2result.h"
@@ -51,7 +43,7 @@ isc_dir_init(isc_dir_t *dir) {
 	dir->entry.length = 0;
 	memset(&(dir->entry.find_data), 0, sizeof(dir->entry.find_data));
 
-	dir->entry_filled = ISC_FALSE;
+	dir->entry_filled = false;
 	dir->search_handle = INVALID_HANDLE_VALUE;
 
 	dir->magic = ISC_DIR_MAGIC;
@@ -76,7 +68,7 @@ isc_dir_open(isc_dir_t *dir, const char *dirname) {
 	if (strlen(dirname) + 3 > sizeof(dir->dirname))
 		/* XXXDCL ? */
 		return (ISC_R_NOSPACE);
-	strcpy(dir->dirname, dirname);
+	strlcpy(dir->dirname, dirname, sizeof(dir->dirname));
 
 	/*
 	 * Append path separator, if needed, and "*".
@@ -108,7 +100,7 @@ isc_dir_read(isc_dir_t *dir) {
 		/*
 		 * start_directory() already filled in the first entry.
 		 */
-		dir->entry_filled = ISC_FALSE;
+		dir->entry_filled = false;
 
 	else {
 		/*
@@ -130,7 +122,8 @@ isc_dir_read(isc_dir_t *dir) {
 	/*
 	 * Make sure that the space for the name is long enough.
 	 */
-	strcpy(dir->entry.name, dir->entry.find_data.cFileName);
+	strlcpy(dir->entry.name, dir->entry.find_data.cFileName,
+		sizeof(dir->entry.name));
 	dir->entry.length = strlen(dir->entry.name);
 
 	return (ISC_R_SUCCESS);
@@ -183,7 +176,7 @@ start_directory(isc_dir_t *dir)
 	REQUIRE(VALID_DIR(dir));
 	REQUIRE(dir->search_handle == INVALID_HANDLE_VALUE);
 
-	dir->entry_filled = ISC_FALSE;
+	dir->entry_filled = false;
 
 	/*
 	 * Open stream and retrieve first file.
@@ -213,10 +206,11 @@ start_directory(isc_dir_t *dir)
 	/*
 	 * Fill in the data for the first entry of the directory.
 	 */
-	strcpy(dir->entry.name, dir->entry.find_data.cFileName);
+	strlcpy(dir->entry.name, dir->entry.find_data.cFileName,
+		sizeof(dir->entry.name));
 	dir->entry.length = strlen(dir->entry.name);
 
-	dir->entry_filled = ISC_TRUE;
+	dir->entry_filled = true;
 
 	return (ISC_R_SUCCESS);
 }

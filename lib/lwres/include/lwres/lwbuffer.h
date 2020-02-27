@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2007  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000, 2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* $Id: lwbuffer.h,v 1.22 2007/06/19 23:47:23 tbox Exp $ */
@@ -103,8 +97,9 @@
  *** Imports
  ***/
 
+#include <inttypes.h>
+
 #include <lwres/lang.h>
-#include <lwres/int.h>
 
 LWRES_LANG_BEGINDECLS
 
@@ -268,7 +263,7 @@ lwres_buffer_back(lwres_buffer_t *b, unsigned int n);
  *
  */
 
-lwres_uint8_t
+uint8_t
 lwres_buffer_getuint8(lwres_buffer_t *b);
 /**<
  * Read an unsigned 8-bit integer from 'b' and return it.
@@ -289,7 +284,7 @@ lwres_buffer_getuint8(lwres_buffer_t *b);
  */
 
 void
-lwres_buffer_putuint8(lwres_buffer_t *b, lwres_uint8_t val);
+lwres_buffer_putuint8(lwres_buffer_t *b, uint8_t val);
 /**<
  * Store an unsigned 8-bit integer from 'val' into 'b'.
  *
@@ -302,7 +297,7 @@ lwres_buffer_putuint8(lwres_buffer_t *b, lwres_uint8_t val);
  *	The used pointer in 'b' is advanced by 1.
  */
 
-lwres_uint16_t
+uint16_t
 lwres_buffer_getuint16(lwres_buffer_t *b);
 /**<
  * Read an unsigned 16-bit integer in network byte order from 'b', convert
@@ -324,7 +319,7 @@ lwres_buffer_getuint16(lwres_buffer_t *b);
  */
 
 void
-lwres_buffer_putuint16(lwres_buffer_t *b, lwres_uint16_t val);
+lwres_buffer_putuint16(lwres_buffer_t *b, uint16_t val);
 /**<
  * Store an unsigned 16-bit integer in host byte order from 'val'
  * into 'b' in network byte order.
@@ -338,7 +333,7 @@ lwres_buffer_putuint16(lwres_buffer_t *b, lwres_uint16_t val);
  *	The used pointer in 'b' is advanced by 2.
  */
 
-lwres_uint32_t
+uint32_t
 lwres_buffer_getuint32(lwres_buffer_t *b);
 /**<
  * Read an unsigned 32-bit integer in network byte order from 'b', convert
@@ -360,7 +355,7 @@ lwres_buffer_getuint32(lwres_buffer_t *b);
  */
 
 void
-lwres_buffer_putuint32(lwres_buffer_t *b, lwres_uint32_t val);
+lwres_buffer_putuint32(lwres_buffer_t *b, uint32_t val);
 /**<
  * Store an unsigned 32-bit integer in host byte order from 'val'
  * into 'b' in network byte order.

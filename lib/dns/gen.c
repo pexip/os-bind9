@@ -1,18 +1,12 @@
 /*
- * Copyright (C) 2004-2009, 2012-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
@@ -60,27 +54,27 @@
 #define TOTEXTARGS "rdata, tctx, target"
 #define TOTEXTCLASS "rdata->rdclass"
 #define TOTEXTTYPE "rdata->type"
-#define TOTEXTDEF "use_default = ISC_TRUE"
+#define TOTEXTDEF "use_default = true"
 
 #define FROMWIREARGS "rdclass, type, source, dctx, options, target"
 #define FROMWIRECLASS "rdclass"
 #define FROMWIRETYPE "type"
-#define FROMWIREDEF "use_default = ISC_TRUE"
+#define FROMWIREDEF "use_default = true"
 
 #define TOWIREARGS "rdata, cctx, target"
 #define TOWIRECLASS "rdata->rdclass"
 #define TOWIRETYPE "rdata->type"
-#define TOWIREDEF "use_default = ISC_TRUE"
+#define TOWIREDEF "use_default = true"
 
 #define FROMSTRUCTARGS "rdclass, type, source, target"
 #define FROMSTRUCTCLASS "rdclass"
 #define FROMSTRUCTTYPE "type"
-#define FROMSTRUCTDEF "use_default = ISC_TRUE"
+#define FROMSTRUCTDEF "use_default = true"
 
 #define TOSTRUCTARGS "rdata, target, mctx"
 #define TOSTRUCTCLASS "rdata->rdclass"
 #define TOSTRUCTTYPE "rdata->type"
-#define TOSTRUCTDEF "use_default = ISC_TRUE"
+#define TOSTRUCTDEF "use_default = true"
 
 #define FREESTRUCTARGS "source"
 #define FREESTRUCTCLASS "common->rdclass"
@@ -90,44 +84,35 @@
 #define COMPAREARGS "rdata1, rdata2"
 #define COMPARECLASS "rdata1->rdclass"
 #define COMPARETYPE "rdata1->type"
-#define COMPAREDEF "use_default = ISC_TRUE"
+#define COMPAREDEF "use_default = true"
 
 #define ADDITIONALDATAARGS "rdata, add, arg"
 #define ADDITIONALDATACLASS "rdata->rdclass"
 #define ADDITIONALDATATYPE "rdata->type"
-#define ADDITIONALDATADEF "use_default = ISC_TRUE"
+#define ADDITIONALDATADEF "use_default = true"
 
 #define DIGESTARGS "rdata, digest, arg"
 #define DIGESTCLASS "rdata->rdclass"
 #define DIGESTTYPE "rdata->type"
-#define DIGESTDEF "use_default = ISC_TRUE"
+#define DIGESTDEF "use_default = true"
 
 #define CHECKOWNERARGS "name, rdclass, type, wildcard"
 #define CHECKOWNERCLASS "rdclass"
 #define CHECKOWNERTYPE "type"
-#define CHECKOWNERDEF "result = ISC_TRUE"
+#define CHECKOWNERDEF "result = true"
 
 #define CHECKNAMESARGS "rdata, owner, bad"
 #define CHECKNAMESCLASS "rdata->rdclass"
 #define CHECKNAMESTYPE "rdata->type"
-#define CHECKNAMESDEF "result = ISC_TRUE"
+#define CHECKNAMESDEF "result = true"
 
 static const char copyright[] =
 "/*\n"
-" * Copyright (C) 2004%s Internet Systems Consortium, Inc. (\"ISC\")\n"
-" * Copyright (C) 1998-2003 Internet Software Consortium.\n"
+" * Copyright (C) 1998%s  Internet Systems Consortium, Inc. (\"ISC\")\n"
 " *\n"
-" * Permission to use, copy, modify, and distribute this software for any\n"
-" * purpose with or without fee is hereby granted, provided that the above\n"
-" * copyright notice and this permission notice appear in all copies.\n"
-" *\n"
-" * THE SOFTWARE IS PROVIDED \"AS IS\" AND ISC DISCLAIMS ALL WARRANTIES WITH\n"
-" * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY\n"
-" * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,\n"
-" * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM\n"
-" * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE\n"
-" * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n"
-" * PERFORMANCE OF THIS SOFTWARE.\n"
+" * This Source Code Form is subject to the terms of the Mozilla Public\n"
+" * License, v. 2.0. If a copy of the MPL was not distributed with this\n"
+" * file, You can obtain one at http://mozilla.org/MPL/2.0/.\n"
 " */\n"
 "\n"
 "/***************\n"
@@ -548,7 +533,7 @@ main(int argc, char **argv) {
 	for (i = 0; i < TYPENAMES; i++)
 		memset(&typenames[i], 0, sizeof(typenames[i]));
 
-	strcpy(srcdir, "");
+	srcdir[0] = '\0';
 	while ((c = isc_commandline_parse(argc, argv, "cdits:F:P:S:")) != -1)
 		switch (c) {
 		case 'c':
@@ -638,18 +623,20 @@ main(int argc, char **argv) {
 			n = snprintf(year, sizeof(year), "-%d",
 				     tm->tm_year + 1900);
 			INSIST(n > 0 && (unsigned)n < sizeof(year));
-		} else
-			year[0] = 0;
-	} else
-		year[0] = 0;
+		} else {
+			snprintf(year, sizeof(year), "-2016");
+		}
+	} else {
+		snprintf(year, sizeof(year), "-2016");
+	}
 
-	if (!depend) fprintf(stdout, copyright, year);
+	if (!depend)
+		fprintf(stdout, copyright, year);
 
 	if (code) {
 		fputs("#ifndef DNS_CODE_H\n", stdout);
 		fputs("#define DNS_CODE_H 1\n\n", stdout);
 
-		fputs("#include <isc/boolean.h>\n", stdout);
 		fputs("#include <isc/result.h>\n\n", stdout);
 		fputs("#include <dns/name.h>\n\n", stdout);
 
@@ -770,7 +757,7 @@ main(int argc, char **argv) {
 					continue;
 				if (hash == HASH(ttn2->typename)) {
 					fprintf(stdout, "\t\t\tRDATATYPE_COMPARE"
-					       "(\"%s\", %u, "
+					       "(\"%s\", %d, "
 					       "_typename, _length, _typep); \\\n",
 					       ttn2->typename, ttn2->type);
 					ttn2->sorted = 1;
@@ -786,7 +773,7 @@ main(int argc, char **argv) {
 			ttn = find_typename(i);
 			if (ttn == NULL)
 				continue;
-			fprintf(stdout, "\tcase %u: return (%s); \\\n",
+			fprintf(stdout, "\tcase %d: return (%s); \\\n",
 				i, upper(ttn->attr));
 		}
 		fprintf(stdout, "\t}\n");
@@ -805,7 +792,7 @@ main(int argc, char **argv) {
 			 */
 			if (i == 65533U)
 				continue;
-			fprintf(stdout, "\tcase %u: return "
+			fprintf(stdout, "\tcase %d: return "
 				"(str_totext(\"%s\", target)); \\\n",
 				i, upper(ttn->typename));
 		}

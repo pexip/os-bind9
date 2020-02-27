@@ -1,24 +1,12 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2011-2013, 2015  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/* $Id$ */
-
-/*
- * Reviewed: Wed Mar 15 16:47:10 PST 2000 by halley.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /* RFC2535 */
@@ -31,14 +19,12 @@
 #define RRTYPE_KEY_ATTRIBUTES (0)
 
 static inline isc_result_t
-fromtext_key(ARGS_FROMTEXT) {
+generic_fromtext_key(ARGS_FROMTEXT) {
 	isc_result_t result;
 	isc_token_t token;
 	dns_secalg_t alg;
 	dns_secproto_t proto;
 	dns_keyflags_t flags;
-
-	REQUIRE(type == dns_rdatatype_key);
 
 	UNUSED(type);
 	UNUSED(rdclass);
@@ -48,19 +34,19 @@ fromtext_key(ARGS_FROMTEXT) {
 
 	/* flags */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_keyflags_fromtext(&flags, &token.value.as_textregion));
 	RETERR(uint16_tobuffer(flags, target));
 
 	/* protocol */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secproto_fromtext(&proto, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &proto, 1));
 
 	/* algorithm */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secalg_fromtext(&alg, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &alg, 1));
 
@@ -80,14 +66,15 @@ fromtext_key(ARGS_FROMTEXT) {
 }
 
 static inline isc_result_t
-totext_key(ARGS_TOTEXT) {
+generic_totext_key(ARGS_TOTEXT) {
 	isc_region_t sr;
-	char buf[sizeof("64000")];
+	char buf[sizeof("[key id = 64000]")];
 	unsigned int flags;
 	unsigned char algorithm;
-	char namebuf[DNS_NAME_FORMATSIZE];
+	char algbuf[DNS_NAME_FORMATSIZE];
+	const char *keyinfo;
+	isc_region_t tmpr;
 
-	REQUIRE(rdata->type == dns_rdatatype_key);
 	REQUIRE(rdata->length != 0);
 
 	dns_rdata_toregion(rdata, &sr);
@@ -95,19 +82,27 @@ totext_key(ARGS_TOTEXT) {
 	/* flags */
 	flags = uint16_fromregion(&sr);
 	isc_region_consume(&sr, 2);
-	sprintf(buf, "%u", flags);
+	snprintf(buf, sizeof(buf), "%u", flags);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
+	if ((flags & DNS_KEYFLAG_KSK) != 0) {
+		if (flags & DNS_KEYFLAG_REVOKE)
+			keyinfo = "revoked KSK";
+		else
+			keyinfo = "KSK";
+	} else
+		keyinfo = "ZSK";
+
 
 	/* protocol */
-	sprintf(buf, "%u", sr.base[0]);
+	snprintf(buf, sizeof(buf), "%u", sr.base[0]);
 	isc_region_consume(&sr, 1);
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 
 	/* algorithm */
 	algorithm = sr.base[0];
-	sprintf(buf, "%u", algorithm);
+	snprintf(buf, sizeof(buf), "%u", algorithm);
 	isc_region_consume(&sr, 1);
 	RETERR(str_totext(buf, target));
 
@@ -120,19 +115,29 @@ totext_key(ARGS_TOTEXT) {
 		dns_name_t name;
 		dns_name_init(&name, NULL);
 		dns_name_fromregion(&name, &sr);
-		dns_name_format(&name, namebuf, sizeof(namebuf));
-	} else
-		namebuf[0] = 0;
+		dns_name_format(&name, algbuf, sizeof(algbuf));
+	} else {
+		dns_secalg_format((dns_secalg_t) algorithm, algbuf,
+				  sizeof(algbuf));
+	}
 
 	/* key */
 	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
 		RETERR(str_totext(" (", target));
 	RETERR(str_totext(tctx->linebreak, target));
-	if (tctx->width == 0)   /* No splitting */
-		RETERR(isc_base64_totext(&sr, 60, "", target));
-	else
-		RETERR(isc_base64_totext(&sr, tctx->width - 2,
-					 tctx->linebreak, target));
+
+	if ((tctx->flags & DNS_STYLEFLAG_NOCRYPTO) == 0) {
+		if (tctx->width == 0)   /* No splitting */
+			RETERR(isc_base64_totext(&sr, 60, "", target));
+		else
+			RETERR(isc_base64_totext(&sr, tctx->width - 2,
+						 tctx->linebreak, target));
+	} else {
+		dns_rdata_toregion(rdata, &tmpr);
+		snprintf(buf, sizeof(buf), "[key id = %u]",
+			 dst_region_computeid(&tmpr, algorithm));
+		RETERR(str_totext(buf, target));
+	}
 
 	if ((tctx->flags & DNS_STYLEFLAG_RRCOMMENT) != 0)
 		RETERR(str_totext(tctx->linebreak, target));
@@ -143,27 +148,27 @@ totext_key(ARGS_TOTEXT) {
 		RETERR(str_totext(")", target));
 
 	if ((tctx->flags & DNS_STYLEFLAG_RRCOMMENT) != 0) {
-		isc_region_t tmpr;
 
+		if (rdata->type == dns_rdatatype_dnskey ||
+		    rdata->type == dns_rdatatype_cdnskey) {
+			RETERR(str_totext(" ; ", target));
+			RETERR(str_totext(keyinfo, target));
+		}
+		RETERR(str_totext("; alg = ", target));
+		RETERR(str_totext(algbuf, target));
 		RETERR(str_totext(" ; key id = ", target));
 		dns_rdata_toregion(rdata, &tmpr);
-		sprintf(buf, "%u", dst_region_computeid(&tmpr, algorithm));
+		snprintf(buf, sizeof(buf), "%u",
+			 dst_region_computeid(&tmpr, algorithm));
 		RETERR(str_totext(buf, target));
-		if (algorithm == DNS_KEYALG_PRIVATEDNS) {
-			RETERR(str_totext(tctx->linebreak, target));
-			RETERR(str_totext("; alg = ", target));
-			RETERR(str_totext(namebuf, target));
-		}
 	}
 	return (ISC_R_SUCCESS);
 }
 
 static inline isc_result_t
-fromwire_key(ARGS_FROMWIRE) {
+generic_fromwire_key(ARGS_FROMWIRE) {
 	unsigned char algorithm;
 	isc_region_t sr;
-
-	REQUIRE(type == dns_rdatatype_key);
 
 	UNUSED(type);
 	UNUSED(rdclass);
@@ -200,9 +205,37 @@ fromwire_key(ARGS_FROMWIRE) {
 }
 
 static inline isc_result_t
+fromtext_key(ARGS_FROMTEXT) {
+
+	REQUIRE(type == dns_rdatatype_key);
+
+	return (generic_fromtext_key(rdclass, type, lexer, origin,
+				     options, target, callbacks));
+}
+
+static inline isc_result_t
+totext_key(ARGS_TOTEXT) {
+
+	REQUIRE(rdata != NULL);
+	REQUIRE(rdata->type == dns_rdatatype_key);
+
+	return (generic_totext_key(rdata, tctx, target));
+}
+
+static inline isc_result_t
+fromwire_key(ARGS_FROMWIRE) {
+
+	REQUIRE(type == dns_rdatatype_key);
+
+	return (generic_fromwire_key(rdclass, type, source, dctx,
+				     options, target));
+}
+
+static inline isc_result_t
 towire_key(ARGS_TOWIRE) {
 	isc_region_t sr;
 
+	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->type == dns_rdatatype_key);
 	REQUIRE(rdata->length != 0);
 
@@ -217,6 +250,8 @@ compare_key(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
 
+	REQUIRE(rdata1 != NULL);
+	REQUIRE(rdata2 != NULL);
 	REQUIRE(rdata1->type == rdata2->type);
 	REQUIRE(rdata1->rdclass == rdata2->rdclass);
 	REQUIRE(rdata1->type == dns_rdatatype_key);
@@ -229,11 +264,10 @@ compare_key(ARGS_COMPARE) {
 }
 
 static inline isc_result_t
-fromstruct_key(ARGS_FROMSTRUCT) {
+generic_fromstruct_key(ARGS_FROMSTRUCT) {
 	dns_rdata_key_t *key = source;
 
-	REQUIRE(type == dns_rdatatype_key);
-	REQUIRE(source != NULL);
+	REQUIRE(key != NULL);
 	REQUIRE(key->common.rdtype == type);
 	REQUIRE(key->common.rdclass == rdclass);
 
@@ -254,17 +288,17 @@ fromstruct_key(ARGS_FROMSTRUCT) {
 }
 
 static inline isc_result_t
-tostruct_key(ARGS_TOSTRUCT) {
+generic_tostruct_key(ARGS_TOSTRUCT) {
 	dns_rdata_key_t *key = target;
 	isc_region_t sr;
 
-	REQUIRE(rdata->type == dns_rdatatype_key);
-	REQUIRE(target != NULL);
+	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->length != 0);
 
-	key->common.rdclass = rdata->rdclass;
-	key->common.rdtype = rdata->type;
-	ISC_LINK_INIT(&key->common, link);
+	REQUIRE(key != NULL);
+	REQUIRE(key->common.rdclass == rdata->rdclass);
+	REQUIRE(key->common.rdtype == rdata->type);
+	REQUIRE(!ISC_LINK_LINKED(&key->common, link));
 
 	dns_rdata_toregion(rdata, &sr);
 
@@ -297,11 +331,10 @@ tostruct_key(ARGS_TOSTRUCT) {
 }
 
 static inline void
-freestruct_key(ARGS_FREESTRUCT) {
+generic_freestruct_key(ARGS_FREESTRUCT) {
 	dns_rdata_key_t *key = (dns_rdata_key_t *) source;
 
-	REQUIRE(source != NULL);
-	REQUIRE(key->common.rdtype == dns_rdatatype_key);
+	REQUIRE(key != NULL);
 
 	if (key->mctx == NULL)
 		return;
@@ -312,7 +345,42 @@ freestruct_key(ARGS_FREESTRUCT) {
 }
 
 static inline isc_result_t
+fromstruct_key(ARGS_FROMSTRUCT) {
+
+	REQUIRE(type == dns_rdatatype_key);
+
+	return (generic_fromstruct_key(rdclass, type, source, target));
+}
+
+static inline isc_result_t
+tostruct_key(ARGS_TOSTRUCT) {
+	dns_rdata_key_t *key = target;
+
+	REQUIRE(key != NULL);
+	REQUIRE(rdata != NULL);
+	REQUIRE(rdata->type == dns_rdatatype_key);
+
+	key->common.rdclass = rdata->rdclass;
+	key->common.rdtype = rdata->type;
+	ISC_LINK_INIT(&key->common, link);
+
+	return (generic_tostruct_key(rdata, target, mctx));
+}
+
+static inline void
+freestruct_key(ARGS_FREESTRUCT) {
+	dns_rdata_key_t *key = (dns_rdata_key_t *) source;
+
+	REQUIRE(key != NULL);
+	REQUIRE(key->common.rdtype == dns_rdatatype_key);
+
+	generic_freestruct_key(source);
+}
+
+static inline isc_result_t
 additionaldata_key(ARGS_ADDLDATA) {
+
+	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->type == dns_rdatatype_key);
 
 	UNUSED(rdata);
@@ -326,6 +394,7 @@ static inline isc_result_t
 digest_key(ARGS_DIGEST) {
 	isc_region_t r;
 
+	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->type == dns_rdatatype_key);
 
 	dns_rdata_toregion(rdata, &r);
@@ -333,7 +402,7 @@ digest_key(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_key(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_key);
@@ -343,19 +412,20 @@ checkowner_key(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_key(ARGS_CHECKNAMES) {
 
+	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->type == dns_rdatatype_key);
 
 	UNUSED(rdata);
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

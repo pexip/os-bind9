@@ -1,25 +1,22 @@
 /*
- * Copyright (C) 2011-2013  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id$ */
 
-/*! \file dns/dlz_open.h */
+/*! \file dns/dlz_dlopen.h */
 
 #ifndef DLZ_DLOPEN_H
 #define DLZ_DLOPEN_H
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <dns/sdlz.h>
 
@@ -109,7 +106,7 @@ typedef isc_result_t dlz_dlopen_newversion_t(const char *zone,
  * a dlz_newversion() function
  */
 typedef void dlz_dlopen_closeversion_t(const char *zone,
-				       isc_boolean_t commit,
+				       bool commit,
 				       void *dbdata,
 				       void **versionp);
 
@@ -134,12 +131,12 @@ typedef isc_result_t dlz_dlopen_setclientcallback_t(dns_view_t *view,
  * dlz_dlopen_ssumatch() is optional, but must be supplied if you want
  * to support dynamic updates
  */
-typedef isc_boolean_t dlz_dlopen_ssumatch_t(const char *signer,
+typedef bool dlz_dlopen_ssumatch_t(const char *signer,
 					    const char *name,
 					    const char *tcpaddr,
 					    const char *type,
 					    const char *key,
-					    isc_uint32_t keydatalen,
+					    uint32_t keydatalen,
 					    unsigned char *keydata,
 					    void *dbdata);
 

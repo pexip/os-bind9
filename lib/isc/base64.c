@@ -1,25 +1,20 @@
 /*
- * Copyright (C) 2004, 2005, 2007, 2009, 2013, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1998-2001, 2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: base64.c,v 1.34 2009/10/21 23:48:05 tbox Exp $ */
 
 /*! \file */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/base64.h>
 #include <isc/buffer.h>
@@ -103,7 +98,7 @@ typedef struct {
 	int length;		/*%< Desired length of binary data or -1 */
 	isc_buffer_t *target;	/*%< Buffer for resulting binary data */
 	int digits;		/*%< Number of buffered base64 digits */
-	isc_boolean_t seen_end;	/*%< True if "=" end marker seen */
+	bool seen_end;	/*%< True if "=" end marker seen */
 	int val[4];
 } base64_decode_ctx_t;
 
@@ -111,14 +106,14 @@ static inline void
 base64_decode_init(base64_decode_ctx_t *ctx, int length, isc_buffer_t *target)
 {
 	ctx->digits = 0;
-	ctx->seen_end = ISC_FALSE;
+	ctx->seen_end = false;
 	ctx->length = length;
 	ctx->target = target;
 }
 
 static inline isc_result_t
 base64_decode_char(base64_decode_ctx_t *ctx, int c) {
-	char *s;
+	const char *s;
 
 	if (ctx->seen_end)
 		return (ISC_R_BADBASE64);
@@ -146,7 +141,7 @@ base64_decode_char(base64_decode_ctx_t *ctx, int c) {
 		n = (ctx->val[2] == 64) ? 1 :
 			(ctx->val[3] == 64) ? 2 : 3;
 		if (n != 3) {
-			ctx->seen_end = ISC_TRUE;
+			ctx->seen_end = true;
 			if (ctx->val[2] == 64)
 				ctx->val[2] = 0;
 			if (ctx->val[3] == 64)
@@ -181,7 +176,7 @@ isc_base64_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length) {
 	base64_decode_ctx_t ctx;
 	isc_textregion_t *tr;
 	isc_token_t token;
-	isc_boolean_t eol;
+	bool eol;
 
 	base64_decode_init(&ctx, length, target);
 
@@ -189,9 +184,9 @@ isc_base64_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length) {
 		unsigned int i;
 
 		if (length > 0)
-			eol = ISC_FALSE;
+			eol = false;
 		else
-			eol = ISC_TRUE;
+			eol = true;
 		RETERR(isc_lex_getmastertoken(lexer, &token,
 					      isc_tokentype_string, eol));
 		if (token.type != isc_tokentype_string)

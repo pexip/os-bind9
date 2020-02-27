@@ -1,27 +1,20 @@
 /*
- * Copyright (C) 2004-2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: globals.h,v 1.92 2011/11/09 18:44:04 each Exp $ */
 
 #ifndef NAMED_GLOBALS_H
 #define NAMED_GLOBALS_H 1
 
 /*! \file */
 
+#include <stdbool.h>
 #include <isc/rwlock.h>
 #include <isc/log.h>
 #include <isc/net.h>
@@ -35,6 +28,7 @@
 #include <dst/dst.h>
 
 #include <named/types.h>
+#include <named/fuzz.h>
 
 #undef EXTERN
 #undef INIT
@@ -59,6 +53,9 @@ EXTERN isc_entropy_t *		ns_g_entropy		INIT(NULL);
 EXTERN isc_entropy_t *		ns_g_fallbackentropy	INIT(NULL);
 EXTERN unsigned int		ns_g_cpus_detected	INIT(1);
 
+#ifdef ENABLE_AFL
+EXTERN bool		ns_g_run_done		INIT(false);
+#endif
 /*
  * XXXRTH  We're going to want multiple timer managers eventually.  One
  *         for really short timers, another for client timers, and one
@@ -67,6 +64,7 @@ EXTERN unsigned int		ns_g_cpus_detected	INIT(1);
 EXTERN isc_timermgr_t *		ns_g_timermgr		INIT(NULL);
 EXTERN isc_socketmgr_t *	ns_g_socketmgr		INIT(NULL);
 EXTERN cfg_parser_t *		ns_g_parser		INIT(NULL);
+EXTERN cfg_parser_t *		ns_g_addparser		INIT(NULL);
 EXTERN const char *		ns_g_version		INIT(VERSION);
 EXTERN const char *		ns_g_product		INIT(PRODUCT);
 EXTERN const char *		ns_g_description	INIT(DESCRIPTION);
@@ -79,7 +77,7 @@ EXTERN in_port_t		lwresd_g_listenport	INIT(0);
 
 EXTERN ns_server_t *		ns_g_server		INIT(NULL);
 
-EXTERN isc_boolean_t		ns_g_lwresdonly		INIT(ISC_FALSE);
+EXTERN bool		ns_g_lwresdonly		INIT(false);
 
 /*
  * Logging.
@@ -107,9 +105,9 @@ EXTERN const char *		lwresd_g_conffile	INIT(NS_SYSCONFDIR
 							     "/lwresd.conf");
 EXTERN const char *		lwresd_g_resolvconffile	INIT("/etc"
 							     "/resolv.conf");
-EXTERN isc_boolean_t		ns_g_conffileset	INIT(ISC_FALSE);
-EXTERN isc_boolean_t		lwresd_g_useresolvconf	INIT(ISC_FALSE);
-EXTERN isc_uint16_t		ns_g_udpsize		INIT(4096);
+EXTERN bool		ns_g_conffileset	INIT(false);
+EXTERN bool		lwresd_g_useresolvconf	INIT(false);
+EXTERN uint16_t		ns_g_udpsize		INIT(4096);
 EXTERN cfg_aclconfctx_t *	ns_g_aclconfctx		INIT(NULL);
 
 /*
@@ -123,15 +121,20 @@ EXTERN isc_resourcevalue_t	ns_g_initopenfiles	INIT(0);
 /*
  * Misc.
  */
-EXTERN isc_boolean_t		ns_g_coreok		INIT(ISC_TRUE);
+EXTERN bool		ns_g_coreok		INIT(true);
 EXTERN const char *		ns_g_chrootdir		INIT(NULL);
-EXTERN isc_boolean_t		ns_g_foreground		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_logstderr		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_nosyslog		INIT(ISC_FALSE);
+EXTERN bool		ns_g_foreground		INIT(false);
+EXTERN bool		ns_g_logstderr		INIT(false);
+EXTERN bool		ns_g_nosyslog		INIT(false);
+EXTERN const char *		ns_g_logfile		INIT(NULL);
 
 EXTERN const char *		ns_g_defaultsessionkeyfile
 					INIT(NS_LOCALSTATEDIR "/run/named/"
 							      "session.key");
+EXTERN const char *		ns_g_defaultlockfile	INIT(NS_LOCALSTATEDIR
+							     "/run/named/"
+							     "named.lock");
+EXTERN bool		ns_g_forcelock		INIT(false);
 
 #if NS_RUN_PID_DIR
 EXTERN const char *		ns_g_defaultpidfile 	INIT(NS_LOCALSTATEDIR
@@ -147,6 +150,14 @@ EXTERN const char *		lwresd_g_defaultpidfile INIT(NS_LOCALSTATEDIR
 							     "/run/lwresd.pid");
 #endif
 
+#ifdef HAVE_DNSTAP
+EXTERN const char *		ns_g_defaultdnstap
+					INIT(NS_LOCALSTATEDIR "/run/named/"
+							      "dnstap.sock");
+#else
+EXTERN const char *		ns_g_defaultdnstap	INIT(NULL);
+#endif /* HAVE_DNSTAP */
+
 EXTERN const char *		ns_g_username		INIT(NULL);
 
 #if defined(USE_PKCS11)
@@ -158,22 +169,30 @@ EXTERN const char *		ns_g_engine		INIT(NULL);
 EXTERN int			ns_g_listen		INIT(3);
 EXTERN isc_time_t		ns_g_boottime;
 EXTERN isc_time_t		ns_g_configtime;
-EXTERN isc_boolean_t		ns_g_memstatistics	INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_clienttest		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_dropedns		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_noedns		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_nosoa		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_noaa		INIT(ISC_FALSE);
+EXTERN bool		ns_g_memstatistics	INIT(false);
+EXTERN bool		ns_g_clienttest		INIT(false);
+EXTERN bool		ns_g_dropedns		INIT(false);
+EXTERN bool		ns_g_noedns		INIT(false);
+EXTERN bool		ns_g_nosoa		INIT(false);
+EXTERN bool		ns_g_noaa		INIT(false);
+EXTERN bool		ns_g_keepstderr		INIT(false);
 EXTERN unsigned int		ns_g_delay		INIT(0);
-EXTERN isc_boolean_t		ns_g_nonearest		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_notcp		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_disable6		INIT(ISC_FALSE);
-EXTERN isc_boolean_t		ns_g_disable4		INIT(ISC_FALSE);
-
+EXTERN bool		ns_g_nonearest		INIT(false);
+EXTERN bool		ns_g_notcp		INIT(false);
+EXTERN bool		ns_g_disable6		INIT(false);
+EXTERN bool		ns_g_disable4		INIT(false);
+EXTERN unsigned int		ns_g_tat_interval	INIT(24*3600);
+EXTERN bool		ns_g_fixedlocal		INIT(false);
+EXTERN bool		ns_g_sigvalinsecs	INIT(false);
 
 #ifdef HAVE_GEOIP
 EXTERN dns_geoip_databases_t	*ns_g_geoip		INIT(NULL);
 #endif
+
+EXTERN const char *		ns_g_fuzz_named_addr	INIT(NULL);
+EXTERN ns_fuzz_t		ns_g_fuzz_type		INIT(ns_fuzz_none);
+
+EXTERN dns_acl_t *		ns_g_mapped		INIT(NULL);
 
 #undef EXTERN
 #undef INIT

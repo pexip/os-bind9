@@ -34,20 +34,11 @@
  */
 
 /*
- * Copyright (C) 1999-2001  Internet Software Consortium.
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * INTERNET SOFTWARE CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING
- * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
- * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * Copyright (C) 1999-2001, 2016  Internet Systems Consortium, Inc. ("ISC")
+ * 
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 #include <config.h>
@@ -92,7 +83,7 @@ destroy_querylist(isc_mem_t *mctx, query_list_t **querylist)
 		 * was really a query segment, and not a pointer to
 		 * %zone%, or %record%, or %client%
 		*/
-		if (tseg->sql != NULL && tseg->direct == isc_boolean_true)
+		if (tseg->sql != NULL && tseg->direct == true)
 			isc_mem_free(mctx, tseg->sql);
 		/* get the next query segment, before we destroy this one. */
 		nseg = ISC_LIST_NEXT(nseg, link);
@@ -110,9 +101,9 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 		unsigned int flags)
 {
 	isc_result_t result;
-	isc_boolean_t foundzone = isc_boolean_false;
-	isc_boolean_t foundrecord = isc_boolean_false;
-	isc_boolean_t foundclient = isc_boolean_false;
+	bool foundzone = false;
+	bool foundrecord = false;
+	bool foundclient = false;
 	char *temp_str = NULL;
 	char *right_str = NULL;
 	query_list_t *tql;
@@ -157,7 +148,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			goto cleanup;
 		}
 		tseg->sql = NULL;
-		tseg->direct = isc_boolean_false;
+		tseg->direct = false;
 		/* initialize the query segment link */
 		ISC_LINK_INIT(tseg, link);
 		/* append the query segment to the list */
@@ -176,7 +167,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			goto cleanup;
 		}
 		/* tseg->sql points directly to a string. */
-		tseg->direct = isc_boolean_true;
+		tseg->direct = true;
 		tseg->strlen = strlen(tseg->sql);
 
 		/* check if we encountered "$zone$" token */
@@ -190,8 +181,8 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			tseg->sql = (char**) zone;
 			tseg->strlen = 0;
 			/* tseg->sql points in-directly to a string */
-			tseg->direct = isc_boolean_false;
-			foundzone = isc_boolean_true;
+			tseg->direct = false;
+			foundzone = true;
 			/* check if we encountered "$record$" token */
 		} else if (strcasecmp(tseg->sql, "record") == 0) {
 			/*
@@ -203,8 +194,8 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			tseg->sql = (char**) record;
 			tseg->strlen = 0;
 			/* tseg->sql points in-directly poinsts to a string */
-			tseg->direct = isc_boolean_false;
-			foundrecord = isc_boolean_true;
+			tseg->direct = false;
+			foundrecord = true;
 			/* check if we encountered "$client$" token */
 		} else if (strcasecmp(tseg->sql, "client") == 0) {
 			/*
@@ -216,8 +207,8 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			tseg->sql = (char**) client;
 			tseg->strlen = 0;
 			/* tseg->sql points in-directly poinsts to a string */
-			tseg->direct = isc_boolean_false;
-			foundclient = isc_boolean_true;
+			tseg->direct = false;
+			foundclient = true;
 		}
 	}
 
@@ -298,7 +289,7 @@ sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
 		 * if this is a query segment, use the
 		 * precalculated string length
 		 */
-		if (tseg->direct == isc_boolean_true)
+		if (tseg->direct == true)
 			length += tseg->strlen;
 		else	/* calculate string length for dynamic segments. */
 			length += strlen(* (char**) tseg->sql);
@@ -316,7 +307,7 @@ sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
 	/* start at the top of the list again */
 	tseg = ISC_LIST_HEAD(*querylist);
 	while (tseg != NULL) {
-		if (tseg->direct == isc_boolean_true)
+		if (tseg->direct == true)
 			/* query segments */
 			strcat(qs, tseg->sql);
 		else

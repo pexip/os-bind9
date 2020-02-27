@@ -1,25 +1,21 @@
 /*
- * Copyright (C) 2011-2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id$ */
 
 /*! \file */
 
 #include <config.h>
 
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include <isc/app.h>
@@ -45,7 +41,7 @@ isc_socketmgr_t *socketmgr = NULL;
 isc_task_t *maintask = NULL;
 int ncpus;
 
-static isc_boolean_t hash_active = ISC_FALSE;
+static bool hash_active = false;
 
 /*
  * Logging categories: this needs to match the list in bin/named/log.c.
@@ -75,15 +71,24 @@ cleanup_managers(void) {
 }
 
 static isc_result_t
-create_managers(void) {
+create_managers(unsigned int workers) {
 	isc_result_t result;
-#ifdef ISC_PLATFORM_USETHREADS
-	ncpus = isc_os_ncpus();
-#else
-	ncpus = 1;
-#endif
+	char *p;
 
-	CHECK(isc_taskmgr_create(mctx, ncpus, 0, &taskmgr));
+	if (workers == 0) {
+#ifdef ISC_PLATFORM_USETHREADS
+		workers = isc_os_ncpus();
+#else
+		workers = 1;
+#endif
+	}
+
+	p = getenv("ISC_TASK_WORKERS");
+	if (p != NULL) {
+		workers = atoi(p);
+	}
+
+	CHECK(isc_taskmgr_create(mctx, workers, 0, &taskmgr));
 	CHECK(isc_task_create(taskmgr, 0, &maintask));
 	isc_taskmgr_setexcltask(taskmgr, maintask);
 
@@ -97,7 +102,9 @@ create_managers(void) {
 }
 
 isc_result_t
-isc_test_begin(FILE *logfile, isc_boolean_t start_managers) {
+isc_test_begin(FILE *logfile, bool start_managers,
+	       unsigned int workers)
+{
 	isc_result_t result;
 
 	isc_mem_debugging |= ISC_MEM_DEBUGRECORD;
@@ -105,7 +112,7 @@ isc_test_begin(FILE *logfile, isc_boolean_t start_managers) {
 	CHECK(isc_entropy_create(mctx, &ectx));
 
 	CHECK(isc_hash_create(mctx, ectx, 255));
-	hash_active = ISC_TRUE;
+	hash_active = true;
 
 	if (logfile != NULL) {
 		isc_logdestination_t destination;
@@ -132,8 +139,9 @@ isc_test_begin(FILE *logfile, isc_boolean_t start_managers) {
 	ncpus = 1;
 #endif
 
-	if (start_managers)
-		CHECK(create_managers());
+	if (start_managers) {
+		CHECK(create_managers(workers));
+	}
 
 	return (ISC_R_SUCCESS);
 
@@ -148,17 +156,17 @@ isc_test_end(void) {
 		isc_task_detach(&maintask);
 	if (taskmgr != NULL)
 		isc_taskmgr_destroy(&taskmgr);
-	if (lctx != NULL)
-		isc_log_destroy(&lctx);
 	if (hash_active) {
 		isc_hash_destroy();
-		hash_active = ISC_FALSE;
+		hash_active = false;
 	}
 	if (ectx != NULL)
 		isc_entropy_detach(&ectx);
 
 	cleanup_managers();
 
+	if (lctx != NULL)
+		isc_log_destroy(&lctx);
 	if (mctx != NULL)
 		isc_mem_destroy(&mctx);
 }
@@ -167,7 +175,7 @@ isc_test_end(void) {
  * Sleep for 'usec' microseconds.
  */
 void
-isc_test_nap(isc_uint32_t usec) {
+isc_test_nap(uint32_t usec) {
 #ifdef HAVE_NANOSLEEP
 	struct timespec ts;
 

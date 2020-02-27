@@ -1,21 +1,13 @@
 /*
- * Copyright (C) 2004-2008, 2012  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 2000-2003  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
-
-/* $Id: entropy.c,v 1.82 2008/12/01 23:47:45 tbox Exp $ */
 
 /* \file unix/entropy.c
  * \brief
@@ -23,6 +15,8 @@
  */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <sys/param.h>	/* Openserver 5.0.6A and FD_SETSIZE */
 #include <sys/types.h>
@@ -37,7 +31,9 @@
 #include <unistd.h>
 
 #include <isc/platform.h>
+#include <isc/print.h>
 #include <isc/strerror.h>
+#include <isc/string.h>
 
 #ifdef ISC_PLATFORM_NEEDSYSSELECTH
 #include <sys/select.h>
@@ -70,7 +66,7 @@ typedef struct {
 #include "../entropy.c"
 
 static unsigned int
-get_from_filesource(isc_entropysource_t *source, isc_uint32_t desired) {
+get_from_filesource(isc_entropysource_t *source, uint32_t desired) {
 	isc_entropy_t *ent = source->ent;
 	unsigned char buf[128];
 	int fd = source->sources.file.handle;
@@ -103,14 +99,14 @@ get_from_filesource(isc_entropysource_t *source, isc_uint32_t desired) {
  err:
 	(void)close(fd);
 	source->sources.file.handle = -1;
-	source->bad = ISC_TRUE;
+	source->bad = true;
 
  out:
 	return (added);
 }
 
 static unsigned int
-get_from_usocketsource(isc_entropysource_t *source, isc_uint32_t desired) {
+get_from_usocketsource(isc_entropysource_t *source, uint32_t desired) {
 	isc_entropy_t *ent = source->ent;
 	unsigned char buf[128];
 	int fd = source->sources.usocket.handle;
@@ -160,7 +156,7 @@ get_from_usocketsource(isc_entropysource_t *source, isc_uint32_t desired) {
 			INSIST(n == 2);
 			source->sources.usocket.status =
 						isc_usocketsource_wrote;
-			/*FALLTHROUGH*/
+			/* FALLTHROUGH */
 
 		case isc_usocketsource_wrote:
 			if (recvfrom(fd, buf, 1, 0, NULL, NULL) != 1) {
@@ -198,7 +194,7 @@ get_from_usocketsource(isc_entropysource_t *source, isc_uint32_t desired) {
 			source->sources.usocket.sz_to_recv = sz_to_recv;
 			if (sz_to_recv > sizeof(buf))
 				goto err;
-			/*FALLTHROUGH*/
+			/* FALLTHROUGH */
 
 		case isc_usocketsource_reading:
 			if (sz_to_recv != 0U) {
@@ -234,7 +230,7 @@ get_from_usocketsource(isc_entropysource_t *source, isc_uint32_t desired) {
 
  err:
 	close(fd);
-	source->bad = ISC_TRUE;
+	source->bad = true;
 	source->sources.usocket.status = isc_usocketsource_disconnected;
 	source->sources.usocket.handle = -1;
 
@@ -247,7 +243,7 @@ get_from_usocketsource(isc_entropysource_t *source, isc_uint32_t desired) {
  * pool.
  */
 static void
-fillpool(isc_entropy_t *ent, unsigned int desired, isc_boolean_t blocking) {
+fillpool(isc_entropy_t *ent, unsigned int desired, bool blocking) {
 	unsigned int added;
 	unsigned int remaining;
 	unsigned int needed;
@@ -456,11 +452,14 @@ destroyusocketsource(isc_entropyusocketsource_t *source) {
 static isc_result_t
 make_nonblock(int fd) {
 	int ret;
-	int flags;
 	char strbuf[ISC_STRERRORSIZE];
 #ifdef USE_FIONBIO_IOCTL
 	int on = 1;
+#else
+	int flags;
+#endif
 
+#ifdef USE_FIONBIO_IOCTL
 	ret = ioctl(fd, FIONBIO, (char *)&on);
 #else
 	flags = fcntl(fd, F_GETFL, 0);
@@ -488,8 +487,8 @@ isc_result_t
 isc_entropy_createfilesource(isc_entropy_t *ent, const char *fname) {
 	int fd;
 	struct stat _stat;
-	isc_boolean_t is_usocket = ISC_FALSE;
-	isc_boolean_t is_connected = ISC_FALSE;
+	bool is_usocket = false;
+	bool is_connected = false;
 	isc_result_t ret;
 	isc_entropysource_t *source;
 
@@ -511,11 +510,11 @@ isc_entropy_createfilesource(isc_entropy_t *ent, const char *fname) {
 	 */
 #if defined(S_ISSOCK)
 	if (S_ISSOCK(_stat.st_mode))
-		is_usocket = ISC_TRUE;
+		is_usocket = true;
 #endif
 #if defined(S_ISFIFO) && defined(sun)
 	if (S_ISFIFO(_stat.st_mode))
-		is_usocket = ISC_TRUE;
+		is_usocket = true;
 #endif
 	if (is_usocket)
 		fd = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -552,7 +551,7 @@ isc_entropy_createfilesource(isc_entropy_t *ent, const char *fname) {
 				goto closefd;
 			}
 		} else
-			is_connected = ISC_TRUE;
+			is_connected = true;
 	}
 
 	source = isc_mem_get(ent->mctx, sizeof(isc_entropysource_t));
@@ -567,7 +566,7 @@ isc_entropy_createfilesource(isc_entropy_t *ent, const char *fname) {
 	source->magic = SOURCE_MAGIC;
 	source->ent = ent;
 	source->total = 0;
-	source->bad = ISC_FALSE;
+	source->bad = false;
 	memset(source->name, 0, sizeof(source->name));
 	ISC_LINK_INIT(source, link);
 	if (is_usocket) {

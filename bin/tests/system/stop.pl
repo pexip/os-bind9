@@ -1,21 +1,13 @@
 #!/usr/bin/perl -w
 #
-# Copyright (C) 2004-2007, 2012  Internet Systems Consortium, Inc. ("ISC")
-# Copyright (C) 2001  Internet Software Consortium.
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
-# Permission to use, copy, modify, and/or distribute this software for any
-# purpose with or without fee is hereby granted, provided that the above
-# copyright notice and this permission notice appear in all copies.
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
-# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
-# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-# PERFORMANCE OF THIS SOFTWARE.
-
-# $Id: stop.pl,v 1.12 2007/06/19 23:47:00 tbox Exp $
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 # Framework for stopping test servers
 # Based on the type of server specified, signal the server to stop, wait
@@ -24,34 +16,36 @@
 
 use strict;
 use Cwd 'abs_path';
+use Getopt::Long;
 
-# Option handling
-#   [--use-rndc] test [server]
+# Usage:
+#   perl stop.pl [--use-rndc [--port port]] test [server]
 #
-#   test - name of the test directory
-#   server - name of the server directory
+#   --use-rndc      Attempt to stop the server via the "rndc stop" command.
+#
+#   --port port     Only relevant if --use-rndc is specified, this sets the
+#                   command port over which the attempt should be made.  If
+#                   not specified, port 9953 is used.
+#
+#   test            Name of the test directory.
+#
+#   server          Name of the server directory.
 
-my $usage = "usage: $0 [--use-rndc] test-directory [server-directory]";
-my $use_rndc;
+my $usage = "usage: $0 [--use-rndc [--halt] [--port port]] test-directory [server-directory]";
 
-while (@ARGV && $ARGV[0] =~ /^-/) {
-	my $opt = shift @ARGV;
-	if ($opt eq '--use-rndc') {
-		$use_rndc = 1;
-	} else {
-		die "$usage\n";
-	}
-}
-
-my $test = $ARGV[0];
-my $server = $ARGV[1];
+my $use_rndc = 0;
+my $halt = 0;
+my $port = 9953;
+GetOptions('use-rndc' => \$use_rndc, 'halt' => \$halt, 'port=i' => \$port) or die "$usage\n";
 
 my $errors = 0;
 
+my $test = $ARGV[0];
+my $server = $ARGV[1];
 die "$usage\n" unless defined($test);
 die "No test directory: \"$test\"\n" unless (-d $test);
 die "No server directory: \"$server\"\n" if (defined($server) && !-d "$test/$server");
-    
+
 # Global variables
 my $testdir = abs_path($test);
 my @servers;
@@ -141,9 +135,10 @@ sub stop_rndc {
 
 	return unless ($server =~ /^ns(\d+)$/);
 	my $ip = "10.53.0.$1";
+	my $how = $halt ? "halt" : "stop";
 
 	# Ugly, but should work.
-	system("$ENV{RNDC} -c $testdir/../common/rndc.conf -s $ip -p 9953 stop | sed 's/^/I:$server /'");
+	system("$ENV{RNDC} -c ../common/rndc.conf -s $ip -p $port $how | sed 's/^/I:$server /'");
 	return;
 }
 
@@ -162,11 +157,21 @@ sub stop_signal {
 		$errors++;
 	}
 
-	my $result = kill $sig, $pid;
-	if (!$result) {
-		print "I:$server died before a SIG$sig was sent\n";
+	my $result;
+	if ($^O eq 'cygwin') {
+		$result = system("/bin/kill -f -$sig $pid");
 		unlink $pid_file;
-		$errors++;
+		if ($result != 0) {
+			print "I:$server died before a SIG$sig was sent\n";
+			$errors++;
+		}
+	} else {
+		$result = kill $sig, $pid;
+		if (!$result) {
+			print "I:$server died before a SIG$sig was sent\n";
+			unlink $pid_file;
+			$errors++;
+		}
 	}
 
 	return;

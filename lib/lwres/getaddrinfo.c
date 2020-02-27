@@ -1,6 +1,12 @@
 /*
- * Copyright (C) 2004-2008, 2012, 2014  Internet Systems Consortium, Inc. ("ISC")
- * Copyright (C) 1999-2001  Internet Software Consortium.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  *
  * This code is derived from software contributed to ISC by
  * Berkeley Software Design, Inc.
@@ -133,6 +139,7 @@
 
 #include <config.h>
 
+#include <inttypes.h>
 #include <errno.h>
 #include <string.h>
 
@@ -352,7 +359,7 @@ lwres_getaddrinfo(const char *hostname, const char *servname,
 #ifdef LWRES_HAVE_SIN6_SCOPE_ID
 		char *p, *ep;
 		char ntmp[NI_MAXHOST];
-		lwres_uint32_t scopeid;
+		uint32_t scopeid;
 #endif
 
 #ifdef LWRES_HAVE_SIN6_SCOPE_ID
@@ -372,7 +379,7 @@ lwres_getaddrinfo(const char *hostname, const char *servname,
 			 */
 
 			if (p != NULL)
-				scopeid = (lwres_uint32_t)strtoul(p + 1,
+				scopeid = (uint32_t)strtoul(p + 1,
 								  &ep, 10);
 			if (p != NULL && ep != NULL && ep[0] == '\0')
 				*p = '\0';

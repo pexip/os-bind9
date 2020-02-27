@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2013, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 
@@ -21,6 +16,9 @@
 /*
  * Rate limit DNS responses.
  */
+
+#include <inttypes.h>
+#include <stdbool.h>
 
 #include <isc/lang.h>
 
@@ -91,16 +89,16 @@ typedef enum {
 #define DNS_RRL_MAX_PREFIX  64
 typedef union dns_rrl_key dns_rrl_key_t;
 struct dns__rrl_key {
-	isc_uint32_t	    ip[DNS_RRL_MAX_PREFIX/32];
-	isc_uint32_t	    qname_hash;
+	uint32_t	    ip[DNS_RRL_MAX_PREFIX/32];
+	uint32_t	    qname_hash;
 	dns_rdatatype_t	    qtype;
-	isc_uint8_t         qclass;
-	dns_rrl_rtype_t	    rtype   :4; /* 3 bits + sign bit */
-	isc_boolean_t	    ipv6    :1;
+	uint8_t         qclass;
+	unsigned int	    rtype   :4; /* dns_rrl_rtype_t */
+	unsigned int	    ipv6    :1;
 };
 union dns_rrl_key {
 	struct dns__rrl_key s;
-	isc_uint16_t	w[sizeof(struct dns__rrl_key)/sizeof(isc_uint16_t)];
+	uint16_t	w[sizeof(struct dns__rrl_key)/sizeof(uint16_t)];
 };
 
 /*
@@ -120,10 +118,10 @@ struct dns_rrl_entry {
 
 # define DNS_RRL_TS_GEN_BITS	2
 	unsigned int	ts_gen	    :DNS_RRL_TS_GEN_BITS;
-	isc_boolean_t	ts_valid    :1;
+	unsigned int	ts_valid    :1;
 # define DNS_RRL_HASH_GEN_BITS	1
 	unsigned int	hash_gen    :DNS_RRL_HASH_GEN_BITS;
-	isc_boolean_t	logged	    :1;
+	unsigned int	logged	    :1;
 # define DNS_RRL_LOG_BITS	11
 	unsigned int	log_secs    :DNS_RRL_LOG_BITS;
 
@@ -207,7 +205,7 @@ struct dns_rrl {
 	isc_mutex_t	lock;
 	isc_mem_t	*mctx;
 
-	isc_boolean_t	log_only;
+	bool	log_only;
 	dns_rrl_rate_t	responses_per_second;
 	dns_rrl_rate_t	referrals_per_second;
 	dns_rrl_rate_t	nodata_per_second;
@@ -242,9 +240,9 @@ struct dns_rrl {
 	isc_stdtime_t	ts_bases[DNS_RRL_TS_BASES];
 
 	int		ipv4_prefixlen;
-	isc_uint32_t	ipv4_mask;
+	uint32_t	ipv4_mask;
 	int		ipv6_prefixlen;
-	isc_uint32_t	ipv6_mask[4];
+	uint32_t	ipv6_mask[4];
 
 	isc_stdtime_t	log_stops_time;
 	dns_rrl_entry_t	*last_logged;
@@ -263,10 +261,10 @@ typedef enum {
 
 dns_rrl_result_t
 dns_rrl(dns_view_t *view,
-	const isc_sockaddr_t *client_addr, isc_boolean_t is_tcp,
+	const isc_sockaddr_t *client_addr, bool is_tcp,
 	dns_rdataclass_t rdclass, dns_rdatatype_t qtype,
 	dns_name_t *qname, isc_result_t resp_result, isc_stdtime_t now,
-	isc_boolean_t wouldlog, char *log_buf, unsigned int log_buf_len);
+	bool wouldlog, char *log_buf, unsigned int log_buf_len);
 
 void
 dns_rrl_view_destroy(dns_view_t *view);

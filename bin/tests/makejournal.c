@@ -1,21 +1,18 @@
 /*
- * Copyright (C) 2013, 2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file */
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <isc/entropy.h>
 #include <isc/hash.h>
@@ -45,7 +42,7 @@ isc_mem_t *mctx = NULL;
 isc_log_t *lctx = NULL;
 isc_entropy_t *ectx = NULL;
 
-static isc_boolean_t hash_active = ISC_FALSE, dst_active = ISC_FALSE;
+static bool hash_active = false, dst_active = false;
 
 /*
  * Logging categories: this needs to match the list in bin/named/log.c.
@@ -68,8 +65,7 @@ loadzone(dns_db_t **db, const char *origin, const char *filename) {
 	dns_fixedname_t fixed;
 	dns_name_t *name;
 
-	dns_fixedname_init(&fixed);
-	name = dns_fixedname_name(&fixed);
+	name = dns_fixedname_initname(&fixed);
 
 	result = dns_name_fromstring(name, origin, 0, NULL);
 	if (result != ISC_R_SUCCESS)
@@ -88,7 +84,7 @@ int
 main(int argc, char **argv) {
 	isc_result_t result;
 	char *origin, *file1, *file2, *journal;
-	dns_db_t *old = NULL, *new = NULL;
+	dns_db_t *olddb = NULL, *newdb = NULL;
 	isc_logdestination_t destination;
 	isc_logconfig_t *logconfig = NULL;
 
@@ -107,10 +103,10 @@ main(int argc, char **argv) {
 	CHECK(isc_entropy_create(mctx, &ectx));
 
 	CHECK(isc_hash_create(mctx, ectx, DNS_NAME_MAXWIRE));
-	hash_active = ISC_TRUE;
+	hash_active = true;
 
 	CHECK(dst_lib_init(mctx, ectx, ISC_ENTROPY_BLOCKING));
-	dst_active = ISC_TRUE;
+	dst_active = true;
 
 	CHECK(isc_log_create(mctx, &lctx, &logconfig));
 	isc_log_registercategories(lctx, categories);
@@ -129,38 +125,38 @@ main(int argc, char **argv) {
 
 	dns_result_register();
 
-	result = loadzone(&old, origin, file1);
+	result = loadzone(&olddb, origin, file1);
 	if (result != ISC_R_SUCCESS) {
 		fprintf(stderr, "Couldn't load %s: ", file1);
 		goto cleanup;
 	}
 
-	result = loadzone(&new, origin, file2);
+	result = loadzone(&newdb, origin, file2);
 	if (result != ISC_R_SUCCESS) {
 		fprintf(stderr, "Couldn't load %s: ", file2);
 		goto cleanup;
 	}
 
-	result = dns_db_diff(mctx, new, NULL, old, NULL, journal);
+	result = dns_db_diff(mctx, newdb, NULL, olddb, NULL, journal);
 
   cleanup:
 	if (result != ISC_R_SUCCESS)
 		fprintf(stderr, "%s\n", isc_result_totext(result));
 
-	if (new != NULL)
-		dns_db_detach(&new);
-	if (old != NULL)
-		dns_db_detach(&old);
+	if (newdb != NULL)
+		dns_db_detach(&newdb);
+	if (olddb != NULL)
+		dns_db_detach(&olddb);
 
 	if (lctx != NULL)
 		isc_log_destroy(&lctx);
 	if (dst_active) {
 		dst_lib_destroy();
-		dst_active = ISC_FALSE;
+		dst_active = false;
 	}
 	if (hash_active) {
 		isc_hash_destroy();
-		hash_active = ISC_FALSE;
+		hash_active = false;
 	}
 	if (ectx != NULL)
 		isc_entropy_detach(&ectx);
@@ -169,4 +165,3 @@ main(int argc, char **argv) {
 
 	return(result != ISC_R_SUCCESS ? 1 : 0);
 }
-

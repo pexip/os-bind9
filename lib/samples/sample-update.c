@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2009, 2010, 2012-2015  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
-/* $Id: sample-update.c,v 1.10 2010/12/09 00:54:34 marka Exp $ */
 
 #include <config.h>
 
@@ -32,6 +26,8 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,9 +64,11 @@ static const dns_rdataclass_t default_rdataclass = dns_rdataclass_in;
 static isc_bufferlist_t usedbuffers;
 static ISC_LIST(dns_rdatalist_t) usedrdatalists;
 
+static const char *port = "53";
+
 static void setup_tsec(char *keyfile, isc_mem_t *mctx);
 static void update_addordelete(isc_mem_t *mctx, char *cmdline,
-			       isc_boolean_t isdelete, dns_name_t *name);
+			       bool isdelete, dns_name_t *name);
 static void evaluate_prereq(isc_mem_t *mctx, char *cmdline, dns_name_t *name);
 
 ISC_PLATFORM_NORETURN_PRE static void
@@ -79,6 +77,7 @@ usage(void) ISC_PLATFORM_NORETURN_POST;
 static void
 usage(void) {
 	fprintf(stderr, "sample-update "
+		"-s "
 		"[-a auth_server] "
 		"[-k keyfile] "
 		"[-p prerequisite] "
@@ -88,22 +87,79 @@ usage(void) {
 	exit(1);
 }
 
+#ifdef _WIN32
+static void
+InitSockets(void) {
+	WORD wVersionRequested;
+	WSADATA wsaData;
+	int err;
+
+	wVersionRequested = MAKEWORD(2, 0);
+
+	err = WSAStartup(wVersionRequested, &wsaData);
+	if (err != 0) {
+		fprintf(stderr, "WSAStartup() failed: %d\n", err);
+		exit(1);
+	}
+}
+
+static void
+DestroySockets(void) {
+	WSACleanup();
+}
+#else
+#define InitSockets() ((void)0)
+#define DestroySockets() ((void)0)
+#endif
+
+static bool
+addserver(const char *server, isc_sockaddrlist_t *list,
+	   isc_sockaddr_t *sockaddr)
+{
+	struct addrinfo hints, *res;
+	int gaierror;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+#ifdef AI_NUMERICHOST
+	hints.ai_flags |= AI_NUMERICHOST;
+#endif
+#ifdef AI_NUMERICSERV
+	hints.ai_flags |= AI_NUMERICSERV;
+#endif
+	InitSockets();
+	gaierror = getaddrinfo(server, port, &hints, &res);
+	if (gaierror != 0) {
+		fprintf(stderr, "getaddrinfo(%s) failed: %s\n",
+			server, gai_strerror(gaierror));
+		DestroySockets();
+		return (false);
+	}
+	INSIST(res->ai_addrlen <= sizeof(sockaddr->type));
+	memmove(&sockaddr->type, res->ai_addr, res->ai_addrlen);
+	sockaddr->length = (unsigned int)res->ai_addrlen;
+	ISC_LINK_INIT(sockaddr, link);
+	ISC_LIST_APPEND(*list, sockaddr, link);
+	freeaddrinfo(res);
+	DestroySockets();
+	return (true);
+}
+
 int
 main(int argc, char *argv[]) {
 	int ch;
-	struct addrinfo hints, *res;
-	int gai_error;
 	dns_client_t *client = NULL;
 	char *zonenamestr = NULL;
 	char *keyfilename = NULL;
 	char *prereqstr = NULL;
-	isc_sockaddrlist_t auth_servers;
-	char *auth_server = NULL;
-	char *recursive_server = NULL;
-	isc_sockaddr_t sa_auth, sa_recursive;
+	isc_sockaddr_t sa_auth[10], sa_recursive[10];
+	unsigned int nsa_auth = 0, nsa_recursive = 0;
 	isc_sockaddrlist_t rec_servers;
+	isc_sockaddrlist_t auth_servers, *auth_serversp = &auth_servers;
 	isc_result_t result;
-	isc_boolean_t isdelete;
+	bool isdelete;
 	isc_buffer_t b, *buf;
 	dns_fixedname_t zname0, pname0, uname0;
 	unsigned int namelen;
@@ -113,20 +169,39 @@ main(int argc, char *argv[]) {
 	dns_rdata_t *rdata;
 	dns_namelist_t updatelist, prereqlist, *prereqlistp = NULL;
 	isc_mem_t *umctx = NULL;
+	bool sendtwice = false;
 
-	while ((ch = isc_commandline_parse(argc, argv, "a:k:p:r:z:")) != EOF) {
+	ISC_LIST_INIT(auth_servers);
+	ISC_LIST_INIT(rec_servers);
+
+	while ((ch = isc_commandline_parse(argc, argv,
+					   "a:k:p:P:r:sz:")) != EOF)
+	{
 		switch (ch) {
 		case 'k':
 			keyfilename = isc_commandline_argument;
 			break;
 		case 'a':
-			auth_server = isc_commandline_argument;
+			if (nsa_auth < sizeof(sa_auth)/sizeof(*sa_auth) &&
+			    addserver(isc_commandline_argument, &auth_servers,
+				      &sa_auth[nsa_auth]))
+				nsa_auth++;
 			break;
 		case 'p':
 			prereqstr = isc_commandline_argument;
 			break;
+		case 'P':
+			port = isc_commandline_argument;
+			break;
 		case 'r':
-			recursive_server = isc_commandline_argument;
+			if (nsa_recursive <
+				sizeof(sa_recursive)/sizeof(*sa_recursive) &&
+			    addserver(isc_commandline_argument, &rec_servers,
+				      &sa_recursive[nsa_recursive]))
+				nsa_recursive++;
+			break;
+		case 's':
+			sendtwice = true;
 			break;
 		case 'z':
 			zonenamestr = isc_commandline_argument;
@@ -143,16 +218,17 @@ main(int argc, char *argv[]) {
 
 	/* command line argument validation */
 	if (strcmp(argv[0], "delete") == 0)
-		isdelete = ISC_TRUE;
+		isdelete = true;
 	else if (strcmp(argv[0], "add") == 0)
-		isdelete = ISC_FALSE;
+		isdelete = false;
 	else {
 		fprintf(stderr, "invalid update command: %s\n", argv[0]);
 		exit(1);
 	}
 
-	if (auth_server == NULL && recursive_server == NULL) {
-		fprintf(stderr, "authoritative or recursive server "
+	if (ISC_LIST_HEAD(auth_servers) == NULL &&
+	    ISC_LIST_HEAD(rec_servers) == NULL) {
+		fprintf(stderr, "authoritative or recursive servers "
 			"must be specified\n");
 		usage();
 	}
@@ -161,11 +237,10 @@ main(int argc, char *argv[]) {
 	ISC_LIST_INIT(usedbuffers);
 	ISC_LIST_INIT(usedrdatalists);
 	ISC_LIST_INIT(prereqlist);
-	ISC_LIST_INIT(auth_servers);
 	isc_lib_register();
 	result = dns_lib_init();
 	if (result != ISC_R_SUCCESS) {
-		fprintf(stderr, "dns_lib_init failed: %d\n", result);
+		fprintf(stderr, "dns_lib_init failed: %u\n", result);
 		exit(1);
 	}
 	result = isc_mem_create(0, 0, &umctx);
@@ -176,62 +251,8 @@ main(int argc, char *argv[]) {
 
 	result = dns_client_create(&client, 0);
 	if (result != ISC_R_SUCCESS) {
-		fprintf(stderr, "dns_client_create failed: %d\n", result);
+		fprintf(stderr, "dns_client_create failed: %u\n", result);
 		exit(1);
-	}
-
-	/* Set the authoritative server */
-	if (auth_server != NULL) {
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_protocol = IPPROTO_UDP;
-#ifdef AI_NUMERICHOST
-		hints.ai_flags = AI_NUMERICHOST;
-#endif
-		gai_error = getaddrinfo(auth_server, "53", &hints, &res);
-		if (gai_error != 0) {
-			fprintf(stderr, "getaddrinfo failed: %s\n",
-				gai_strerror(gai_error));
-			exit(1);
-		}
-		INSIST(res->ai_addrlen <= sizeof(sa_auth.type));
-		memmove(&sa_auth.type, res->ai_addr, res->ai_addrlen);
-		freeaddrinfo(res);
-		sa_auth.length = (unsigned int)res->ai_addrlen;
-		ISC_LINK_INIT(&sa_auth, link);
-
-		ISC_LIST_APPEND(auth_servers, &sa_auth, link);
-	}
-
-	/* Set the recursive server */
-	if (recursive_server != NULL) {
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_protocol = IPPROTO_UDP;
-#ifdef AI_NUMERICHOST
-		hints.ai_flags = AI_NUMERICHOST;
-#endif
-		gai_error = getaddrinfo(recursive_server, "53", &hints, &res);
-		if (gai_error != 0) {
-			fprintf(stderr, "getaddrinfo failed: %s\n",
-				gai_strerror(gai_error));
-			exit(1);
-		}
-		INSIST(res->ai_addrlen <= sizeof(sa_recursive.type));
-		memmove(&sa_recursive.type, res->ai_addr, res->ai_addrlen);
-		freeaddrinfo(res);
-		sa_recursive.length = (unsigned int)res->ai_addrlen;
-		ISC_LINK_INIT(&sa_recursive, link);
-		ISC_LIST_INIT(rec_servers);
-		ISC_LIST_APPEND(rec_servers, &sa_recursive, link);
-		result = dns_client_setservers(client, dns_rdataclass_in,
-					       NULL, &rec_servers);
-		if (result != ISC_R_SUCCESS) {
-			fprintf(stderr, "set server failed: %d\n", result);
-			exit(1);
-		}
 	}
 
 	/* Construct zone name */
@@ -240,18 +261,16 @@ main(int argc, char *argv[]) {
 		namelen = strlen(zonenamestr);
 		isc_buffer_init(&b, zonenamestr, namelen);
 		isc_buffer_add(&b, namelen);
-		dns_fixedname_init(&zname0);
-		zname = dns_fixedname_name(&zname0);
+		zname = dns_fixedname_initname(&zname0);
 		result = dns_name_fromtext(zname, &b, dns_rootname, 0, NULL);
 		if (result != ISC_R_SUCCESS)
-			fprintf(stderr, "failed to convert zone name: %d\n",
+			fprintf(stderr, "failed to convert zone name: %u\n",
 				result);
 	}
 
 	/* Construct prerequisite name (if given) */
 	if (prereqstr != NULL) {
-		dns_fixedname_init(&pname0);
-		pname = dns_fixedname_name(&pname0);
+		pname = dns_fixedname_initname(&pname0);
 		evaluate_prereq(umctx, prereqstr, pname);
 		ISC_LIST_APPEND(prereqlist, pname, link);
 		prereqlistp = &prereqlist;
@@ -259,8 +278,7 @@ main(int argc, char *argv[]) {
 
 	/* Construct update name */
 	ISC_LIST_INIT(updatelist);
-	dns_fixedname_init(&uname0);
-	uname = dns_fixedname_name(&uname0);
+	uname = dns_fixedname_initname(&uname0);
 	update_addordelete(umctx, argv[1], isdelete, uname);
 	ISC_LIST_APPEND(updatelist, uname, link);
 
@@ -268,17 +286,32 @@ main(int argc, char *argv[]) {
 	if (keyfilename != NULL)
 		setup_tsec(keyfilename, umctx);
 
+	if (ISC_LIST_HEAD(auth_servers) == NULL)
+		auth_serversp = NULL;
+
 	/* Perform update */
 	result = dns_client_update(client,
 				   default_rdataclass, /* XXX: fixed */
 				   zname, prereqlistp, &updatelist,
-				   (auth_server == NULL) ? NULL :
-				   &auth_servers, tsec, 0);
+				   auth_serversp, tsec, 0);
 	if (result != ISC_R_SUCCESS) {
 		fprintf(stderr,
 			"update failed: %s\n", dns_result_totext(result));
 	} else
 		fprintf(stderr, "update succeeded\n");
+
+	if (sendtwice) {
+		/* Perform 2nd update */
+		result = dns_client_update(client,
+					   default_rdataclass, /* XXX: fixed */
+					   zname, prereqlistp, &updatelist,
+					   auth_serversp, tsec, 0);
+		if (result != ISC_R_SUCCESS) {
+			fprintf(stderr, "2nd update failed: %s\n",
+				dns_result_totext(result));
+		} else
+			fprintf(stderr, "2nd update succeeded\n");
+	}
 
 	/* Cleanup */
 	while ((pname = ISC_LIST_HEAD(prereqlist)) != NULL) {
@@ -446,11 +479,11 @@ parse_rdata(isc_mem_t *mctx, char **cmdlinep, dns_rdataclass_t rdataclass,
 }
 
 static void
-update_addordelete(isc_mem_t *mctx, char *cmdline, isc_boolean_t isdelete,
+update_addordelete(isc_mem_t *mctx, char *cmdline, bool isdelete,
 		   dns_name_t *name)
 {
 	isc_result_t result;
-	isc_uint32_t ttl;
+	uint32_t ttl;
 	char *word;
 	dns_rdataclass_t rdataclass;
 	dns_rdatatype_t rdatatype;
@@ -588,7 +621,6 @@ update_addordelete(isc_mem_t *mctx, char *cmdline, isc_boolean_t isdelete,
 	rdatalist->rdclass = rdataclass;
 	rdatalist->covers = rdatatype;
 	rdatalist->ttl = (dns_ttl_t)ttl;
-	ISC_LIST_INIT(rdatalist->rdata);
 	ISC_LIST_APPEND(rdatalist->rdata, rdata, link);
 	ISC_LIST_APPEND(usedrdatalists, rdatalist, link);
 
@@ -599,13 +631,14 @@ update_addordelete(isc_mem_t *mctx, char *cmdline, isc_boolean_t isdelete,
 	}
 	dns_rdataset_init(rdataset);
 	dns_rdatalist_tordataset(rdatalist, rdataset);
+	dns_rdataset_setownercase(rdataset, name);
 	ISC_LIST_INIT(name->list);
 	ISC_LIST_APPEND(name->list, rdataset, link);
 }
 
 static void
-make_prereq(isc_mem_t *mctx, char *cmdline, isc_boolean_t ispositive,
-	    isc_boolean_t isrrset, dns_name_t *name)
+make_prereq(isc_mem_t *mctx, char *cmdline, bool ispositive,
+	    bool isrrset, dns_name_t *name)
 {
 	isc_result_t result;
 	char *word;
@@ -698,6 +731,7 @@ make_prereq(isc_mem_t *mctx, char *cmdline, isc_boolean_t ispositive,
 	}
 	dns_rdataset_init(rdataset);
 	dns_rdatalist_tordataset(rdatalist, rdataset);
+	dns_rdataset_setownercase(rdataset, name);
 	ISC_LIST_INIT(name->list);
 	ISC_LIST_APPEND(name->list, rdataset, link);
 }
@@ -705,7 +739,7 @@ make_prereq(isc_mem_t *mctx, char *cmdline, isc_boolean_t ispositive,
 static void
 evaluate_prereq(isc_mem_t *mctx, char *cmdline, dns_name_t *name) {
 	char *word;
-	isc_boolean_t ispositive, isrrset;
+	bool ispositive, isrrset;
 
 	word = nsu_strsep(&cmdline, " \t\r\n");
 	if (word == NULL || *word == 0) {
@@ -713,17 +747,17 @@ evaluate_prereq(isc_mem_t *mctx, char *cmdline, dns_name_t *name) {
 		exit(1);
 	}
 	if (strcasecmp(word, "nxdomain") == 0) {
-		ispositive = ISC_FALSE;
-		isrrset = ISC_FALSE;
+		ispositive = false;
+		isrrset = false;
 	} else if (strcasecmp(word, "yxdomain") == 0) {
-		ispositive = ISC_TRUE;
-		isrrset = ISC_FALSE;
+		ispositive = true;
+		isrrset = false;
 	} else if (strcasecmp(word, "nxrrset") == 0) {
-		ispositive = ISC_FALSE;
-		isrrset = ISC_TRUE;
+		ispositive = false;
+		isrrset = true;
 	} else if (strcasecmp(word, "yxrrset") == 0) {
-		ispositive = ISC_TRUE;
-		isrrset = ISC_TRUE;
+		ispositive = true;
+		isrrset = true;
 	} else {
 		fprintf(stderr, "incorrect operation code: %s\n", word);
 		exit(1);

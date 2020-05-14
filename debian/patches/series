@@ -33,3 +33,5 @@ CVE-2017-3145.patch
 0033-Update-keyfetch_done-compute_tag-check.patch
 CVE-2018-5743.patch
 CVE-2018-5743-atomic-fix.patch
+CVE-2020-8616.patch
+CVE-2020-8617.patch

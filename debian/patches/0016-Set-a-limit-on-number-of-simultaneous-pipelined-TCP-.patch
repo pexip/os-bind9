@@ -1,0 +1,117 @@
+From: =?utf-8?q?Witold_Kr=C4=99cicki?= <wpk@isc.org>
+Date: Wed, 16 Oct 2019 13:18:48 +0200
+Subject: Set a limit on number of simultaneous pipelined TCP queries
+
+There was no limit on concurrently served queries served over one pipelined TCP
+connection, thus it was possible to send thousands queries over a single TCP
+connection, possibly exhausting the server resources.
+
+(cherry picked from commit efaa67749de825073cd7f19778386d0815c4ce29)
+---
+ bin/named/client.c               | 57 ++++++++++++++++++++++++++--------------
+ bin/named/include/named/client.h |  5 +++-
+ 2 files changed, 42 insertions(+), 20 deletions(-)
+
+diff --git a/bin/named/client.c b/bin/named/client.c
+index 8155c6b..30877c5 100644
+--- a/bin/named/client.c
++++ b/bin/named/client.c
+@@ -101,7 +101,15 @@
+ #define SEND_BUFFER_SIZE		4096
+ #define RECV_BUFFER_SIZE		4096
+ 
++#define TCP_CLIENTS_PER_CONN		23
++/*%<
++ * Number of simultaneous ns_clients_t (queries in flight) for one
++ * TCP connection.  The number was arbitrarily picked and might be
++ * changed in the future.
++ */
++
+ #ifdef ISC_PLATFORM_USETHREADS
++
+ #define NMCTXS				100
+ /*%<
+  * Number of 'mctx pools' for clients. (Should this be configurable?)
+@@ -337,7 +345,7 @@ tcpconn_init(ns_client_t *client, bool force) {
+ 	 */
+ 	tconn = isc_mem_allocate(ns_g_mctx, sizeof(*tconn));
+ 
+-	isc_refcount_init(&tconn->refs, 1);
++	isc_refcount_init(&tconn->refs, 1);	/* Current client */
+ 	tconn->tcpquota = quota;
+ 	quota = NULL;
+ 	tconn->pipelined = false;
+@@ -2631,28 +2639,39 @@ client_request(isc_task_t *task, isc_event_t *event) {
+ 	/*
+ 	 * Pipeline TCP query processing.
+ 	 */
+-	if (TCP_CLIENT(client) &&
+-	    client->message->opcode != dns_opcode_query)
+-	{
+-		client->tcpconn->pipelined = false;
+-	}
+-	if (TCP_CLIENT(client) && client->tcpconn->pipelined) {
++	if (TCP_CLIENT(client)) {
++		if (client->message->opcode != dns_opcode_query) {
++			client->tcpconn->pipelined = false;
++		}
++
+ 		/*
+-		 * We're pipelining. Replace the client; the
+-		 * replacement can read the TCP socket looking
+-		 * for new messages and this one can process the
+-		 * current message asynchronously.
+-		 *
+-		 * There will now be at least three clients using this
+-		 * TCP socket - one accepting new connections,
+-		 * one reading an existing connection to get new
+-		 * messages, and one answering the message already
+-		 * received.
++		 * Limit the maximum number of simultaenous pipelined
++		 * queries on TCP connection to TCP_CLIENTS_PER_CONN.
+ 		 */
+-		result = ns_client_replace(client);
+-		if (result != ISC_R_SUCCESS) {
++		if ((isc_refcount_current(&client->tcpconn->refs)
++			    > TCP_CLIENTS_PER_CONN))
++		{
+ 			client->tcpconn->pipelined = false;
+ 		}
++
++		if (client->tcpconn->pipelined) {
++			/*
++			 * We're pipelining. Replace the client; the
++			 * replacement can read the TCP socket looking
++			 * for new messages and this one can process the
++			 * current message asynchronously.
++			 *
++			 * There will now be at least three clients using this
++			 * TCP socket - one accepting new connections,
++			 * one reading an existing connection to get new
++			 * messages, and one answering the message already
++			 * received.
++			 */
++			result = ns_client_replace(client);
++			if (result != ISC_R_SUCCESS) {
++				client->tcpconn->pipelined = false;
++			}
++		}
+ 	}
+ 
+ 	dns_opcodestats_increment(ns_g_server->opcodestats,
+diff --git a/bin/named/include/named/client.h b/bin/named/include/named/client.h
+index 969ee4c..5ae10ae 100644
+--- a/bin/named/include/named/client.h
++++ b/bin/named/include/named/client.h
+@@ -80,7 +80,10 @@
+ 
+ /*% reference-counted TCP connection object */
+ typedef struct ns_tcpconn {
+-	isc_refcount_t		refs;
++	isc_refcount_t		refs;		/* Number of clients using
++						 * this connection. Conn can
++						 * be freed if goes to 0
++						 */
+ 	isc_quota_t		*tcpquota;
+ 	bool			pipelined;
+ } ns_tcpconn_t;

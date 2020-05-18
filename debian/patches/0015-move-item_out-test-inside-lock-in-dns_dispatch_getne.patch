@@ -1,6 +1,7 @@
 From: Mark Andrews <marka@isc.org>
 Date: Tue, 19 Mar 2019 14:14:21 +1100
 Subject: move item_out test inside lock in dns_dispatch_getnext()
+
 Origin: https://gitlab.isc.org/isc-projects/bind9/commit/3a9c7bb80d4a609b86427406d9dd783199920b5b
 Bug-Debian-Security: https://security-tracker.debian.org/tracker/CVE-2019-6471
 Bug-Debian: https://bugs.debian.org/930746
@@ -11,7 +12,7 @@ Bug-Debian: https://bugs.debian.org/930746
  1 file changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/lib/dns/dispatch.c b/lib/dns/dispatch.c
-index 408beda3679d..3278db4a07c2 100644
+index d1e4c16..b5a8f74 100644
 --- a/lib/dns/dispatch.c
 +++ b/lib/dns/dispatch.c
 @@ -134,7 +134,7 @@ struct dns_dispentry {
@@ -51,6 +52,3 @@ index 408beda3679d..3278db4a07c2 100644
  static void
  do_cancel(dns_dispatch_t *disp) {
  	dns_dispatchevent_t *ev;
--- 
-2.20.1
-

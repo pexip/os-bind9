@@ -1,3 +1,16 @@
+bind9 (1:9.10.3.dfsg.P4-12.3+deb9u6pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Wed, 27 May 2020 16:33:52 +0100
+
+bind9 (1:9.10.3.dfsg.P4-12.3+deb9u6) stretch-security; urgency=medium
+
+  * [CVE-2020-8616]: Fix NXNSATTACK amplification attack on BIND 9
+  * [CVE-2020-8617]: Fix assertion failure in TSIG processing code
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 14 May 2020 13:00:44 +0200
+
 bind9 (1:9.10.3.dfsg.P4-12.3+deb9u5pexip1) pexip; urgency=medium
 
   * New upstream release

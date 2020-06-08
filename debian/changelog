@@ -1,3 +1,9 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1pexip1) pexip; urgency=medium
+
+  * Migrate to Buster
+
+ -- Vincent Sanders <vince@pexip.com>  Mon, 08 Jun 2020 07:49:58 +0000
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1) buster-security; urgency=high
 
   * [CVE-2019-6477]: TCP-pipelined queries can bypass tcp-clients limit.

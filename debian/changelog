@@ -1,3 +1,12 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1) buster-security; urgency=high
+
+  * [CVE-2019-6477]: TCP-pipelined queries can bypass tcp-clients limit.
+    (Closes: #945171)
+  * [CVE-2020-8616]: Fix NXNSATTACK amplification attack on BIND 9
+  * [CVE-2020-8617]: Fix assertion failure in TSIG processing code
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 18 May 2020 10:02:41 +0200
+
 bind9 (1:9.11.5.P4+dfsg-5.1pexip1) pexip; urgency=medium
 
   * Migrate to Buster

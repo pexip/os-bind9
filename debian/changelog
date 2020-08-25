@@ -1,3 +1,20 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u2) buster-security; urgency=high
+
+  [ Salvatore Bonaccorso ]
+  * [CVE-2020-8622] Properly handle malformed truncated responses to TSIG
+    queries
+  * [CVE-2020-8623] Fix crash in pk11_numbits() with crafted packet when
+    native-pkcs11 is used
+  * Wait more than 1 second for NSEC3 chain changes
+  * [CVE-2020-8624] Fix processing of "update-policy" rules of type
+    "subdomain" (Closes: #966497)
+
+  [ Ondřej Surý ]
+  * [CVE-2020-8619]: It was possible to trigger a INSIST when a zone with
+    interior (non-leaf) wildcard label
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Tue, 25 Aug 2020 10:10:23 +0200
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1) buster-security; urgency=high
 
   * [CVE-2019-6477]: TCP-pipelined queries can bypass tcp-clients limit.

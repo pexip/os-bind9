@@ -1,0 +1,113 @@
+From: Mark Andrews <marka@isc.org>
+Date: Tue, 4 Aug 2020 11:41:33 +1000
+Subject: [3/3] Add a test for update-policy 'zonesub'
+Origin: https://gitlab.isc.org/isc-projects/bind9/commit/58e560beb50873c699f3431cf57e215dc645d7aa
+Bug-Debian-Security: https://security-tracker.debian.org/tracker/CVE-2020-8624
+
+The new test checks that 'update-policy zonesub' is properly enforced.
+---
+ bin/tests/system/nsupdate/ns1/named.conf.in |  6 ++++
+ bin/tests/system/nsupdate/tests.sh          | 35 ++++++++++++++++++---
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/bin/tests/system/nsupdate/ns1/named.conf.in b/bin/tests/system/nsupdate/ns1/named.conf.in
+index 87904f43aa17..e90907aecdbb 100644
+--- a/bin/tests/system/nsupdate/ns1/named.conf.in
++++ b/bin/tests/system/nsupdate/ns1/named.conf.in
+@@ -41,6 +41,11 @@ key restricted.example.nil {
+ 	secret "1234abcd8765";
+ };
+ 
++key zonesub-key.example.nil {
++	algorithm hmac-md5;
++	secret "1234subk8765";
++};
++
+ include "ddns.key";
+ 
+ zone "example.nil" {
+@@ -49,6 +54,7 @@ zone "example.nil" {
+ 	check-integrity no;
+ 	check-mx ignore;
+ 	update-policy {
++		grant zonesub-key.example.nil zonesub TXT;
+ 		grant ddns-key.example.nil subdomain example.nil ANY;
+ 		grant restricted.example.nil subdomain restricted.example.nil ANY;
+ 	};
+diff --git a/bin/tests/system/nsupdate/tests.sh b/bin/tests/system/nsupdate/tests.sh
+index 7f0c3f3ecc44..14952c8cd64e 100755
+--- a/bin/tests/system/nsupdate/tests.sh
++++ b/bin/tests/system/nsupdate/tests.sh
+@@ -428,7 +428,7 @@ EOF
+ # this also proves that the server is still running.
+ $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec example.\
+ 	@10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
+-grep "ANSWER: 0" dig.out.ns3.$n > /dev/null || ret=1
++grep "ANSWER: 0," dig.out.ns3.$n > /dev/null || ret=1
+ grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
+ [ $ret = 0 ] || { echo_i "failed"; status=1; }
+ 
+@@ -443,7 +443,7 @@ EOF
+ 
+ $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec nsec3param.test.\
+         @10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
+-grep "ANSWER: 1" dig.out.ns3.$n > /dev/null || ret=1
++grep "ANSWER: 1," dig.out.ns3.$n > /dev/null || ret=1
+ grep "3600.*NSEC3PARAM" dig.out.ns3.$n > /dev/null || ret=1
+ grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
+ [ $ret = 0 ] || { echo_i "failed"; status=1; }
+@@ -460,7 +460,7 @@ EOF
+ _ret=1
+ for i in 0 1 2 3 4 5 6 7 8 9; do
+ 	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
+-	if grep "ANSWER: 2" dig.out.ns3.$n > /dev/null; then
++	if grep "ANSWER: 2," dig.out.ns3.$n > /dev/null; then
+ 		_ret=0
+ 		break
+ 	fi
+@@ -485,7 +485,7 @@ EOF
+ _ret=1
+ for i in 0 1 2 3 4 5 6 7 8 9; do
+ 	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
+-	if grep "ANSWER: 1" dig.out.ns3.$n > /dev/null; then
++	if grep "ANSWER: 1," dig.out.ns3.$n > /dev/null; then
+ 		_ret=0
+ 		break
+ 	fi
+@@ -656,6 +656,33 @@ $DIG $DIGOPTS +tcp @10.53.0.1 example.nil TXT > dig.out.2.test$n || ret=1
+ grep "TXT.*everywhere" dig.out.2.test$n > /dev/null && ret=1
+ [ $ret = 0 ] || { echo_i "failed"; status=1; }
+ 
++n=`expr $n + 1`
++ret=0
++echo_i "check that 'update-policy zonesub' is properly enforced ($n)"
++# grant zonesub-key.example.nil zonesub TXT;
++# the A record update should be rejected as it is not in the type list
++$NSUPDATE -d <<END > nsupdate.out1-$n 2>&1 && ret=1
++server 10.53.0.1 ${PORT}
++key zonesub-key.example.nil 1234subk8765
++update add zonesub.example.nil 0 IN A 1.2.3.4
++send
++END
++$DIG $DIGOPTS +tcp @10.53.0.1 zonesub.example.nil A > dig.out.1.test$n || ret=1
++grep "status: REFUSED" nsupdate.out1-$n > /dev/null || ret=1
++grep "ANSWER: 0," dig.out.1.test$n > /dev/null || ret=1
++# the TXT record update should be accepted as it is in the type list
++$NSUPDATE -d <<END > nsupdate.out2-$n 2>&1 || ret=1
++server 10.53.0.1 ${PORT}
++key zonesub-key.example.nil 1234subk8765
++update add zonesub.example.nil 0 IN TXT everywhere.
++send
++END
++$DIG $DIGOPTS +tcp @10.53.0.1 zonesub.example.nil TXT > dig.out.2.test$n || ret=1
++grep "status: REFUSED" nsupdate.out2-$n > /dev/null && ret=1
++grep "ANSWER: 1," dig.out.2.test$n > /dev/null || ret=1
++grep "TXT.*everywhere" dig.out.2.test$n > /dev/null || ret=1
++[ $ret = 0 ] || { echo_i "failed"; status=1; }
++
+ n=`expr $n + 1`
+ ret=0
+ echo_i "check that changes to the DNSKEY RRset TTL do not have side effects ($n)"
+-- 
+2.28.0
+

@@ -17,3 +17,10 @@
 0017-libns-Rename-ns_tcpconn-refs-member-to-clients.patch
 0018-CVE-2020-8616.patch
 0019-CVE-2020-8617.patch
+0020-Remove-INSIST-from-from-new_reference.patch
+0021-Always-keep-a-copy-of-the-message.patch
+0022-Fix-crash-in-pk11_numbits-when-native-pkcs11-is-used.patch
+0023-Wait-more-than-1-second-for-NSEC3-chain-changes.patch
+0024-Update-policy-subdomain-was-incorrectly-treated-as-z.patch
+0025-Add-a-test-for-update-policy-subdomain.patch
+0026-Add-a-test-for-update-policy-zonesub.patch

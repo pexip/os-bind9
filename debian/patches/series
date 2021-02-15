@@ -24,3 +24,4 @@
 0024-Update-policy-subdomain-was-incorrectly-treated-as-z.patch
 0025-Add-a-test-for-update-policy-subdomain.patch
 0026-Add-a-test-for-update-policy-zonesub.patch
+0027-CVE-2020-8625.patch

@@ -1,3 +1,10 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u3) buster-security; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Buffer overflow in GSSAPI security policy negotiation (CVE-2020-8625)
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 15 Feb 2021 08:51:28 +0100
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u2) buster-security; urgency=high
 
   [ Salvatore Bonaccorso ]

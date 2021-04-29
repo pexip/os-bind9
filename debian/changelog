@@ -1,3 +1,16 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u5) buster-security; urgency=high
+
+  * CVE-2021-25214: A malformed incoming IXFR transfer could trigger
+    an assertion failure in ``named``, causing it to quit abnormally.
+  * CVE-2021-25215: ``named`` crashed when a DNAME record placed in
+    the ANSWER section during DNAME chasing turned out to be the final
+    answer to a client query.
+  * CVE-2021-25216: Compile with system provided SPNEGO
+  * Ensure all resources are properly cleaned up when a call to
+    gss_accept_sec_context() fails.
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 29 Apr 2021 12:42:26 +0200
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u3) buster-security; urgency=high
 
   * Non-maintainer upload by the Security Team.

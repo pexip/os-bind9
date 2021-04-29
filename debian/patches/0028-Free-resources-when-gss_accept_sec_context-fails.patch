@@ -1,0 +1,28 @@
+From: =?utf-8?b?TWljaGHFgiBLxJlwaWXFhA==?= <michal@isc.org>
+Date: Thu, 8 Apr 2021 10:33:44 +0200
+Subject: Free resources when gss_accept_sec_context() fails
+
+Even if a call to gss_accept_sec_context() fails, it might still cause a
+GSS-API response token to be allocated and left for the caller to
+release.  Make sure the token is released before an early return from
+dst_gssapi_acceptctx().
+
+(cherry picked from commit d954e152d9f2901118b1fe36d3931ec244317fab)
+---
+ lib/dns/gssapictx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/lib/dns/gssapictx.c b/lib/dns/gssapictx.c
+index 8bd99af..6d787d3 100644
+--- a/lib/dns/gssapictx.c
++++ b/lib/dns/gssapictx.c
+@@ -746,6 +746,9 @@ dst_gssapi_acceptctx(gss_cred_id_t cred,
+ 	default:
+ 		gss_log(3, "failed gss_accept_sec_context: %s",
+ 			gss_error_tostring(gret, minor, buf, sizeof(buf)));
++		if (gouttoken.length > 0U) {
++			(void)gss_release_buffer(&minor, &gouttoken);
++		}
+ 		return (result);
+ 	}
+ 

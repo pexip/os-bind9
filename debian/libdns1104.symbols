@@ -1563,9 +1563,7 @@ libdns-pkcs11.so.1104 libdns1104 #MINVER#
  dst_region_computerid@Base 1:9.11.3+dfsg
  dst_result_register@Base 1:9.11.3+dfsg
  dst_result_totext@Base 1:9.11.3+dfsg
- gss_accept_sec_context_spnego@Base 1:9.11.3+dfsg
  gss_error_tostring@Base 1:9.11.3+dfsg
- gss_init_sec_context_spnego@Base 1:9.11.3+dfsg
  gss_log@Base 1:9.11.3+dfsg
  isc__rdatalist_addclosest@Base 1:9.11.3+dfsg
  isc__rdatalist_addnoqname@Base 1:9.11.3+dfsg
@@ -3158,9 +3156,7 @@ libdns.so.1104 libdns1104 #MINVER#
  dst_region_computerid@Base 1:9.11.3+dfsg
  dst_result_register@Base 1:9.11.3+dfsg
  dst_result_totext@Base 1:9.11.3+dfsg
- gss_accept_sec_context_spnego@Base 1:9.11.3+dfsg
  gss_error_tostring@Base 1:9.11.3+dfsg
- gss_init_sec_context_spnego@Base 1:9.11.3+dfsg
  gss_log@Base 1:9.11.3+dfsg
  isc__rdatalist_addclosest@Base 1:9.11.3+dfsg
  isc__rdatalist_addnoqname@Base 1:9.11.3+dfsg

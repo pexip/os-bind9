@@ -1,17 +1,18 @@
 From: Mark Andrews <marka@isc.org>
 Date: Tue, 4 Aug 2020 11:41:33 +1000
 Subject: [3/3] Add a test for update-policy 'zonesub'
+
 Origin: https://gitlab.isc.org/isc-projects/bind9/commit/58e560beb50873c699f3431cf57e215dc645d7aa
 Bug-Debian-Security: https://security-tracker.debian.org/tracker/CVE-2020-8624
 
 The new test checks that 'update-policy zonesub' is properly enforced.
 ---
- bin/tests/system/nsupdate/ns1/named.conf.in |  6 ++++
- bin/tests/system/nsupdate/tests.sh          | 35 ++++++++++++++++++---
+ bin/tests/system/nsupdate/ns1/named.conf.in |  6 +++++
+ bin/tests/system/nsupdate/tests.sh          | 35 +++++++++++++++++++++++++----
  2 files changed, 37 insertions(+), 4 deletions(-)
 
 diff --git a/bin/tests/system/nsupdate/ns1/named.conf.in b/bin/tests/system/nsupdate/ns1/named.conf.in
-index 87904f43aa17..e90907aecdbb 100644
+index 87904f4..e90907a 100644
 --- a/bin/tests/system/nsupdate/ns1/named.conf.in
 +++ b/bin/tests/system/nsupdate/ns1/named.conf.in
 @@ -41,6 +41,11 @@ key restricted.example.nil {
@@ -35,10 +36,10 @@ index 87904f43aa17..e90907aecdbb 100644
  		grant restricted.example.nil subdomain restricted.example.nil ANY;
  	};
 diff --git a/bin/tests/system/nsupdate/tests.sh b/bin/tests/system/nsupdate/tests.sh
-index 7f0c3f3ecc44..14952c8cd64e 100755
+index 432240e..f2f26ab 100755
 --- a/bin/tests/system/nsupdate/tests.sh
 +++ b/bin/tests/system/nsupdate/tests.sh
-@@ -428,7 +428,7 @@ EOF
+@@ -430,7 +430,7 @@ sleep 1
  # this also proves that the server is still running.
  $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec example.\
  	@10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
@@ -47,7 +48,7 @@ index 7f0c3f3ecc44..14952c8cd64e 100755
  grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
  [ $ret = 0 ] || { echo_i "failed"; status=1; }
  
-@@ -443,7 +443,7 @@ EOF
+@@ -447,7 +447,7 @@ sleep 1
  
  $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec nsec3param.test.\
          @10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
@@ -56,7 +57,7 @@ index 7f0c3f3ecc44..14952c8cd64e 100755
  grep "3600.*NSEC3PARAM" dig.out.ns3.$n > /dev/null || ret=1
  grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
  [ $ret = 0 ] || { echo_i "failed"; status=1; }
-@@ -460,7 +460,7 @@ EOF
+@@ -464,7 +464,7 @@ EOF
  _ret=1
  for i in 0 1 2 3 4 5 6 7 8 9; do
  	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
@@ -65,7 +66,7 @@ index 7f0c3f3ecc44..14952c8cd64e 100755
  		_ret=0
  		break
  	fi
-@@ -485,7 +485,7 @@ EOF
+@@ -489,7 +489,7 @@ EOF
  _ret=1
  for i in 0 1 2 3 4 5 6 7 8 9; do
  	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
@@ -74,7 +75,7 @@ index 7f0c3f3ecc44..14952c8cd64e 100755
  		_ret=0
  		break
  	fi
-@@ -656,6 +656,33 @@ $DIG $DIGOPTS +tcp @10.53.0.1 example.nil TXT > dig.out.2.test$n || ret=1
+@@ -660,6 +660,33 @@ $DIG $DIGOPTS +tcp @10.53.0.1 example.nil TXT > dig.out.2.test$n || ret=1
  grep "TXT.*everywhere" dig.out.2.test$n > /dev/null && ret=1
  [ $ret = 0 ] || { echo_i "failed"; status=1; }
  
@@ -108,6 +109,3 @@ index 7f0c3f3ecc44..14952c8cd64e 100755
  n=`expr $n + 1`
  ret=0
  echo_i "check that changes to the DNSKEY RRset TTL do not have side effects ($n)"
--- 
-2.28.0
-

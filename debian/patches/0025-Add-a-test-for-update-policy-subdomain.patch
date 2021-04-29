@@ -1,17 +1,18 @@
 From: Mark Andrews <marka@isc.org>
 Date: Wed, 29 Jul 2020 23:36:03 +1000
 Subject: [2/3] Add a test for update-policy 'subdomain'
+
 Origin: https://gitlab.isc.org/isc-projects/bind9/commit/393e8f643c02215fa4e6d4edf67be7d77085da0e
 Bug-Debian-Security: https://security-tracker.debian.org/tracker/CVE-2020-8624
 
 The new test checks that 'update-policy subdomain' is properly enforced.
 ---
- bin/tests/system/nsupdate/ns1/named.conf.in |  6 +++++
- bin/tests/system/nsupdate/tests.sh          | 25 +++++++++++++++++++++
+ bin/tests/system/nsupdate/ns1/named.conf.in |  6 ++++++
+ bin/tests/system/nsupdate/tests.sh          | 25 +++++++++++++++++++++++++
  2 files changed, 31 insertions(+)
 
 diff --git a/bin/tests/system/nsupdate/ns1/named.conf.in b/bin/tests/system/nsupdate/ns1/named.conf.in
-index 1d999adc3993..87904f43aa17 100644
+index 1d999ad..87904f4 100644
 --- a/bin/tests/system/nsupdate/ns1/named.conf.in
 +++ b/bin/tests/system/nsupdate/ns1/named.conf.in
 @@ -36,6 +36,11 @@ key altkey {
@@ -35,10 +36,10 @@ index 1d999adc3993..87904f43aa17 100644
  	allow-transfer { any; };
  };
 diff --git a/bin/tests/system/nsupdate/tests.sh b/bin/tests/system/nsupdate/tests.sh
-index 44436dbce887..7f0c3f3ecc44 100755
+index c72753b..432240e 100755
 --- a/bin/tests/system/nsupdate/tests.sh
 +++ b/bin/tests/system/nsupdate/tests.sh
-@@ -631,6 +631,31 @@ then
+@@ -635,6 +635,31 @@ then
  echo_i "failed"; status=1
  fi
  
@@ -70,6 +71,3 @@ index 44436dbce887..7f0c3f3ecc44 100755
  n=`expr $n + 1`
  ret=0
  echo_i "check that changes to the DNSKEY RRset TTL do not have side effects ($n)"
--- 
-2.28.0
-

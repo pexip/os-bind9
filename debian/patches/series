@@ -25,3 +25,8 @@
 0025-Add-a-test-for-update-policy-subdomain.patch
 0026-Add-a-test-for-update-policy-zonesub.patch
 0027-CVE-2020-8625.patch
+0028-Free-resources-when-gss_accept_sec_context-fails.patch
+0029-Check-SOA-owner-names-in-zone-transfers.patch
+0030-Address-inconsistencies-in-checking-added-RRsets.patch
+0031-Unload-a-zone-if-a-transfer-breaks-its-SOA-record.patch
+0032-Handle-DNAME-lookup-via-itself.patch

@@ -1,6 +1,7 @@
-From: =?UTF-8?q?Micha=C5=82=20K=C4=99pie=C5=84?= <michal@isc.org>
+From: =?utf-8?b?TWljaGHFgiBLxJlwaWXFhA==?= <michal@isc.org>
 Date: Tue, 23 Apr 2019 14:59:05 +0200
 Subject: Wait more than 1 second for NSEC3 chain changes
+
 Origin: https://gitlab.isc.org/isc-projects/bind9/commit/4e2cc911d2ceb90ec04605451fb1bb518ef75cd0
 
 One second may not be enough for an NSEC3 chain change triggered by an
@@ -13,10 +14,10 @@ a given NSEC3 chain change is complete in the "nsupdate" system test.
  1 file changed, 21 insertions(+), 9 deletions(-)
 
 diff --git a/bin/tests/system/nsupdate/tests.sh b/bin/tests/system/nsupdate/tests.sh
-index d5c0f07e9b16..4da48490b66c 100755
+index 9f26572..c72753b 100755
 --- a/bin/tests/system/nsupdate/tests.sh
 +++ b/bin/tests/system/nsupdate/tests.sh
-@@ -450,18 +450,24 @@ grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
+@@ -454,18 +454,24 @@ grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
  
  n=`expr $n + 1`
  ret=0
@@ -46,7 +47,7 @@ index d5c0f07e9b16..4da48490b66c 100755
  grep "NSEC3PARAM 1 0 4 -" dig.out.ns3.$n > /dev/null || ret=1
  grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
  if [ $ret != 0 ] ; then echo_i "failed"; status=`expr $ret + $status`; fi
-@@ -476,11 +482,17 @@ update add nsec3param.test 7200 NSEC3PARAM 1 0 5 -
+@@ -480,11 +486,17 @@ update add nsec3param.test 7200 NSEC3PARAM 1 0 5 -
  send
  EOF
  
@@ -68,6 +69,3 @@ index d5c0f07e9b16..4da48490b66c 100755
  grep "7200.*NSEC3PARAM 1 0 5 -" dig.out.ns3.$n > /dev/null || ret=1
  grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
  $JOURNALPRINT ns3/nsec3param.test.db.signed.jnl > jp.out.ns3.$n
--- 
-2.28.0
-

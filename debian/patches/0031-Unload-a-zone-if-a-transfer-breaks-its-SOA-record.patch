@@ -1,0 +1,40 @@
+From: Mark Andrews <marka@isc.org>
+Date: Thu, 25 Feb 2021 14:11:05 +1100
+Subject: Unload a zone if a transfer breaks its SOA record
+
+If a zone transfer results in a zone not having any NS records, named
+stops serving it because such a zone is broken.  Do the same if an
+incoming zone transfer results in a zone lacking an SOA record at the
+apex or containing more than one SOA record.
+---
+ lib/dns/zone.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/lib/dns/zone.c b/lib/dns/zone.c
+index 6d4426a..c3c8f94 100644
+--- a/lib/dns/zone.c
++++ b/lib/dns/zone.c
+@@ -15352,11 +15352,20 @@ zone_xfrdone(dns_zone_t *zone, isc_result_t result) {
+ 					  &retry, &expire, &minimum, NULL);
+ 		ZONEDB_UNLOCK(&zone->dblock, isc_rwlocktype_read);
+ 		if (result == ISC_R_SUCCESS) {
+-			if (soacount != 1)
++			if (soacount != 1) {
+ 				dns_zone_log(zone, ISC_LOG_ERROR,
+ 					     "transferred zone "
+-					     "has %d SOA record%s", soacount,
+-					     (soacount != 0) ? "s" : "");
++					     "has %d SOA records",
++					     soacount);
++				if (DNS_ZONE_FLAG(zone,
++						  DNS_ZONEFLG_HAVETIMERS)) {
++					zone->refresh = DNS_ZONE_DEFAULTREFRESH;
++					zone->retry = DNS_ZONE_DEFAULTRETRY;
++				}
++				DNS_ZONE_CLRFLAG(zone, DNS_ZONEFLG_HAVETIMERS);
++				zone_unload(zone);
++				goto next_master;
++			}
+ 			if (nscount == 0) {
+ 				dns_zone_log(zone, ISC_LOG_ERROR,
+ 					     "transferred zone "

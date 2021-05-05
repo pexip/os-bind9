@@ -89,6 +89,7 @@ override_dh_auto_configure:
 		--with-gost=no \
 		--with-openssl=/usr \
 		--with-gssapi=/usr \
+		--disable-isc-spnego \
 		--with-libidn2 \
 		--with-libjson=/usr \
 		--with-lmdb=/usr \
@@ -120,6 +121,7 @@ override_dh_auto_configure:
 		--enable-shared \
 		--with-libtool \
 		--with-gssapi=no \
+		--disable-isc-spnego \
 		--libdir=/lib/$(DEB_HOST_MULTIARCH) \
 		--includedir=/usr/include/bind-export
 	sh debian/apply-export-patch

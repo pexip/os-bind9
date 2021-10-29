@@ -1,3 +1,17 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6pexip1) pexip; urgency=medium
+
+  * New upstream version.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Fri, 29 Oct 2021 10:24:36 +0100
+
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6) buster-security; urgency=high
+
+  * CVE-2021-25219: The "lame-ttl" option is now forcibly set to 0. This
+    effectively disables the lame server cache, as it could previously be
+    abused by an attacker to significantly degrade resolver performance.
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 13:42:31 +0200
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u5pexip1) pexip; urgency=medium
 
   * New upstream version

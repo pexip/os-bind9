@@ -1,3 +1,19 @@
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u7) buster-security; urgency=high
+
+  * CVE-2021-25220: The rules for acceptance of records into the cache
+    have been tightened to prevent the possibility of poisoning if
+    forwarders send records outside the configured bailiwick.
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 14 Mar 2022 15:21:48 +0100
+
+bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6) buster-security; urgency=high
+
+  * CVE-2021-25219: The "lame-ttl" option is now forcibly set to 0. This
+    effectively disables the lame server cache, as it could previously be
+    abused by an attacker to significantly degrade resolver performance.
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 13:42:31 +0200
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u5) buster-security; urgency=high
 
   * CVE-2021-25214: A malformed incoming IXFR transfer could trigger

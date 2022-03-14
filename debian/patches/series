@@ -30,3 +30,6 @@
 0030-Address-inconsistencies-in-checking-added-RRsets.patch
 0031-Unload-a-zone-if-a-transfer-breaks-its-SOA-record.patch
 0032-Handle-DNAME-lookup-via-itself.patch
+0033-Disable-lame-ttl-cache.patch
+0034-Enable-lame-response-detection-even-with-disabled-la.patch
+0035-CVE-2021-25220.patch

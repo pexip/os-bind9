@@ -1,21 +1,22 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef DNS_DBTABLE_H
 #define DNS_DBTABLE_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/dbtable.h
  * \brief
@@ -44,7 +45,7 @@
 
 #include <dns/types.h>
 
-#define DNS_DBTABLEFIND_NOEXACT		0x01
+#define DNS_DBTABLEFIND_NOEXACT 0x01
 
 ISC_LANG_BEGINDECLS
 
@@ -139,7 +140,7 @@ dns_dbtable_removedefault(dns_dbtable_t *dbtable);
  */
 
 isc_result_t
-dns_dbtable_find(dns_dbtable_t *dbtable, dns_name_t *name,
+dns_dbtable_find(dns_dbtable_t *dbtable, const dns_name_t *name,
 		 unsigned int options, dns_db_t **dbp);
 /*%<
  * Find the deepest match to 'name' in the dbtable, and return it

@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef DNS_RDATALIST_P_H
 #define DNS_RDATALIST_P_H
@@ -16,6 +17,7 @@
 /*! \file */
 
 #include <isc/result.h>
+
 #include <dns/types.h>
 
 ISC_LANG_BEGINDECLS
@@ -39,14 +41,14 @@ unsigned int
 isc__rdatalist_count(dns_rdataset_t *rdataset);
 
 isc_result_t
-isc__rdatalist_addnoqname(dns_rdataset_t *rdataset, dns_name_t *name);
+isc__rdatalist_addnoqname(dns_rdataset_t *rdataset, const dns_name_t *name);
 
 isc_result_t
 isc__rdatalist_getnoqname(dns_rdataset_t *rdataset, dns_name_t *name,
 			  dns_rdataset_t *neg, dns_rdataset_t *negsig);
 
 isc_result_t
-isc__rdatalist_addclosest(dns_rdataset_t *rdataset, dns_name_t *name);
+isc__rdatalist_addclosest(dns_rdataset_t *rdataset, const dns_name_t *name);
 
 isc_result_t
 isc__rdatalist_getclosest(dns_rdataset_t *rdataset, dns_name_t *name,

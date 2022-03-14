@@ -1,15 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
-/* $Id: rndc-confgen.c,v 1.7 2011/03/12 04:59:46 tbox Exp $ */
 
 /*! \file */
 
@@ -22,19 +22,15 @@
  * controls statement altogether.
  */
 
-#include <config.h>
-
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdarg.h>
 
 #include <isc/assertions.h>
 #include <isc/base64.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
-#include <isc/entropy.h>
 #include <isc/file.h>
-#include <isc/keyboard.h>
 #include <isc/mem.h>
 #include <isc/net.h>
 #include <isc/print.h>
@@ -49,14 +45,15 @@
 #include <dns/name.h>
 
 #include <dst/dst.h>
+
 #include <confgen/os.h>
 
-#include "util.h"
 #include "keygen.h"
+#include "util.h"
 
-#define DEFAULT_KEYNAME		"rndc-key"
-#define DEFAULT_SERVER		"127.0.0.1"
-#define DEFAULT_PORT		953
+#define DEFAULT_KEYNAME "rndc-key"
+#define DEFAULT_SERVER	"127.0.0.1"
+#define DEFAULT_PORT	953
 
 static char program[256];
 const char *progname;
@@ -70,27 +67,9 @@ usage(int status) ISC_PLATFORM_NORETURN_POST;
 
 static void
 usage(int status) {
-
-#ifndef PK11_MD5_DISABLE
 	fprintf(stderr, "\
 Usage:\n\
- %s [-a] [-b bits] [-c keyfile] [-k keyname] [-p port] [-r randomfile] \
-[-s addr] [-t chrootdir] [-u user]\n\
-  -a:		 generate just the key clause and write it to keyfile (%s)\n\
-  -A alg:	 algorithm (default hmac-md5)\n\
-  -b bits:	 from 1 through 512, default 256; total length of the secret\n\
-  -c keyfile:	 specify an alternate key file (requires -a)\n\
-  -k keyname:	 the name as it will be used  in named.conf and rndc.conf\n\
-  -p port:	 the port named will listen on and rndc will connect to\n\
-  -r randomfile: source of random data (use \"keyboard\" for key timing)\n\
-  -s addr:	 the address to which rndc should connect\n\
-  -t chrootdir:	 write a keyfile in chrootdir as well (requires -a)\n\
-  -u user:	 set the keyfile owner to \"user\" (requires -a)\n",
-		 progname, keydef);
-#else
-	fprintf(stderr, "\
-Usage:\n\
- %s [-a] [-b bits] [-c keyfile] [-k keyname] [-p port] [-r randomfile] \
+ %s [-a] [-b bits] [-c keyfile] [-k keyname] [-p port] \
 [-s addr] [-t chrootdir] [-u user]\n\
   -a:		 generate just the key clause and write it to keyfile (%s)\n\
   -A alg:	 algorithm (default hmac-sha256)\n\
@@ -98,14 +77,12 @@ Usage:\n\
   -c keyfile:	 specify an alternate key file (requires -a)\n\
   -k keyname:	 the name as it will be used  in named.conf and rndc.conf\n\
   -p port:	 the port named will listen on and rndc will connect to\n\
-  -r randomfile: source of random data (use \"keyboard\" for key timing)\n\
   -s addr:	 the address to which rndc should connect\n\
   -t chrootdir:	 write a keyfile in chrootdir as well (requires -a)\n\
   -u user:	 set the keyfile owner to \"user\" (requires -a)\n",
-		 progname, keydef);
-#endif
+		progname, keydef);
 
-	exit (status);
+	exit(status);
 }
 
 int
@@ -116,7 +93,6 @@ main(int argc, char **argv) {
 	isc_mem_t *mctx = NULL;
 	isc_result_t result = ISC_R_SUCCESS;
 	const char *keyname = NULL;
-	const char *randomfile = NULL;
 	const char *serveraddr = NULL;
 	dns_secalg_t alg;
 	const char *algname;
@@ -134,16 +110,13 @@ main(int argc, char **argv) {
 	keydef = keyfile = RNDC_KEYFILE;
 
 	result = isc_file_progname(*argv, program, sizeof(program));
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		memmove(program, "rndc-confgen", 13);
+	}
 	progname = program;
 
 	keyname = DEFAULT_KEYNAME;
-#ifndef PK11_MD5_DISABLE
-	alg = DST_ALG_HMACMD5;
-#else
 	alg = DST_ALG_HMACSHA256;
-#endif
 	serveraddr = DEFAULT_SERVER;
 	port = DEFAULT_PORT;
 
@@ -159,13 +132,15 @@ main(int argc, char **argv) {
 		case 'A':
 			algname = isc_commandline_argument;
 			alg = alg_fromtext(algname);
-			if (alg == DST_ALG_UNKNOWN)
+			if (alg == DST_ALG_UNKNOWN) {
 				fatal("Unsupported algorithm '%s'", algname);
+			}
 			break;
 		case 'b':
 			keysize = strtol(isc_commandline_argument, &p, 10);
-			if (*p != '\0' || keysize < 0)
+			if (*p != '\0' || keysize < 0) {
 				fatal("-b requires a non-negative number");
+			}
 			break;
 		case 'c':
 			keyfile = isc_commandline_argument;
@@ -173,7 +148,7 @@ main(int argc, char **argv) {
 		case 'h':
 			usage(0);
 		case 'k':
-		case 'y':	/* Compatible with rndc -y. */
+		case 'y': /* Compatible with rndc -y. */
 			keyname = isc_commandline_argument;
 			break;
 		case 'M':
@@ -185,18 +160,21 @@ main(int argc, char **argv) {
 			break;
 		case 'p':
 			port = strtol(isc_commandline_argument, &p, 10);
-			if (*p != '\0' || port < 0 || port > 65535)
+			if (*p != '\0' || port < 0 || port > 65535) {
 				fatal("port '%s' out of range",
 				      isc_commandline_argument);
+			}
 			break;
 		case 'r':
-			randomfile = isc_commandline_argument;
+			fatal("The -r option has been deprecated.");
 			break;
 		case 's':
 			serveraddr = isc_commandline_argument;
 			if (inet_pton(AF_INET, serveraddr, &addr4_dummy) != 1 &&
 			    inet_pton(AF_INET6, serveraddr, &addr6_dummy) != 1)
+			{
 				fatal("-s should be an IPv4 or IPv6 address");
+			}
 			break;
 		case 't':
 			chrootdir = isc_commandline_argument;
@@ -212,12 +190,13 @@ main(int argc, char **argv) {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 				usage(1);
-			} else
+			} else {
 				usage(0);
+			}
 			break;
 		default:
-			fprintf(stderr, "%s: unhandled option -%c\n",
-				program, isc_commandline_option);
+			fprintf(stderr, "%s: unhandled option -%c\n", program,
+				isc_commandline_option);
 			exit(1);
 		}
 	}
@@ -226,17 +205,25 @@ main(int argc, char **argv) {
 	argv += isc_commandline_index;
 	POST(argv);
 
-	if (argc > 0)
+	if (argc > 0) {
 		usage(1);
+	}
 
-	if (keysize < 0)
+	if (alg == DST_ALG_HMACMD5) {
+		fprintf(stderr, "warning: use of hmac-md5 for RNDC keys "
+				"is deprecated; hmac-sha256 is now "
+				"recommended.\n");
+	}
+
+	if (keysize < 0) {
 		keysize = alg_bits(alg);
+	}
 	algname = alg_totext(alg);
 
-	DO("create memory context", isc_mem_create(0, 0, &mctx));
+	isc_mem_create(&mctx);
 	isc_buffer_init(&key_txtbuffer, &key_txtsecret, sizeof(key_txtsecret));
 
-	generate_key(mctx, randomfile, alg, keysize, &key_txtbuffer);
+	generate_key(mctx, alg, keysize, &key_txtbuffer);
 
 	if (keyonly) {
 		write_key_file(keyfile, chrootdir == NULL ? user : NULL,
@@ -246,8 +233,6 @@ main(int argc, char **argv) {
 			char *buf;
 			len = strlen(chrootdir) + strlen(keyfile) + 2;
 			buf = isc_mem_get(mctx, len);
-			if (buf == NULL)
-				fatal("isc_mem_get(%d) failed\n", len);
 			snprintf(buf, len, "%s%s%s", chrootdir,
 				 (*keyfile != '/') ? "/" : "", keyfile);
 
@@ -282,16 +267,16 @@ options {\n\
 # End of named.conf\n",
 		       keyname, algname,
 		       (int)isc_buffer_usedlength(&key_txtbuffer),
-		       (char *)isc_buffer_base(&key_txtbuffer),
-		       keyname, serveraddr, port,
-		       keyname, algname,
+		       (char *)isc_buffer_base(&key_txtbuffer), keyname,
+		       serveraddr, port, keyname, algname,
 		       (int)isc_buffer_usedlength(&key_txtbuffer),
-		       (char *)isc_buffer_base(&key_txtbuffer),
-		       serveraddr, port, serveraddr, keyname);
+		       (char *)isc_buffer_base(&key_txtbuffer), serveraddr,
+		       port, serveraddr, keyname);
 	}
 
-	if (show_final_mem)
+	if (show_final_mem) {
 		isc_mem_stats(mctx, stderr);
+	}
 
 	isc_mem_destroy(&mctx);
 

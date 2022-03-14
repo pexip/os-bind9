@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -16,24 +18,6 @@
 
 #include <stddef.h>	/* Required on FreeBSD (and  others?) for size_t. */
 #include <netdb.h>	/* Contractual provision. */
-
-/*
- * Define if <netdb.h> does not declare struct addrinfo.
- */
-@ISC_IRS_NEEDADDRINFO@
-
-#ifdef ISC_IRS_NEEDADDRINFO
-struct addrinfo {
-	int		ai_flags;      /* AI_PASSIVE, AI_CANONNAME */
-	int		ai_family;     /* PF_xxx */
-	int		ai_socktype;   /* SOCK_xxx */
-	int		ai_protocol;   /* 0 or IPPROTO_xxx for IPv4 and IPv6 */
-	size_t		ai_addrlen;    /* Length of ai_addr */
-	char		*ai_canonname; /* Canonical name for hostname */
-	struct sockaddr	*ai_addr;      /* Binary address */
-	struct addrinfo	*ai_next;      /* Next structure in linked list */
-};
-#endif
 
 /*
  * Undefine all #defines we are interested in as <netdb.h> may or may not have
@@ -126,7 +110,7 @@ struct addrinfo {
 #define AI_DEFAULT	(AI_V4MAPPED|AI_ADDRCONFIG)
 
 /*
- * Constants for lwres_getnameinfo()
+ * Constants for getnameinfo()
  */
 #undef	NI_MAXHOST
 #undef	NI_MAXSERV
@@ -135,7 +119,7 @@ struct addrinfo {
 #define	NI_MAXSERV	32
 
 /*
- * Flag values for lwres_getnameinfo()
+ * Flag values for getnameinfo()
  */
 #undef	NI_NOFQDN
 #undef	NI_NUMERICHOST
@@ -149,6 +133,55 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
+
+/*
+ * Define to map into irs_ namespace.
+ */
+
+#define IRS_NAMESPACE
+
+#ifdef IRS_NAMESPACE
+
+/*
+ * Use our versions not the ones from the C library.
+ */
+
+#ifdef getnameinfo
+#undef getnameinfo
+#endif
+#define getnameinfo irs_getnameinfo
+
+#ifdef getaddrinfo
+#undef getaddrinfo
+#endif
+#define getaddrinfo irs_getaddrinfo
+
+#ifdef freeaddrinfo
+#undef freeaddrinfo
+#endif
+#define freeaddrinfo irs_freeaddrinfo
+
+#ifdef gai_strerror
+#undef gai_strerror
+#endif
+#define gai_strerror irs_gai_strerror
+
+int
+getaddrinfo(const char *hostname, const char *servname,
+	    const struct addrinfo *hints, struct addrinfo **res);
+
+int
+getnameinfo(const struct sockaddr *sa, socklen_t salen,
+	    char *host, socklen_t hostlen,
+	    char *serv, socklen_t servlen,
+	    int flags);
+
+void freeaddrinfo (struct addrinfo *ai);
+
+const char *
+gai_strerror(int ecode);
+
+#endif /* IRS_NAMESPACE */
 
 /*
  * Tell Emacs to use C mode on this file.

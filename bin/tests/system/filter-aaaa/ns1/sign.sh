@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -14,17 +16,20 @@ SYSTEMTESTTOP=../..
 
 SYSTESTDIR=filter-aaaa
 
-dlvsets=
-
 zone=signed.
 infile=signed.db.in
 zonefile=signed.db.signed
 outfile=signed.db.signed
 
-keyname1=`$KEYGEN -r $RANDFILE -a DSA -b 768 -n zone $zone 2> /dev/null`
-keyname2=`$KEYGEN -f KSK -r $RANDFILE -a DSA -b 768 -n zone $zone 2> /dev/null`
+$KEYGEN -a $DEFAULT_ALGORITHM $zone 2>&1 > /dev/null | cat_i
+$KEYGEN -f KSK -a $DEFAULT_ALGORITHM $zone 2>&1 > keygen.out | cat_i
+keyname=`cat keygen.out`
+rm -f keygen.out
 
-cat $infile $keyname1.key $keyname2.key >$zonefile
+keyfile_to_static_ds $keyname > trusted.conf
+cp trusted.conf ../ns2/trusted.conf
+cp trusted.conf ../ns3/trusted.conf
+cp trusted.conf ../ns5/trusted.conf
 
-$SIGNER -r $RANDFILE -o $zone -f $outfile $zonefile > /dev/null 2> signer.err || cat signer.err
-echo_i "signed $zone"
+$SIGNER -S -o $zone -f $outfile $infile > /dev/null 2> signer.err || cat signer.err
+echo_i "signed zone '$zone'"

@@ -1,13 +1,13 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
-
-# $Id: includes.in,v 1.21 2007/06/19 23:47:24 tbox Exp $
 
 # Search for machine-generated header files in the build tree,
 # and for normal headers in the source tree (${top_srcdir}).
@@ -19,8 +19,7 @@ ISC_INCLUDES = @BIND9_ISC_BUILDINCLUDE@ \
 	-I${top_srcdir}/lib/isc \
 	-I${top_srcdir}/lib/isc/include \
 	-I${top_srcdir}/lib/isc/unix/include \
-	-I${top_srcdir}/lib/isc/@ISC_THREAD_DIR@/include \
-	-I${top_srcdir}/lib/isc/@ISC_ARCH_DIR@/include
+	-I${top_srcdir}/lib/isc/pthreads/include
 
 ISCCC_INCLUDES = @BIND9_ISCCC_BUILDINCLUDE@ \
        -I${top_srcdir}/lib/isccc/include
@@ -31,12 +30,11 @@ ISCCFG_INCLUDES = @BIND9_ISCCFG_BUILDINCLUDE@ \
 DNS_INCLUDES = @BIND9_DNS_BUILDINCLUDE@ \
 	-I${top_srcdir}/lib/dns/include
 
+NS_INCLUDES = @BIND9_NS_BUILDINCLUDE@ \
+	-I${top_srcdir}/lib/ns/include
+
 IRS_INCLUDES = @BIND9_IRS_BUILDINCLUDE@ \
 	-I${top_srcdir}/lib/irs/include
-
-LWRES_INCLUDES = @BIND9_LWRES_BUILDINCLUDE@ \
-	-I${top_srcdir}/lib/lwres/unix/include \
-	-I${top_srcdir}/lib/lwres/include
 
 BIND9_INCLUDES = @BIND9_BIND9_BUILDINCLUDE@ \
 	-I${top_srcdir}/lib/bind9/include

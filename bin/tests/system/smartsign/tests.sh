@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -22,63 +24,69 @@ cfile=child.db
 
 echo_i "generating child's keys"
 # active zsk
-czsk1=`$KEYGEN -q -r $RANDFILE -L 30 $czone`
+czsk1=`$KEYGEN -q -a rsasha1 -L 30 $czone`
 
 # not yet published or active
-czsk2=`$KEYGEN -q -r $RANDFILE -P none -A none $czone`
+czsk2=`$KEYGEN -q -a rsasha1 -P none -A none $czone`
 
 # published but not active
-czsk3=`$KEYGEN -q -r $RANDFILE -A none $czone`
+czsk3=`$KEYGEN -q -a rsasha1 -A none $czone`
 
 # inactive
-czsk4=`$KEYGEN -q -r $RANDFILE -P now-24h -A now-24h -I now $czone`
+czsk4=`$KEYGEN -q -a rsasha1 -P now-24h -A now-24h -I now $czone`
 
 # active in 12 hours, inactive 12 hours after that...
-czsk5=`$KEYGEN -q -r $RANDFILE -P now+12h -A now+12h -I now+24h $czone`
+czsk5=`$KEYGEN -q -a rsasha1 -P now+12h -A now+12h -I now+24h $czone`
 
 # explicit successor to czk5
 # (suppressing warning about lack of removal date)
-czsk6=`$KEYGEN -q -r $RANDFILE -S $czsk5 -i 6h 2>/dev/null` 
+czsk6=`$KEYGEN -q -S $czsk5 -i 6h 2>/dev/null` 
 
 # active ksk
-cksk1=`$KEYGEN -q -r $RANDFILE -fk -L 30 $czone`
+cksk1=`$KEYGEN -q -a rsasha1 -fk -L 30 $czone`
 
 # published but not YET active; will be active in 20 seconds
-cksk2=`$KEYGEN -q -r $RANDFILE -fk $czone`
+cksk2=`$KEYGEN -q -a rsasha1 -fk $czone`
 # $SETTIME moved after other $KEYGENs
 
 echo_i "revoking key"
 # revoking key changes its ID
-cksk3=`$KEYGEN -q -r $RANDFILE -fk $czone`
+cksk3=`$KEYGEN -q -a rsasha1 -fk $czone`
 cksk4=`$REVOKE $cksk3`
 
+echo_i "setting up sync key"
+cksk5=`$KEYGEN -q -a rsasha1 -fk -P now+1mo -A now+1mo -Psync now $czone`
+
+echo_i "and future sync key"
+cksk6=`$KEYGEN -q -a rsasha1 -fk -P now+1mo -A now+1mo -Psync now+1mo $czone`
+
 echo_i "generating parent keys"
-pzsk=`$KEYGEN -q -r $RANDFILE $pzone`
-pksk=`$KEYGEN -q -r $RANDFILE -fk $pzone`
+pzsk=`$KEYGEN -q -a rsasha1 $pzone`
+pksk=`$KEYGEN -q -a rsasha1 -fk $pzone`
 
 echo_i "setting child's activation time"
 # using now+30s to fix RT 24561
 $SETTIME -A now+30s $cksk2 > /dev/null
 
 echo_i "signing child zone"
-czoneout=`$SIGNER -Sg -e now+1d -X now+2d -r $RANDFILE -o $czone $cfile 2>&1`
+czoneout=`$SIGNER -Sg -e now+1d -X now+2d -o $czone $cfile`
 
 echo_i "signing parent zone"
-pzoneout=`$SIGNER -Sg -r $RANDFILE -o $pzone $pfile 2>&1`
+pzoneout=`$SIGNER -Sg -o $pzone $pfile`
 
-czactive=`echo $czsk1 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-czgenerated=`echo $czsk2 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-czpublished=`echo $czsk3 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-czinactive=`echo $czsk4 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-czpredecessor=`echo $czsk5 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-czsuccessor=`echo $czsk6 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-ckactive=`echo $cksk1 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-ckpublished=`echo $cksk2 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-ckprerevoke=`echo $cksk3 | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-ckrevoked=`echo $cksk4 | sed 's/.*+005+0*\([0-9]*\)$/\1/'`
+czactive=$(keyfile_to_key_id $czsk1)
+czgenerated=$(keyfile_to_key_id $czsk2)
+czpublished=$(keyfile_to_key_id $czsk3)
+czinactive=$(keyfile_to_key_id $czsk4)
+czpredecessor=$(keyfile_to_key_id $czsk5)
+czsuccessor=$(keyfile_to_key_id $czsk6)
+ckactive=$(keyfile_to_key_id $cksk1)
+ckpublished=$(keyfile_to_key_id $cksk2)
+ckprerevoke=$(keyfile_to_key_id $cksk3)
+ckrevoked=$(keyfile_to_key_id $cksk4)
 
-pzid=`echo $pzsk | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
-pkid=`echo $pksk | sed 's/^K.*+005+0*\([0-9]\)/\1/'`
+pzid=$(keyfile_to_key_id $pzsk)
+pkid=$(keyfile_to_key_id $pksk)
 
 echo_i "checking dnssec-signzone output matches expectations"
 ret=0
@@ -96,8 +104,8 @@ status=`expr $status + $ret`
 echo_i "rechecking dnssec-signzone output with -x"
 ret=0
 # use an alternate output file so -x doesn't interfere with later checks
-pzoneout=`$SIGNER -Sxg -r $RANDFILE -o $pzone -f ${pfile}2.signed $pfile 2>&1`
-czoneout=`$SIGNER -Sxg -e now+1d -X now+2d -r $RANDFILE -o $czone -f ${cfile}2.signed $cfile 2>&1`
+pzoneout=`$SIGNER -Sxg -o $pzone -f ${pfile}2.signed $pfile`
+czoneout=`$SIGNER -Sxg -e now+1d -X now+2d -o $czone -f ${cfile}2.signed $cfile`
 echo "$pzoneout" | grep 'KSKs: 1 active, 0 stand-by, 0 revoked' > /dev/null || ret=1
 echo "$pzoneout" | grep 'ZSKs: 1 active, 0 present, 0 revoked' > /dev/null || ret=1
 echo "$czoneout" | grep 'KSKs: 1 active, 1 stand-by, 1 revoked' > /dev/null || ret=1
@@ -162,7 +170,7 @@ grep "key id = $czinactive\$" $cfile.signed > /dev/null || {
 # should not be there, hence the &&
 grep "key id = $ckprerevoke\$" $cfile.signed > /dev/null && {
 	ret=1
-	echo_i "found unexpect child pre-revoke ZSK id = $ckprerevoke"
+	echo_i "found unexpected child pre-revoke ZSK id = $ckprerevoke"
 }
 grep "key id = $czgenerated\$" $cfile.signed > /dev/null && {
 	ret=1
@@ -201,7 +209,7 @@ status=`expr $status + $ret`
 echo_i "re-signing and checking imported TTLs again"
 ret=0
 $SETTIME -L 15 ${czsk2} > /dev/null
-czoneout=`$SIGNER -Sg -e now+1d -X now+2d -r $RANDFILE -o $czone $cfile 2>&1`
+czoneout=`$SIGNER -Sg -e now+1d -X now+2d -o $czone $cfile`
 awk 'BEGIN {r = 0} $2 == "DNSKEY" && $1 != 15 {r = 1} END {exit r}' \
         ${cfile}.signed || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
@@ -254,7 +262,7 @@ sub=0
 grep -w "$czgenerated" dnskey.sigs > /dev/null && sub=1
 if [ $sub != 0 ]; then echo_i "found czgenerated $czgenerated (dnskey)"; ret=1; fi
 # now check other signatures first
-awk '$2 == "RRSIG" && $3 != "DNSKEY" { getline; print $3 }' $cfile.signed | sort -un > other.sigs
+awk '$2 == "RRSIG" && $3 != "DNSKEY" && $3 != "CDNSKEY" && $3 != "CDS" { getline; print $3 }' $cfile.signed | sort -un > other.sigs
 # should not be there:
 echo $ret > /dev/null
 sync
@@ -322,7 +330,7 @@ status=`expr $status + $ret`
 echo_i "waiting 30 seconds for key activation"
 sleep 30
 echo_i "re-signing child zone"
-czoneout2=`$SIGNER -Sg -r $RANDFILE -o $czone -f $cfile.new $cfile.signed 2>&1`
+czoneout2=`$SIGNER -Sg -o $czone -f $cfile.new $cfile.signed`
 mv $cfile.new $cfile.signed
 
 echo_i "checking dnssec-signzone output matches expectations"
@@ -335,6 +343,24 @@ echo_i "checking child zone signatures again"
 ret=0
 awk '$2 == "RRSIG" && $3 == "DNSKEY" { getline; print $3 }' $cfile.signed > dnskey.sigs
 grep -w "$ckpublished" dnskey.sigs > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "checking sync record publication"
+ret=0
+awk 'BEGIN { r=1 } $2 == "CDNSKEY" { r=0 } END { exit r }' $cfile.signed || ret=1
+awk 'BEGIN { r=1 } $2 == "CDS" { r=0 } END { exit r }' $cfile.signed || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+# this also checks that the future sync record is not yet published
+echo_i "checking sync record deletion"
+ret=0
+$SETTIME -P now -A now -Dsync now ${cksk5} > /dev/null
+$SIGNER -Sg -o $czone -f $cfile.new $cfile.signed > /dev/null
+mv $cfile.new $cfile.signed
+awk 'BEGIN { r=1 } $2 == "CDNSKEY" { r=0 } END { exit r }' $cfile.signed && ret=1
+awk 'BEGIN { r=1 } $2 == "CDS" { r=0 } END { exit r }' $cfile.signed && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 

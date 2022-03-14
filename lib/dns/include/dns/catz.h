@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef DNS_CATZ_H
 #define DNS_CATZ_H 1
@@ -18,6 +19,7 @@
 
 #include <isc/ht.h>
 #include <isc/lang.h>
+#include <isc/refcount.h>
 #include <isc/rwlock.h>
 #include <isc/time.h>
 #include <isc/timer.h>
@@ -30,12 +32,12 @@
 
 ISC_LANG_BEGINDECLS
 
-#define DNS_CATZ_ERROR_LEVEL	ISC_LOG_WARNING
-#define DNS_CATZ_INFO_LEVEL	ISC_LOG_INFO
-#define DNS_CATZ_DEBUG_LEVEL1	ISC_LOG_DEBUG(1)
-#define DNS_CATZ_DEBUG_LEVEL2	ISC_LOG_DEBUG(2)
-#define DNS_CATZ_DEBUG_LEVEL3	ISC_LOG_DEBUG(3)
-#define DNS_CATZ_DEBUG_QUIET	(DNS_CATZ_DEBUG_LEVEL3+1)
+#define DNS_CATZ_ERROR_LEVEL  ISC_LOG_WARNING
+#define DNS_CATZ_INFO_LEVEL   ISC_LOG_INFO
+#define DNS_CATZ_DEBUG_LEVEL1 ISC_LOG_DEBUG(1)
+#define DNS_CATZ_DEBUG_LEVEL2 ISC_LOG_DEBUG(2)
+#define DNS_CATZ_DEBUG_LEVEL3 ISC_LOG_DEBUG(3)
+#define DNS_CATZ_DEBUG_QUIET  (DNS_CATZ_DEBUG_LEVEL3 + 1)
 
 /*
  * Catalog Zones functions and structures.
@@ -46,7 +48,7 @@ ISC_LANG_BEGINDECLS
  */
 struct dns_catz_entry_options {
 	/*
-	 * Options that can be overriden in catalog zone
+	 * Options that can be overridden in catalog zone
 	 */
 	/* default-masters definition */
 	dns_ipkeylist_t masters;
@@ -77,7 +79,7 @@ dns_catz_options_init(dns_catz_options_t *options);
  * Initialize 'options' to NULL values.
  *
  * Requires:
- * \li	options to be non NULL
+ * \li	'options' to be non NULL.
  */
 
 void
@@ -86,20 +88,20 @@ dns_catz_options_free(dns_catz_options_t *options, isc_mem_t *mctx);
  * Free 'options' contents into 'mctx'. ('options' itself is not freed.)
  *
  * Requires:
- * \li	options to be non NULL
- * \li	mctx to be a valid memory context
+ * \li	'options' to be non NULL.
+ * \li	'mctx' to be a valid memory context.
  */
 
 isc_result_t
 dns_catz_options_copy(isc_mem_t *mctx, const dns_catz_options_t *opts,
 		      dns_catz_options_t *nopts);
 /*%<
- * Duplicate 'opts' into 'nopts', allocating space from 'mctx'
+ * Duplicate 'opts' into 'nopts', allocating space from 'mctx'.
  *
  * Requires:
- * \li	'mctx' to be a valid memory context
- * \li	'options' to be non NULL and valid options
- * \li	'nopts' to be non NULL
+ * \li	'mctx' to be a valid memory context.
+ * \li	'options' to be non NULL and valid options.
+ * \li	'nopts' to be non NULL.
  */
 
 isc_result_t
@@ -109,9 +111,9 @@ dns_catz_options_setdefault(isc_mem_t *mctx, const dns_catz_options_t *defaults,
  * Replace empty values in 'opts' with values from 'defaults'
  *
  * Requires:
- * \li	mctx to be a valid memory context
- * \li	defaults to be non NULL and valid options
- * \li	opts to be non NULL
+ * \li	'mctx' to be a valid memory context.
+ * \li	'defaults' to be non NULL and valid options.
+ * \li	'opts' to be non NULL.
  */
 
 dns_name_t *
@@ -120,10 +122,10 @@ dns_catz_entry_getname(dns_catz_entry_t *entry);
  * Get domain name for 'entry'
  *
  * Requires:
- * \li	entry to be non NULL
+ * \li	'entry' to be non NULL.
  *
  * Returns:
- * \li	domain name for entry
+ * \li	domain name for entry.
  */
 
 isc_result_t
@@ -133,9 +135,9 @@ dns_catz_entry_new(isc_mem_t *mctx, const dns_name_t *domain,
  * Allocate a new catz_entry on 'mctx', with the name 'domain'
  *
  * Requires:
- * \li	mctx to be a valid memory context
- * \li	domain to be valid dns_name or NULL
- * \li	nentryp to be non NULL, *nentryp to be NULL
+ * \li	'mctx' to be a valid memory context.
+ * \li	'domain' to be valid dns_name or NULL.
+ * \li	'nentryp' to be non NULL, *nentryp to be NULL.
  *
  * Returns:
  * \li	ISC_R_SUCCESS on success
@@ -149,9 +151,9 @@ dns_catz_entry_copy(dns_catz_zone_t *zone, const dns_catz_entry_t *entry,
  * Allocate a new catz_entry and deep copy 'entry' into 'nentryp'.
  *
  * Requires:
- * \li	mctx to be a valid memory context
- * \li	entry to be non NULL
- * \li	nentryp to be non NULL, *nentryp to be NULL
+ * \li	'mctx' to be a valid memory context.
+ * \li	'entry' to be non NULL.
+ * \li	'nentryp' to be non NULL, *nentryp to be NULL.
  *
  * Returns:
  * \li	ISC_R_SUCCESS on success
@@ -164,8 +166,8 @@ dns_catz_entry_attach(dns_catz_entry_t *entry, dns_catz_entry_t **entryp);
  * Attach an entry
  *
  * Requires:
- * \li	entry is not NULL
- * \li	entryp is not NULL, *entryp is NULL
+ * \li	'entry' is a valid dns_catz_entry_t.
+ * \li	'entryp' is not NULL and '*entryp' is NULL.
  */
 
 void
@@ -174,8 +176,8 @@ dns_catz_entry_detach(dns_catz_zone_t *zone, dns_catz_entry_t **entryp);
  * Detach an entry, free if no further references
  *
  * Requires:
- * \li	zone is not NULL
- * \li	entryp is not NULL, *entryp is not NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
+ * \li	'entryp' is not NULL and '*entryp' is not NULL.
  */
 
 bool
@@ -183,6 +185,9 @@ dns_catz_entry_validate(const dns_catz_entry_t *entry);
 /*%<
  * Validate whether entry is correct.
  * (NOT YET IMPLEMENTED: always returns true)
+ *
+ * Requires:
+ *\li	'entry' is a valid dns_catz_entry_t.
  */
 
 bool
@@ -191,12 +196,12 @@ dns_catz_entry_cmp(const dns_catz_entry_t *ea, const dns_catz_entry_t *eb);
  * Deep compare two entries
  *
  * Requires:
- * \li	ea is not NULL
- * \li	eb is not NULL
+ * \li	'ea' is a valid dns_catz_entry_t.
+ * \li	'eb' is a valid dns_catz_entry_t.
  *
  * Returns:
- * \li true if entries are the same
- * \li false if the entries differ
+ * \li 'true' if entries are the same.
+ * \li 'false' if the entries differ.
  */
 
 void
@@ -205,29 +210,29 @@ dns_catz_zone_attach(dns_catz_zone_t *zone, dns_catz_zone_t **zonep);
  * Attach a catzone
  *
  * Requires:
- * \li	zone is not NULL
- * \li	zonep is not NULL, *zonep is NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
+ * \li	'zonep' is not NULL and '*zonep' is NULL.
  */
 
 void
-dns_catz_zone_detach(dns_catz_zone_t** zonep);
+dns_catz_zone_detach(dns_catz_zone_t **zonep);
 /*%<
  * Detach a zone, free if no further references
  *
  * Requires:
- * \li	zonep is not NULL, *zonep is not NULL
+ * \li	'zonep' is not NULL and '*zonep' is not NULL.
  */
 
 isc_result_t
 dns_catz_new_zone(dns_catz_zones_t *catzs, dns_catz_zone_t **zonep,
-		const dns_name_t *name);
+		  const dns_name_t *name);
 /*%<
  * Allocate a new catz zone on catzs mctx
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	zonep is not NULL, *zonep is NULL
- * \li	name is not NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'zonep' is not NULL and '*zonep' is NULL.
+ * \li	'name' is a valid dns_name_t.
  *
  */
 
@@ -237,7 +242,7 @@ dns_catz_zone_getname(dns_catz_zone_t *zone);
  * Get catalog zone name
  *
  * Requires:
- * \li	zone is not NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
  */
 
 dns_catz_options_t *
@@ -246,7 +251,7 @@ dns_catz_zone_getdefoptions(dns_catz_zone_t *zone);
  * Get default member zone options for catalog zone 'zone'
  *
  * Requires:
- * \li	zone is not NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
  */
 
 void
@@ -256,7 +261,7 @@ dns_catz_zone_resetdefoptions(dns_catz_zone_t *zone);
  * the default values.
  *
  * Requires:
- * \li	zone is not NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
  */
 
 isc_result_t
@@ -266,23 +271,23 @@ dns_catz_zones_merge(dns_catz_zone_t *target, dns_catz_zone_t *newzone);
  * (from zone->catzs->zmm) for appropriate member zones.
  *
  * Requires:
- * \li	orig is not NULL
- * \li	newzone is not NULL, *newzone is not NULL
+ * \li	'orig' is a valid dns_catz_zone_t.
+ * \li	'newzone' is not NULL and '*newzone' is not NULL.
  *
  */
 
 isc_result_t
 dns_catz_update_process(dns_catz_zones_t *catzs, dns_catz_zone_t *zone,
-			 dns_name_t *src_name, dns_rdataset_t *rdataset);
+			const dns_name_t *src_name, dns_rdataset_t *rdataset);
 /*%<
  * Process a single rdataset from a catalog zone 'zone' update, src_name is the
  * record name.
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	zone is not NULL
- * \li	src_name is not NULL
- * \li	rdataset is valid
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'zone' is a valid dns_catz_zone_t.
+ * \li	'src_name' is a valid dns_name_t.
+ * \li	'rdataset' is valid rdataset.
  */
 
 isc_result_t
@@ -296,9 +301,9 @@ dns_catz_generate_masterfilename(dns_catz_zone_t *zone, dns_catz_entry_t *entry,
  * __catz__unique_hash_generated_from_the_above.db
  *
  * Requires:
- * \li	zone is not NULL
- * \li	entry is not NULL
- * \li	buffer is not NULL and *buffer is not NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
+ * \li	'entry' is a valid dns_catz_entry_t.
+ * \li	'buffer' is not NULL and '*buffer' is not NULL.
  */
 
 isc_result_t
@@ -309,26 +314,25 @@ dns_catz_generate_zonecfg(dns_catz_zone_t *zone, dns_catz_entry_t *entry,
  * it into *buf. buf might be reallocated.
  *
  * Requires:
- * \li	zone is not NULL
- * \li	entry is not NULL
- * \li	buf is not NULL
- * \li	*buf is NULL
+ * \li	'zone' is a valid dns_catz_zone_t.
+ * \li	'entry' is a valid dns_catz_entry_t.
+ * \li	'buf' is not NULL and '*buf' is NULL.
  *
  */
-
 
 /* Methods provided by named to dynamically modify the member zones */
 /* xxxwpk TODO config! */
 typedef isc_result_t (*dns_catz_zoneop_fn_t)(dns_catz_entry_t *entry,
-		dns_catz_zone_t *origin, dns_view_t *view,
-		isc_taskmgr_t *taskmgr, void *udata);
+					     dns_catz_zone_t  *origin,
+					     dns_view_t	*view,
+					     isc_taskmgr_t	   *taskmgr,
+					     void		  *udata);
 struct dns_catz_zonemodmethods {
 	dns_catz_zoneop_fn_t addzone;
 	dns_catz_zoneop_fn_t modzone;
 	dns_catz_zoneop_fn_t delzone;
-	void * udata;
+	void		     *udata;
 };
-
 
 isc_result_t
 dns_catz_new_zones(dns_catz_zones_t **catzsp, dns_catz_zonemodmethods_t *zmm,
@@ -339,8 +343,8 @@ dns_catz_new_zones(dns_catz_zones_t **catzsp, dns_catz_zonemodmethods_t *zmm,
  * for a view.
  *
  * Requires:
- * \li catzsp is not NULL, *catzsp is NULL
- * \li zmm is not NULL
+ * \li 'catzsp' is not NULL and '*catzsp' is NULL.
+ * \li 'zmm' is not NULL.
  *
  */
 
@@ -351,9 +355,9 @@ dns_catz_add_zone(dns_catz_zones_t *catzs, const dns_name_t *name,
  * Allocate a new catz named 'name' and put it in 'catzs' collection.
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	name is not NULL
- * \li	zonep is not NULL, *zonep is NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'name' is a valid dns_name_t.
+ * \li	'zonep' is not NULL and *zonep is NULL.
  *
  */
 
@@ -363,39 +367,38 @@ dns_catz_get_zone(dns_catz_zones_t *catzs, const dns_name_t *name);
  * Returns a zone named 'name' from collection 'catzs'
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	name is not NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'name' is a valid dns_name_t.
  */
 
 void
 dns_catz_catzs_attach(dns_catz_zones_t *catzs, dns_catz_zones_t **catzsp);
 /*%<
- * Attach 'catzs' to 'catzsp'
+ * Attach 'catzs' to 'catzsp'.
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	catzsp is not NULL, *catzsp is NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'catzsp' is not NULL and *catzsp is NULL.
  */
 
 void
 dns_catz_catzs_detach(dns_catz_zones_t **catzsp);
 /*%<
- * Detach 'catzsp', free if no further references
+ * Detach 'catzsp', free if no further references.
  *
  * Requires:
- * \li	catzsp is not NULL, *catzsp is not NULL
+ * \li	'catzsp' is not NULL and *catzsp is not NULL.
  */
 
 void
 dns_catz_catzs_set_view(dns_catz_zones_t *catzs, dns_view_t *view);
 /*%<
- * Set a view for catzs
+ * Set a view for 'catzs'.
  *
  * Requires:
- * \li	catzs is not NULL
- * \li	catzs->view is NULL or catzs->view == view
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'catzs->view' is NULL or 'catzs->view' == 'view'.
  */
-
 
 isc_result_t
 dns_catz_dbupdate_callback(dns_db_t *db, void *fn_arg);
@@ -408,17 +411,17 @@ dns_catz_dbupdate_callback(dns_db_t *db, void *fn_arg);
  * If there is an update scheduled it replaces old db version with a new one.
  *
  * Requires:
- * \li	db is a valid database
- * \li	fn_arg is not NULL (casted to dns_catz_zones_t*)
+ * \li	'db' is a valid database.
+ * \li	'fn_arg' is not NULL (casted to dns_catz_zones_t*).
  */
 
 void
 dns_catz_update_taskaction(isc_task_t *task, isc_event_t *event);
 /*%<
- * Task that launches dns_catz_update_from_db
+ * Task that launches dns_catz_update_from_db.
  *
  * Requires:
- * \li	event is not NULL
+ * \li	'event' is not NULL.
  */
 
 void
@@ -429,8 +432,8 @@ dns_catz_update_from_db(dns_db_t *db, dns_catz_zones_t *catzs);
  * then merges new catz into old catz.
  *
  * Requires:
- * \li	db is a valid DB
- * \li	catzs is not NULL
+ * \li	'db' is a valid DB.
+ * \li	'catzs' is a valid dns_catz_zones_t.
  *
  */
 
@@ -440,7 +443,7 @@ dns_catz_prereconfig(dns_catz_zones_t *catzs);
  * Called before reconfig, clears 'active' flag on all the zones in set
  *
  * Requires:
- * \li	catzs is not NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
  *
  */
 
@@ -451,13 +454,17 @@ dns_catz_postreconfig(dns_catz_zones_t *catzs);
  * inactive and force reload of those with changed configuration.
  *
  * Requires:
- * \li	catzs is not NULL
+ * \li	'catzs' is a valid dns_catz_zones_t.
  */
 
 isc_result_t
 dns_catz_get_iterator(dns_catz_zone_t *catz, isc_ht_iter_t **itp);
 /*%<
  * Get the hashtable iterator on catalog zone members, point '*itp' to it.
+ *
+ * Requires:
+ * \li	'catzs' is a valid dns_catz_zones_t.
+ * \li	'itp' is not NULL and '*itp' is NULL.
  *
  * Returns:
  * \li #ISC_R_SUCCESS		-- success

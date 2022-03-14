@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -13,8 +15,8 @@
 #define DNS_DISPATCH_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/dispatch.h
  * \brief
@@ -44,6 +46,7 @@
  *** Imports
  ***/
 
+#include <inttypes.h>
 #include <stdbool.h>
 
 #include <isc/buffer.h>
@@ -74,13 +77,13 @@ ISC_LANG_BEGINDECLS
  */
 
 struct dns_dispatchevent {
-	ISC_EVENT_COMMON(dns_dispatchevent_t);	/*%< standard event common */
-	isc_result_t		result;		/*%< result code */
-	int32_t		id;		/*%< message id */
-	isc_sockaddr_t		addr;		/*%< address recv'd from */
-	struct in6_pktinfo	pktinfo;	/*%< reply info for v6 */
-	isc_buffer_t	        buffer;		/*%< data buffer */
-	uint32_t		attributes;	/*%< mirrored from socket.h */
+	ISC_EVENT_COMMON(dns_dispatchevent_t); /*%< standard event common */
+	isc_result_t	   result;	       /*%< result code */
+	int32_t		   id;		       /*%< message id */
+	isc_sockaddr_t	   addr;	       /*%< address recv'd from */
+	struct in6_pktinfo pktinfo;	       /*%< reply info for v6 */
+	isc_buffer_t	   buffer;	       /*%< data buffer */
+	uint32_t	   attributes;	       /*%< mirrored from socket.h */
 };
 
 /*%
@@ -88,11 +91,11 @@ struct dns_dispatchevent {
  * round-robin fashion.
  */
 struct dns_dispatchset {
-	isc_mem_t		*mctx;
-	dns_dispatch_t		**dispatches;
-	int			ndisp;
-	int			cur;
-	isc_mutex_t		lock;
+	isc_mem_t	  *mctx;
+	dns_dispatch_t **dispatches;
+	int		 ndisp;
+	int		 cur;
+	isc_mutex_t	 lock;
 };
 
 /*@{*/
@@ -129,25 +132,25 @@ struct dns_dispatchset {
  * _EXCLUSIVE
  *	A separate socket will be used on-demand for each transaction.
  */
-#define DNS_DISPATCHATTR_PRIVATE	0x00000001U
-#define DNS_DISPATCHATTR_TCP		0x00000002U
-#define DNS_DISPATCHATTR_UDP		0x00000004U
-#define DNS_DISPATCHATTR_IPV4		0x00000008U
-#define DNS_DISPATCHATTR_IPV6		0x00000010U
-#define DNS_DISPATCHATTR_NOLISTEN	0x00000020U
-#define DNS_DISPATCHATTR_MAKEQUERY	0x00000040U
-#define DNS_DISPATCHATTR_CONNECTED	0x00000080U
-#define DNS_DISPATCHATTR_FIXEDID	0x00000100U
-#define DNS_DISPATCHATTR_EXCLUSIVE	0x00000200U
+#define DNS_DISPATCHATTR_PRIVATE   0x00000001U
+#define DNS_DISPATCHATTR_TCP	   0x00000002U
+#define DNS_DISPATCHATTR_UDP	   0x00000004U
+#define DNS_DISPATCHATTR_IPV4	   0x00000008U
+#define DNS_DISPATCHATTR_IPV6	   0x00000010U
+#define DNS_DISPATCHATTR_NOLISTEN  0x00000020U
+#define DNS_DISPATCHATTR_MAKEQUERY 0x00000040U
+#define DNS_DISPATCHATTR_CONNECTED 0x00000080U
+#define DNS_DISPATCHATTR_FIXEDID   0x00000100U
+#define DNS_DISPATCHATTR_EXCLUSIVE 0x00000200U
+#define DNS_DISPATCHATTR_CANREUSE  0x00000400U
 /*@}*/
 
 /*
  */
-#define DNS_DISPATCHOPT_FIXEDID		0x00000001U
+#define DNS_DISPATCHOPT_FIXEDID 0x00000001U
 
 isc_result_t
-dns_dispatchmgr_create(isc_mem_t *mctx, isc_entropy_t *entropy,
-		       dns_dispatchmgr_t **mgrp);
+dns_dispatchmgr_create(isc_mem_t *mctx, dns_dispatchmgr_t **mgrp);
 /*%<
  * Creates a new dispatchmgr object.
  *
@@ -156,16 +159,11 @@ dns_dispatchmgr_create(isc_mem_t *mctx, isc_entropy_t *entropy,
  *
  *\li	mgrp != NULL && *mgrp == NULL
  *
- *\li	"entropy" may be NULL, in which case an insecure random generator
- *	will be used.  If it is non-NULL, it must be a valid entropy
- *	source.
- *
  * Returns:
  *\li	ISC_R_SUCCESS	-- all ok
  *
  *\li	anything else	-- failure
  */
-
 
 void
 dns_dispatchmgr_destroy(dns_dispatchmgr_t **mgrp);
@@ -177,7 +175,6 @@ dns_dispatchmgr_destroy(dns_dispatchmgr_t **mgrp);
  *\li	mgrp != NULL && *mgrp is a valid dispatchmgr.
  */
 
-
 void
 dns_dispatchmgr_setblackhole(dns_dispatchmgr_t *mgr, dns_acl_t *blackhole);
 /*%<
@@ -188,7 +185,6 @@ dns_dispatchmgr_setblackhole(dns_dispatchmgr_t *mgr, dns_acl_t *blackhole);
  * \li	mgrp is a valid dispatchmgr
  * \li	blackhole is a valid acl
  */
-
 
 dns_acl_t *
 dns_dispatchmgr_getblackhole(dns_dispatchmgr_t *mgr);
@@ -204,7 +200,7 @@ dns_dispatchmgr_getblackhole(dns_dispatchmgr_t *mgr);
 
 void
 dns_dispatchmgr_setblackportlist(dns_dispatchmgr_t *mgr,
-				 dns_portlist_t *portlist);
+				 dns_portlist_t	*portlist);
 /*%<
  * This function is deprecated.  Use dns_dispatchmgr_setavailports() instead.
  *
@@ -250,21 +246,20 @@ dns_dispatchmgr_setstats(dns_dispatchmgr_t *mgr, isc_stats_t *stats);
 
 isc_result_t
 dns_dispatch_getudp(dns_dispatchmgr_t *mgr, isc_socketmgr_t *sockmgr,
-		    isc_taskmgr_t *taskmgr, isc_sockaddr_t *localaddr,
-		    unsigned int buffersize,
-		    unsigned int maxbuffers, unsigned int maxrequests,
-		    unsigned int buckets, unsigned int increment,
-		    unsigned int attributes, unsigned int mask,
-		    dns_dispatch_t **dispp);
+		    isc_taskmgr_t *taskmgr, const isc_sockaddr_t *localaddr,
+		    unsigned int buffersize, unsigned int maxbuffers,
+		    unsigned int maxrequests, unsigned int buckets,
+		    unsigned int increment, unsigned int attributes,
+		    unsigned int mask, dns_dispatch_t **dispp);
 
 isc_result_t
 dns_dispatch_getudp_dup(dns_dispatchmgr_t *mgr, isc_socketmgr_t *sockmgr,
-		    isc_taskmgr_t *taskmgr, isc_sockaddr_t *localaddr,
-		    unsigned int buffersize,
-		    unsigned int maxbuffers, unsigned int maxrequests,
-		    unsigned int buckets, unsigned int increment,
-		    unsigned int attributes, unsigned int mask,
-		    dns_dispatch_t **dispp, dns_dispatch_t *dup);
+			isc_taskmgr_t *taskmgr, const isc_sockaddr_t *localaddr,
+			unsigned int buffersize, unsigned int maxbuffers,
+			unsigned int maxrequests, unsigned int buckets,
+			unsigned int increment, unsigned int attributes,
+			unsigned int mask, dns_dispatch_t **dispp,
+			dns_dispatch_t *dup);
 /*%<
  * Attach to existing dns_dispatch_t if one is found with dns_dispatchmgr_find,
  * otherwise create a new UDP dispatch.
@@ -292,17 +287,11 @@ dns_dispatch_getudp_dup(dns_dispatchmgr_t *mgr, isc_socketmgr_t *sockmgr,
 
 isc_result_t
 dns_dispatch_createtcp(dns_dispatchmgr_t *mgr, isc_socket_t *sock,
-		       isc_taskmgr_t *taskmgr, unsigned int buffersize,
+		       isc_taskmgr_t *taskmgr, const isc_sockaddr_t *localaddr,
+		       const isc_sockaddr_t *destaddr, unsigned int buffersize,
 		       unsigned int maxbuffers, unsigned int maxrequests,
 		       unsigned int buckets, unsigned int increment,
 		       unsigned int attributes, dns_dispatch_t **dispp);
-isc_result_t
-dns_dispatch_createtcp2(dns_dispatchmgr_t *mgr, isc_socket_t *sock,
-			isc_taskmgr_t *taskmgr, isc_sockaddr_t *localaddr,
-			isc_sockaddr_t *destaddr, unsigned int buffersize,
-			unsigned int maxbuffers, unsigned int maxrequests,
-			unsigned int buckets, unsigned int increment,
-			unsigned int attributes, dns_dispatch_t **dispp);
 /*%<
  * Create a new dns_dispatch and attach it to the provided isc_socket_t.
  *
@@ -375,35 +364,19 @@ dns_dispatch_starttcp(dns_dispatch_t *disp);
  */
 
 isc_result_t
-dns_dispatch_gettcp(dns_dispatchmgr_t *mgr, isc_sockaddr_t *destaddr,
-		    isc_sockaddr_t *localaddr, dns_dispatch_t **dispp);
-isc_result_t
-dns_dispatch_gettcp2(dns_dispatchmgr_t *mgr, isc_sockaddr_t *destaddr,
-		     isc_sockaddr_t *localaddr, bool *connected,
-		     dns_dispatch_t **dispp);
+dns_dispatch_gettcp(dns_dispatchmgr_t *mgr, const isc_sockaddr_t *destaddr,
+		    const isc_sockaddr_t *localaddr, bool *connected,
+		    dns_dispatch_t **dispp);
 /*
  * Attempt to connect to a existing TCP connection (connection completed
- * for dns_dispatch_gettcp()).
+ * if connected == NULL).
  */
 
-
 isc_result_t
-dns_dispatch_addresponse3(dns_dispatch_t *disp, unsigned int options,
-			  isc_sockaddr_t *dest, isc_task_t *task,
-			  isc_taskaction_t action, void *arg,
-			  uint16_t *idp, dns_dispentry_t **resp,
-			  isc_socketmgr_t *sockmgr);
-
-isc_result_t
-dns_dispatch_addresponse2(dns_dispatch_t *disp, isc_sockaddr_t *dest,
-			  isc_task_t *task, isc_taskaction_t action, void *arg,
-			  uint16_t *idp, dns_dispentry_t **resp,
-			  isc_socketmgr_t *sockmgr);
-
-isc_result_t
-dns_dispatch_addresponse(dns_dispatch_t *disp, isc_sockaddr_t *dest,
-			 isc_task_t *task, isc_taskaction_t action, void *arg,
-			 uint16_t *idp, dns_dispentry_t **resp);
+dns_dispatch_addresponse(dns_dispatch_t *disp, unsigned int options,
+			 const isc_sockaddr_t *dest, isc_task_t *task,
+			 isc_taskaction_t action, void *arg, uint16_t *idp,
+			 dns_dispentry_t **resp, isc_socketmgr_t *sockmgr);
 /*%<
  * Add a response entry for this dispatch.
  *
@@ -440,9 +413,8 @@ dns_dispatch_addresponse(dns_dispatch_t *disp, isc_sockaddr_t *dest,
  *				   for this destination.
  */
 
-
 void
-dns_dispatch_removeresponse(dns_dispentry_t **resp,
+dns_dispatch_removeresponse(dns_dispentry_t	    **resp,
 			    dns_dispatchevent_t **sockevent);
 /*%<
  * Stops the flow of responses for the provided id and destination.
@@ -507,8 +479,8 @@ dns_dispatch_getattributes(dns_dispatch_t *disp);
  */
 
 void
-dns_dispatch_changeattributes(dns_dispatch_t *disp,
-			      unsigned int attributes, unsigned int mask);
+dns_dispatch_changeattributes(dns_dispatch_t *disp, unsigned int attributes,
+			      unsigned int mask);
 /*%<
  * Set the bits described by "mask" to the corresponding values in
  * "attributes".

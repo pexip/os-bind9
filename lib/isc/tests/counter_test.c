@@ -1,64 +1,105 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-#include <config.h>
-#include <stdlib.h>
+#if HAVE_CMOCKA
 
-#include <atf-c.h>
+#include <sched.h> /* IWYU pragma: keep */
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define UNIT_TESTING
+#include <cmocka.h>
 
 #include <isc/counter.h>
 #include <isc/result.h>
+#include <isc/util.h>
 
 #include "isctest.h"
 
-ATF_TC(isc_counter);
-ATF_TC_HEAD(isc_counter, tc) {
-	atf_tc_set_md_var(tc, "descr", "isc counter object");
+static int
+_setup(void **state) {
+	isc_result_t result;
+
+	UNUSED(state);
+
+	result = isc_test_begin(NULL, true, 0);
+	assert_int_equal(result, ISC_R_SUCCESS);
+
+	return (0);
 }
-ATF_TC_BODY(isc_counter, tc) {
+
+static int
+_teardown(void **state) {
+	UNUSED(state);
+
+	isc_test_end();
+
+	return (0);
+}
+
+/* test isc_counter object */
+static void
+isc_counter_test(void **state) {
 	isc_result_t result;
 	isc_counter_t *counter = NULL;
 	int i;
 
-	result = isc_test_begin(NULL, true, 0);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	UNUSED(state);
 
-	result = isc_counter_create(mctx, 0, &counter);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	result = isc_counter_create(test_mctx, 0, &counter);
+	assert_int_equal(result, ISC_R_SUCCESS);
 
 	for (i = 0; i < 10; i++) {
 		result = isc_counter_increment(counter);
-		ATF_CHECK_EQ(result, ISC_R_SUCCESS);
+		assert_int_equal(result, ISC_R_SUCCESS);
 	}
 
-	ATF_CHECK_EQ(isc_counter_used(counter), 10);
+	assert_int_equal(isc_counter_used(counter), 10);
 
 	isc_counter_setlimit(counter, 15);
 	for (i = 0; i < 10; i++) {
 		result = isc_counter_increment(counter);
-		if (result != ISC_R_SUCCESS)
+		if (result != ISC_R_SUCCESS) {
 			break;
+		}
 	}
 
-	ATF_CHECK_EQ(isc_counter_used(counter), 15);
+	assert_int_equal(isc_counter_used(counter), 15);
 
 	isc_counter_detach(&counter);
-	isc_test_end();
 }
 
-/*
- * Main
- */
-ATF_TP_ADD_TCS(tp) {
-	ATF_TP_ADD_TC(tp, isc_counter);
-	return (atf_no_error());
+int
+main(void) {
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test_setup_teardown(isc_counter_test, _setup,
+						_teardown),
+	};
+
+	return (cmocka_run_group_tests(tests, NULL, NULL));
 }
 
+#else /* HAVE_CMOCKA */
+
+#include <stdio.h>
+
+int
+main(void) {
+	printf("1..0 # Skipped: cmocka not available\n");
+	return (SKIPPED_TEST_EXIT_CODE);
+}
+
+#endif /* if HAVE_CMOCKA */

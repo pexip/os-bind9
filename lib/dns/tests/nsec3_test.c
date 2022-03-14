@@ -1,32 +1,57 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
+#if HAVE_CMOCKA
 
-/*! \file */
-
-#include <config.h>
-
-#include <atf-c.h>
-
+#include <sched.h> /* IWYU pragma: keep */
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+
+#define UNIT_TESTING
+#include <cmocka.h>
+
+#include <isc/string.h>
+#include <isc/util.h>
 
 #include <dns/db.h>
 #include <dns/nsec3.h>
 
 #include "dnstest.h"
 
-#if defined(OPENSSL) || defined(PKCS11CRYPTO)
-/*
- * Helper functions
- */
+static int
+_setup(void **state) {
+	isc_result_t result;
+
+	UNUSED(state);
+
+	result = dns_test_begin(NULL, false);
+	assert_int_equal(result, ISC_R_SUCCESS);
+
+	return (0);
+}
+
+static int
+_teardown(void **state) {
+	UNUSED(state);
+
+	dns_test_end();
+
+	return (0);
+}
 
 static void
 iteration_test(const char *file, unsigned int expected) {
@@ -35,12 +60,11 @@ iteration_test(const char *file, unsigned int expected) {
 	unsigned int iterations;
 
 	result = dns_test_loaddb(&db, dns_dbtype_zone, "test", file);
-	ATF_CHECK_EQ_MSG(result, ISC_R_SUCCESS, "%s", file);
+	assert_int_equal(result, ISC_R_SUCCESS);
 
-	result = dns_nsec3_maxiterations(db, NULL, mctx, &iterations);
-	ATF_CHECK_EQ_MSG(result, ISC_R_SUCCESS, "%s", file);
+	iterations = dns_nsec3_maxiterations();
 
-	ATF_CHECK_EQ_MSG(iterations, expected, "%s", file);
+	assert_int_equal(iterations, expected);
 
 	dns_db_detach(&db);
 }
@@ -49,8 +73,8 @@ iteration_test(const char *file, unsigned int expected) {
  * Structure containing parameters for nsec3param_salttotext_test().
  */
 typedef struct {
-	const char *nsec3param_text;	/* NSEC3PARAM RDATA in text form */
-	const char *expected_salt;	/* string expected in target buffer */
+	const char *nsec3param_text; /* NSEC3PARAM RDATA in text form */
+	const char *expected_salt;   /* string expected in target buffer */
 } nsec3param_salttotext_test_params_t;
 
 /*%
@@ -73,24 +97,19 @@ nsec3param_salttotext_test(const nsec3param_salttotext_test_params_t *params) {
 	/*
 	 * Prepare a dns_rdata_nsec3param_t structure for testing.
 	 */
-	result = dns_test_rdatafromstring(&rdata, dns_rdataclass_in,
-					  dns_rdatatype_nsec3param, buf,
-					  sizeof(buf),
-					  params->nsec3param_text);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	result = dns_test_rdatafromstring(
+		&rdata, dns_rdataclass_in, dns_rdatatype_nsec3param, buf,
+		sizeof(buf), params->nsec3param_text, false);
+	assert_int_equal(result, ISC_R_SUCCESS);
 	result = dns_rdata_tostruct(&rdata, &nsec3param, NULL);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	assert_int_equal(result, ISC_R_SUCCESS);
 
 	/*
 	 * Check typical use.
 	 */
 	result = dns_nsec3param_salttotext(&nsec3param, salt, sizeof(salt));
-	ATF_CHECK_EQ_MSG(result, ISC_R_SUCCESS,
-			 "\"%s\": expected success, got %s\n",
-			 params->nsec3param_text, isc_result_totext(result));
-	ATF_CHECK_EQ_MSG(strcmp(salt, params->expected_salt), 0,
-			 "\"%s\": expected salt \"%s\", got \"%s\"",
-			 params->nsec3param_text, params->expected_salt, salt);
+	assert_int_equal(result, ISC_R_SUCCESS);
+	assert_string_equal(salt, params->expected_salt);
 
 	/*
 	 * Ensure available space in the buffer is checked before the salt is
@@ -98,61 +117,37 @@ nsec3param_salttotext_test(const nsec3param_salttotext_test_params_t *params) {
 	 * terminating NULL byte.
 	 */
 	length = strlen(params->expected_salt);
-	ATF_REQUIRE(length < sizeof(salt) - 1);	/* prevent buffer overwrite */
-	ATF_REQUIRE(length > 0U);		/* prevent length underflow */
+	assert_true(length < sizeof(salt) - 1); /* prevent buffer overwrite */
+	assert_true(length > 0U);		/* prevent length underflow */
 
 	result = dns_nsec3param_salttotext(&nsec3param, salt, length - 1);
-	ATF_CHECK_EQ_MSG(result, ISC_R_NOSPACE,
-			 "\"%s\": expected a %lu-byte target buffer to be "
-			 "rejected, got %s\n",
-			 params->nsec3param_text, (unsigned long)(length - 1),
-			 isc_result_totext(result));
+	assert_int_equal(result, ISC_R_NOSPACE);
+
 	result = dns_nsec3param_salttotext(&nsec3param, salt, length);
-	ATF_CHECK_EQ_MSG(result, ISC_R_NOSPACE,
-			 "\"%s\": expected a %lu-byte target buffer to be "
-			 "rejected, got %s\n",
-			 params->nsec3param_text, (unsigned long)length,
-			 isc_result_totext(result));
+	assert_int_equal(result, ISC_R_NOSPACE);
+
 	result = dns_nsec3param_salttotext(&nsec3param, salt, length + 1);
-	ATF_CHECK_EQ_MSG(result, ISC_R_SUCCESS,
-			 "\"%s\": expected a %lu-byte target buffer to be "
-			 "accepted, got %s\n",
-			 params->nsec3param_text, (unsigned long)(length + 1),
-			 isc_result_totext(result));
+	assert_int_equal(result, ISC_R_SUCCESS);
 }
 
 /*
- * Individual unit tests
+ * check that appropriate max iterations is returned for different
+ * key size mixes
  */
-
-ATF_TC(max_iterations);
-ATF_TC_HEAD(max_iterations, tc) {
-	atf_tc_set_md_var(tc, "descr", "check that appropriate max iterations "
-			  " is returned for different key size mixes");
-}
-ATF_TC_BODY(max_iterations, tc) {
-	isc_result_t result;
-
-	UNUSED(tc);
-
-	result = dns_test_begin(NULL, false);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+static void
+max_iterations(void **state) {
+	UNUSED(state);
 
 	iteration_test("testdata/nsec3/1024.db", 150);
-	iteration_test("testdata/nsec3/2048.db", 500);
-	iteration_test("testdata/nsec3/4096.db", 2500);
+	iteration_test("testdata/nsec3/2048.db", 150);
+	iteration_test("testdata/nsec3/4096.db", 150);
 	iteration_test("testdata/nsec3/min-1024.db", 150);
-	iteration_test("testdata/nsec3/min-2048.db", 500);
-
-	dns_test_end();
+	iteration_test("testdata/nsec3/min-2048.db", 150);
 }
 
-ATF_TC(nsec3param_salttotext);
-ATF_TC_HEAD(nsec3param_salttotext, tc) {
-	atf_tc_set_md_var(tc, "descr", "check dns_nsec3param_salttotext()");
-}
-ATF_TC_BODY(nsec3param_salttotext, tc) {
-	isc_result_t result;
+/* check dns_nsec3param_salttotext() */
+static void
+nsec3param_salttotext(void **state) {
 	size_t i;
 
 	const nsec3param_salttotext_test_params_t tests[] = {
@@ -169,39 +164,33 @@ ATF_TC_BODY(nsec3param_salttotext, tc) {
 		{ "0 0 0 -", "-" },
 	};
 
-	UNUSED(tc);
-
-	result = dns_test_begin(NULL, false);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	UNUSED(state);
 
 	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
 		nsec3param_salttotext_test(&tests[i]);
 	}
-
-	dns_test_end();
-}
-#else
-ATF_TC(untested);
-ATF_TC_HEAD(untested, tc) {
-	atf_tc_set_md_var(tc, "descr", "skipping nsec3 test");
-}
-ATF_TC_BODY(untested, tc) {
-	UNUSED(tc);
-	atf_tc_skip("DNSSEC not available");
-}
-#endif
-
-/*
- * Main
- */
-ATF_TP_ADD_TCS(tp) {
-#if defined(OPENSSL) || defined(PKCS11CRYPTO)
-	ATF_TP_ADD_TC(tp, max_iterations);
-	ATF_TP_ADD_TC(tp, nsec3param_salttotext);
-#else
-	ATF_TP_ADD_TC(tp, untested);
-#endif
-
-	return (atf_no_error());
 }
 
+int
+main(void) {
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test_setup_teardown(max_iterations, _setup,
+						_teardown),
+		cmocka_unit_test_setup_teardown(nsec3param_salttotext, _setup,
+						_teardown),
+	};
+
+	return (cmocka_run_group_tests(tests, NULL, NULL));
+}
+
+#else /* HAVE_CMOCKA */
+
+#include <stdio.h>
+
+int
+main(void) {
+	printf("1..0 # Skipped: cmocka not available\n");
+	return (SKIPPED_TEST_EXIT_CODE);
+}
+
+#endif /* if HAVE_CMOCKA */

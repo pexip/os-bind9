@@ -1,3 +1,9 @@
 Tests: simpletest
-Restrictions: needs-root, isolation-container
-Depends: bind9, dnsutils
+Restrictions: isolation-container, needs-internet, needs-root
+Depends: bind9,
+         bind9-dnsutils
+
+Tests: validation
+Restrictions: isolation-container, needs-internet, needs-root, flaky
+Depends: bind9,
+         bind9-dnsutils

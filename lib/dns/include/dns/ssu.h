@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -20,6 +22,7 @@
 
 #include <dns/acl.h>
 #include <dns/types.h>
+
 #include <dst/dst.h>
 
 ISC_LANG_BEGINDECLS
@@ -28,11 +31,11 @@ typedef enum {
 	dns_ssumatchtype_name = 0,
 	dns_ssumatchtype_subdomain = 1,
 	dns_ssumatchtype_wildcard = 2,
-	dns_ssumatchtype_self    = 3,
+	dns_ssumatchtype_self = 3,
 	dns_ssumatchtype_selfsub = 4,
 	dns_ssumatchtype_selfwild = 5,
 	dns_ssumatchtype_selfkrb5 = 6,
-	dns_ssumatchtype_selfms  = 7,
+	dns_ssumatchtype_selfms = 7,
 	dns_ssumatchtype_subdomainms = 8,
 	dns_ssumatchtype_subdomainkrb5 = 9,
 	dns_ssumatchtype_tcpself = 10,
@@ -41,28 +44,10 @@ typedef enum {
 	dns_ssumatchtype_local = 13,
 	dns_ssumatchtype_selfsubms = 14,
 	dns_ssumatchtype_selfsubkrb5 = 15,
-	dns_ssumatchtype_max = 15,	/* max value */
+	dns_ssumatchtype_max = 15, /* max value */
 
-	dns_ssumatchtype_dlz = 16	/* intentionally higher than _max */
+	dns_ssumatchtype_dlz = 16 /* intentionally higher than _max */
 } dns_ssumatchtype_t;
-
-#define DNS_SSUMATCHTYPE_NAME		dns_ssumatchtype_name
-#define DNS_SSUMATCHTYPE_SUBDOMAIN	dns_ssumatchtype_subdomain
-#define DNS_SSUMATCHTYPE_WILDCARD	dns_ssumatchtype_wildcard
-#define DNS_SSUMATCHTYPE_SELF		dns_ssumatchtype_self
-#define DNS_SSUMATCHTYPE_SELFSUB	dns_ssumatchtype_selfsub
-#define DNS_SSUMATCHTYPE_SELFWILD	dns_ssumatchtype_selfwild
-#define DNS_SSUMATCHTYPE_SELFKRB5	dns_ssumatchtype_selfkrb5
-#define DNS_SSUMATCHTYPE_SELFMS		dns_ssumatchtype_selfms
-#define DNS_SSUMATCHTYPE_SUBDOMAINMS	dns_ssumatchtype_subdomainms
-#define DNS_SSUMATCHTYPE_SUBDOMAINKRB5	dns_ssumatchtype_subdomainkrb5
-#define DNS_SSUMATCHTYPE_TCPSELF	dns_ssumatchtype_tcpself
-#define DNS_SSUMATCHTYPE_6TO4SELF	dns_ssumatchtype_6to4self
-#define DNS_SSUMATCHTYPE_EXTERNAL	dns_ssumatchtype_external
-#define DNS_SSUMATCHTYPE_LOCAL		dns_ssumatchtype_local
-#define DNS_SSUMATCHTYPE_MAX 		dns_ssumatchtype_max  /* max value */
-
-#define DNS_SSUMATCHTYPE_DLZ		dns_ssumatchtype_dlz  /* intentionally higher than _MAX */
 
 isc_result_t
 dns_ssutable_create(isc_mem_t *mctx, dns_ssutable_t **table);
@@ -84,7 +69,7 @@ dns_ssutable_createdlz(isc_mem_t *mctx, dns_ssutable_t **tablep,
 		       dns_dlzdb_t *dlzdatabase);
 /*%<
  * Create an SSU table that contains a dlzdatabase pointer, and a
- * single rule with matchtype DNS_SSUMATCHTYPE_DLZ. This type of SSU
+ * single rule with matchtype dns_ssumatchtype_dlz. This type of SSU
  * table is used by writeable DLZ drivers to offload authorization for
  * updates to the driver.
  */
@@ -118,8 +103,8 @@ dns_ssutable_detach(dns_ssutable_t **tablep);
 
 isc_result_t
 dns_ssutable_addrule(dns_ssutable_t *table, bool grant,
-		     dns_name_t *identity, unsigned int matchtype,
-		     dns_name_t *name, unsigned int ntypes,
+		     const dns_name_t *identity, dns_ssumatchtype_t matchtype,
+		     const dns_name_t *name, unsigned int ntypes,
 		     dns_rdatatype_t *types);
 /*%<
  *	Adds a new rule to a simple-secure-update rule table.  The rule
@@ -150,14 +135,10 @@ dns_ssutable_addrule(dns_ssutable_t *table, bool grant,
  */
 
 bool
-dns_ssutable_checkrules(dns_ssutable_t *table, dns_name_t *signer,
-			dns_name_t *name, isc_netaddr_t *addr,
-			dns_rdatatype_t type, const dst_key_t *key);
-bool
-dns_ssutable_checkrules2(dns_ssutable_t *table, dns_name_t *signer,
-			dns_name_t *name, isc_netaddr_t *addr,
-			bool tcp, const dns_aclenv_t *env,
-			dns_rdatatype_t type, const dst_key_t *key);
+dns_ssutable_checkrules(dns_ssutable_t *table, const dns_name_t *signer,
+			const dns_name_t *name, const isc_netaddr_t *addr,
+			bool tcp, const dns_aclenv_t *env, dns_rdatatype_t type,
+			const dst_key_t *key);
 /*%<
  *	Checks that the attempted update of (name, type) is allowed according
  *	to the rules specified in the simple-secure-update rule table.  If
@@ -167,23 +148,23 @@ dns_ssutable_checkrules2(dns_ssutable_t *table, dns_name_t *signer,
  *		In dns_ssutable_checkrules(), 'addr' should only be
  *		set if the request received via TCP.  This provides a
  *		weak assurance that the request was not spoofed.
- *		'addr' is to to validate DNS_SSUMATCHTYPE_TCPSELF
- *		and DNS_SSUMATCHTYPE_6TO4SELF rules.
+ *		'addr' is to to validate dns_ssumatchtype_tcpself
+ *		and dns_ssumatchtype_6to4self rules.
  *
  *		In dns_ssutable_checkrules2(), 'addr' can also be passed for
  *		UDP requests and TCP is specified via the 'tcp' parameter.
- *		In addition to DNS_SSUMATCHTYPE_TCPSELF and
+ *		In addition to dns_ssumatchtype_tcpself and
  *		tcp_ssumatchtype_6to4self  rules, the address
- *		also be used to check DNS_SSUMATCHTYPE_LOCAL rules.
+ *		also be used to check dns_ssumatchtype_local rules.
  *		If 'addr' is set then 'env' must also be set so that
  *		requests from non-localhost addresses can be rejected.
  *
- *		For DNS_SSUMATCHTYPE_TCPSELF the addresses are mapped to
+ *		For dns_ssumatchtype_tcpself the addresses are mapped to
  *		the standard reverse names under IN-ADDR.ARPA and IP6.ARPA.
  *		RFC 1035, Section 3.5, "IN-ADDR.ARPA domain" and RFC 3596,
  *		Section 2.5, "IP6.ARPA Domain".
  *
- *		For DNS_SSUMATCHTYPE_6TO4SELF, IPv4 address are converted
+ *		For dns_ssumatchtype_6to4self, IPv4 address are converted
  *		to a 6to4 prefix (48 bits) per the rules in RFC 3056.  Only
  *		the top	48 bits of the IPv6 address are mapped to the reverse
  *		name. This is independent of whether the most significant 16
@@ -198,21 +179,24 @@ dns_ssutable_checkrules2(dns_ssutable_t *table, dns_name_t *signer,
  *\li		if 'addr' is not NULL, 'env' is not NULL.
  */
 
+/*% Accessor functions to extract rule components */
+bool
+dns_ssurule_isgrant(const dns_ssurule_t *rule);
+/*% Accessor functions to extract rule components */
+dns_name_t *
+dns_ssurule_identity(const dns_ssurule_t *rule);
+/*% Accessor functions to extract rule components */
+unsigned int
+dns_ssurule_matchtype(const dns_ssurule_t *rule);
+/*% Accessor functions to extract rule components */
+dns_name_t *
+dns_ssurule_name(const dns_ssurule_t *rule);
+/*% Accessor functions to extract rule components */
+unsigned int
+dns_ssurule_types(const dns_ssurule_t *rule, dns_rdatatype_t **types);
 
-/*% Accessor functions to extract rule components */
-bool	dns_ssurule_isgrant(const dns_ssurule_t *rule);
-/*% Accessor functions to extract rule components */
-dns_name_t *	dns_ssurule_identity(const dns_ssurule_t *rule);
-/*% Accessor functions to extract rule components */
-unsigned int	dns_ssurule_matchtype(const dns_ssurule_t *rule);
-/*% Accessor functions to extract rule components */
-dns_name_t *	dns_ssurule_name(const dns_ssurule_t *rule);
-/*% Accessor functions to extract rule components */
-unsigned int	dns_ssurule_types(const dns_ssurule_t *rule,
-				  dns_rdatatype_t **types);
-
-isc_result_t	dns_ssutable_firstrule(const dns_ssutable_t *table,
-				       dns_ssurule_t **rule);
+isc_result_t
+dns_ssutable_firstrule(const dns_ssutable_t *table, dns_ssurule_t **rule);
 /*%<
  * Initiates a rule iterator.  There is no need to maintain any state.
  *
@@ -221,8 +205,8 @@ isc_result_t	dns_ssutable_firstrule(const dns_ssutable_t *table,
  *\li	#ISC_R_NOMORE
  */
 
-isc_result_t	dns_ssutable_nextrule(dns_ssurule_t *rule,
-				      dns_ssurule_t **nextrule);
+isc_result_t
+dns_ssutable_nextrule(dns_ssurule_t *rule, dns_ssurule_t **nextrule);
 /*%<
  * Returns the next rule in the table.
  *
@@ -232,8 +216,8 @@ isc_result_t	dns_ssutable_nextrule(dns_ssurule_t *rule,
  */
 
 bool
-dns_ssu_external_match(dns_name_t *identity, dns_name_t *signer,
-		       dns_name_t *name, isc_netaddr_t *tcpaddr,
+dns_ssu_external_match(const dns_name_t *identity, const dns_name_t *signer,
+		       const dns_name_t *name, const isc_netaddr_t *tcpaddr,
 		       dns_rdatatype_t type, const dst_key_t *key,
 		       isc_mem_t *mctx);
 /*%<

@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -18,28 +20,23 @@
 
 static inline isc_result_t
 fromtext_ta(ARGS_FROMTEXT) {
-
 	REQUIRE(type == dns_rdatatype_ta);
 
-	return (generic_fromtext_ds(rdclass, type, lexer, origin, options,
-				    target, callbacks));
+	return (generic_fromtext_ds(CALL_FROMTEXT));
 }
 
 static inline isc_result_t
 totext_ta(ARGS_TOTEXT) {
-
 	REQUIRE(rdata->type == dns_rdatatype_ta);
 
-	return (generic_totext_ds(rdata, tctx, target));
+	return (generic_totext_ds(CALL_TOTEXT));
 }
 
 static inline isc_result_t
 fromwire_ta(ARGS_FROMWIRE) {
-
 	REQUIRE(type == dns_rdatatype_ta);
 
-	return (generic_fromwire_ds(rdclass, type, source, dctx, options,
-				    target));
+	return (generic_fromwire_ds(CALL_FROMWIRE));
 }
 
 static inline isc_result_t
@@ -73,10 +70,9 @@ compare_ta(ARGS_COMPARE) {
 
 static inline isc_result_t
 fromstruct_ta(ARGS_FROMSTRUCT) {
-
 	REQUIRE(type == dns_rdatatype_ta);
 
-	return (generic_fromstruct_ds(rdclass, type, source, target));
+	return (generic_fromstruct_ds(CALL_FROMSTRUCT));
 }
 
 static inline isc_result_t
@@ -84,6 +80,7 @@ tostruct_ta(ARGS_TOSTRUCT) {
 	dns_rdata_ds_t *ds = target;
 
 	REQUIRE(rdata->type == dns_rdatatype_ta);
+	REQUIRE(ds != NULL);
 
 	/*
 	 * Checked by generic_tostruct_ds().
@@ -92,7 +89,7 @@ tostruct_ta(ARGS_TOSTRUCT) {
 	ds->common.rdtype = rdata->type;
 	ISC_LINK_INIT(&ds->common, link);
 
-	return (generic_tostruct_ds(rdata, target, mctx));
+	return (generic_tostruct_ds(CALL_TOSTRUCT));
 }
 
 static inline void
@@ -102,11 +99,13 @@ freestruct_ta(ARGS_FREESTRUCT) {
 	REQUIRE(ds != NULL);
 	REQUIRE(ds->common.rdtype == dns_rdatatype_ta);
 
-	if (ds->mctx == NULL)
+	if (ds->mctx == NULL) {
 		return;
+	}
 
-	if (ds->digest != NULL)
+	if (ds->digest != NULL) {
 		isc_mem_free(ds->mctx, ds->digest);
+	}
 	ds->mctx = NULL;
 }
 
@@ -134,7 +133,6 @@ digest_ta(ARGS_DIGEST) {
 
 static inline bool
 checkowner_ta(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_ta);
 
 	UNUSED(name);
@@ -147,7 +145,6 @@ checkowner_ta(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_ta(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_ta);
 
 	UNUSED(rdata);
@@ -162,4 +159,4 @@ casecompare_ta(ARGS_COMPARE) {
 	return (compare_ta(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_TA_32768_C */
+#endif /* RDATA_GENERIC_TA_32768_C */

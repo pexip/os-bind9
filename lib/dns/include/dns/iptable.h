@@ -1,18 +1,20 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef DNS_IPTABLE_H
 #define DNS_IPTABLE_H 1
 
+#include <inttypes.h>
 #include <stdbool.h>
 
 #include <isc/lang.h>
@@ -22,15 +24,15 @@
 #include <dns/types.h>
 
 struct dns_iptable {
-	unsigned int		magic;
-	isc_mem_t		*mctx;
-	isc_refcount_t		refcount;
-	isc_radix_tree_t	*radix;
-	ISC_LINK(dns_iptable_t)	nextincache;
+	unsigned int	  magic;
+	isc_mem_t	  *mctx;
+	isc_refcount_t	  refcount;
+	isc_radix_tree_t *radix;
+	ISC_LINK(dns_iptable_t) nextincache;
 };
 
-#define DNS_IPTABLE_MAGIC	ISC_MAGIC('T','a','b','l')
-#define DNS_IPTABLE_VALID(a)	ISC_MAGIC_VALID(a, DNS_IPTABLE_MAGIC)
+#define DNS_IPTABLE_MAGIC    ISC_MAGIC('T', 'a', 'b', 'l')
+#define DNS_IPTABLE_VALID(a) ISC_MAGIC_VALID(a, DNS_IPTABLE_MAGIC)
 
 /***
  *** Functions
@@ -45,12 +47,8 @@ dns_iptable_create(isc_mem_t *mctx, dns_iptable_t **target);
  */
 
 isc_result_t
-dns_iptable_addprefix(dns_iptable_t *tab, isc_netaddr_t *addr,
+dns_iptable_addprefix(dns_iptable_t *tab, const isc_netaddr_t *addr,
 		      uint16_t bitlen, bool pos);
-isc_result_t
-dns_iptable_addprefix2(dns_iptable_t *tab, isc_netaddr_t *addr,
-		       uint16_t bitlen, bool pos,
-		       bool is_ecs);
 /*
  * Add an IP prefix to an existing IP table
  */

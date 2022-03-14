@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -20,13 +22,14 @@ options {
 	listen-on { 10.53.0.4; };
 	listen-on-v6 { none; };
 	recursion yes;
-	acache-enable yes;
-	dnssec-enable yes;
 	dnssec-validation yes;
 	dnssec-must-be-secure mustbesecure.example yes;
+	minimal-responses no;
 
 	nta-lifetime 12s;
 	nta-recheck 9s;
+
+	validate-except { corp; };
 
 	# Note: We only reference the bind.keys file here to confirm that it
 	# is *not* being used.  It contains the real root key, and we're
@@ -48,6 +51,11 @@ controls {
 zone "." {
 	type hint;
 	file "../../common/root.hint";
+};
+
+zone "corp" {
+	type static-stub;
+	server-addresses { 10.53.0.2; };
 };
 
 include "trusted.conf";

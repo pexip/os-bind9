@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef DNS_TKEY_H
 #define DNS_TKEY_H 1
@@ -28,24 +29,22 @@
 ISC_LANG_BEGINDECLS
 
 /* Key agreement modes */
-#define DNS_TKEYMODE_SERVERASSIGNED		1
-#define DNS_TKEYMODE_DIFFIEHELLMAN		2
-#define DNS_TKEYMODE_GSSAPI			3
-#define DNS_TKEYMODE_RESOLVERASSIGNED		4
-#define DNS_TKEYMODE_DELETE			5
+#define DNS_TKEYMODE_SERVERASSIGNED   1
+#define DNS_TKEYMODE_DIFFIEHELLMAN    2
+#define DNS_TKEYMODE_GSSAPI	      3
+#define DNS_TKEYMODE_RESOLVERASSIGNED 4
+#define DNS_TKEYMODE_DELETE	      5
 
 struct dns_tkeyctx {
-	dst_key_t *dhkey;
-	dns_name_t *domain;
-	gss_cred_id_t gsscred;
-	isc_mem_t *mctx;
-	isc_entropy_t *ectx;
-	char *gssapi_keytab;
+	dst_key_t	  *dhkey;
+	dns_name_t	   *domain;
+	dns_gss_cred_id_t gsscred;
+	isc_mem_t	  *mctx;
+	char	     *gssapi_keytab;
 };
 
 isc_result_t
-dns_tkeyctx_create(isc_mem_t *mctx, isc_entropy_t *ectx,
-		   dns_tkeyctx_t **tctxp);
+dns_tkeyctx_create(isc_mem_t *mctx, dns_tkeyctx_t **tctxp);
 /*%<
  *	Create an empty TKEY context.
  *
@@ -91,9 +90,9 @@ dns_tkey_processquery(dns_message_t *msg, dns_tkeyctx_t *tctx,
  */
 
 isc_result_t
-dns_tkey_builddhquery(dns_message_t *msg, dst_key_t *key, dns_name_t *name,
-		      dns_name_t *algorithm, isc_buffer_t *nonce,
-		      uint32_t lifetime);
+dns_tkey_builddhquery(dns_message_t *msg, dst_key_t *key,
+		      const dns_name_t *name, const dns_name_t *algorithm,
+		      isc_buffer_t *nonce, uint32_t lifetime);
 /*%<
  *	Builds a query containing a TKEY that will generate a shared
  *	secret using a Diffie-Hellman key exchange.  The shared key
@@ -118,9 +117,9 @@ dns_tkey_builddhquery(dns_message_t *msg, dst_key_t *key, dns_name_t *name,
  */
 
 isc_result_t
-dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
-		       isc_buffer_t *intoken, uint32_t lifetime,
-		       gss_ctx_id_t *context, bool win2k,
+dns_tkey_buildgssquery(dns_message_t *msg, const dns_name_t *name,
+		       const dns_name_t *gname, isc_buffer_t *intoken,
+		       uint32_t lifetime, dns_gss_ctx_id_t *context, bool win2k,
 		       isc_mem_t *mctx, char **err_message);
 /*%<
  *	Builds a query containing a TKEY that will generate a GSSAPI context.
@@ -141,7 +140,6 @@ dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
  *\li		other		an error occurred while building the message
  *\li		*err_message	optional error message
  */
-
 
 isc_result_t
 dns_tkey_builddeletequery(dns_message_t *msg, dns_tsigkey_t *key);
@@ -184,7 +182,7 @@ dns_tkey_processdhresponse(dns_message_t *qmsg, dns_message_t *rmsg,
 
 isc_result_t
 dns_tkey_processgssresponse(dns_message_t *qmsg, dns_message_t *rmsg,
-			    dns_name_t *gname, gss_ctx_id_t *context,
+			    const dns_name_t *gname, dns_gss_ctx_id_t *context,
 			    isc_buffer_t *outtoken, dns_tsigkey_t **outkey,
 			    dns_tsig_keyring_t *ring, char **err_message);
 /*%<
@@ -212,7 +210,7 @@ dns_tkey_processdeleteresponse(dns_message_t *qmsg, dns_message_t *rmsg,
 
 isc_result_t
 dns_tkey_gssnegotiate(dns_message_t *qmsg, dns_message_t *rmsg,
-		      dns_name_t *server, gss_ctx_id_t *context,
+		      const dns_name_t *server, dns_gss_ctx_id_t *context,
 		      dns_tsigkey_t **outkey, dns_tsig_keyring_t *ring,
 		      bool win2k, char **err_message);
 

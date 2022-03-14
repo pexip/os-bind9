@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -208,14 +210,37 @@ if [ $ret -eq 1 ] ; then
 	echo_i "failed"; status=1
 fi
 
-echo "I:check that multiple dnssec-keygen calls don't emit dns_dnssec_findmatchingkeys warning"
+echo_i "check that dnssec-keygen won't generate TSIG keys"
 ret=0
-$KEYGEN -r $RANDFILE -a hmac-sha256 -b 128 -n host example.net > keygen.out1 2>&1 || ret=1
-grep dns_dnssec_findmatchingkeys keygen.out1 > /dev/null && ret=1
-$KEYGEN -r $RANDFILE -a hmac-sha256 -b 128 -n host example.net > keygen.out2 2>&1 || ret=1
-grep dns_dnssec_findmatchingkeys keygen.out2 > /dev/null && ret=1
+$KEYGEN -a hmac-sha256 -b 128 -n host example.net > keygen.out3 2>&1 && ret=1
+grep "unknown algorithm" keygen.out3 > /dev/null || ret=1
+
+echo_i "check that a 'BADTIME' response with 'QR=0' is handled as a request"
+ret=0
+$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp < badtime > /dev/null || ret=1
+$DIG -p ${PORT} @10.53.0.1 version.bind txt ch > dig.out.verify || ret=1
+grep "status: NOERROR" dig.out.verify > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-	echo "I: failed"; status=1
+    echo_i "failed"; status=1
+fi
+
+if "$PERL" -e 'use Net::DNS; use Net::DNS::Packet;' > /dev/null 2>&1
+then
+  echo_i "check that TSIG in the wrong place returns FORMERR"
+  ret=0
+  $PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t udp -d < badlocation > packet.out
+  grep "rcode  = FORMERR" packet.out > /dev/null || ret=1
+  if [ $ret -eq 1 ] ; then
+    echo_i "failed"; status=1
+  fi
+fi
+
+echo_i "check that a malformed truncated response to a TSIG query is handled"
+ret=0
+$DIG -p $PORT @10.53.0.1 bad-tsig > dig.out.bad-tsig || ret=1
+grep "status: SERVFAIL" dig.out.bad-tsig > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+    echo_i "failed"; status=1
 fi
 
 echo_i "exit status: $status"

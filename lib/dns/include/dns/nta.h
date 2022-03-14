@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -13,8 +15,8 @@
 #define DNS_NTA_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file
  * \brief
@@ -29,38 +31,40 @@
 #include <isc/buffer.h>
 #include <isc/lang.h>
 #include <isc/magic.h>
+#include <isc/refcount.h>
 #include <isc/rwlock.h>
 #include <isc/stdtime.h>
 #include <isc/task.h>
 #include <isc/timer.h>
 
-#include <dns/types.h>
 #include <dns/rdataset.h>
 #include <dns/resolver.h>
+#include <dns/types.h>
 #include <dns/view.h>
 
 ISC_LANG_BEGINDECLS
 
 struct dns_ntatable {
 	/* Unlocked. */
-	unsigned int		magic;
-	dns_view_t		*view;
-	isc_rwlock_t		rwlock;
-	isc_taskmgr_t		*taskmgr;
-	isc_timermgr_t		*timermgr;
-	isc_task_t		*task;
+	unsigned int	magic;
+	dns_view_t	   *view;
+	isc_rwlock_t	rwlock;
+	isc_taskmgr_t  *taskmgr;
+	isc_timermgr_t *timermgr;
+	isc_task_t	   *task;
+	/* Protected by atomics */
+	isc_refcount_t references;
 	/* Locked by rwlock. */
-	uint32_t		references;
-	dns_rbt_t		*table;
+	dns_rbt_t *table;
+	bool	   shuttingdown;
 };
 
-#define NTATABLE_MAGIC		ISC_MAGIC('N', 'T', 'A', 't')
-#define VALID_NTATABLE(nt) 	ISC_MAGIC_VALID(nt, NTATABLE_MAGIC)
+#define NTATABLE_MAGIC	   ISC_MAGIC('N', 'T', 'A', 't')
+#define VALID_NTATABLE(nt) ISC_MAGIC_VALID(nt, NTATABLE_MAGIC)
 
 isc_result_t
-dns_ntatable_create(dns_view_t *view,
-		    isc_taskmgr_t *taskmgr, isc_timermgr_t *timermgr,
-		    dns_ntatable_t **ntatablep);
+dns_ntatable_create(dns_view_t *view, isc_taskmgr_t *taskmgr,
+		    isc_timermgr_t *timermgr, dns_ntatable_t **ntatablep);
 /*%<
  * Create an NTA table in view 'view'.
  *
@@ -116,14 +120,16 @@ dns_ntatable_detach(dns_ntatable_t **ntatablep);
  */
 
 isc_result_t
-dns_ntatable_add(dns_ntatable_t *ntatable, dns_name_t *name,
-		 bool force, isc_stdtime_t now,
-		 uint32_t lifetime);
+dns_ntatable_add(dns_ntatable_t *ntatable, const dns_name_t *name, bool force,
+		 isc_stdtime_t now, uint32_t lifetime);
 /*%<
  * Add a negative trust anchor to 'ntatable' for name 'name',
- * which will expire at time 'now' + 'lifetime'.  If 'force' is false,
- * then the name will be checked periodically to see if it's bogus;
- * if not, then the NTA will be allowed to expire early.
+ * which will expire at time 'now' + 'lifetime'.  If 'force' is true,
+ * then the NTA will persist for the entire specified lifetime.
+ * If it is false, then the name will be queried periodically and
+ * validation will be attempted to see whether it's still bogus;
+ * if validation is successful, the NTA will be allowed to expire
+ * early and validation below the NTA will resume.
  *
  * Notes:
  *
@@ -144,7 +150,7 @@ dns_ntatable_add(dns_ntatable_t *ntatable, dns_name_t *name,
  */
 
 isc_result_t
-dns_ntatable_delete(dns_ntatable_t *ntatable, dns_name_t *keyname);
+dns_ntatable_delete(dns_ntatable_t *ntatable, const dns_name_t *keyname);
 /*%<
  * Delete node(s) from 'ntatable' matching name 'keyname'
  *
@@ -163,7 +169,7 @@ dns_ntatable_delete(dns_ntatable_t *ntatable, dns_name_t *keyname);
 
 bool
 dns_ntatable_covered(dns_ntatable_t *ntatable, isc_stdtime_t now,
-		     dns_name_t *name, dns_name_t *anchor);
+		     const dns_name_t *name, const dns_name_t *anchor);
 /*%<
  * Return true if 'name' is below a non-expired negative trust
  * anchor which in turn is at or below 'anchor'.
@@ -178,9 +184,10 @@ dns_ntatable_covered(dns_ntatable_t *ntatable, isc_stdtime_t now,
  */
 
 isc_result_t
-dns_ntatable_totext(dns_ntatable_t *ntatable, isc_buffer_t **buf);
+dns_ntatable_totext(dns_ntatable_t *ntatable, const char *view,
+		    isc_buffer_t **buf);
 /*%<
- * Dump the NTA table to buffer at 'buf'
+ * Dump the NTA table to buffer at 'buf', with view names
  *
  * Requires:
  * \li   "ntatable" is a valid table.
@@ -199,6 +206,13 @@ dns_ntatable_save(dns_ntatable_t *ntatable, FILE *fp);
 /*%<
  * Save the NTA table to the file opened as 'fp', for later loading.
  */
+
+void
+dns_ntatable_shutdown(dns_ntatable_t *ntatable);
+/*%<
+ * Cancel future checks to see if NTAs can be removed.
+ */
+
 ISC_LANG_ENDDECLS
 
 #endif /* DNS_NTA_H */

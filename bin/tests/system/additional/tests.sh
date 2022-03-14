@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -24,7 +26,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +rec -t RT rt.rt.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -32,7 +34,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +rec -t RT rt.rt2.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -40,7 +42,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +rec -t NAPTR nap.naptr.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -48,7 +50,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +rec -t NAPTR nap.hang3b.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -78,7 +80,7 @@ dotests() {
       ;;
     esac
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -94,7 +96,7 @@ dotests() {
       grep -w "L32" dig.out.$n > /dev/null && ret=1
     fi
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -112,7 +114,7 @@ dotests() {
       grep -w "L32" dig.out.$n > /dev/null && ret=1
     fi
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -120,7 +122,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +norec -t RT rt.rt.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -128,7 +130,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +norec -t RT rt.rt2.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -136,7 +138,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +norec -t NAPTR nap.naptr.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -144,7 +146,7 @@ dotests() {
     ret=0
     $DIG $DIGOPTS +norec -t NAPTR nap.hang3b.example @10.53.0.1 > dig.out.$n || ret=1
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -174,7 +176,7 @@ dotests() {
       ;;
     esac
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -190,7 +192,7 @@ dotests() {
       grep -w "L32" dig.out.$n > /dev/null && ret=1
     fi
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
     fi
 
     n=`expr $n + 1`
@@ -208,7 +210,39 @@ dotests() {
       grep -w "L32" dig.out.$n > /dev/null && ret=1
     fi
     if [ $ret -eq 1 ] ; then
-            echo_i " failed"; status=1
+            echo_i "failed"; status=$((status+1))
+    fi
+
+    n=`expr $n + 1`
+    echo_i "test with NS, root zone ($n)"
+    ret=0
+    $DIG $DIGOPTS -t NS . @10.53.0.1 > dig.out.$n || ret=1
+    # Always expect glue for root priming queries, regardless $minimal
+    grep 'ADDITIONAL: 3' dig.out.$n > /dev/null || ret=1
+    if [ $ret -eq 1 ] ; then
+            echo_i "failed"; status=$((status+1))
+    fi
+
+    n=`expr $n + 1`
+    echo_i "test with NS, non-root zone ($n)"
+    ret=0
+    $DIG $DIGOPTS -t NS rt.example @10.53.0.1 > dig.out.$n || ret=1
+    case $minimal in
+    yes)
+      grep 'ADDITIONAL: 2' dig.out.$n > /dev/null || ret=1
+      ;;
+    no)
+      grep 'ADDITIONAL: 2' dig.out.$n > /dev/null || ret=1
+      ;;
+    no-auth)
+      grep 'ADDITIONAL: 2' dig.out.$n > /dev/null || ret=1
+      ;;
+    no-auth-recursive)
+      grep 'ADDITIONAL: 2' dig.out.$n > /dev/null || ret=1
+      ;;
+    esac
+    if [ $ret -eq 1 ] ; then
+            echo_i "failed"; status=$((status+1))
     fi
 }
 
@@ -218,8 +252,7 @@ dotests
 
 echo_i "reconfiguring server: minimal-responses no"
 copy_setports ns1/named2.conf.in ns1/named.conf
-$RNDCCMD 10.53.0.1 reconfig 2>&1 | sed 's/^/ns1 /' | cat_i
-sleep 2
+rndc_reconfig ns1 10.53.0.1
 
 echo_i "testing with 'minimal-responses no;'"
 minimal=no
@@ -229,15 +262,14 @@ n=`expr $n + 1`
 echo_i "testing with 'minimal-any no;' ($n)"
 ret=0
 $DIG $DIGOPTS -t ANY www.rt.example @10.53.0.1 > dig.out.$n || ret=1
-grep "ANSWER: 3, AUTHORITY: 1, ADDITIONAL: 2" dig.out.$n > /dev/null || ret=1
+grep "ANSWER: 3, AUTHORITY: 2, ADDITIONAL: 2" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 echo_i "reconfiguring server: minimal-any yes"
 copy_setports ns1/named3.conf.in ns1/named.conf
-$RNDCCMD 10.53.0.1 reconfig 2>&1 | sed 's/^/ns1 /' | cat_i
-sleep 2
+rndc_reconfig ns1 10.53.0.1
 
 n=`expr $n + 1`
 echo_i "testing with 'minimal-any yes;' over UDP ($n)"
@@ -245,7 +277,7 @@ ret=0
 $DIG $DIGOPTS -t ANY +notcp www.rt.example @10.53.0.1 > dig.out.$n || ret=1
 grep "ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 n=`expr $n + 1`
 
@@ -254,7 +286,7 @@ ret=0
 $DIG $DIGOPTS -t ANY +tcp www.rt.example @10.53.0.1 > dig.out.$n || ret=1
 grep "ANSWER: 3, AUTHORITY: 0, ADDITIONAL: 1" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 n=`expr $n + 1`
@@ -263,7 +295,7 @@ ret=0
 $DIG $DIGOPTS -t ANY +notcp www.rt.example @10.53.0.1 > dig.out.$n || ret=1
 grep "ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 echo_i "testing with 'minimal-responses no-auth;'"
@@ -272,8 +304,7 @@ dotests
 
 echo_i "reconfiguring server: minimal-responses no-auth-recursive"
 copy_setports ns1/named4.conf.in ns1/named.conf
-$RNDCCMD 10.53.0.1 reconfig 2>&1 | sed 's/^/ns1 /' | cat_i
-sleep 2
+rndc_reconfig ns1 10.53.0.1
 
 echo_i "testing with 'minimal-responses no-auth-recursive;'"
 minimal=no-auth-recursive
@@ -287,7 +318,7 @@ grep "mx\.example\..*MX.0 mail\.mx\.example" dig.out.$n > /dev/null || ret=1
 grep "mail\.mx\.example\..*A.1\.2\.3\.4" dig.out.$n > /dev/null || ret=1
 grep "_25\._tcp\.mail\.mx\.example\..*TLSA.3 0 1 5B30F9602297D558EB719162C225088184FAA32CA45E1ED15DE58A21 D9FCE383" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 n=`expr $n + 1`
@@ -298,13 +329,12 @@ grep "_xmpp-client\._tcp\.srv\.example\..*SRV.1 0 5222 server\.srv\.example" dig
 grep "server\.srv\.example\..*A.1\.2\.3\.4" dig.out.$n > /dev/null || ret=1
 grep "_5222\._tcp\.server\.srv\.example\..*TLSA.3 0 1 5B30F9602297D558EB719162C225088184FAA32CA45E1ED15DE58A21 D9FCE383" dig.out.$n > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 echo_i "reconfiguring server: minimal-responses no"
 copy_setports ns1/named2.conf.in ns1/named.conf
-$RNDCCMD 10.53.0.1 reconfig 2>&1 | sed 's/^/ns1 /' | cat_i
-sleep 2
+rndc_reconfig ns1 10.53.0.1
 
 n=`expr $n + 1`
 echo_i "testing NS handling in ANY responses (authoritative) ($n)"
@@ -313,7 +343,7 @@ $DIG $DIGOPTS -t ANY rt.example @10.53.0.1 > dig.out.$n || ret=1
 grep "AUTHORITY: 0" dig.out.$n  > /dev/null || ret=1
 grep "NS[ 	]*ns" dig.out.$n  > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
 fi
 
 n=`expr $n + 1`
@@ -323,7 +353,25 @@ $DIG $DIGOPTS -t ANY rt.example @10.53.0.3 > dig.out.$n || ret=1
 grep "AUTHORITY: 0" dig.out.$n  > /dev/null || ret=1
 grep "NS[ 	]*ns" dig.out.$n  > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
-    echo_i " failed"; status=1
+    echo_i "failed"; status=$((status+1))
+fi
+
+n=`expr $n + 1`
+echo_i "testing out-of-zone additional data from auth zones (authoritative) ($n)"
+ret=0
+$DIG $DIGOPTS -t NS rt.example @10.53.0.1 > dig.out.$n || ret=1
+grep "ADDITIONAL: 2" dig.out.$n  > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+    echo_i "failed"; status=$((status+1))
+fi
+
+n=`expr $n + 1`
+echo_i "testing out-of-zone additional data from auth zones (recursive) ($n)"
+ret=0
+$DIG $DIGOPTS -t NS ex @10.53.0.3 > dig.out.$n || ret=1
+grep "ADDITIONAL: 3" dig.out.$n  > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+    echo_i "failed"; status=$((status+1))
 fi
 
 echo_i "exit status: $status"

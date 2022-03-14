@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -32,8 +34,9 @@ fromtext_lp(ARGS_FROMTEXT) {
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      false));
-	if (token.value.as_ulong > 0xffffU)
+	if (token.value.as_ulong > 0xffffU) {
 		RETTOK(ISC_R_RANGE);
+	}
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
@@ -41,8 +44,9 @@ fromtext_lp(ARGS_FROMTEXT) {
 
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	if (origin == NULL)
+	if (origin == NULL) {
 		origin = dns_rootname;
+	}
 	return (dns_name_fromtext(&name, &buffer, origin, options, target));
 }
 
@@ -89,8 +93,9 @@ fromwire_lp(ARGS_FROMWIRE) {
 	dns_name_init(&name, NULL);
 
 	isc_buffer_activeregion(source, &sregion);
-	if (sregion.length < 2)
+	if (sregion.length < 2) {
 		return (ISC_R_UNEXPECTEDEND);
+	}
 	RETERR(mem_tobuffer(target, sregion.base, 2));
 	isc_buffer_forward(source, 2);
 	return (dns_name_fromwire(&name, source, dctx, options, target));
@@ -98,7 +103,6 @@ fromwire_lp(ARGS_FROMWIRE) {
 
 static inline isc_result_t
 towire_lp(ARGS_TOWIRE) {
-
 	REQUIRE(rdata->type == dns_rdatatype_lp);
 	REQUIRE(rdata->length != 0);
 
@@ -130,7 +134,7 @@ fromstruct_lp(ARGS_FROMSTRUCT) {
 	isc_region_t region;
 
 	REQUIRE(type == dns_rdatatype_lp);
-	REQUIRE(source != NULL);
+	REQUIRE(lp != NULL);
 	REQUIRE(lp->common.rdtype == type);
 	REQUIRE(lp->common.rdclass == rdclass);
 
@@ -149,7 +153,7 @@ tostruct_lp(ARGS_TOSTRUCT) {
 	dns_name_t name;
 
 	REQUIRE(rdata->type == dns_rdatatype_lp);
-	REQUIRE(target != NULL);
+	REQUIRE(lp != NULL);
 	REQUIRE(rdata->length != 0);
 
 	lp->common.rdclass = rdata->rdclass;
@@ -171,11 +175,12 @@ static inline void
 freestruct_lp(ARGS_FREESTRUCT) {
 	dns_rdata_lp_t *lp = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(lp != NULL);
 	REQUIRE(lp->common.rdtype == dns_rdatatype_lp);
 
-	if (lp->mctx == NULL)
+	if (lp->mctx == NULL) {
 		return;
+	}
 
 	dns_name_free(&lp->lp, lp->mctx);
 	lp->mctx = NULL;
@@ -196,8 +201,9 @@ additionaldata_lp(ARGS_ADDLDATA) {
 	dns_name_fromregion(&name, &region);
 
 	result = (add)(arg, &name, dns_rdatatype_l32);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		return (result);
+	}
 	return ((add)(arg, &name, dns_rdatatype_l64));
 }
 
@@ -213,7 +219,6 @@ digest_lp(ARGS_DIGEST) {
 
 static inline bool
 checkowner_lp(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_lp);
 
 	UNUSED(type);
@@ -226,7 +231,6 @@ checkowner_lp(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_lp(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_lp);
 
 	UNUSED(bad);
@@ -250,8 +254,9 @@ casecompare_lp(ARGS_COMPARE) {
 	REQUIRE(rdata2->length != 0);
 
 	order = memcmp(rdata1->data, rdata2->data, 2);
-	if (order != 0)
+	if (order != 0) {
 		return (order < 0 ? -1 : 1);
+	}
 
 	dns_name_init(&name1, NULL);
 	dns_name_init(&name2, NULL);
@@ -268,4 +273,4 @@ casecompare_lp(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-#endif	/* RDATA_GENERIC_LP_107_C */
+#endif /* RDATA_GENERIC_LP_107_C */

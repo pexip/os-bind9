@@ -1,43 +1,37 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef ISC_SAFE_H
 #define ISC_SAFE_H 1
 
 /*! \file isc/safe.h */
 
-#include <stdbool.h>
-
-#include <isc/types.h>
-#include <stdlib.h>
+#include <isc/lang.h>
 
 ISC_LANG_BEGINDECLS
 
-bool
-isc_safe_memequal(const void *s1, const void *s2, size_t n);
+int
+isc_safe_memequal(const void *, const void *, size_t);
+
 /*%<
  * Returns true iff. two blocks of memory are equal, otherwise
  * false.
  *
  */
 
-int
-isc_safe_memcompare(const void *b1, const void *b2, size_t len);
-/*%<
- * Clone of libc memcmp() which is safe to differential timing attacks.
- */
-
 void
-isc_safe_memwipe(void *ptr, size_t len);
+isc_safe_memwipe(void *, size_t);
+
 /*%<
  * Clear the memory of length `len` pointed to by `ptr`.
  *

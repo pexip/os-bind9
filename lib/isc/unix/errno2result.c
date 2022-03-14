@@ -1,26 +1,26 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 /*! \file */
 
-#include <config.h>
-
+#include "errno2result.h"
 #include <stdbool.h>
 
+#include <isc/platform.h>
 #include <isc/result.h>
-#include <isc/strerror.h>
+#include <isc/strerr.h>
+#include <isc/string.h>
 #include <isc/util.h>
-
-#include "errno2result.h"
 
 /*%
  * Convert a POSIX errno value into an isc_result_t.  The
@@ -29,15 +29,14 @@
  * not already there.
  */
 isc_result_t
-isc___errno2result(int posixerrno, bool dolog,
-		   const char *file, unsigned int line)
-{
+isc___errno2result(int posixerrno, bool dolog, const char *file,
+		   unsigned int line) {
 	char strbuf[ISC_STRERRORSIZE];
 
 	switch (posixerrno) {
 	case ENOTDIR:
 	case ELOOP:
-	case EINVAL:		/* XXX sometimes this is not for files */
+	case EINVAL: /* XXX sometimes this is not for files */
 	case ENAMETOOLONG:
 	case EBADF:
 		return (ISC_R_INVALIDFILE);
@@ -55,62 +54,69 @@ isc___errno2result(int posixerrno, bool dolog,
 	case ENFILE:
 	case EMFILE:
 		return (ISC_R_TOOMANYOPENFILES);
+#ifdef EDQUOT
+	case EDQUOT:
+		return (ISC_R_DISCQUOTA);
+#endif /* ifdef EDQUOT */
+	case ENOSPC:
+		return (ISC_R_DISCFULL);
 #ifdef EOVERFLOW
 	case EOVERFLOW:
 		return (ISC_R_RANGE);
-#endif
+#endif /* ifdef EOVERFLOW */
 	case EPIPE:
 #ifdef ECONNRESET
 	case ECONNRESET:
-#endif
+#endif /* ifdef ECONNRESET */
 #ifdef ECONNABORTED
 	case ECONNABORTED:
-#endif
+#endif /* ifdef ECONNABORTED */
 		return (ISC_R_CONNECTIONRESET);
 #ifdef ENOTCONN
 	case ENOTCONN:
 		return (ISC_R_NOTCONNECTED);
-#endif
+#endif /* ifdef ENOTCONN */
 #ifdef ETIMEDOUT
 	case ETIMEDOUT:
 		return (ISC_R_TIMEDOUT);
-#endif
+#endif /* ifdef ETIMEDOUT */
 #ifdef ENOBUFS
 	case ENOBUFS:
 		return (ISC_R_NORESOURCES);
-#endif
+#endif /* ifdef ENOBUFS */
 #ifdef EAFNOSUPPORT
 	case EAFNOSUPPORT:
 		return (ISC_R_FAMILYNOSUPPORT);
-#endif
+#endif /* ifdef EAFNOSUPPORT */
 #ifdef ENETDOWN
 	case ENETDOWN:
 		return (ISC_R_NETDOWN);
-#endif
+#endif /* ifdef ENETDOWN */
 #ifdef EHOSTDOWN
 	case EHOSTDOWN:
 		return (ISC_R_HOSTDOWN);
-#endif
+#endif /* ifdef EHOSTDOWN */
 #ifdef ENETUNREACH
 	case ENETUNREACH:
 		return (ISC_R_NETUNREACH);
-#endif
+#endif /* ifdef ENETUNREACH */
 #ifdef EHOSTUNREACH
 	case EHOSTUNREACH:
 		return (ISC_R_HOSTUNREACH);
-#endif
+#endif /* ifdef EHOSTUNREACH */
 #ifdef EADDRINUSE
 	case EADDRINUSE:
 		return (ISC_R_ADDRINUSE);
-#endif
+#endif /* ifdef EADDRINUSE */
 	case EADDRNOTAVAIL:
 		return (ISC_R_ADDRNOTAVAIL);
 	case ECONNREFUSED:
 		return (ISC_R_CONNREFUSED);
 	default:
 		if (dolog) {
-			isc__strerror(posixerrno, strbuf, sizeof(strbuf));
-			UNEXPECTED_ERROR(file, line, "unable to convert errno "
+			strerror_r(posixerrno, strbuf, sizeof(strbuf));
+			UNEXPECTED_ERROR(file, line,
+					 "unable to convert errno "
 					 "to isc_result: %d: %s",
 					 posixerrno, strbuf);
 		}

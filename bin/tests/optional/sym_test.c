@@ -1,15 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
-#include <config.h>
 
 #include <stdbool.h>
 #include <string.h>
@@ -24,8 +24,7 @@ isc_mem_t *mctx;
 isc_symtab_t *st;
 
 static void
-undefine_action(char *key, unsigned int type, isc_symvalue_t value, void *arg)
-{
+undefine_action(char *key, unsigned int type, isc_symvalue_t value, void *arg) {
 	UNUSED(arg);
 
 	INSIST(type == 1);
@@ -61,7 +60,7 @@ main(int argc, char *argv[]) {
 		}
 	}
 
-	RUNTIME_CHECK(isc_mem_create(0, 0, &mctx) == ISC_R_SUCCESS);
+	isc_mem_create(&mctx);
 	RUNTIME_CHECK(isc_symtab_create(mctx, 691, undefine_action, NULL,
 					case_sensitive, &st) == ISC_R_SUCCESS);
 
@@ -77,13 +76,15 @@ main(int argc, char *argv[]) {
 		if (cp[0] == '!') {
 			cp++;
 			result = isc_symtab_undefine(st, cp, 1);
-			if (trace || result != ISC_R_SUCCESS)
+			if (trace || result != ISC_R_SUCCESS) {
 				printf("undefine('%s'): %s\n", cp,
 				       isc_result_totext(result));
+			}
 		} else {
 			key = cp;
-			while (*cp != '\0' && *cp != ' ' && *cp != '\t')
+			while (*cp != '\0' && *cp != ' ' && *cp != '\t') {
 				cp++;
+			}
 			if (*cp == '\0') {
 				result = isc_symtab_lookup(st, key, 0, &value);
 				if (trace || result != ISC_R_SUCCESS) {
@@ -102,12 +103,12 @@ main(int argc, char *argv[]) {
 				result = isc_symtab_define(st, key, 1, value,
 							   exists_policy);
 				if (trace || result != ISC_R_SUCCESS) {
-					printf("define('%s', '%s'): %s\n",
-					       key, cp,
-					       isc_result_totext(result));
-					if (result != ISC_R_SUCCESS)
-						undefine_action(key, 1,
-							value, NULL);
+					printf("define('%s', '%s'): %s\n", key,
+					       cp, isc_result_totext(result));
+					if (result != ISC_R_SUCCESS) {
+						undefine_action(key, 1, value,
+								NULL);
+					}
 				}
 			}
 		}

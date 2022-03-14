@@ -1,8 +1,14 @@
 # Copyright (C) 1998-2001, 2016  Internet Systems Consortium, Inc. ("ISC")
-# 
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 srcdir =	@srcdir@
 VPATH =		@srcdir@
@@ -21,7 +27,7 @@ CDEFINES =      @CONTRIB_DLZ@
 CWARNINGS =
 
 DLZLIBS = 	@DLZ_DRIVER_LIBS@
-ISCLIBS =	../../../../lib/isc/libisc.@A@
+ISCLIBS =	../../../../lib/isc/libisc.@A@ @NO_LIBTOOL_ISCLIBS@
 
 DEPLIBS =	${ISCDEPLIBS}
 
@@ -30,12 +36,6 @@ LIBS =		${ISCLIBS} ${DLZLIBS} @LIBS@
 TARGETS =	dlzbdb
 
 SRCS =		dlzbdb.c
-
-#MANPAGES =	
-
-#HTMLPAGES =	
-
-#MANOBJS =	${MANPAGES} ${HTMLPAGES}
 
 @BIND9_MAKE_RULES@
 
@@ -46,17 +46,11 @@ dlzbdb.@O@: dlzbdb.c
 dlzbdb: dlzbdb.@O@ ${DEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} -o $@ dlzbdb.@O@ ${LIBS}
 
-doc man:: ${MANOBJS}
-
-#docclean manclean maintainer-clean::
-#	rm -f ${MANOBJS}
-
 clean distclean maintainer-clean::
 	rm -f ${TARGETS}
 
 installdirs:
 	$(SHELL) ${top_srcdir}/mkinstalldirs ${DESTDIR}${sbindir}
-#	$(SHELL) ${top_srcdir}/mkinstalldirs ${DESTDIR}${mandir}/man8
 
 install:: dlzbdb installdirs
 	${LIBTOOL_MODE_INSTALL} ${INSTALL_PROGRAM} dlzbdb ${DESTDIR}${sbindir}

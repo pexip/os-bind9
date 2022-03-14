@@ -1,26 +1,32 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
-/*! \file */
-
-#include <config.h>
-
-#include <atf-c.h>
+#if HAVE_CMOCKA
 
 #include <inttypes.h>
+#include <sched.h> /* IWYU pragma: keep */
+#include <setjmp.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdlib.h>
 #include <unistd.h>
 
+#define UNIT_TESTING
+#include <cmocka.h>
+
 #include <isc/buffer.h>
+#include <isc/util.h>
 
 #include <dns/nsec3.h>
 #include <dns/private.h>
@@ -32,6 +38,27 @@
 #include "dnstest.h"
 
 static dns_rdatatype_t privatetype = 65534;
+
+static int
+_setup(void **state) {
+	isc_result_t result;
+
+	UNUSED(state);
+
+	result = dns_test_begin(NULL, false);
+	assert_int_equal(result, ISC_R_SUCCESS);
+
+	return (0);
+}
+
+static int
+_teardown(void **state) {
+	UNUSED(state);
+
+	dns_test_end();
+
+	return (0);
+}
 
 typedef struct {
 	unsigned char alg;
@@ -50,13 +77,9 @@ typedef struct {
 	bool nonsec;
 } nsec3_testcase_t;
 
-/*
- * Helper functions
- */
 static void
 make_signing(signing_testcase_t *testcase, dns_rdata_t *private,
-	     unsigned char *buf, size_t len)
-{
+	     unsigned char *buf, size_t len) {
 	dns_rdata_init(private);
 
 	buf[0] = testcase->alg;
@@ -64,16 +87,19 @@ make_signing(signing_testcase_t *testcase, dns_rdata_t *private,
 	buf[2] = (testcase->keyid & 0xff);
 	buf[3] = testcase->remove;
 	buf[4] = testcase->complete;
-	private->data = buf;
-	private->length = len;
-	private->type = privatetype;
-	private->rdclass = dns_rdataclass_in;
+      private
+	->data = buf;
+      private
+	->length = len;
+      private
+	->type = privatetype;
+      private
+	->rdclass = dns_rdataclass_in;
 }
 
 static void
 make_nsec3(nsec3_testcase_t *testcase, dns_rdata_t *private,
-	   unsigned char *pbuf)
-{
+	   unsigned char *pbuf) {
 	dns_rdata_nsec3param_t params;
 	dns_rdata_t nsec3param = DNS_RDATA_INIT;
 	unsigned char bufdata[BUFSIZ];
@@ -84,8 +110,8 @@ make_nsec3(nsec3_testcase_t *testcase, dns_rdata_t *private,
 
 	/* for simplicity, we're using a maximum salt length of 4 */
 	salt = htonl(testcase->salt);
-	sp = (unsigned char *) &salt;
-	while (*sp == '\0' && slen > 0) {
+	sp = (unsigned char *)&salt;
+	while (slen > 0 && *sp == '\0') {
 		slen--;
 		sp++;
 	}
@@ -100,12 +126,14 @@ make_nsec3(nsec3_testcase_t *testcase, dns_rdata_t *private,
 	params.flags = testcase->flags;
 	if (testcase->remove) {
 		params.flags |= DNS_NSEC3FLAG_REMOVE;
-		if (testcase->nonsec)
+		if (testcase->nonsec) {
 			params.flags |= DNS_NSEC3FLAG_NONSEC;
+		}
 	} else {
 		params.flags |= DNS_NSEC3FLAG_CREATE;
-		if (testcase->pending)
+		if (testcase->pending) {
 			params.flags |= DNS_NSEC3FLAG_INITIAL;
+		}
 	}
 
 	isc_buffer_init(&buf, bufdata, sizeof(bufdata));
@@ -114,41 +142,29 @@ make_nsec3(nsec3_testcase_t *testcase, dns_rdata_t *private,
 
 	dns_rdata_init(private);
 
-	dns_nsec3param_toprivate(&nsec3param, private, privatetype,
-				 pbuf, DNS_NSEC3PARAM_BUFFERSIZE + 1);
+	dns_nsec3param_toprivate(&nsec3param, private, privatetype, pbuf,
+				 DNS_NSEC3PARAM_BUFFERSIZE + 1);
 }
 
-/*
- * Individual unit tests
- */
-ATF_TC(private_signing_totext);
-ATF_TC_HEAD(private_signing_totext, tc) {
-	atf_tc_set_md_var(tc, "descr",
-			  "convert private signing records to text");
-}
-ATF_TC_BODY(private_signing_totext, tc) {
-	isc_result_t result;
+/* convert private signing records to text */
+static void
+private_signing_totext_test(void **state) {
 	dns_rdata_t private;
 	int i;
 
-	signing_testcase_t testcases[] = {
-		{ DST_ALG_RSASHA512, 12345, 0, 0 },
-		{ DST_ALG_RSASHA256, 54321, 1, 0 },
-		{ DST_ALG_NSEC3RSASHA1, 22222, 0, 1 },
-		{ DST_ALG_RSASHA1, 33333, 1, 1 }
-	};
-	const char *results[] = {
-		"Signing with key 12345/RSASHA512",
-		"Removing signatures for key 54321/RSASHA256",
-		"Done signing with key 22222/NSEC3RSASHA1",
-		"Done removing signatures for key 33333/RSASHA1"
-	};
+	signing_testcase_t testcases[] = { { DST_ALG_RSASHA512, 12345, 0, 0 },
+					   { DST_ALG_RSASHA256, 54321, 1, 0 },
+					   { DST_ALG_NSEC3RSASHA1, 22222, 0,
+					     1 },
+					   { DST_ALG_RSASHA1, 33333, 1, 1 } };
+	const char *results[] = { "Signing with key 12345/RSASHA512",
+				  "Removing signatures for key 54321/RSASHA256",
+				  "Done signing with key 22222/NSEC3RSASHA1",
+				  ("Done removing signatures for key "
+				   "33333/RSASHA1") };
 	int ncases = 4;
 
-	UNUSED(tc);
-
-	result = dns_test_begin(NULL, true);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	UNUSED(state);
 
 	for (i = 0; i < ncases; i++) {
 		unsigned char data[5];
@@ -159,18 +175,13 @@ ATF_TC_BODY(private_signing_totext, tc) {
 
 		make_signing(&testcases[i], &private, data, sizeof(data));
 		dns_private_totext(&private, &buf);
-		ATF_CHECK_STREQ(output, results[i]);
+		assert_string_equal(output, results[i]);
 	}
-
-	dns_test_end();
 }
 
-ATF_TC(private_nsec3_totext);
-ATF_TC_HEAD(private_nsec3_totext, tc) {
-	atf_tc_set_md_var(tc, "descr", "convert private chain records to text");
-}
-ATF_TC_BODY(private_nsec3_totext, tc) {
-	isc_result_t result;
+/* convert private chain records to text */
+static void
+private_nsec3_totext_test(void **state) {
 	dns_rdata_t private;
 	int i;
 
@@ -181,19 +192,15 @@ ATF_TC_BODY(private_nsec3_totext, tc) {
 		{ 1, 0, 30, 0xdeaf, 1, 0, 0 },
 		{ 1, 0, 100, 0xfeedabee, 1, 0, 1 },
 	};
-	const char *results[] = {
-		"Creating NSEC3 chain 1 0 1 BEEF",
-		"Creating NSEC3 chain 1 1 10 DADD",
-		"Pending NSEC3 chain 1 0 20 BEAD",
-		"Removing NSEC3 chain 1 0 30 DEAF / creating NSEC chain",
-		"Removing NSEC3 chain 1 0 100 FEEDABEE"
-	};
+	const char *results[] = { "Creating NSEC3 chain 1 0 1 BEEF",
+				  "Creating NSEC3 chain 1 1 10 DADD",
+				  "Pending NSEC3 chain 1 0 20 BEAD",
+				  ("Removing NSEC3 chain 1 0 30 DEAF / "
+				   "creating NSEC chain"),
+				  "Removing NSEC3 chain 1 0 100 FEEDABEE" };
 	int ncases = 5;
 
-	UNUSED(tc);
-
-	result = dns_test_begin(NULL, true);
-	ATF_REQUIRE_EQ(result, ISC_R_SUCCESS);
+	UNUSED(state);
 
 	for (i = 0; i < ncases; i++) {
 		unsigned char data[DNS_NSEC3PARAM_BUFFERSIZE + 1];
@@ -204,17 +211,30 @@ ATF_TC_BODY(private_nsec3_totext, tc) {
 
 		make_nsec3(&testcases[i], &private, data);
 		dns_private_totext(&private, &buf);
-		ATF_CHECK_STREQ(output, results[i]);
+		assert_string_equal(output, results[i]);
 	}
-
-	dns_test_end();
 }
 
-/*
- * Main
- */
-ATF_TP_ADD_TCS(tp) {
-	ATF_TP_ADD_TC(tp, private_signing_totext);
-	ATF_TP_ADD_TC(tp, private_nsec3_totext);
-	return (atf_no_error());
+int
+main(void) {
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test_setup_teardown(private_signing_totext_test,
+						_setup, _teardown),
+		cmocka_unit_test_setup_teardown(private_nsec3_totext_test,
+						_setup, _teardown),
+	};
+
+	return (cmocka_run_group_tests(tests, NULL, NULL));
 }
+
+#else /* HAVE_CMOCKA */
+
+#include <stdio.h>
+
+int
+main(void) {
+	printf("1..0 # Skipped: cmocka not available\n");
+	return (SKIPPED_TEST_EXIT_CODE);
+}
+
+#endif /* if HAVE_CMOCKA */

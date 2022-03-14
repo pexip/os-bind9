@@ -1,56 +1,56 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-#include <stdbool.h>
-
-#include <isc/magic.h>
-#include <isc/types.h>
-#include <isc/mutex.h>
-#include <isc/net.h>
-#include <isc/refcount.h>
-
-#include <string.h>
-
 #ifndef _RADIX_H
 #define _RADIX_H
 
-#define NETADDR_TO_PREFIX_T(na,pt,bits,is_ecs)	\
-	do { \
-		const void *p = na; \
-		memset(&(pt), 0, sizeof(pt)); \
-		if (p != NULL) { \
-			(pt).family = (na)->family; \
-			(pt).bitlen = (bits); \
-			if ((pt).family == AF_INET6) { \
+#include <inttypes.h>
+#include <string.h>
+
+#include <isc/magic.h>
+#include <isc/mutex.h>
+#include <isc/net.h>
+#include <isc/refcount.h>
+#include <isc/types.h>
+
+#define NETADDR_TO_PREFIX_T(na, pt, bits)                                \
+	do {                                                             \
+		const void *p = na;                                      \
+		memset(&(pt), 0, sizeof(pt));                            \
+		if (p != NULL) {                                         \
+			(pt).family = (na)->family;                      \
+			(pt).bitlen = (bits);                            \
+			if ((pt).family == AF_INET6) {                   \
 				memmove(&(pt).add.sin6, &(na)->type.in6, \
-				       ((bits)+7)/8); \
-			} else \
-				memmove(&(pt).add.sin, &(na)->type.in, \
-				       ((bits)+7)/8); \
-		} else { \
-			(pt).family = AF_UNSPEC; \
-			(pt).bitlen = 0; \
-		} \
-		(pt).ecs = is_ecs; \
-		isc_refcount_init(&(pt).refcount, 0); \
-	} while(0)
+					((bits) + 7) / 8);               \
+			} else                                           \
+				memmove(&(pt).add.sin, &(na)->type.in,   \
+					((bits) + 7) / 8);               \
+		} else {                                                 \
+			(pt).family = AF_UNSPEC;                         \
+			(pt).bitlen = 0;                                 \
+		}                                                        \
+		isc_refcount_init(&(pt).refcount, 0);                    \
+	} while (0)
 
 typedef struct isc_prefix {
-	isc_mem_t *mctx;
-	unsigned int family;	/* AF_INET | AF_INET6, or AF_UNSPEC for "any" */
-	unsigned int bitlen;	/* 0 for "any" */
-	bool ecs;	/* true for an EDNS client subnet address */
+	isc_mem_t	  *mctx;
+	unsigned int family;   /* AF_INET | AF_INET6, or AF_UNSPEC for
+				* "any" */
+	unsigned int   bitlen; /* 0 for "any" */
 	isc_refcount_t refcount;
 	union {
-		struct in_addr sin;
+		struct in_addr	sin;
 		struct in6_addr sin6;
 	} add;
 } isc_prefix_t;
@@ -58,10 +58,8 @@ typedef struct isc_prefix {
 typedef void (*isc_radix_destroyfunc_t)(void *);
 typedef void (*isc_radix_processfunc_t)(isc_prefix_t *, void **);
 
-#define isc_prefix_tochar(prefix) ((char *)&(prefix)->add.sin)
+#define isc_prefix_tochar(prefix)  ((char *)&(prefix)->add.sin)
 #define isc_prefix_touchar(prefix) ((u_char *)&(prefix)->add.sin)
-
-#define BIT_TEST(f, b)  ((f) & (b))
 
 /*
  * We need "first match" when we search the radix tree to preserve
@@ -72,54 +70,47 @@ typedef void (*isc_radix_processfunc_t)(isc_prefix_t *, void **);
  * return the one that was added first.
  *
  * An IPv4 prefix and an IPv6 prefix may share a radix tree node if they
- * have the same length and bit pattern (e.g., 127/8 and 7f::/8).  Also,
- * a node that matches a client address may also match an EDNS client
- * subnet address.  To disambiguate between these, node_num and data
- * are four-element arrays;
+ * have the same length and bit pattern (e.g., 127/8 and 7f::/8).  To
+ * disambiguate between them, node_num and data are two-element arrays:
  *
  *   - node_num[0] and data[0] are used for IPv4 client addresses
- *   - node_num[1] and data[1] for IPv4 client subnet addresses
- *   - node_num[2] and data[2] are used for IPv6 client addresses
- *   - node_num[3] and data[3] for IPv6 client subnet addresses
+ *   - node_num[1] and data[1] are used for IPv6 client addresses
  *
  * A prefix of 0/0 (aka "any" or "none"), is always stored as IPv4,
- * but matches IPv6 addresses too, as well as all client subnet
- * addresses.
+ * but matches all IPv6 addresses too.
  */
 
-#define RADIX_NOECS 0
-#define RADIX_ECS 2
-#define RADIX_V4 0
-#define RADIX_V6 1
-#define RADIX_V4_ECS 2
-#define RADIX_V6_ECS 3
-#define RADIX_FAMILIES 4
+#define RADIX_V4       0
+#define RADIX_V6       1
+#define RADIX_FAMILIES 2
 
-#define ISC_RADIX_FAMILY(p) \
-	((((p)->family == AF_INET6) ? RADIX_V6 : RADIX_V4) + \
-	 ((p)->ecs ? RADIX_ECS : RADIX_NOECS))
+#define ISC_RADIX_FAMILY(p) (((p)->family == AF_INET6) ? RADIX_V6 : RADIX_V4)
 
 typedef struct isc_radix_node {
-	isc_mem_t *mctx;
-	uint32_t bit;		/* bit length of the prefix */
-	isc_prefix_t *prefix;		/* who we are in radix tree */
-	struct isc_radix_node *l, *r;	/* left and right children */
-	struct isc_radix_node *parent;	/* may be used */
-	void *data[RADIX_FAMILIES];	/* pointers to IPv4 and IPV6 data */
-	int node_num[RADIX_FAMILIES];	/* which node this was in the tree,
-					   or -1 for glue nodes */
+	isc_mem_t		  *mctx;
+	uint32_t	       bit;    /* bit length of the prefix */
+	isc_prefix_t	     *prefix; /* who we are in radix tree */
+	struct isc_radix_node *l, *r;  /* left and right children */
+	struct isc_radix_node *parent; /* may be used */
+	void		     *data[RADIX_FAMILIES]; /* pointers to IPv4
+						      * and IPV6 data */
+	int node_num[RADIX_FAMILIES];		     /* which node
+						      * this was in
+						      * the tree,
+						      * or -1 for glue
+						      * nodes */
 } isc_radix_node_t;
 
-#define RADIX_TREE_MAGIC         ISC_MAGIC('R','d','x','T');
-#define RADIX_TREE_VALID(a)      ISC_MAGIC_VALID(a, RADIX_TREE_MAGIC);
+#define RADIX_TREE_MAGIC    ISC_MAGIC('R', 'd', 'x', 'T');
+#define RADIX_TREE_VALID(a) ISC_MAGIC_VALID(a, RADIX_TREE_MAGIC);
 
 typedef struct isc_radix_tree {
-	unsigned int magic;
-	isc_mem_t *mctx;
+	unsigned int	  magic;
+	isc_mem_t	  *mctx;
 	isc_radix_node_t *head;
-	uint32_t maxbits;		/* for IP, 32 bit addresses */
-	int num_active_node;		/* for debugging purposes */
-	int num_added_node;		/* total number of nodes */
+	uint32_t	  maxbits;	   /* for IP, 32 bit addresses */
+	int		  num_active_node; /* for debugging purposes */
+	int		  num_added_node;  /* total number of nodes */
 } isc_radix_tree_t;
 
 isc_result_t
@@ -201,32 +192,33 @@ isc_radix_process(isc_radix_tree_t *radix, isc_radix_processfunc_t func);
  * \li	'func' to point to a function.
  */
 
-#define RADIX_MAXBITS 128
-#define RADIX_NBIT(x)        (0x80 >> ((x) & 0x7f))
-#define RADIX_NBYTE(x)       ((x) >> 3)
+#define RADIX_MAXBITS  128
+#define RADIX_NBIT(x)  (0x80 >> ((x)&0x7f))
+#define RADIX_NBYTE(x) ((x) >> 3)
 
-#define RADIX_WALK(Xhead, Xnode) \
-    do { \
-	isc_radix_node_t *Xstack[RADIX_MAXBITS+1]; \
-	isc_radix_node_t **Xsp = Xstack; \
-	isc_radix_node_t *Xrn = (Xhead); \
-	while ((Xnode = Xrn)) { \
-	    if (Xnode->prefix)
+#define RADIX_WALK(Xhead, Xnode)                              \
+	do {                                                  \
+		isc_radix_node_t	 *Xstack[RADIX_MAXBITS + 1]; \
+		isc_radix_node_t **Xsp = Xstack;              \
+		isc_radix_node_t	 *Xrn = (Xhead);             \
+		while ((Xnode = Xrn)) {                       \
+			if (Xnode->prefix)
 
-#define RADIX_WALK_END \
-	    if (Xrn->l) { \
-		if (Xrn->r) { \
-		    *Xsp++ = Xrn->r; \
-		} \
-		Xrn = Xrn->l; \
-	    } else if (Xrn->r) { \
-		Xrn = Xrn->r; \
-	    } else if (Xsp != Xstack) { \
-		Xrn = *(--Xsp); \
-	    } else { \
-		Xrn = (isc_radix_node_t *) 0; \
-	    } \
-	} \
-    } while (0)
+#define RADIX_WALK_END                       \
+	if (Xrn->l) {                        \
+		if (Xrn->r) {                \
+			*Xsp++ = Xrn->r;     \
+		}                            \
+		Xrn = Xrn->l;                \
+	} else if (Xrn->r) {                 \
+		Xrn = Xrn->r;                \
+	} else if (Xsp != Xstack) {          \
+		Xrn = *(--Xsp);              \
+	} else {                             \
+		Xrn = (isc_radix_node_t *)0; \
+	}                                    \
+	}                                    \
+	}                                    \
+	while (0)
 
 #endif /* _RADIX_H */

@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -13,8 +15,8 @@
 #define DNS_RESOLVER_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/resolver.h
  *
@@ -51,8 +53,8 @@
 #include <isc/socket.h>
 #include <isc/stats.h>
 
-#include <dns/types.h>
 #include <dns/fixedname.h>
+#include <dns/types.h>
 
 ISC_LANG_BEGINDECLS
 
@@ -67,86 +69,108 @@ ISC_LANG_BEGINDECLS
  */
 typedef struct dns_fetchevent {
 	ISC_EVENT_COMMON(struct dns_fetchevent);
-	dns_fetch_t *			fetch;
-	isc_result_t			result;
-	dns_rdatatype_t			qtype;
-	dns_db_t *			db;
-	dns_dbnode_t *			node;
-	dns_rdataset_t *		rdataset;
-	dns_rdataset_t *		sigrdataset;
-	dns_fixedname_t			foundname;
-	isc_sockaddr_t *		client;
-	dns_messageid_t			id;
-	isc_result_t			vresult;
+	dns_fetch_t	    *fetch;
+	isc_result_t	      result;
+	dns_rdatatype_t	      qtype;
+	dns_db_t		 *db;
+	dns_dbnode_t	     *node;
+	dns_rdataset_t       *rdataset;
+	dns_rdataset_t       *sigrdataset;
+	dns_fixedname_t	      foundname;
+	const isc_sockaddr_t *client;
+	dns_messageid_t	      id;
+	isc_result_t	      vresult;
 } dns_fetchevent_t;
 
 /*%
  * The two quota types (fetches-per-zone and fetches-per-server)
  */
-typedef enum {
-	dns_quotatype_zone = 0,
-	dns_quotatype_server
-} dns_quotatype_t;
+typedef enum { dns_quotatype_zone = 0, dns_quotatype_server } dns_quotatype_t;
 
 /*
  * Options that modify how a 'fetch' is done.
  */
-#define DNS_FETCHOPT_TCP		0x0001	     /*%< Use TCP. */
-#define DNS_FETCHOPT_UNSHARED		0x0002	     /*%< See below. */
-#define DNS_FETCHOPT_RECURSIVE		0x0004	     /*%< Set RD? */
-#define DNS_FETCHOPT_NOEDNS0		0x0008	     /*%< Do not use EDNS. */
-#define DNS_FETCHOPT_FORWARDONLY	0x0010	     /*%< Only use forwarders. */
-#define DNS_FETCHOPT_NOVALIDATE		0x0020	     /*%< Disable validation. */
-#define DNS_FETCHOPT_EDNS512		0x0040	     /*%< Advertise a 512 byte
-							  UDP buffer. */
-#define DNS_FETCHOPT_WANTNSID		0x0080	     /*%< Request NSID */
-#define DNS_FETCHOPT_PREFETCH		0x0100	     /*%< Do prefetch */
-#define DNS_FETCHOPT_NOCDFLAG		0x0200	     /*%< Don't set CD flag. */
-#define DNS_FETCHOPT_NONTA		0x0400	     /*%< Ignore NTA table. */
-/* RESERVED ECS				0x0000 */
-/* RESERVED ECS				0x1000 */
-/* RESERVED ECS				0x2000 */
-/* RESERVED TCPCLIENT			0x4000 */
-#define DNS_FETCHOPT_NOCACHED		0x8000	     /*%< Force cache update. */
+#define DNS_FETCHOPT_TCP	 0x00000001 /*%< Use TCP. */
+#define DNS_FETCHOPT_UNSHARED	 0x00000002 /*%< See below. */
+#define DNS_FETCHOPT_RECURSIVE	 0x00000004 /*%< Set RD? */
+#define DNS_FETCHOPT_NOEDNS0	 0x00000008 /*%< Do not use EDNS. */
+#define DNS_FETCHOPT_FORWARDONLY 0x00000010 /*%< Only use forwarders. */
+#define DNS_FETCHOPT_NOVALIDATE	 0x00000020 /*%< Disable validation. */
+#define DNS_FETCHOPT_EDNS512                                       \
+	0x00000040			 /*%< Advertise a 512 byte \
+					  *   UDP buffer. */
+#define DNS_FETCHOPT_WANTNSID 0x00000080 /*%< Request NSID */
+#define DNS_FETCHOPT_PREFETCH 0x00000100 /*%< Do prefetch */
+#define DNS_FETCHOPT_NOCDFLAG 0x00000200 /*%< Don't set CD flag. */
+#define DNS_FETCHOPT_NONTA    0x00000400 /*%< Ignore NTA table. */
+/* RESERVED ECS				0x00000000 */
+/* RESERVED ECS				0x00001000 */
+/* RESERVED ECS				0x00002000 */
+/* RESERVED TCPCLIENT			0x00004000 */
+#define DNS_FETCHOPT_NOCACHED 0x00008000 /*%< Force cache update. */
+#define DNS_FETCHOPT_QMINIMIZE    \
+	0x00010000 /*%< Use qname \
+		    *    minimization. */
+#define DNS_FETCHOPT_NOFOLLOW        \
+	0x00020000 /*%< Don't follow \
+		    *   delegations */
+#define DNS_FETCHOPT_QMIN_STRICT            \
+	0x00040000 /*%< Do not work around  \
+		    *   servers that return \
+		    *   errors on non-empty \
+		    *   terminals. */
+#define DNS_FETCHOPT_QMIN_USE_A            \
+	0x00080000 /*%< Use A type queries \
+		    *   instead of NS when \
+		    *   doing minimization */
+#define DNS_FETCHOPT_QMIN_SKIP_IP6A      \
+	0x00100000 /*%< Skip some labels \
+		    *   when doing qname \
+		    *   minimization on  \
+		    *   ip6.arpa. */
+#define DNS_FETCHOPT_NOFORWARD                \
+	0x00200000 /*%< Do not use forwarders \
+		    *   if possible. */
 
 /* Reserved in use by adb.c		0x00400000 */
-#define	DNS_FETCHOPT_EDNSVERSIONSET	0x00800000
-#define	DNS_FETCHOPT_EDNSVERSIONMASK	0xff000000
-#define	DNS_FETCHOPT_EDNSVERSIONSHIFT	24
+#define DNS_FETCHOPT_EDNSVERSIONSET	0x00800000
+#define DNS_FETCHOPT_EDNSVERSIONMASK	0xff000000
+#define DNS_FETCHOPT_EDNSVERSIONSHIFT	24
+#define DNS_FETCHOPT_TRYSTALE_ONTIMEOUT 0x01000000
 
 /*
  * Upper bounds of class of query RTT (ms).  Corresponds to
  * dns_resstatscounter_queryrttX statistics counters.
  */
-#define DNS_RESOLVER_QRYRTTCLASS0	10
-#define DNS_RESOLVER_QRYRTTCLASS0STR	"10"
-#define DNS_RESOLVER_QRYRTTCLASS1	100
-#define DNS_RESOLVER_QRYRTTCLASS1STR	"100"
-#define DNS_RESOLVER_QRYRTTCLASS2	500
-#define DNS_RESOLVER_QRYRTTCLASS2STR	"500"
-#define DNS_RESOLVER_QRYRTTCLASS3	800
-#define DNS_RESOLVER_QRYRTTCLASS3STR	"800"
-#define DNS_RESOLVER_QRYRTTCLASS4	1600
-#define DNS_RESOLVER_QRYRTTCLASS4STR	"1600"
+#define DNS_RESOLVER_QRYRTTCLASS0    10
+#define DNS_RESOLVER_QRYRTTCLASS0STR "10"
+#define DNS_RESOLVER_QRYRTTCLASS1    100
+#define DNS_RESOLVER_QRYRTTCLASS1STR "100"
+#define DNS_RESOLVER_QRYRTTCLASS2    500
+#define DNS_RESOLVER_QRYRTTCLASS2STR "500"
+#define DNS_RESOLVER_QRYRTTCLASS3    800
+#define DNS_RESOLVER_QRYRTTCLASS3STR "800"
+#define DNS_RESOLVER_QRYRTTCLASS4    1600
+#define DNS_RESOLVER_QRYRTTCLASS4STR "1600"
 
 /*
  * XXXRTH  Should this API be made semi-private?  (I.e.
  * _dns_resolver_create()).
  */
 
-#define DNS_RESOLVER_CHECKNAMES		0x01
-#define DNS_RESOLVER_CHECKNAMESFAIL	0x02
+#define DNS_RESOLVER_CHECKNAMES	    0x01
+#define DNS_RESOLVER_CHECKNAMESFAIL 0x02
+
+#define DNS_QMIN_MAXLABELS	   7
+#define DNS_QMIN_MAX_NO_DELEGATION 3
+#define DNS_MAX_LABELS		   127
 
 isc_result_t
-dns_resolver_create(dns_view_t *view,
-		    isc_taskmgr_t *taskmgr,
+dns_resolver_create(dns_view_t *view, isc_taskmgr_t *taskmgr,
 		    unsigned int ntasks, unsigned int ndisp,
-		    isc_socketmgr_t *socketmgr,
-		    isc_timermgr_t *timermgr,
-		    unsigned int options,
-		    dns_dispatchmgr_t *dispatchmgr,
-		    dns_dispatch_t *dispatchv4,
-		    dns_dispatch_t *dispatchv6,
+		    isc_socketmgr_t *socketmgr, isc_timermgr_t *timermgr,
+		    unsigned int options, dns_dispatchmgr_t *dispatchmgr,
+		    dns_dispatch_t *dispatchv4, dns_dispatch_t *dispatchv6,
 		    dns_resolver_t **resp);
 
 /*%<
@@ -220,7 +244,6 @@ dns_resolver_prime(dns_resolver_t *res);
  *\li	'res' is a valid, frozen resolver.
  */
 
-
 void
 dns_resolver_whenshutdown(dns_resolver_t *res, isc_task_t *task,
 			  isc_event_t **eventp);
@@ -266,39 +289,16 @@ void
 dns_resolver_detach(dns_resolver_t **resp);
 
 isc_result_t
-dns_resolver_createfetch(dns_resolver_t *res, dns_name_t *name,
-			 dns_rdatatype_t type,
-			 dns_name_t *domain, dns_rdataset_t *nameservers,
-			 dns_forwarders_t *forwarders,
-			 unsigned int options, isc_task_t *task,
+dns_resolver_createfetch(dns_resolver_t *res, const dns_name_t *name,
+			 dns_rdatatype_t type, const dns_name_t *domain,
+			 dns_rdataset_t	*nameservers,
+			 dns_forwarders_t	  *forwarders,
+			 const isc_sockaddr_t *client, dns_messageid_t id,
+			 unsigned int options, unsigned int depth,
+			 isc_counter_t *qc, isc_task_t *task,
 			 isc_taskaction_t action, void *arg,
-			 dns_rdataset_t *rdataset,
-			 dns_rdataset_t *sigrdataset,
+			 dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset,
 			 dns_fetch_t **fetchp);
-
-isc_result_t
-dns_resolver_createfetch2(dns_resolver_t *res, dns_name_t *name,
-			  dns_rdatatype_t type,
-			  dns_name_t *domain, dns_rdataset_t *nameservers,
-			  dns_forwarders_t *forwarders,
-			  isc_sockaddr_t *client, uint16_t id,
-			  unsigned int options, isc_task_t *task,
-			  isc_taskaction_t action, void *arg,
-			  dns_rdataset_t *rdataset,
-			  dns_rdataset_t *sigrdataset,
-			  dns_fetch_t **fetchp);
-isc_result_t
-dns_resolver_createfetch3(dns_resolver_t *res, dns_name_t *name,
-			  dns_rdatatype_t type,
-			  dns_name_t *domain, dns_rdataset_t *nameservers,
-			  dns_forwarders_t *forwarders,
-			  isc_sockaddr_t *client, uint16_t id,
-			  unsigned int options, unsigned int depth,
-			  isc_counter_t *qc, isc_task_t *task,
-			  isc_taskaction_t action, void *arg,
-			  dns_rdataset_t *rdataset,
-			  dns_rdataset_t *sigrdataset,
-			  dns_fetch_t **fetchp);
 /*%<
  * Recurse to answer a question.
  *
@@ -441,19 +441,9 @@ dns_resolver_setlamettl(dns_resolver_t *resolver, uint32_t lame_ttl);
  *\li	'resolver' to be valid.
  */
 
-unsigned int
-dns_resolver_nrunning(dns_resolver_t *resolver);
-/*%<
- * Return the number of currently running resolutions in this
- * resolver.  This is may be less than the number of outstanding
- * fetches due to multiple identical fetches, or more than the
- * number of of outstanding fetches due to the fact that resolution
- * can continue even though a fetch has been canceled.
- */
-
 isc_result_t
-dns_resolver_addalternate(dns_resolver_t *resolver, isc_sockaddr_t *alt,
-			  dns_name_t *name, in_port_t port);
+dns_resolver_addalternate(dns_resolver_t *resolver, const isc_sockaddr_t *alt,
+			  const dns_name_t *name, in_port_t port);
 /*%<
  * Add alternate addresses to be tried in the event that the nameservers
  * for a zone are not available in the address families supported by the
@@ -484,11 +474,11 @@ dns_resolver_reset_algorithms(dns_resolver_t *resolver);
 void
 dns_resolver_reset_ds_digests(dns_resolver_t *resolver);
 /*%<
- * Clear the disabled DS/DLV digest types.
+ * Clear the disabled DS digest types.
  */
 
 isc_result_t
-dns_resolver_disable_algorithm(dns_resolver_t *resolver, dns_name_t *name,
+dns_resolver_disable_algorithm(dns_resolver_t *resolver, const dns_name_t *name,
 			       unsigned int alg);
 /*%<
  * Mark the given DNSSEC algorithm as disabled and below 'name'.
@@ -501,10 +491,10 @@ dns_resolver_disable_algorithm(dns_resolver_t *resolver, dns_name_t *name,
  */
 
 isc_result_t
-dns_resolver_disable_ds_digest(dns_resolver_t *resolver, dns_name_t *name,
+dns_resolver_disable_ds_digest(dns_resolver_t *resolver, const dns_name_t *name,
 			       unsigned int digest_type);
 /*%<
- * Mark the given DS/DLV digest type as disabled and below 'name'.
+ * Mark the given DS digest type as disabled and below 'name'.
  * Valid types are less than 256.
  *
  * Returns:
@@ -514,8 +504,8 @@ dns_resolver_disable_ds_digest(dns_resolver_t *resolver, dns_name_t *name,
  */
 
 bool
-dns_resolver_algorithm_supported(dns_resolver_t *resolver, dns_name_t *name,
-				 unsigned int alg);
+dns_resolver_algorithm_supported(dns_resolver_t	*resolver,
+				 const dns_name_t *name, unsigned int alg);
 /*%<
  * Check if the given algorithm is supported by this resolver.
  * This checks whether the algorithm has been disabled via
@@ -524,8 +514,9 @@ dns_resolver_algorithm_supported(dns_resolver_t *resolver, dns_name_t *name,
  */
 
 bool
-dns_resolver_ds_digest_supported(dns_resolver_t *resolver, dns_name_t *name,
-				 unsigned int digest_type);
+dns_resolver_ds_digest_supported(dns_resolver_t	*resolver,
+				 const dns_name_t *name,
+				 unsigned int	   digest_type);
 /*%<
  * Check if the given digest type is supported by this resolver.
  * This checks whether the digest type has been disabled via
@@ -537,17 +528,19 @@ void
 dns_resolver_resetmustbesecure(dns_resolver_t *resolver);
 
 isc_result_t
-dns_resolver_setmustbesecure(dns_resolver_t *resolver, dns_name_t *name,
+dns_resolver_setmustbesecure(dns_resolver_t *resolver, const dns_name_t *name,
 			     bool value);
 
 bool
-dns_resolver_getmustbesecure(dns_resolver_t *resolver, dns_name_t *name);
-
+dns_resolver_getmustbesecure(dns_resolver_t *resolver, const dns_name_t *name);
 
 void
-dns_resolver_settimeout(dns_resolver_t *resolver, unsigned int seconds);
+dns_resolver_settimeout(dns_resolver_t *resolver, unsigned int timeout);
 /*%<
- * Set the length of time the resolver will work on a query, in seconds.
+ * Set the length of time the resolver will work on a query, in milliseconds.
+ *
+ * 'timeout' was originally defined in seconds, and later redefined to be in
+ * milliseconds.  Values less than or equal to 300 are treated as seconds.
  *
  * If timeout is 0, the default timeout will be applied.
  *
@@ -558,15 +551,16 @@ dns_resolver_settimeout(dns_resolver_t *resolver, unsigned int seconds);
 unsigned int
 dns_resolver_gettimeout(dns_resolver_t *resolver);
 /*%<
- * Get the current length of time the resolver will work on a query, in seconds.
+ * Get the current length of time the resolver will work on a query,
+ * in milliseconds.
  *
  * Requires:
  * \li  resolver to be valid.
  */
 
 void
-dns_resolver_setclientsperquery(dns_resolver_t *resolver,
-				uint32_t min, uint32_t max);
+dns_resolver_setclientsperquery(dns_resolver_t *resolver, uint32_t min,
+				uint32_t max);
 void
 dns_resolver_setfetchesperzone(dns_resolver_t *resolver, uint32_t clients);
 
@@ -581,10 +575,49 @@ void
 dns_resolver_setzeronosoattl(dns_resolver_t *resolver, bool state);
 
 unsigned int
-dns_resolver_getoptions(dns_resolver_t *resolver);
+dns_resolver_getretryinterval(dns_resolver_t *resolver);
 
 void
-dns_resolver_addbadcache(dns_resolver_t *resolver, dns_name_t *name,
+dns_resolver_setretryinterval(dns_resolver_t *resolver, unsigned int interval);
+/*%<
+ * Sets the amount of time, in milliseconds, that is waited for a reply
+ * to a server before another server is tried.  Interacts with the
+ * value of dns_resolver_getnonbackofftries() by trying that number of times
+ * at this interval, before doing exponential backoff and doubling the interval
+ * on each subsequent try, to a maximum of 10 seconds.  Defaults to 800 ms;
+ * silently capped at 2000 ms.
+ *
+ * Requires:
+ * \li	resolver to be valid.
+ * \li  interval > 0.
+ */
+
+unsigned int
+dns_resolver_getnonbackofftries(dns_resolver_t *resolver);
+
+void
+dns_resolver_setnonbackofftries(dns_resolver_t *resolver, unsigned int tries);
+/*%<
+ * Sets the number of failures of getting a reply from remote servers for
+ * a query before backing off by doubling the retry interval for each
+ * subsequent request sent.  Defaults to 3.
+ *
+ * Requires:
+ * \li	resolver to be valid.
+ * \li  tries > 0.
+ */
+
+unsigned int
+dns_resolver_getoptions(dns_resolver_t *resolver);
+/*%<
+ * Get the resolver options.
+ *
+ * Requires:
+ * \li	resolver to be valid.
+ */
+
+void
+dns_resolver_addbadcache(dns_resolver_t *resolver, const dns_name_t *name,
 			 dns_rdatatype_t type, isc_time_t *expire);
 /*%<
  * Add a entry to the bad cache for <name,type> that will expire at 'expire'.
@@ -595,7 +628,7 @@ dns_resolver_addbadcache(dns_resolver_t *resolver, dns_name_t *name,
  */
 
 bool
-dns_resolver_getbadcache(dns_resolver_t *resolver, dns_name_t *name,
+dns_resolver_getbadcache(dns_resolver_t *resolver, const dns_name_t *name,
 			 dns_rdatatype_t type, isc_time_t *now);
 /*%<
  * Check to see if there is a unexpired entry in the bad cache for
@@ -607,7 +640,7 @@ dns_resolver_getbadcache(dns_resolver_t *resolver, dns_name_t *name,
  */
 
 void
-dns_resolver_flushbadcache(dns_resolver_t *resolver, dns_name_t *name);
+dns_resolver_flushbadcache(dns_resolver_t *resolver, const dns_name_t *name);
 /*%<
  * Flush the bad cache of all entries at 'name' if 'name' is non NULL.
  * Flush the entire bad cache if 'name' is NULL.
@@ -617,7 +650,7 @@ dns_resolver_flushbadcache(dns_resolver_t *resolver, dns_name_t *name);
  */
 
 void
-dns_resolver_flushbadnames(dns_resolver_t *resolver, dns_name_t *name);
+dns_resolver_flushbadnames(dns_resolver_t *resolver, const dns_name_t *name);
 /*%<
  * Flush the bad cache of all entries at or below 'name'.
  *
@@ -677,8 +710,8 @@ dns_resolver_getmaxqueries(dns_resolver_t *resolver);
  */
 
 void
-dns_resolver_setquotaresponse(dns_resolver_t *resolver,
-			     dns_quotatype_t which, isc_result_t resp);
+dns_resolver_setquotaresponse(dns_resolver_t *resolver, dns_quotatype_t which,
+			      isc_result_t resp);
 isc_result_t
 dns_resolver_getquotaresponse(dns_resolver_t *resolver, dns_quotatype_t which);
 /*%
@@ -686,7 +719,7 @@ dns_resolver_getquotaresponse(dns_resolver_t *resolver, dns_quotatype_t which);
  * are exceeded. If 'which' is set to quotatype "zone", then the
  * result specified in 'resp' will be used when the fetches-per-zone
  * quota is exceeded by a fetch.  If 'which' is set to quotatype "server",
- * then the reuslt specified in 'resp' will be used when the
+ * then the result specified in 'resp' will be used when the
  * fetches-per-server quota has been exceeded for all the
  * authoritative servers for a zone.  Valid choices are
  * DNS_R_DROP or DNS_R_SERVFAIL.
@@ -698,16 +731,16 @@ dns_resolver_getquotaresponse(dns_resolver_t *resolver, dns_quotatype_t which);
  */
 
 void
-dns_resolver_dumpfetches(dns_resolver_t *resolver,
-			 isc_statsformat_t format, FILE *fp);
-
+dns_resolver_dumpfetches(dns_resolver_t *resolver, isc_statsformat_t format,
+			 FILE *fp);
 
 #ifdef ENABLE_AFL
 /*%
  * Enable fuzzing of resolver, changes behaviour and eliminates retries
  */
-void dns_resolver_setfuzzing(void);
-#endif
+void
+dns_resolver_setfuzzing(void);
+#endif /* ifdef ENABLE_AFL */
 
 ISC_LANG_ENDDECLS
 

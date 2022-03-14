@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -13,7 +15,8 @@ SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
 
 DIGOPTS="+tcp +noadd +nosea +nostat +noquest +nocomm +nocmd"
-DIGCMD="$DIG $DIGOPTS @10.53.0.2 -p ${PORT}"
+DIGOPTS=""
+DIGCMD="$DIG $DIGOPTS -p ${PORT}"
 RNDCCMD="$RNDC -p ${CONTROLPORT} -c ../common/rndc.conf -s"
 
 status=0
@@ -41,7 +44,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 echo_i "rndc freeze"
-$RNDCCMD 10.53.0.2 freeze | sed 's/^/ns2 /' | cat_i | cat_i
+$RNDCCMD 10.53.0.2 freeze | sed 's/^/ns2 /' | cat_i
 
 n=`expr $n + 1`
 echo_i "checking zone was dumped ($n)"
@@ -74,7 +77,7 @@ update add text2.nil. 600 IN TXT "addition 2"
 send
 END
 
-$DIGCMD text2.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text2.nil. TXT > dig.out.1.test$n
 grep 'addition 2' dig.out.1.test$n >/dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -91,7 +94,7 @@ zone nil.
 update add text3.nil. 600 IN TXT "addition 3"
 send
 END
-$DIGCMD text3.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text3.nil. TXT > dig.out.1.test$n
 grep 'addition 3' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -131,7 +134,7 @@ update add text4.nil. 600 IN TXT "addition 4"
 send
 END
 
-$DIGCMD text4.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n
 grep 'addition 4' dig.out.1.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -171,7 +174,7 @@ update add text5.nil. 600 IN TXT "addition 5"
 send
 END
 
-$DIGCMD text4.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n
 grep 'addition 4' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -227,7 +230,7 @@ do
 	grep "addition 6" ns2/other.db > /dev/null && break
 	sleep 1
 done
-serial=`awk '$3 == "serial" {print $1}' ns2/other.db`
+serial=`awk '$3 ~ /serial/ {print $1}' ns2/other.db`
 newserial=`expr $serial + 1`
 sed s/$serial/$newserial/ ns2/other.db > ns2/other.db.new
 echo 'frozen TXT "frozen addition"' >> ns2/other.db.new
@@ -243,11 +246,11 @@ zone other.
 update add text7.other. 600 IN TXT "addition 7"
 send
 END
-$DIGCMD text6.other. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text6.other. TXT > dig.out.1.test$n
 grep 'addition 6' dig.out.1.test$n >/dev/null || ret=1
-$DIGCMD text7.other. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.2 text7.other. TXT > dig.out.2.test$n
 grep 'addition 7' dig.out.2.test$n >/dev/null || ret=1
-$DIGCMD frozen.other. TXT > dig.out.3.test$n
+$DIGCMD @10.53.0.2 frozen.other. TXT > dig.out.3.test$n
 grep 'frozen addition' dig.out.3.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -270,7 +273,7 @@ do
 	grep "addition 6" ns2/nil.db > /dev/null && break
 	sleep 1
 done
-serial=`awk '$3 == "serial" {print $1}' ns2/nil.db`
+serial=`awk '$3 ~ /serial/ {print $1}' ns2/nil.db`
 newserial=`expr $serial + 1`
 sed s/$serial/$newserial/ ns2/nil.db > ns2/nil.db.new
 echo 'frozen TXT "frozen addition"' >> ns2/nil.db.new
@@ -286,11 +289,11 @@ zone nil.
 update add text7.nil. 600 IN TXT "addition 7"
 send
 END
-$DIGCMD text6.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text6.nil. TXT > dig.out.1.test$n
 grep 'addition 6' dig.out.1.test$n > /dev/null || ret=1
-$DIGCMD text7.nil. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.2 text7.nil. TXT > dig.out.2.test$n
 grep 'addition 7' dig.out.2.test$n > /dev/null || ret=1
-$DIGCMD frozen.nil. TXT > dig.out.3.test$n
+$DIGCMD @10.53.0.2 frozen.nil. TXT > dig.out.3.test$n
 grep 'frozen addition' dig.out.3.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -314,15 +317,7 @@ status=`expr $status + $ret`
 n=`expr $n + 1`
 echo_i "test 'rndc dumpdb' on a empty cache ($n)"
 ret=0
-$RNDCCMD 10.53.0.3 dumpdb > /dev/null || ret=1
-for i in 1 2 3 4 5 6 7 8 9
-do
-	tmp=0
-	grep "Dump complete" ns3/named_dump.db > /dev/null || tmp=1
-	[ $tmp -eq 0 ] && break
-	sleep 1
-done
-[ $tmp -eq 1 ] && ret=1
+rndc_dumpdb ns3 || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -422,10 +417,20 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 n=`expr $n + 1`
+echo_i "testing single control channel with multiple algorithms ($n)"
+ret=0
+for i in 1 2 3 4 5 6
+do
+        $RNDC -s 10.53.0.4 -p ${EXTRAPORT7} -c ns4/key${i}.conf status > /dev/null 2>&1 || ret=1
+done
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
 echo_i "testing automatic zones are reported ($n)"
 ret=0
 $RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf status > rndc.out.1.test$n || ret=1
-grep "number of zones: 200 (198 automatic)" rndc.out.1.test$n > /dev/null || ret=1
+grep "number of zones: 201 (198 automatic)" rndc.out.1.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -450,15 +455,24 @@ ret=0
 # first enable it with querylog on option
 $RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf querylog on >/dev/null 2>&1 || ret=1
 grep "query logging is now on" ns4/named.run > /dev/null || ret=1
-# query for builtin and check if query was logged
+# query for builtin and check if query was logged (without +subnet)
 $DIG @10.53.0.4 -p ${PORT} -c ch -t txt foo12345.bind > /dev/null || ret=1
-grep "query: foo12345.bind CH TXT" ns4/named.run > /dev/null || ret=1
+grep "query: foo12345.bind CH TXT.*(.*)$" ns4/named.run > /dev/null || ret=1
+# query for another builtin zone and check if query was logged (with +subnet=127.0.0.1)
+$DIG +subnet=127.0.0.1 @10.53.0.4 -p ${PORT} -c ch -t txt foo12346.bind > /dev/null || ret=1
+grep "query: foo12346.bind CH TXT.*\[ECS 127\.0\.0\.1\/32\/0]" ns4/named.run > /dev/null || ret=1
+# query for another builtin zone and check if query was logged (with +subnet=127.0.0.1/24)
+$DIG +subnet=127.0.0.1/24 @10.53.0.4 -p ${PORT} -c ch -t txt foo12347.bind > /dev/null || ret=1
+grep "query: foo12347.bind CH TXT.*\[ECS 127\.0\.0\.0\/24\/0]" ns4/named.run > /dev/null || ret=1
+# query for another builtin zone and check if query was logged (with +subnet=::1)
+$DIG +subnet=::1 @10.53.0.4 -p ${PORT} -c ch -t txt foo12348.bind > /dev/null || ret=1
+grep "query: foo12348.bind CH TXT.*\[ECS \:\:1\/128\/0]" ns4/named.run > /dev/null || ret=1
 # toggle query logging and check again
 $RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf querylog > /dev/null 2>&1 || ret=1
 grep "query logging is now off" ns4/named.run > /dev/null || ret=1
-# query for another builtin zone and check if query was logged
+# query for another builtin zone and check if query was logged (without +subnet)
 $DIG @10.53.0.4 -p ${PORT} -c ch -t txt foo9876.bind > /dev/null || ret=1
-grep "query: foo9876.bind CH TXT" ns4/named.run > /dev/null && ret=1
+grep "query: foo9876.bind CH TXT.*(.*)$" ns4/named.run > /dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -536,10 +550,32 @@ mv ns4/named.conf ns4/named.conf.save
 echo "error error error" >> ns4/named.conf
 $RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf reconfig > rndc.out.1.test$n 2>&1 && ret=1
 grep "rndc: 'reconfig' failed: unexpected token" rndc.out.1.test$n > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "check rndc status reports failure ($n)"
+ret=0
+$RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf status > rndc.out.1.test$n 2>&1 || ret=1
+grep "reload/reconfig failed" rndc.out.1.test$n > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "restore working config ($n)"
+ret=0
 mv ns4/named.conf.save ns4/named.conf
 sleep 1
 $RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf reconfig > /dev/null || ret=1
 sleep 1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "check 'rndc status' 'reload/reconfig failure' is cleared after successful reload/reconfig ($n)"
+ret=0
+$RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf status > rndc.out.1.test$n 2>&1 || ret=1
+grep "reload/reconfig failed" rndc.out.1.test$n > /dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -565,7 +601,7 @@ echo_i "test 'rndc reconfig' with loading of a large zone ($n)"
 ret=0
 cur=`awk 'BEGIN {l=0} /^/ {l++} END { print l }' ns6/named.run`
 cp ns6/named.conf ns6/named.conf.save
-echo "zone \"huge.zone\" { type master; file \"huge.zone.db\"; };" >> ns6/named.conf
+echo "zone \"huge.zone\" { type primary; file \"huge.zone.db\"; };" >> ns6/named.conf
 echo_i "reloading config"
 $RNDCCMD 10.53.0.6 reconfig > rndc.out.1.test$n 2>&1 || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
@@ -588,7 +624,7 @@ n=`expr $n + 1`
 echo_i "wait for the zones to be loaded ($n)"
 ret=1
 try=0
-while test $try -lt 100
+while test $try -lt 180
 do
     sleep 1
     sed -n "$cur,"'$p' < ns6/named.run | grep "any newly configured zones are now loaded" > /dev/null && {
@@ -648,6 +684,22 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 n=`expr $n + 1`
+echo_i "check rndc -4 -6 ($n)"
+ret=0
+$RNDCCMD 10.53.0.2 -4 -6 status > rndc.out.1.test$n 2>&1 && ret=1
+grep "only one of -4 and -6 allowed" rndc.out.1.test$n > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "check rndc -4 with an IPv6 server address ($n)"
+ret=0
+$RNDCCMD fd92:7065:b8e:ffff::2 -4 status > rndc.out.1.test$n 2>&1 && ret=1
+grep "address family not supported" rndc.out.1.test$n > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
 echo_i "check rndc nta reports adding to multiple views ($n)"
 ret=0
 $RNDCCMD 10.53.0.3 nta test.com > rndc.out.test$n 2>&1 || ret=1
@@ -655,6 +707,129 @@ lines=`cat rndc.out.test$n | wc -l`
 [ ${lines:-0} -eq 2 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "check 'rndc retransfer' of primary error message ($n)"
+ret=0
+$RNDCCMD 10.53.0.2 retransfer nil > rndc.out.test$n 2>&1 && ret=1
+grep "rndc: 'retransfer' failed: failure" rndc.out.test$n > /dev/null || ret=1
+grep "retransfer: inappropriate zone type: primary" rndc.out.test$n > /dev/null || ret=1
+lines=`cat rndc.out.test$n | wc -l`
+[ ${lines:-0} -eq 2 ] || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+n=$((n+1))
+echo_i "check 'rndc freeze' with in-view zones works ($n)"
+ret=0
+$RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf freeze > rndc.out.test$n 2>&1 || ret=1
+test -s rndc.out.test$n && sed 's/^/ns2 /' rndc.out.test$n | cat_i
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "checking non in-view zone instance is not writable ($n)"
+ret=0
+$NSUPDATE -p ${PORT} > /dev/null 2>&1 <<END && ret=1
+server 10.53.0.4
+zone example.
+update add text2.example. 600 IN TXT "addition 3"
+send
+END
+$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n
+grep 'addition 3' dig.out.1.test$n >/dev/null && ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "check 'rndc thaw' with in-view zones works ($n)"
+ret=0
+$RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf thaw > rndc.out.test$n 2>&1 || ret=1
+test -s rndc.out.test$n && sed 's/^/ns2 /' rndc.out.test$n | cat_i
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "checking non in-view zone instance is now writable ($n)"
+ret=0
+$NSUPDATE -p ${PORT} > nsupdate.out.test$n 2>&1 <<END || ret=1
+server 10.53.0.4
+zone example.
+update add text2.example. 600 IN TXT "addition 3"
+send
+END
+$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n
+grep 'addition 3' dig.out.1.test$n >/dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "checking initial in-view zone file is loaded ($n)"
+ret=0
+TSIG="hmac-sha1:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n
+grep 'include 1' dig.out.1.test$n >/dev/null || ret=1
+TSIG="hmac-sha1:ext:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n
+grep 'include 1' dig.out.2.test$n >/dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+echo_i "update in-view zone ($n)"
+ret=0
+TSIG="hmac-sha1:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$NSUPDATE -p ${PORT} -y "$TSIG" > /dev/null 2>&1 <<END || ret=1
+server 10.53.0.7
+zone test.
+update add text2.test. 600 IN TXT "addition 1"
+send
+END
+[ -s ns7/test.db.jnl ] || {
+	echo_i "'test -s ns7/test.db.jnl' failed when it shouldn't have"; ret=1;
+}
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+echo_i "checking update ($n)"
+ret=0
+TSIG="hmac-sha1:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$DIGCMD @10.53.0.7 -y "$TSIG" text2.test. TXT > dig.out.1.test$n
+grep 'addition 1' dig.out.1.test$n >/dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+nextpart ns7/named.run > /dev/null
+
+echo_i "rndc freeze"
+$RNDCCMD 10.53.0.7 freeze | sed 's/^/ns7 /' | cat_i | cat_i
+
+wait_for_log 3 "dump_done: zone test/IN/internal: enter" ns7/named.run
+
+echo_i "edit zone files"
+cp ns7/test.db.in ns7/test.db
+cp ns7/include2.db.in ns7/include.db
+
+echo_i "rndc thaw"
+$RNDCCMD 10.53.0.7 thaw | sed 's/^/ns7 /' | cat_i
+
+wait_for_log 3 "zone_postload: zone test/IN/internal: done" ns7/named.run
+
+echo_i "rndc reload"
+$RNDCCMD 10.53.0.7 reload | sed 's/^/ns7 /' | cat_i
+
+wait_for_log 3 "all zones loaded" ns7/named.run
+
+n=$((n+1))
+echo_i "checking zone file edits are loaded ($n)"
+ret=0
+TSIG="hmac-sha1:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n
+grep 'include 2' dig.out.1.test$n >/dev/null || ret=1
+TSIG="hmac-sha1:ext:FrSt77yPTFx6hTs4i2tKLB9LmE0="
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n
+grep 'include 2' dig.out.2.test$n >/dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
 
 echo_i "exit status: $status"
 [ $status -eq 0 ] || exit 1

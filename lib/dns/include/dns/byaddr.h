@@ -1,21 +1,22 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef DNS_BYADDR_H
 #define DNS_BYADDR_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/byaddr.h
  * \brief
@@ -40,10 +41,8 @@
  *\li	Drafts:	TBS
  */
 
-#include <stdbool.h>
-
-#include <isc/lang.h>
 #include <isc/event.h>
+#include <isc/lang.h>
 
 #include <dns/types.h>
 
@@ -58,20 +57,13 @@ ISC_LANG_BEGINDECLS
  */
 typedef struct dns_byaddrevent {
 	ISC_EVENT_COMMON(struct dns_byaddrevent);
-	isc_result_t			result;
-	dns_namelist_t			names;
+	isc_result_t   result;
+	dns_namelist_t names;
 } dns_byaddrevent_t;
 
-/*
- * This option is deprecated since we now only consider nibbles.
-#define DNS_BYADDROPT_IPV6NIBBLE	0x0001
- */
-/*% Note DNS_BYADDROPT_IPV6NIBBLE is now deprecated. */
-#define DNS_BYADDROPT_IPV6INT		0x0002
-
 isc_result_t
-dns_byaddr_create(isc_mem_t *mctx, isc_netaddr_t *address, dns_view_t *view,
-		  unsigned int options, isc_task_t *task,
+dns_byaddr_create(isc_mem_t *mctx, const isc_netaddr_t *address,
+		  dns_view_t *view, unsigned int options, isc_task_t *task,
 		  isc_taskaction_t action, void *arg, dns_byaddr_t **byaddrp);
 /*%<
  * Find the domain name of 'address'.
@@ -85,8 +77,6 @@ dns_byaddr_create(isc_mem_t *mctx, isc_netaddr_t *address, dns_view_t *view,
  * \code
  *   1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.e.f.ip6.arpa.
  * \endcode
- *
- *\li	#DNS_BYADDROPT_IPV6INT can be used to get nibble lookups under ip6.int.
  *
  * Requires:
  *
@@ -142,12 +132,8 @@ dns_byaddr_destroy(dns_byaddr_t **byaddrp);
  */
 
 isc_result_t
-dns_byaddr_createptrname(isc_netaddr_t *address, bool nibble,
+dns_byaddr_createptrname(const isc_netaddr_t *address, unsigned int options,
 			 dns_name_t *name);
-
-isc_result_t
-dns_byaddr_createptrname2(isc_netaddr_t *address, unsigned int options,
-			  dns_name_t *name);
 /*%<
  * Creates a name that would be used in a PTR query for this address.  The
  * nibble flag indicates that the 'nibble' format is to be used if an IPv6

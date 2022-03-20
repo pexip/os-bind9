@@ -32,3 +32,4 @@
 0032-Handle-DNAME-lookup-via-itself.patch
 0033-Disable-lame-ttl-cache.patch
 0034-Enable-lame-response-detection-even-with-disabled-la.patch
+0035-CVE-2021-25220.patch

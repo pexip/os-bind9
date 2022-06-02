@@ -1,16 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
-
-#include <config.h>
 
 #include <time.h>
 
@@ -27,4 +26,18 @@ isc_stdtime_get(isc_stdtime_t *t) {
 	REQUIRE(t != NULL);
 
 	(void)_time32(t);
+}
+
+void
+isc_stdtime_tostring(isc_stdtime_t t, char *out, size_t outlen) {
+	time_t when;
+
+	REQUIRE(out != NULL);
+	/* Minimum buffer as per ctime_r() specification. */
+	REQUIRE(outlen >= 26);
+
+	/* time_t and isc_stdtime_t might be different sizes */
+	when = t;
+	INSIST((ctime_s(out, outlen, &when) == 0));
+	*(out + strlen(out) - 1) = '\0';
 }

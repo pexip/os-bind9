@@ -1,10 +1,12 @@
 #!/usr/bin/env perl
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -37,9 +39,6 @@ if ($options{'o'}) {
 $nm_prog = "nm";
 $ostype = `uname -s`;
 chop($ostype);
-if ($ostype eq "SunOS" || $ostype eq "HP-UX") {
-	$nm_prog = "/usr/ccs/bin/nm -x"
-}
 
 if ($options{'i'}) {
 	open(SYMBOLS, $options{'i'}) || die "failed to open $options{'i'}";
@@ -52,35 +51,15 @@ open(TBLFILE, ">$outputfile") || die "failed to open output file: $outputfile";
 $nsyms = 0;
 while (<SYMBOLS>) {
 	my ($addr, $symbol) = (0, "");
-	if ($ostype eq "SunOS") {
-		if (/\[\d*\]\s*\|\s*0x([0-9a-f]*)\|\s*0x[0-9a-f]*\|FUNC\s*(.*)\|([^|]+)$/) {
-			next if ($2 =~ /UNDEF/); # skip undefined symbols
-			$addr = $1;
-			$symbol = $3;
-			chop($symbol);
-		}
-	} elsif ($ostype eq "HP-UX") {
-		if (/(\S*)\s*\|0x([0-9a-f]*)\|([^|]*\|entry|extern\|code)/) {
-			$addr = $2;
-			$symbol = $1;
-			# this filter catches a massive number of awkward
-			# symbols such as "$START$".  we are not interested in
-			# those and ignore them.
-			next if ($symbol =~ /\$/);
-		}
-	} else {
-		# *BSDs, Linux, etc.
-		if (/([0-9a-f]*)\s[tT]\s(.*)/) {
-			($addr, $symbol) = ($1, $2);
-			# heuristics: some compilers add a "_" to all program
-			# defined symbols.  Detect and fix it for a well known
-			# symbol of "main".
-			$need_uscorefix = 1 if ($symbol eq "_main");
-		}
+	# *BSDs, Linux, etc.
+	if (/([0-9a-f]*)\s[tT]\s(.*)/) {
+		($addr, $symbol) = ($1, $2);
+		# heuristics: some compilers add a "_" to all program
+		# defined symbols.  Detect and fix it for a well known
+		# symbol of "main".
+		$need_uscorefix = 1 if ($symbol eq "_main");
 	}
 	if ($symbol ne "") {
-		# XXX: HP-UX's nm can produce a duplicate entry for the same
-		# address.  Ignore duplicate entries except the first one.
 		next if ($symmap{$addr});
 
 		$symmap{$addr} = $symbol;

@@ -1,55 +1,34 @@
 /*
  * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * SPDX-License-Identifier: MPL-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND STICHTING NLNET
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * STICHTING NLNET BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
- * The development of Dynamically Loadable Zones (DLZ) for Bind 9 was
- * conceived and contributed by Rob Butler.
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ROB BUTLER
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * ROB BUTLER BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*
  * Copyright (C) 1999-2001, 2016  Internet Systems Consortium, Inc. ("ISC")
- * 
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <config.h>
-
-#include <dns/log.h>
-#include <dns/result.h>
+#include <stdbool.h>
 
 #include <isc/mem.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
+
+#include <dns/log.h>
+#include <dns/result.h>
 
 #include <dlz/sdlz_helper.h>
 
@@ -63,28 +42,29 @@
  */
 
 static void
-destroy_querylist(isc_mem_t *mctx, query_list_t **querylist)
-{
+destroy_querylist(isc_mem_t *mctx, query_list_t **querylist) {
 	query_segment_t *tseg = NULL;
 	query_segment_t *nseg = NULL;
 
 	REQUIRE(mctx != NULL);
 
 	/* if query list is null, nothing to do */
-	if (*querylist == NULL)
+	if (*querylist == NULL) {
 		return;
+	}
 
 	/* start at the top of the list */
 	nseg = ISC_LIST_HEAD(**querylist);
-	while (nseg != NULL) {	/* loop, until end of list */
+	while (nseg != NULL) { /* loop, until end of list */
 		tseg = nseg;
 		/*
 		 * free the query segment's text string but only if it
 		 * was really a query segment, and not a pointer to
 		 * %zone%, or %record%, or %client%
-		*/
-		if (tseg->sql != NULL && tseg->direct == true)
+		 */
+		if (tseg->sql != NULL && tseg->direct) {
 			isc_mem_free(mctx, tseg->sql);
+		}
 		/* get the next query segment, before we destroy this one. */
 		nseg = ISC_LIST_NEXT(nseg, link);
 		/* deallocate this query segment. */
@@ -98,55 +78,58 @@ destroy_querylist(isc_mem_t *mctx, query_list_t **querylist)
 static isc_result_t
 build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 		char **record, char **client, query_list_t **querylist,
-		unsigned int flags)
-{
+		unsigned int flags) {
 	isc_result_t result;
 	bool foundzone = false;
 	bool foundrecord = false;
 	bool foundclient = false;
+	char *free_me = NULL;
 	char *temp_str = NULL;
-	char *right_str = NULL;
 	query_list_t *tql;
 	query_segment_t *tseg = NULL;
+	char *last = NULL;
 
 	REQUIRE(querylist != NULL && *querylist == NULL);
 	REQUIRE(mctx != NULL);
 
 	/* if query string is null, or zero length */
 	if (query_str == NULL || strlen(query_str) < 1) {
-		if ((flags & SDLZH_REQUIRE_QUERY) == 0)
+		if ((flags & SDLZH_REQUIRE_QUERY) == 0) {
 			/* we don't need it were ok. */
 			return (ISC_R_SUCCESS);
-		else
+		} else {
 			/* we did need it, PROBLEM!!! */
 			return (ISC_R_FAILURE);
+		}
 	}
 
 	/* allocate memory for query list */
 	tql = isc_mem_get(mctx, sizeof(query_list_t));
-	/* couldn't allocate memory.  Problem!! */
-	if (tql == NULL)
-		return (ISC_R_NOMEMORY);
 
 	/* initialize the query segment list */
 	ISC_LIST_INIT(*tql);
 
 	/* make a copy of query_str so we can chop it up */
-	temp_str = right_str = isc_mem_strdup(mctx, query_str);
+	free_me = temp_str = isc_mem_strdup(mctx, query_str);
 	/* couldn't make a copy, problem!! */
-	if (right_str == NULL) {
+	if (temp_str == NULL) {
 		result = ISC_R_NOMEMORY;
 		goto cleanup;
 	}
 
 	/* loop through the string and chop it up */
-	while (right_str != NULL) {
+	for (;;) {
+		/*
+		 * Split string into tokens at '$'.
+		 */
+		const char *sql = strtok_r(temp_str, "$", &last);
+		if (sql == NULL) {
+			break;
+		}
+		temp_str = NULL;
+
 		/* allocate memory for tseg */
 		tseg = isc_mem_get(mctx, sizeof(query_segment_t));
-		if (tseg  == NULL) {	/* no memory, clean everything up. */
-			result = ISC_R_NOMEMORY;
-			goto cleanup;
-		}
 		tseg->sql = NULL;
 		tseg->direct = false;
 		/* initialize the query segment link */
@@ -154,18 +137,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 		/* append the query segment to the list */
 		ISC_LIST_APPEND(*tql, tseg, link);
 
-		/*
-		 * split string at the first "$". set query segment to
-		 * left portion
-		 */
-		tseg->sql = isc_mem_strdup(mctx,
-					   isc_string_separate(&right_str,
-							       "$"));
-		if (tseg->sql == NULL) {
-			/* no memory, clean everything up. */
-			result = ISC_R_NOMEMORY;
-			goto cleanup;
-		}
+		tseg->sql = isc_mem_strdup(mctx, sql);
 		/* tseg->sql points directly to a string. */
 		tseg->direct = true;
 		tseg->strlen = strlen(tseg->sql);
@@ -178,7 +150,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct zone string */
-			tseg->sql = (char**) zone;
+			tseg->sql = zone;
 			tseg->strlen = 0;
 			/* tseg->sql points in-directly to a string */
 			tseg->direct = false;
@@ -191,9 +163,9 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct record string */
-			tseg->sql = (char**) record;
+			tseg->sql = record;
 			tseg->strlen = 0;
-			/* tseg->sql points in-directly poinsts to a string */
+			/* tseg->sql points in-directly points to a string */
 			tseg->direct = false;
 			foundrecord = true;
 			/* check if we encountered "$client$" token */
@@ -204,23 +176,23 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct record string */
-			tseg->sql = (char**) client;
+			tseg->sql = client;
 			tseg->strlen = 0;
-			/* tseg->sql points in-directly poinsts to a string */
+			/* tseg->sql points in-directly points to a string */
 			tseg->direct = false;
 			foundclient = true;
 		}
 	}
 
 	/* we don't need temp_str any more */
-	isc_mem_free(mctx, temp_str);
+	isc_mem_free(mctx, free_me);
 	/*
 	 * add checks later to verify zone and record are found if
 	 * necessary.
 	 */
 
 	/* if this query requires %client%, make sure we found it */
-	if (((flags & SDLZH_REQUIRE_CLIENT) != 0) && (!foundclient) ) {
+	if (((flags & SDLZH_REQUIRE_CLIENT) != 0) && (!foundclient)) {
 		/* Write error message to log */
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_DLZ, ISC_LOG_ERROR,
@@ -230,7 +202,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 	}
 
 	/* if this query requires %record%, make sure we found it */
-	if (((flags & SDLZH_REQUIRE_RECORD) != 0) && (!foundrecord) ) {
+	if (((flags & SDLZH_REQUIRE_RECORD) != 0) && (!foundrecord)) {
 		/* Write error message to log */
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_DLZ, ISC_LOG_ERROR,
@@ -240,7 +212,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 	}
 
 	/* if this query requires %zone%, make sure we found it */
-	if (((flags & SDLZH_REQUIRE_ZONE) != 0) && (!foundzone) ) {
+	if (((flags & SDLZH_REQUIRE_ZONE) != 0) && (!foundzone)) {
 		/* Write error message to log */
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
 			      DNS_LOGMODULE_DLZ, ISC_LOG_ERROR,
@@ -250,21 +222,21 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 	}
 
 	/* pass back the query list */
-	*querylist = (query_list_t *) tql;
+	*querylist = (query_list_t *)tql;
 
 	/* return success */
 	return (ISC_R_SUCCESS);
 
- cleanup:
-	/* get rid of temp_str */
-	if (temp_str != NULL)
-		isc_mem_free(mctx, temp_str);
+cleanup:
+	/* get rid of free_me */
+	if (free_me != NULL) {
+		isc_mem_free(mctx, free_me);
+	}
 
- flag_fail:
+flag_fail:
 	/* get rid of what was build of the query list */
-	if (tql != NULL)
-		destroy_querylist(mctx, &tql);
-	return result;
+	destroy_querylist(mctx, &tql);
+	return (result);
 }
 
 /*%
@@ -273,8 +245,7 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
  * used to be in our queries from named.conf
  */
 char *
-sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
-{
+sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist) {
 	query_segment_t *tseg = NULL;
 	unsigned int length = 0;
 	char *qs = NULL;
@@ -289,45 +260,42 @@ sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
 		 * if this is a query segment, use the
 		 * precalculated string length
 		 */
-		if (tseg->direct == true)
+		if (tseg->direct) {
 			length += tseg->strlen;
-		else	/* calculate string length for dynamic segments. */
-			length += strlen(* (char**) tseg->sql);
+		} else { /* calculate string length for dynamic segments. */
+			length += strlen(*(char **)tseg->sql);
+		}
 		/* get the next segment */
 		tseg = ISC_LIST_NEXT(tseg, link);
 	}
 
 	/* allocate memory for the string */
 	qs = isc_mem_allocate(mctx, length + 1);
-	/* couldn't allocate memory,  We need more ram! */
-	if (qs == NULL)
-		return NULL;
 
 	*qs = 0;
 	/* start at the top of the list again */
 	tseg = ISC_LIST_HEAD(*querylist);
 	while (tseg != NULL) {
-		if (tseg->direct == true)
+		if (tseg->direct) {
 			/* query segments */
 			strcat(qs, tseg->sql);
-		else
+		} else {
 			/* dynamic segments */
-			strcat(qs, * (char**) tseg->sql);
+			strcat(qs, *(char **)tseg->sql);
+		}
 		/* get the next segment */
 		tseg = ISC_LIST_NEXT(tseg, link);
 	}
 
-	return qs;
+	return (qs);
 }
 
 /*% constructs a sql dbinstance (DBI) */
 isc_result_t
 sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
-			 const char *allowxfr_str, const char *authority_str,
-			 const char *findzone_str, const char *lookup_str,
-			 const char *countzone_str, dbinstance_t **dbi)
-{
-
+			  const char *allowxfr_str, const char *authority_str,
+			  const char *findzone_str, const char *lookup_str,
+			  const char *countzone_str, dbinstance_t **dbi) {
 	isc_result_t result;
 	dbinstance_t *db = NULL;
 
@@ -336,13 +304,6 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 
 	/* allocate and zero memory for driver structure */
 	db = isc_mem_get(mctx, sizeof(dbinstance_t));
-	if (db == NULL) {
-		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
-			      DNS_LOGMODULE_DLZ, ISC_LOG_ERROR,
-			      "Could not allocate memory for "
-			      "database instance object.");
-		return (ISC_R_NOMEMORY);
-	}
 	memset(db, 0, sizeof(dbinstance_t));
 	db->dbconn = NULL;
 	db->client = NULL;
@@ -361,18 +322,12 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	isc_mem_attach(mctx, &db->mctx);
 
 	/* initialize the reference count mutex */
-	result = isc_mutex_init(&db->instance_lock);
-	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_mutex_init() failed: %s",
-				 isc_result_totext(result));
-		goto cleanup;
-	}
+	isc_mutex_init(&db->instance_lock);
 
 	/* build the all nodes query list */
-	result = build_querylist(mctx, allnodes_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->allnodes_q, SDLZH_REQUIRE_ZONE);
+	result = build_querylist(mctx, allnodes_str, &db->zone, &db->record,
+				 &db->client, &db->allnodes_q,
+				 SDLZH_REQUIRE_ZONE);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -382,9 +337,8 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* build the allow zone transfer query list */
-	result = build_querylist(mctx, allowxfr_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->allowxfr_q,
+	result = build_querylist(mctx, allowxfr_str, &db->zone, &db->record,
+				 &db->client, &db->allowxfr_q,
 				 SDLZH_REQUIRE_ZONE | SDLZH_REQUIRE_CLIENT);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
@@ -395,9 +349,9 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* build the authority query, query list */
-	result = build_querylist(mctx, authority_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->authority_q, SDLZH_REQUIRE_ZONE);
+	result = build_querylist(mctx, authority_str, &db->zone, &db->record,
+				 &db->client, &db->authority_q,
+				 SDLZH_REQUIRE_ZONE);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -407,9 +361,9 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* build findzone query, query list */
-	result = build_querylist(mctx, findzone_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->findzone_q, SDLZH_REQUIRE_ZONE);
+	result = build_querylist(mctx, findzone_str, &db->zone, &db->record,
+				 &db->client, &db->findzone_q,
+				 SDLZH_REQUIRE_ZONE);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -419,9 +373,9 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* build countzone query, query list */
-	result = build_querylist(mctx, countzone_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->countzone_q, SDLZH_REQUIRE_ZONE);
+	result = build_querylist(mctx, countzone_str, &db->zone, &db->record,
+				 &db->client, &db->countzone_q,
+				 SDLZH_REQUIRE_ZONE);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -431,9 +385,9 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* build lookup query, query list */
-	result = build_querylist(mctx, lookup_str, &db->zone,
-				 &db->record, &db->client,
-				 &db->lookup_q, SDLZH_REQUIRE_RECORD);
+	result = build_querylist(mctx, lookup_str, &db->zone, &db->record,
+				 &db->client, &db->lookup_q,
+				 SDLZH_REQUIRE_RECORD);
 	/* if unsuccessful, log err msg and cleanup */
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
@@ -443,12 +397,12 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	}
 
 	/* pass back the db instance */
-	*dbi = (dbinstance_t *) db;
+	*dbi = (dbinstance_t *)db;
 
 	/* return success */
 	return (ISC_R_SUCCESS);
 
- cleanup:
+cleanup:
 	/* destroy whatever was build of the db instance */
 	destroy_sqldbinstance(db);
 	/* return failure */
@@ -456,8 +410,7 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 }
 
 void
-sdlzh_destroy_sqldbinstance(dbinstance_t *dbi)
-{
+sdlzh_destroy_sqldbinstance(dbinstance_t *dbi) {
 	isc_mem_t *mctx;
 
 	/* save mctx for later */
@@ -472,33 +425,34 @@ sdlzh_destroy_sqldbinstance(dbinstance_t *dbi)
 	destroy_querylist(mctx, &dbi->lookup_q);
 
 	/* get rid of the mutex */
-	(void) isc_mutex_destroy(&dbi->instance_lock);
+	(void)isc_mutex_destroy(&dbi->instance_lock);
 
 	/* return, and detach the memory */
-	isc_mem_put(mctx, dbi, sizeof(dbinstance_t));
-	isc_mem_detach(&mctx);
+	isc_mem_putanddetach(&mctx, dbi, sizeof(dbinstance_t));
 }
 
 char *
-sdlzh_get_parameter_value(isc_mem_t *mctx, const char *input, const char* key)
-{
+sdlzh_get_parameter_value(isc_mem_t *mctx, const char *input, const char *key) {
 	int keylen;
 	char *keystart;
 	char value[255];
 	int i;
 
-	if (key == NULL || input == NULL || strlen(input) < 1)
-		return NULL;
+	if (key == NULL || input == NULL || strlen(input) < 1) {
+		return (NULL);
+	}
 
 	keylen = strlen(key);
 
-	if (keylen < 1)
-		return NULL;
+	if (keylen < 1) {
+		return (NULL);
+	}
 
 	keystart = strstr(input, key);
 
-	if (keystart == NULL)
-		return NULL;
+	if (keystart == NULL) {
+		return (NULL);
+	}
 
 	REQUIRE(mctx != NULL);
 
@@ -510,5 +464,5 @@ sdlzh_get_parameter_value(isc_mem_t *mctx, const char *input, const char* key)
 		}
 	}
 
-	return isc_mem_strdup(mctx, value);
+	return (isc_mem_strdup(mctx, value));
 }

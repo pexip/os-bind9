@@ -1,13 +1,13 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
-
-# $Id: Makefile.in,v 1.2 2009/10/05 12:07:08 fdupont Exp $
 
 srcdir =	@srcdir@
 VPATH =		@srcdir@
@@ -19,7 +19,7 @@ CINCLUDES =	${ISC_INCLUDES}
 
 CDEFINES =
 
-ISCLIBS =	../../lib/isc/libisc.@A@ @ISC_OPENSSL_LIBS@
+ISCLIBS =	../../lib/isc/libisc.@A@ @NO_LIBTOOL_ISCLIBS@
 
 ISCDEPLIBS =	../../lib/isc/libisc.@A@
 
@@ -36,13 +36,6 @@ SRCS =		pkcs11-list.c pkcs11-destroy.c \
 		pkcs11-keygen.c pkcs11-tokens.c
 OBJS =		pkcs11-list.@O@ pkcs11-destroy.@O@ \
 		pkcs11-keygen.@O@ pkcs11-tokens.@O@
-
-
-MANPAGES =	pkcs11-list.8 pkcs11-destroy.8 \
-		pkcs11-keygen.8 pkcs11-tokens.8
-HTMLPAGES =	pkcs11-list.html pkcs11-destroy.html \
-		pkcs11-keygen.html pkcs11-tokens.html
-MANOBJS =	${MANPAGES} ${HTMLPAGES}
 
 @BIND9_MAKE_RULES@
 
@@ -62,14 +55,8 @@ pkcs11-tokens@EXEEXT@: pkcs11-tokens.@O@ ${DEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${ALL_CFLAGS} ${LDFLAGS} \
 		-o $@ pkcs11-tokens.@O@ ${LIBS}
 
-doc man:: ${MANOBJS}
-
-docclean manclean maintainer-clean::
-	rm -f ${MANOBJS}
-
 installdirs:
 	$(SHELL) ${top_srcdir}/mkinstalldirs ${DESTDIR}${sbindir}
-	$(SHELL) ${top_srcdir}/mkinstalldirs ${DESTDIR}${mandir}/man8
 
 install:: ${TARGETS} installdirs
 	${LIBTOOL_MODE_INSTALL} ${INSTALL_PROGRAM} pkcs11-list@EXEEXT@ \
@@ -80,16 +67,8 @@ install:: ${TARGETS} installdirs
 		${DESTDIR}${sbindir}
 	${LIBTOOL_MODE_INSTALL} ${INSTALL_PROGRAM} pkcs11-tokens@EXEEXT@ \
 		${DESTDIR}${sbindir}
-	${INSTALL_DATA} ${srcdir}/pkcs11-list.8 ${DESTDIR}${mandir}/man8
-	${INSTALL_DATA} ${srcdir}/pkcs11-destroy.8 ${DESTDIR}${mandir}/man8
-	${INSTALL_DATA} ${srcdir}/pkcs11-keygen.8 ${DESTDIR}${mandir}/man8
-	${INSTALL_DATA} ${srcdir}/pkcs11-tokens.8 ${DESTDIR}${mandir}/man8
 
 uninstall::
-	rm -f ${DESTDIR}${mandir}/man8/pkcs11-tokens.8
-	rm -f ${DESTDIR}${mandir}/man8/pkcs11-keygen.8
-	rm -f ${DESTDIR}${mandir}/man8/pkcs11-destroy.8
-	rm -f ${DESTDIR}${mandir}/man8/pkcs11-list.8
 	${LIBTOOL_MODE_UNINSTALL} rm -f /
 		${DESTDIR}${sbindir}/pkcs11-tokens@EXEEXT@
 	${LIBTOOL_MODE_UNINSTALL} rm -f /

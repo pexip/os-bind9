@@ -1,15 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
-#include <config.h>
 
 #include <isc/mem.h>
 #include <isc/util.h>
@@ -23,26 +23,20 @@ main(int argc, char *argv[]) {
 	void *tmp;
 	isc_mempool_t *mp1, *mp2;
 	unsigned int i, j;
-	isc_mutex_t lock;
 
 	UNUSED(argc);
 	UNUSED(argv);
 
 	isc_mem_debugging = ISC_MEM_DEBUGRECORD;
 
-	RUNTIME_CHECK(isc_mutex_init(&lock) == ISC_R_SUCCESS);
-
 	mctx = NULL;
-	RUNTIME_CHECK(isc_mem_create(0, 0, &mctx) == ISC_R_SUCCESS);
+	isc_mem_create(&mctx);
 
 	mp1 = NULL;
-	RUNTIME_CHECK(isc_mempool_create(mctx, 24, &mp1) == ISC_R_SUCCESS);
+	isc_mempool_create(mctx, 24, &mp1);
 
 	mp2 = NULL;
-	RUNTIME_CHECK(isc_mempool_create(mctx, 31, &mp2) == ISC_R_SUCCESS);
-
-	isc_mempool_associatelock(mp1, &lock);
-	isc_mempool_associatelock(mp2, &lock);
+	isc_mempool_create(mctx, 31, &mp2);
 
 	isc_mem_stats(mctx, stderr);
 
@@ -113,8 +107,6 @@ main(int argc, char *argv[]) {
 	isc_mem_stats(mctx, stderr);
 
 	isc_mem_destroy(&mctx);
-
-	DESTROYLOCK(&lock);
 
 	return (0);
 }

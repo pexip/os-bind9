@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef ISC_LFSR_H
 #define ISC_LFSR_H 1
@@ -38,21 +39,19 @@ typedef void (*isc_lfsrreseed_t)(isc_lfsr_t *, void *);
  * needs to be taken to not change state once the lfsr is in operation.
  */
 struct isc_lfsr {
-	uint32_t		state;	/*%< previous state */
-	unsigned int		bits;	/*%< length */
-	uint32_t		tap;	/*%< bit taps */
-	unsigned int		count;	/*%< reseed count (in BITS!) */
-	isc_lfsrreseed_t	reseed;	/*%< reseed function */
-	void		       *arg;	/*%< reseed function argument */
+	uint32_t	 state;	 /*%< previous state */
+	unsigned int	 bits;	 /*%< length */
+	uint32_t	 tap;	 /*%< bit taps */
+	unsigned int	 count;	 /*%< reseed count (in BITS!) */
+	isc_lfsrreseed_t reseed; /*%< reseed function */
+	void	     *arg;	 /*%< reseed function argument */
 };
 
 ISC_LANG_BEGINDECLS
 
-
 void
-isc_lfsr_init(isc_lfsr_t *lfsr, uint32_t state, unsigned int bits,
-		   uint32_t tap, unsigned int count,
-		   isc_lfsrreseed_t reseed, void *arg);
+isc_lfsr_init(isc_lfsr_t *lfsr, uint32_t state, unsigned int bits, uint32_t tap,
+	      unsigned int count, isc_lfsrreseed_t reseed, void *arg);
 /*%<
  * Initialize an LFSR.
  *

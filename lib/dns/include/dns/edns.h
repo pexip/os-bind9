@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -22,6 +24,6 @@
  * Warning: this currently disables sending COOKIE requests in resolver.c
  */
 #define DNS_EDNS_VERSION 1 /* draft-andrews-edns1 */
-#endif
+#endif			   /* ifdef DRAFT_ANDREWS_EDNS1 */
 
-#endif
+#endif /* ifndef DNS_EDNS_H */

@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -13,32 +15,22 @@
 # Set up interface aliases for bind9 system tests.
 #
 # IPv4: 10.53.0.{1..10}				RFC 1918
-#       10.53.1.{0..2}
-#       10.53.2.{0..2}
+#       10.53.1.{1..2}
+#       10.53.2.{1..2}
 # IPv6: fd92:7065:b8e:ffff::{1..10}		ULA
 #       fd92:7065:b8e:99ff::{1..2}
 #       fd92:7065:b8e:ff::{1..2}
 #
+# We also set the MTU on the 1500 bytes to match the default MTU on physical
+# interfaces, so we can properly test the cases with packets bigger than
+# interface MTU.
 
-config_guess=""
-for f in ./config.guess ../../../config.guess
-do
-	if test -f $f
-	then
-		config_guess=$f
-	fi
-done
+SYSTEMTESTTOP="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+. "$SYSTEMTESTTOP/conf.sh"
 
-if test "X$config_guess" = "X"
-then
-	cat <<EOF >&2
-$0: must be run from the top level source directory or the
-bin/tests/system directory
-EOF
-	exit 1
-fi
+export SYSTEMTESTTOP
 
-sys=`sh $config_guess`
+sys=$($SHELL "$TOP/config.guess")
 
 use_ip=
 case "$sys" in
@@ -81,6 +73,7 @@ case "$1" in
 			    *-*-solaris2.[8-9]|*-*-solaris2.1[0-9])
 				/sbin/ifconfig lo0:$int plumb
 				/sbin/ifconfig lo0:$int 10.53.$i.$ns up
+				/sbin/ifconfig lo0:$int mtu 1500
 				/sbin/ifconfig lo0:$int inet6 plumb
 				[ "$ipv6" ] && /sbin/ifconfig lo0:$int \
 					inet6 fd92:7065:b8e:${ipv6}ff::$ns up
@@ -89,31 +82,29 @@ case "$1" in
                                 if [ $use_ip ]; then
                                         ip address add 10.53.$i.$ns/24 \
                                             dev lo:$int
+                                        ip link set dev lo:$int mtu 1500
                                         [ "$ipv6" ] && ip address add \
                                             fd92:7065:b8e:${ipv6}ff::$ns/64 \
                                             dev lo
                                 else
                                         ifconfig lo:$int 10.53.$i.$ns up \
-                                                netmask 255.255.255.0
+                                                netmask 255.255.255.0 \
+                                                mtu 1500
                                         [ "$ipv6" ] && ifconfig lo inet6 add \
                                                 fd92:7065:b8e:${ipv6}ff::$ns/64
                                 fi
 				;;
 			    *-unknown-freebsd*)
 				ifconfig lo0 10.53.$i.$ns alias \
-					netmask 0xffffffff
+					netmask 0xffffffff \
+					mtu 1500
 				[ "$ipv6" ] && ifconfig lo0 inet6 \
 					fd92:7065:b8e:${ipv6}ff::$ns alias
 				;;
-			    *-unknown-netbsd*)
+			    *-unknown-dragonfly*|*-unknown-netbsd*|*-unknown-openbsd*)
 				ifconfig lo0 10.53.$i.$ns alias \
-					netmask 255.255.255.0
-				[ "$ipv6" ] && ifconfig lo0 inet6 \
-					fd92:7065:b8e:${ipv6}ff::$ns alias
-				;;
-			    *-unknown-openbsd*)
-				ifconfig lo0 10.53.$i.$ns alias \
-					netmask 255.255.255.0
+					netmask 255.255.255.0 \
+					mtu 1500
 				[ "$ipv6" ] && ifconfig lo0 inet6 \
 					fd92:7065:b8e:${ipv6}ff::$ns alias
 				;;

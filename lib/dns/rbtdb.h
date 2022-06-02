@@ -1,24 +1,26 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef DNS_RBTDB_H
 #define DNS_RBTDB_H 1
 
 #include <isc/lang.h>
+
 #include <dns/types.h>
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file
  * \brief
@@ -28,7 +30,7 @@
 ISC_LANG_BEGINDECLS
 
 isc_result_t
-dns_rbtdb_create(isc_mem_t *mctx, dns_name_t *base, dns_dbtype_t type,
+dns_rbtdb_create(isc_mem_t *mctx, const dns_name_t *base, dns_dbtype_t type,
 		 dns_rdataclass_t rdclass, unsigned int argc, char *argv[],
 		 void *driverarg, dns_db_t **dbp);
 

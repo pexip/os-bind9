@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -13,24 +15,21 @@ top_srcdir =	@top_srcdir@
 
 @BIND9_MAKE_INCLUDES@
 
-PROVIDER =	@PKCS11_PROVIDER@
-
 CINCLUDES =	${ISC_INCLUDES}
+CDEFINES =
 
-CDEFINES =	-DPK11_LIB_LOCATION=\"${PROVIDER}\"
-
-ISCLIBS =	../../../../lib/isc/libisc.@A@ @ISC_OPENSSL_LIBS@
+ISCLIBS =	../../../../lib/isc/libisc.@A@ @NO_LIBTOOL_ISCLIBS@
 
 LIBS =		${ISCLIBS} @LIBS@
 
 SUBDIRS =
 
-TARGETS =	session@EXEEXT@ login@EXEEXT@ random@EXEEXT@ \
-		sha1@EXEEXT@ create@EXEEXT@ find@EXEEXT@ \
+TARGETS =	session@EXEEXT@ login@EXEEXT@ \
+		create@EXEEXT@ find@EXEEXT@ \
 		pubrsa@EXEEXT@ privrsa@EXEEXT@ genrsa@EXEEXT@ \
 		sign@EXEEXT@ verify@EXEEXT@
 
-SRCS =		session.c login.c random.c sha1.c create.c find.c \
+SRCS =		session.c login.c create.c find.c \
 		pubrsa.c privrsa.c genrsa.c sign.c verify.c
 
 @BIND9_MAKE_RULES@
@@ -42,14 +41,6 @@ session@EXEEXT@: @srcdir@/session.c
 login@EXEEXT@: @srcdir@/login.c
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${ALL_CFLAGS} ${LDFLAGS} \
 		-o $@ @srcdir@/login.c ${LIBS}
-
-random@EXEEXT@: @srcdir@/random.c
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${ALL_CFLAGS} ${LDFLAGS} \
-		-o $@ @srcdir@/random.c ${LIBS}
-
-sha1@EXEEXT@: @srcdir@/sha1.c
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${ALL_CFLAGS} ${LDFLAGS} \
-		-o $@ @srcdir@/sha1.c ${LIBS}
 
 create@EXEEXT@: @srcdir@/create.c
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${ALL_CFLAGS} ${LDFLAGS} \

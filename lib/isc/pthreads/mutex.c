@@ -1,53 +1,53 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 /*! \file */
 
-#include <config.h>
-
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <time.h>
 #include <sys/time.h>
-#include <errno.h>
+#include <time.h>
 
 #include <isc/mutex.h>
-#include <isc/util.h>
-#include <isc/print.h>
-#include <isc/strerror.h>
 #include <isc/once.h>
+#include <isc/print.h>
+#include <isc/strerr.h>
+#include <isc/string.h>
+#include <isc/util.h>
 
 #if ISC_MUTEX_PROFILE
 
 /*@{*/
 /*% Operations on timevals; adapted from FreeBSD's sys/time.h */
-#define timevalclear(tvp)      ((tvp)->tv_sec = (tvp)->tv_usec = 0)
-#define timevaladd(vvp, uvp)						\
-	do {								\
-		(vvp)->tv_sec += (uvp)->tv_sec;				\
-		(vvp)->tv_usec += (uvp)->tv_usec;			\
-		if ((vvp)->tv_usec >= 1000000) {			\
-			(vvp)->tv_sec++;				\
-			(vvp)->tv_usec -= 1000000;			\
-		}							\
+#define timevalclear(tvp) ((tvp)->tv_sec = (tvp)->tv_usec = 0)
+#define timevaladd(vvp, uvp)                       \
+	do {                                       \
+		(vvp)->tv_sec += (uvp)->tv_sec;    \
+		(vvp)->tv_usec += (uvp)->tv_usec;  \
+		if ((vvp)->tv_usec >= 1000000) {   \
+			(vvp)->tv_sec++;           \
+			(vvp)->tv_usec -= 1000000; \
+		}                                  \
 	} while (0)
-#define timevalsub(vvp, uvp)						\
-	do {								\
-		(vvp)->tv_sec -= (uvp)->tv_sec;				\
-		(vvp)->tv_usec -= (uvp)->tv_usec;			\
-		if ((vvp)->tv_usec < 0) {				\
-			(vvp)->tv_sec--;				\
-			(vvp)->tv_usec += 1000000;			\
-		}							\
+#define timevalsub(vvp, uvp)                       \
+	do {                                       \
+		(vvp)->tv_sec -= (uvp)->tv_sec;    \
+		(vvp)->tv_usec -= (uvp)->tv_usec;  \
+		if ((vvp)->tv_usec < 0) {          \
+			(vvp)->tv_sec--;           \
+			(vvp)->tv_usec += 1000000; \
+		}                                  \
 	} while (0)
 
 /*@}*/
@@ -55,47 +55,48 @@
 #define ISC_MUTEX_MAX_LOCKERS 32
 
 typedef struct {
-	const char *		file;
-	int			line;
-	unsigned		count;
-	struct timeval		locked_total;
-	struct timeval		wait_total;
+	const char *file;
+	int line;
+	unsigned count;
+	struct timeval locked_total;
+	struct timeval wait_total;
 } isc_mutexlocker_t;
 
 struct isc_mutexstats {
-	const char *		file;	/*%< File mutex was created in. */
-	int			line;	/*%< Line mutex was created on. */
-	unsigned		count;
-	struct timeval		lock_t;
-	struct timeval		locked_total;
-	struct timeval		wait_total;
-	isc_mutexlocker_t *	cur_locker;
-	isc_mutexlocker_t	lockers[ISC_MUTEX_MAX_LOCKERS];
+	const char *file; /*%< File mutex was created in. */
+	int line;	  /*%< Line mutex was created on. */
+	unsigned count;
+	struct timeval lock_t;
+	struct timeval locked_total;
+	struct timeval wait_total;
+	isc_mutexlocker_t *cur_locker;
+	isc_mutexlocker_t lockers[ISC_MUTEX_MAX_LOCKERS];
 };
 
 #ifndef ISC_MUTEX_PROFTABLESIZE
 #define ISC_MUTEX_PROFTABLESIZE (1024 * 1024)
-#endif
+#endif /* ifndef ISC_MUTEX_PROFTABLESIZE */
 static isc_mutexstats_t stats[ISC_MUTEX_PROFTABLESIZE];
 static int stats_next = 0;
 static bool stats_init = false;
 static pthread_mutex_t statslock = PTHREAD_MUTEX_INITIALIZER;
 
-
-isc_result_t
+void
 isc_mutex_init_profile(isc_mutex_t *mp, const char *file, int line) {
 	int i, err;
 
 	err = pthread_mutex_init(&mp->mutex, NULL);
-	if (err == ENOMEM)
-		return (ISC_R_NOMEMORY);
-	if (err != 0)
-		return (ISC_R_UNEXPECTED);
+	if (err != 0) {
+		strerror_r(err, strbuf, sizeof(strbuf));
+		isc_error_fatal(file, line, "pthread_mutex_init failed: %s",
+				strbuf);
+	}
 
 	RUNTIME_CHECK(pthread_mutex_lock(&statslock) == 0);
 
-	if (stats_init == false)
+	if (!stats_init) {
 		stats_init = true;
+	}
 
 	/*
 	 * If all statistics entries have been used, give up and trigger an
@@ -122,8 +123,6 @@ isc_mutex_init_profile(isc_mutex_t *mp, const char *file, int line) {
 		timevalclear(&mp->stats->lockers[i].locked_total);
 		timevalclear(&mp->stats->lockers[i].wait_total);
 	}
-
-	return (ISC_R_SUCCESS);
 }
 
 isc_result_t
@@ -135,8 +134,9 @@ isc_mutex_lock_profile(isc_mutex_t *mp, const char *file, int line) {
 
 	gettimeofday(&prelock_t, NULL);
 
-	if (pthread_mutex_lock(&mp->mutex) != 0)
+	if (pthread_mutex_lock(&mp->mutex) != 0) {
 		return (ISC_R_UNEXPECTED);
+	}
 
 	gettimeofday(&postlock_t, NULL);
 	mp->stats->lock_t = postlock_t;
@@ -153,7 +153,8 @@ isc_mutex_lock_profile(isc_mutex_t *mp, const char *file, int line) {
 			locker->line = line;
 			break;
 		} else if (mp->stats->lockers[i].file == file &&
-			   mp->stats->lockers[i].line == line) {
+			   mp->stats->lockers[i].line == line)
+		{
 			locker = &mp->stats->lockers[i];
 			break;
 		}
@@ -184,10 +185,9 @@ isc_mutex_unlock_profile(isc_mutex_t *mp, const char *file, int line) {
 		mp->stats->cur_locker = NULL;
 	}
 
-	return ((pthread_mutex_unlock((&mp->mutex)) == 0) ? \
-		ISC_R_SUCCESS : ISC_R_UNEXPECTED);
+	return ((pthread_mutex_unlock((&mp->mutex)) == 0) ? ISC_R_SUCCESS
+							  : ISC_R_UNEXPECTED);
 }
-
 
 void
 isc_mutex_statsprofile(FILE *fp) {
@@ -200,20 +200,20 @@ isc_mutex_statsprofile(FILE *fp) {
 			stats[i].file, stats[i].line, stats[i].count,
 			stats[i].locked_total.tv_sec,
 			stats[i].locked_total.tv_usec,
-			stats[i].wait_total.tv_sec,
-			stats[i].wait_total.tv_usec,
+			stats[i].wait_total.tv_sec, stats[i].wait_total.tv_usec,
 			i);
 		for (j = 0; j < ISC_MUTEX_MAX_LOCKERS; j++) {
 			locker = &stats[i].lockers[j];
-			if (locker->file == NULL)
+			if (locker->file == NULL) {
 				continue;
-			fprintf(fp, " %-11s %4d: %10u  %lu.%06lu %lu.%06lu %5d\n",
+			}
+			fprintf(fp,
+				" %-11s %4d: %10u  %lu.%06lu %lu.%06lu %5d\n",
 				locker->file, locker->line, locker->count,
 				locker->locked_total.tv_sec,
 				locker->locked_total.tv_usec,
 				locker->wait_total.tv_sec,
-				locker->wait_total.tv_usec,
-				i);
+				locker->wait_total.tv_usec, i);
 		}
 	}
 }
@@ -229,12 +229,12 @@ static isc_once_t once_errcheck = ISC_ONCE_INIT;
 static void
 initialize_errcheck(void) {
 	RUNTIME_CHECK(pthread_mutexattr_init(&errcheck) == 0);
-	RUNTIME_CHECK(pthread_mutexattr_settype
-		      (&errcheck, PTHREAD_MUTEX_ERRORCHECK) == 0);
+	RUNTIME_CHECK(pthread_mutexattr_settype(&errcheck,
+						PTHREAD_MUTEX_ERRORCHECK) == 0);
 	errcheck_initialized = true;
 }
 
-isc_result_t
+void
 isc_mutex_init_errcheck(isc_mutex_t *mp) {
 	isc_result_t result;
 	int err;
@@ -243,20 +243,24 @@ isc_mutex_init_errcheck(isc_mutex_t *mp) {
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	err = pthread_mutex_init(mp, &errcheck);
-	if (err == ENOMEM)
-		return (ISC_R_NOMEMORY);
-	return ((err == 0) ? ISC_R_SUCCESS : ISC_R_UNEXPECTED);
+	if (err != 0) {
+		strerror_r(err, strbuf, sizeof(strbuf));
+		isc_error_fatal(file, line, "pthread_mutex_init failed: %s",
+				strbuf);
+	}
 }
-#endif
+#endif /* if ISC_MUTEX_DEBUG && defined(PTHREAD_MUTEX_ERRORCHECK) */
 
 #if ISC_MUTEX_DEBUG && defined(__NetBSD__) && defined(PTHREAD_MUTEX_ERRORCHECK)
 pthread_mutexattr_t isc__mutex_attrs = {
-	PTHREAD_MUTEX_ERRORCHECK,	/* m_type */
-	0				/* m_flags, which appears to be unused. */
+	PTHREAD_MUTEX_ERRORCHECK, /* m_type */
+	0			  /* m_flags, which appears to be unused. */
 };
-#endif
+#endif /* if ISC_MUTEX_DEBUG && defined(__NetBSD__) && \
+	* defined(PTHREAD_MUTEX_ERRORCHECK) */
 
-#if !(ISC_MUTEX_DEBUG && defined(PTHREAD_MUTEX_ERRORCHECK)) && !ISC_MUTEX_PROFILE
+#if !(ISC_MUTEX_DEBUG && defined(PTHREAD_MUTEX_ERRORCHECK)) && \
+	!ISC_MUTEX_PROFILE
 
 #ifdef HAVE_PTHREAD_MUTEX_ADAPTIVE_NP
 static bool attr_initialized = false;
@@ -268,35 +272,31 @@ static isc_once_t once_attr = ISC_ONCE_INIT;
 static void
 initialize_attr(void) {
 	RUNTIME_CHECK(pthread_mutexattr_init(&attr) == 0);
-	RUNTIME_CHECK(pthread_mutexattr_settype
-		      (&attr, PTHREAD_MUTEX_ADAPTIVE_NP) == 0);
+	RUNTIME_CHECK(pthread_mutexattr_settype(
+			      &attr, PTHREAD_MUTEX_ADAPTIVE_NP) == 0);
 	attr_initialized = true;
 }
 #endif /* HAVE_PTHREAD_MUTEX_ADAPTIVE_NP */
 
-isc_result_t
+void
 isc__mutex_init(isc_mutex_t *mp, const char *file, unsigned int line) {
-	char strbuf[ISC_STRERRORSIZE];
-	isc_result_t result = ISC_R_SUCCESS;
 	int err;
 
 #ifdef HAVE_PTHREAD_MUTEX_ADAPTIVE_NP
+	isc_result_t result = ISC_R_SUCCESS;
 	result = isc_once_do(&once_attr, initialize_attr);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	err = pthread_mutex_init(mp, &attr);
-#else /* HAVE_PTHREAD_MUTEX_ADAPTIVE_NP */
+#else  /* HAVE_PTHREAD_MUTEX_ADAPTIVE_NP */
 	err = pthread_mutex_init(mp, ISC__MUTEX_ATTRS);
 #endif /* HAVE_PTHREAD_MUTEX_ADAPTIVE_NP */
-
-	if (err == ENOMEM)
-		return (ISC_R_NOMEMORY);
 	if (err != 0) {
-		isc__strerror(err, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(file, line, "isc_mutex_init() failed: %s",
-				 strbuf);
-		result = ISC_R_UNEXPECTED;
+		char strbuf[ISC_STRERRORSIZE];
+		strerror_r(err, strbuf, sizeof(strbuf));
+		isc_error_fatal(file, line, "pthread_mutex_init failed: %s",
+				strbuf);
 	}
-	return (result);
 }
-#endif
+#endif /* if !(ISC_MUTEX_DEBUG && defined(PTHREAD_MUTEX_ERRORCHECK)) && \
+	* !ISC_MUTEX_PROFILE */

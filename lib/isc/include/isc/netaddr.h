@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef ISC_NETADDR_H
 #define ISC_NETADDR_H 1
@@ -25,18 +26,22 @@
 #ifdef ISC_PLATFORM_HAVESYSUNH
 #include <sys/types.h>
 #include <sys/un.h>
-#endif
+#endif /* ifdef ISC_PLATFORM_HAVESYSUNH */
 
 ISC_LANG_BEGINDECLS
 
+/*
+ * Any updates to this structure should also be applied in
+ * contrib/modules/dlz/dlz_minmal.h.
+ */
 struct isc_netaddr {
 	unsigned int family;
 	union {
-		struct in_addr in;
+		struct in_addr	in;
 		struct in6_addr in6;
 #ifdef ISC_PLATFORM_HAVESYSUNH
 		char un[sizeof(((struct sockaddr_un *)0)->sun_path)];
-#endif
+#endif /* ifdef ISC_PLATFORM_HAVESYSUNH */
 	} type;
 	uint32_t zone;
 };
@@ -127,32 +132,38 @@ isc_netaddr_any6(isc_netaddr_t *netaddr);
  * Return the IPv6 wildcard address.
  */
 
+void
+isc_netaddr_unspec(isc_netaddr_t *netaddr);
+/*%<
+ * Initialize as AF_UNSPEC address.
+ */
+
 bool
-isc_netaddr_ismulticast(isc_netaddr_t *na);
+isc_netaddr_ismulticast(const isc_netaddr_t *na);
 /*%<
  * Returns true if the address is a multicast address.
  */
 
 bool
-isc_netaddr_isexperimental(isc_netaddr_t *na);
+isc_netaddr_isexperimental(const isc_netaddr_t *na);
 /*%<
  * Returns true if the address is a experimental (CLASS E) address.
  */
 
 bool
-isc_netaddr_islinklocal(isc_netaddr_t *na);
+isc_netaddr_islinklocal(const isc_netaddr_t *na);
 /*%<
  * Returns #true if the address is a link local address.
  */
 
 bool
-isc_netaddr_issitelocal(isc_netaddr_t *na);
+isc_netaddr_issitelocal(const isc_netaddr_t *na);
 /*%<
  * Returns #true if the address is a site local address.
  */
 
 bool
-isc_netaddr_isnetzero(isc_netaddr_t *na);
+isc_netaddr_isnetzero(const isc_netaddr_t *na);
 /*%<
  * Returns #true if the address is in net zero.
  */
@@ -166,7 +177,7 @@ isc_netaddr_fromv4mapped(isc_netaddr_t *t, const isc_netaddr_t *s);
 isc_result_t
 isc_netaddr_prefixok(const isc_netaddr_t *na, unsigned int prefixlen);
 /*
- * Test whether the netaddr 'na' and 'prefixlen' are consistant.
+ * Test whether the netaddr 'na' and 'prefixlen' are consistent.
  * e.g. prefixlen within range.
  *      na does not have bits set which are not covered by the prefixlen.
  *

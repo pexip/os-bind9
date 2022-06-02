@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -14,24 +16,23 @@ top_srcdir =	@top_srcdir@
 @BIND9_MAKE_INCLUDES@
 
 CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES} ${ISCCFG_INCLUDES} \
-		${LWRES_INCLUDES} @DST_OPENSSL_INC@ @DST_GSSAPI_INC@
+		${OPENSSL_CFLAGS} @DST_GSSAPI_INC@
 
-CDEFINES =	@CRYPTO@ @USE_GSSAPI@
+CDEFINES =	@USE_GSSAPI@
 
 CWARNINGS =
 BACKTRACECFLAGS = @BACKTRACECFLAGS@
+PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
 
-DNSLIBS =	../../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
-ISCLIBS =	../../../lib/isc/libisc.@A@ @ISC_OPENSSL_LIBS@
-ISCNOSYMLIBS =	../../../lib/isc/libisc-nosymtbl.@A@ @ISC_OPENSSL_LIBS@
+DNSLIBS =	../../../lib/dns/libdns.@A@ @NO_LIBTOOL_DNSLIBS@
+ISCLIBS =	../../../lib/isc/libisc.@A@ @NO_LIBTOOL_ISCLIBS@
+ISCNOSYMLIBS =	../../../lib/isc/libisc-nosymtbl.@A@ @NO_LIBTOOL_ISCLIBS@
 ISCCFGLIBS = 	../../../lib/isccfg/libisccfg.@A@
-LWRESDEPLIBS =	../../../lib/lwres/liblwres.@A@
 
 DNSDEPLIBS =	../../../lib/dns/libdns.@A@
 ISCDEPLIBS =	../../../lib/isc/libisc.@A@
 ISCDEPNOSYMLIBS = ../../../lib/isc/libisc-nosymtbl.@A@
 ISCCFGDEPLIBS = ../../../lib/isccfg/libisccfg.@A@
-LWRESLIBS =	../../../lib/lwres/liblwres.@A@
 
 LIBS =		@LIBS@
 
@@ -48,21 +49,12 @@ XTARGETS =	adb_test@EXEEXT@ \
 		backtrace_test_nosymtbl@EXEEXT@ \
 		byname_test@EXEEXT@ \
 		db_test@EXEEXT@ \
-		dst_test@EXEEXT@ \
-		entropy_test@EXEEXT@ \
-		entropy2_test@EXEEXT@ \
 		gsstest@EXEEXT@ \
-		gxba_test@EXEEXT@ \
-		gxbn_test@EXEEXT@ \
-		hash_test@EXEEXT@ \
 		fsaccess_test@EXEEXT@ \
 		inter_test@EXEEXT@ \
-		keyboard_test@EXEEXT@ \
 		lex_test@EXEEXT@ \
 		lfsr_test@EXEEXT@ \
 		log_test@EXEEXT@ \
-		lwres_test@EXEEXT@ \
-		lwresconf_test@EXEEXT@ \
 		master_test@EXEEXT@ \
 		mempool_test@EXEEXT@ \
 		name_test@EXEEXT@ \
@@ -85,21 +77,12 @@ XSRCS =		adb_test.c \
 		backtrace_test.c \
 		byname_test.c \
 		db_test.c \
-		dst_test.c \
-		entropy_test.c \
-		entropy2_test.c \
-		hash_test.c \
 		fsaccess_test.c \
 		gsstest.c \
-		gxba_test.c \
-		gxbn_test.c \
 		inter_test.c \
-		keyboard_test.c \
 		lex_test.c \
 		lfsr_test.c \
 		log_test.c \
-		lwres_test.c \
-		lwresconf_test.c \
 		master_test.c \
 		mempool_test.c \
 		name_test.c \
@@ -120,7 +103,7 @@ XSRCS =		adb_test.c \
 
 # disable optimization for backtrace test to get the expected result
 BTTEST_CFLAGS =	${BACKTRACECFLAGS} ${EXT_CFLAGS} ${ALL_CPPFLAGS} -g \
-		${ALWAYS_WARNINGS} ${STD_CWARNINGS} ${CWARNINGS}
+		${ALWAYS_WARNINGS} ${STD_CWARNINGS} ${CWARNINGS} ${PTHREAD_CFLAGS}
 
 all_tests: ${XTARGETS}
 
@@ -181,10 +164,6 @@ log_test@EXEEXT@: log_test.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
 name_test@EXEEXT@: name_test.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ name_test.@O@ \
 		${DNSLIBS} ${ISCLIBS} ${LIBS}
-
-hash_test@EXEEXT@: hash_test.@O@ ${ISCDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ hash_test.@O@ \
-		${ISCLIBS} ${LIBS}
 
 entropy_test@EXEEXT@: entropy_test.@O@ ${ISCDEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ entropy_test.@O@ \
@@ -254,33 +233,9 @@ inter_test@EXEEXT@: inter_test.@O@ ${ISCDEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ inter_test.@O@ \
 		${ISCLIBS} ${LIBS}
 
-keyboard_test@EXEEXT@: keyboard_test.@O@ ${ISCDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ keyboard_test.@O@ \
-		${ISCLIBS} ${LIBS}
-
-lwresconf_test@EXEEXT@: lwresconf_test.@O@ ${ISCDEPLIBS} ${LWRESDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ lwresconf_test.@O@ \
-		${LWRESLIBS} ${ISCLIBS} ${LIBS}
-
-lwres_test@EXEEXT@: lwres_test.@O@ ${ISCDEPLIBS} ${LWRESDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ lwres_test.@O@ \
-		${LWRESLIBS} ${ISCLIBS} ${LIBS}
-
-gxbn_test@EXEEXT@: gxbn_test.@O@ ${LWRESDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ gxbn_test.@O@ \
-		${LWRESLIBS} ${ISCLIBS} ${LIBS}
-
-gxba_test@EXEEXT@: gxba_test.@O@ ${LWRESDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ gxba_test.@O@ \
-		${LWRESLIBS} ${ISCLIBS} ${LIBS}
-
 sig0_test@EXEEXT@: sig0_test.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ sig0_test.@O@ \
 		${DNSLIBS} ${ISCLIBS} ${LIBS}
-
-dst_test@EXEEXT@: dst_test.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
-	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} \
-		-o $@ dst_test.@O@ ${DNSLIBS} ${ISCLIBS} ${LIBS}
 
 gsstest@EXEEXT@: gsstest.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} \

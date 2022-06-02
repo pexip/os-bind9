@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef ISC_CONDITION_H
 #define ISC_CONDITION_H 1
@@ -23,21 +24,20 @@
 typedef struct isc_condition_thread isc_condition_thread_t;
 
 struct isc_condition_thread {
-	unsigned long				th;
-	HANDLE					handle[2];
-	ISC_LINK(isc_condition_thread_t)	link;
-
+	uintptr_t th;
+	HANDLE	  handle[2];
+	ISC_LINK(isc_condition_thread_t) link;
 };
 
 typedef struct isc_condition {
-	HANDLE 		events[2];
-	unsigned int	waiters;
+	HANDLE	     events[2];
+	unsigned int waiters;
 	ISC_LIST(isc_condition_thread_t) threadlist;
 } isc_condition_t;
 
 ISC_LANG_BEGINDECLS
 
-isc_result_t
+void
 isc_condition_init(isc_condition_t *);
 
 isc_result_t

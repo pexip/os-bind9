@@ -1,24 +1,45 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef ISC_TIME_H
 #define ISC_TIME_H 1
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <time.h>
 #include <windows.h>
 
 #include <isc/lang.h>
 #include <isc/types.h>
+
+/***
+ *** POSIX Shims
+ ***/
+
+struct tm *
+gmtime_r(const time_t *clock, struct tm *result);
+
+struct tm *
+localtime_r(const time_t *clock, struct tm *result);
+
+int
+nanosleep(const struct timespec *req, struct timespec *rem);
+
+typedef uint32_t useconds_t;
+
+int
+usleep(useconds_t usec);
 
 /***
  *** Intervals
@@ -34,7 +55,7 @@ struct isc_interval {
 	int64_t interval;
 };
 
-LIBISC_EXTERNAL_DATA extern const isc_interval_t * const isc_interval_zero;
+LIBISC_EXTERNAL_DATA extern const isc_interval_t *const isc_interval_zero;
 
 /*
  * ISC_FORMATHTTPTIMESTAMP_SIZE needs to be 30 in C locale and potentially
@@ -46,8 +67,8 @@ LIBISC_EXTERNAL_DATA extern const isc_interval_t * const isc_interval_zero;
 ISC_LANG_BEGINDECLS
 
 void
-isc_interval_set(isc_interval_t *i,
-		 unsigned int seconds, unsigned int nanoseconds);
+isc_interval_set(isc_interval_t *i, unsigned int seconds,
+		 unsigned int nanoseconds);
 /*
  * Set 'i' to a value representing an interval of 'seconds' seconds and
  * 'nanoseconds' nanoseconds, suitable for use in isc_time_add() and
@@ -84,7 +105,7 @@ struct isc_time {
 	FILETIME absolute;
 };
 
-LIBISC_EXTERNAL_DATA extern const isc_time_t * const isc_time_epoch;
+LIBISC_EXTERNAL_DATA extern const isc_time_t *const isc_time_epoch;
 
 void
 isc_time_set(isc_time_t *t, unsigned int seconds, unsigned int nanoseconds);
@@ -135,6 +156,26 @@ isc_time_now(isc_time_t *t);
  *	Unexpected error
  *		Getting the time from the system failed.
  *	Out of range
+ *		The time from the system is too large to be represented
+ *		in the current definition of isc_time_t.
+ */
+
+isc_result_t
+isc_time_now_hires(isc_time_t *t);
+/*%<
+ * Set 't' to the current absolute time. Uses higher resolution clocks
+ * recommended when microsecond accuracy is required.
+ *
+ * Requires:
+ *
+ *\li	't' is a valid pointer.
+ *
+ * Returns:
+ *
+ *\li	Success
+ *\li	Unexpected error
+ *		Getting the time from the system failed.
+ *\li	Out of range
  *		The time from the system is too large to be represented
  *		in the current definition of isc_time_t.
  */
@@ -292,6 +333,48 @@ isc_time_parsehttptimestamp(char *input, isc_time_t *t);
  */
 
 void
+isc_time_formatISO8601L(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
+isc_time_formatISO8601Lms(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss.sss"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
+isc_time_formatISO8601Lus(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss.ssssss"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
 isc_time_formatISO8601(const isc_time_t *t, char *buf, unsigned int len);
 /*%<
  * Format the time 't' into the buffer 'buf' of length 'len',
@@ -310,6 +393,34 @@ isc_time_formatISO8601ms(const isc_time_t *t, char *buf, unsigned int len);
 /*%<
  * Format the time 't' into the buffer 'buf' of length 'len',
  * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss.sssZ"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
+isc_time_formatISO8601us(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the ISO8601 format: "yyyy-mm-ddThh:mm:ss.ssssssZ"
+ * If the text does not fit in the buffer, the result is indeterminate,
+ * but is always guaranteed to be null terminated.
+ *
+ *  Requires:
+ *\li      'len' > 0
+ *\li      'buf' points to an array of at least len chars
+ *
+ */
+
+void
+isc_time_formatshorttimestamp(const isc_time_t *t, char *buf, unsigned int len);
+/*%<
+ * Format the time 't' into the buffer 'buf' of length 'len',
+ * using the format "yyyymmddhhmmsssss" useful for file timestamping.
  * If the text does not fit in the buffer, the result is indeterminate,
  * but is always guaranteed to be null terminated.
  *

@@ -1,124 +1,65 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-/* $Id: random.h,v 1.20 2009/01/17 23:47:43 tbox Exp $ */
+#pragma once
 
-#ifndef ISC_RANDOM_H
-#define ISC_RANDOM_H 1
+#include <inttypes.h>
+#include <stdlib.h>
 
 #include <isc/lang.h>
 #include <isc/types.h>
-#include <isc/entropy.h>
-#include <isc/mem.h>
-#include <isc/mutex.h>
 
 /*! \file isc/random.h
- * \brief Implements a random state pool which will let the caller return a
- * series of possibly non-reproducible random values.
+ * \brief Implements wrapper around a non-cryptographically secure
+ * pseudo-random number generator.
  *
- * Note that the
- * strength of these numbers is not all that high, and should not be
- * used in cryptography functions.  It is useful for jittering values
- * a bit here and there, such as timeouts, etc.
  */
 
 ISC_LANG_BEGINDECLS
 
-typedef struct isc_rng isc_rng_t;
-/*%<
- * Opaque type
+uint8_t
+isc_random8(void);
+/*!<
+ * \brief Returns a single 8-bit random value.
  */
 
-void
-isc_random_seed(uint32_t seed);
-/*%<
- * Set the initial seed of the random state.
- */
-
-void
-isc_random_get(uint32_t *val);
-/*%<
- * Get a random value.
- *
- * Requires:
- *	val != NULL.
+uint16_t
+isc_random16(void);
+/*!<
+ * \brief Returns a single 16-bit random value.
  */
 
 uint32_t
-isc_random_jitter(uint32_t max, uint32_t jitter);
-/*%<
- * Get a random value between (max - jitter) and (max).
- * This is useful for jittering timer values.
- */
-
-isc_result_t
-isc_rng_create(isc_mem_t *mctx, isc_entropy_t *entropy, isc_rng_t **rngp);
-/*%<
- * Creates and initializes a pseudo random number generator. The
- * returned RNG can be used to generate pseudo random numbers.
- *
- * The reference count of the returned RNG is set to 1.
- *
- * Requires:
- * \li mctx is a pointer to a valid memory context.
- * \li entropy is an optional entopy source (can be NULL)
- * \li rngp != NULL && *rngp == NULL is where a pointer to the RNG is
- *     returned.
- *
- * Ensures:
- *\li	If result is ISC_R_SUCCESS:
- *		*rngp points to a valid RNG.
- *
- *\li	If result is failure:
- *		*rngp does not point to a valid RNG.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS	Success
- *\li	#ISC_R_NOMEMORY Resource limit: Out of Memory
+isc_random32(void);
+/*!<
+ * \brief Returns a single 32-bit random value.
  */
 
 void
-isc_rng_attach(isc_rng_t *source, isc_rng_t **targetp);
-/*%<
- * Increments a reference count on the passed RNG.
- *
- * Requires:
- * \li source the RNG struct to attach to (is refcount is incremented)
- * \li targetp != NULL && *targetp == NULL where a pointer to the
- *     reference incremented RNG is returned.
+isc_random_buf(void *buf, size_t buflen);
+/*!<
+ * \brief Fills the region buf of length buflen with random data.
  */
 
-void
-isc_rng_detach(isc_rng_t **rngp);
-/*%<
- * Decrements a reference count on the passed RNG. If the reference
- * count reaches 0, the RNG is destroyed.
- *
- * Requires:
- * \li rngp != NULL the RNG struct to decrement reference for
- */
-
-uint16_t
-isc_rng_random(isc_rng_t *rngctx);
-/*%<
- * Returns a pseudo random 16-bit unsigned integer.
- */
-
-uint16_t
-isc_rng_uniformrandom(isc_rng_t *rngctx, uint16_t upper_bound);
-/*%<
- * Returns a uniformly distributed pseudo random 16-bit unsigned
- * integer.
+uint32_t
+isc_random_uniform(uint32_t upper_bound);
+/*!<
+ * \brief Will return a single 32-bit value, uniformly distributed but
+ *        less than upper_bound.  This is recommended over
+ *        constructions like ``isc_random() % upper_bound'' as it
+ *        avoids "modulo bias" when the upper bound is not a power of
+ *        two.  In the worst case, this function may require multiple
+ *        iterations to ensure uniformity.
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_RANDOM_H */

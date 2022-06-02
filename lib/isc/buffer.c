@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -11,11 +13,9 @@
 
 /*! \file */
 
-#include <config.h>
-
 #include <inttypes.h>
-#include <stdbool.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <isc/buffer.h>
 #include <isc/mem.h>
@@ -262,10 +262,11 @@ isc_buffer_compact(isc_buffer_t *b) {
 		(void)memmove(b->base, src, (size_t)length);
 	}
 
-	if (b->active > b->current)
+	if (b->active > b->current) {
 		b->active -= b->current;
-	else
+	} else {
 		b->active = 0;
+	}
 	b->current = 0;
 	b->used = length;
 }
@@ -431,8 +432,7 @@ isc__buffer_putuint48(isc_buffer_t *b, uint64_t val) {
 
 void
 isc__buffer_putmem(isc_buffer_t *b, const unsigned char *base,
-		   unsigned int length)
-{
+		   unsigned int length) {
 	isc_result_t result;
 	REQUIRE(ISC_BUFFER_VALID(b));
 	if (ISC_UNLIKELY(b->autore)) {
@@ -470,7 +470,7 @@ isc__buffer_putstr(isc_buffer_t *b, const char *source) {
 
 void
 isc_buffer_putdecint(isc_buffer_t *b, int64_t v) {
-	unsigned int l=0;
+	unsigned int l = 0;
 	unsigned char *cp;
 	char buf[21];
 	isc_result_t result;
@@ -502,9 +502,7 @@ isc_buffer_dup(isc_mem_t *mctx, isc_buffer_t **dstp, const isc_buffer_t *src) {
 
 	isc_buffer_usedregion(src, &region);
 
-	result = isc_buffer_allocate(mctx, &dst, region.length);
-	if (result != ISC_R_SUCCESS)
-		return (result);
+	isc_buffer_allocate(mctx, &dst, region.length);
 
 	result = isc_buffer_copyregion(dst, &region);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS); /* NOSPACE is impossible */
@@ -514,105 +512,63 @@ isc_buffer_dup(isc_mem_t *mctx, isc_buffer_t **dstp, const isc_buffer_t *src) {
 
 isc_result_t
 isc_buffer_copyregion(isc_buffer_t *b, const isc_region_t *r) {
-	unsigned char *base;
-	unsigned int available;
 	isc_result_t result;
 
 	REQUIRE(ISC_BUFFER_VALID(b));
 	REQUIRE(r != NULL);
 
-	/*
-	 * XXXDCL
-	 */
-	base = isc_buffer_used(b);
-	available = isc_buffer_availablelength(b);
 	if (ISC_UNLIKELY(b->autore)) {
 		result = isc_buffer_reserve(&b, r->length);
-		if (result != ISC_R_SUCCESS)
+		if (result != ISC_R_SUCCESS) {
 			return (result);
+		}
 	}
-	if (r->length > available)
+
+	if (r->length > isc_buffer_availablelength(b)) {
 		return (ISC_R_NOSPACE);
+	}
+
 	if (r->length > 0U) {
-		memmove(base, r->base, r->length);
+		memmove(isc_buffer_used(b), r->base, r->length);
 		b->used += r->length;
 	}
 
 	return (ISC_R_SUCCESS);
 }
 
-isc_result_t
+void
 isc_buffer_allocate(isc_mem_t *mctx, isc_buffer_t **dynbuffer,
-		    unsigned int length)
-{
-	isc_buffer_t *dbuf;
-	unsigned char * bdata;
-	REQUIRE(dynbuffer != NULL);
-	REQUIRE(*dynbuffer == NULL);
+		    unsigned int length) {
+	REQUIRE(dynbuffer != NULL && *dynbuffer == NULL);
 
-	dbuf = isc_mem_get(mctx, sizeof(isc_buffer_t));
-	if (dbuf == NULL)
-		return (ISC_R_NOMEMORY);
-
-	bdata = isc_mem_get(mctx, length);
-	if (bdata == NULL) {
-		isc_mem_put(mctx, dbuf, sizeof(isc_buffer_t));
-		return (ISC_R_NOMEMORY);
-	}
+	isc_buffer_t *dbuf = isc_mem_get(mctx, sizeof(isc_buffer_t));
+	unsigned char *bdata = isc_mem_get(mctx, length);
 
 	isc_buffer_init(dbuf, bdata, length);
-	dbuf->mctx = mctx;
 
 	ENSURE(ISC_BUFFER_VALID(dbuf));
 
+	dbuf->mctx = mctx;
+
 	*dynbuffer = dbuf;
-
-	return (ISC_R_SUCCESS);
-}
-
-isc_result_t
-isc_buffer_reallocate(isc_buffer_t **dynbuffer, unsigned int length) {
-	unsigned char *bdata;
-
-	REQUIRE(dynbuffer != NULL);
-	REQUIRE(ISC_BUFFER_VALID(*dynbuffer));
-	REQUIRE((*dynbuffer)->mctx != NULL);
-
-	if ((*dynbuffer)->length > length)
-		return (ISC_R_NOSPACE);
-
-	/*
-	 * XXXMUKS: This is far more expensive than plain realloc() as
-	 * it doesn't remap pages, but does ordinary copy. So is
-	 * isc_mem_reallocate(), which has additional issues.
-	 */
-	bdata = isc_mem_get((*dynbuffer)->mctx, length);
-	if (bdata == NULL)
-		return (ISC_R_NOMEMORY);
-
-	memmove(bdata, (*dynbuffer)->base, (*dynbuffer)->length);
-	isc_mem_put((*dynbuffer)->mctx, (*dynbuffer)->base,
-		    (*dynbuffer)->length);
-
-	(*dynbuffer)->base = bdata;
-	(*dynbuffer)->length = length;
-
-	return (ISC_R_SUCCESS);
 }
 
 isc_result_t
 isc_buffer_reserve(isc_buffer_t **dynbuffer, unsigned int size) {
+	unsigned char *bdata;
 	uint64_t len;
 
 	REQUIRE(dynbuffer != NULL);
 	REQUIRE(ISC_BUFFER_VALID(*dynbuffer));
 
 	len = (*dynbuffer)->length;
-	if ((len - (*dynbuffer)->used) >= size)
+	if ((len - (*dynbuffer)->used) >= size) {
 		return (ISC_R_SUCCESS);
+	}
 
-	if ((*dynbuffer)->mctx == NULL)
+	if ((*dynbuffer)->mctx == NULL) {
 		return (ISC_R_NOSPACE);
+	}
 
 	/* Round to nearest buffer size increment */
 	len = size + (*dynbuffer)->used;
@@ -623,10 +579,25 @@ isc_buffer_reserve(isc_buffer_t **dynbuffer, unsigned int size) {
 		len = UINT_MAX;
 	}
 
-	if ((len - (*dynbuffer)->used) < size)
+	if ((len - (*dynbuffer)->used) < size) {
 		return (ISC_R_NOMEMORY);
+	}
 
-	return (isc_buffer_reallocate(dynbuffer, (unsigned int) len));
+	/*
+	 * XXXMUKS: This is far more expensive than plain realloc() as
+	 * it doesn't remap pages, but does ordinary copy. So is
+	 * isc_mem_reallocate(), which has additional issues.
+	 */
+	bdata = isc_mem_get((*dynbuffer)->mctx, (unsigned int)len);
+
+	memmove(bdata, (*dynbuffer)->base, (*dynbuffer)->length);
+	isc_mem_put((*dynbuffer)->mctx, (*dynbuffer)->base,
+		    (*dynbuffer)->length);
+
+	(*dynbuffer)->base = bdata;
+	(*dynbuffer)->length = (unsigned int)len;
+
+	return (ISC_R_SUCCESS);
 }
 
 void
@@ -639,11 +610,51 @@ isc_buffer_free(isc_buffer_t **dynbuffer) {
 	REQUIRE((*dynbuffer)->mctx != NULL);
 
 	dbuf = *dynbuffer;
-	*dynbuffer = NULL;	/* destroy external reference */
+	*dynbuffer = NULL; /* destroy external reference */
 	mctx = dbuf->mctx;
 	dbuf->mctx = NULL;
 
 	isc_mem_put(mctx, dbuf->base, dbuf->length);
 	isc_buffer_invalidate(dbuf);
 	isc_mem_put(mctx, dbuf, sizeof(isc_buffer_t));
+}
+
+isc_result_t
+isc_buffer_printf(isc_buffer_t *b, const char *format, ...) {
+	va_list ap;
+	int n;
+	isc_result_t result;
+
+	REQUIRE(ISC_BUFFER_VALID(b));
+
+	va_start(ap, format);
+	n = vsnprintf(NULL, 0, format, ap);
+	va_end(ap);
+
+	if (n < 0) {
+		return (ISC_R_FAILURE);
+	}
+
+	if (ISC_UNLIKELY(b->autore)) {
+		result = isc_buffer_reserve(&b, n + 1);
+		if (result != ISC_R_SUCCESS) {
+			return (result);
+		}
+	}
+
+	if (isc_buffer_availablelength(b) < (unsigned int)n + 1) {
+		return (ISC_R_NOSPACE);
+	}
+
+	va_start(ap, format);
+	n = vsnprintf(isc_buffer_used(b), n + 1, format, ap);
+	va_end(ap);
+
+	if (n < 0) {
+		return (ISC_R_FAILURE);
+	}
+
+	b->used += n;
+
+	return (ISC_R_SUCCESS);
 }

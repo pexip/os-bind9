@@ -1,8 +1,10 @@
 ; Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 ;
+; SPDX-License-Identifier: MPL-2.0
+;
 ; This Source Code Form is subject to the terms of the Mozilla Public
-; License, v. 2.0. If a copy of the MPL was not distributed with this
-; file, You can obtain one at http://mozilla.org/MPL/2.0/.
+; License, v. 2.0.  If a copy of the MPL was not distributed with this
+; file, you can obtain one at https://mozilla.org/MPL/2.0/.
 ;
 ; See the COPYRIGHT file distributed with this work for additional
 ; information regarding copyright ownership.
@@ -16,6 +18,6 @@ mail	IN A	10.53.0.6
 fetch 10 IN TXT A short ttl
 non-zero 10 IN TXT A short ttl
 zero 0  IN TXT	A zero ttl
-$TTL 10
+$TTL 13
 ds 	IN NS	ns.ds
 ns.ds	IN A	10.53.0.6

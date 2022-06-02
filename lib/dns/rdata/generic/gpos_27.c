@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -31,8 +33,7 @@ fromtext_gpos(ARGS_FROMTEXT) {
 
 	for (i = 0; i < 3; i++) {
 		RETERR(isc_lex_getmastertoken(lexer, &token,
-					      isc_tokentype_qstring,
-					      false));
+					      isc_tokentype_qstring, false));
 		RETTOK(txt_fromtext(&token.value.as_textregion, target));
 	}
 	return (ISC_R_SUCCESS);
@@ -52,8 +53,9 @@ totext_gpos(ARGS_TOTEXT) {
 
 	for (i = 0; i < 3; i++) {
 		RETERR(txt_totext(&region, true, target));
-		if (i != 2)
+		if (i != 2) {
 			RETERR(str_totext(" ", target));
+		}
 	}
 
 	return (ISC_R_SUCCESS);
@@ -77,7 +79,6 @@ fromwire_gpos(ARGS_FROMWIRE) {
 
 static inline isc_result_t
 towire_gpos(ARGS_TOWIRE) {
-
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
 	REQUIRE(rdata->length != 0);
 
@@ -107,7 +108,7 @@ fromstruct_gpos(ARGS_FROMSTRUCT) {
 	dns_rdata_gpos_t *gpos = source;
 
 	REQUIRE(type == dns_rdatatype_gpos);
-	REQUIRE(source != NULL);
+	REQUIRE(gpos != NULL);
 	REQUIRE(gpos->common.rdtype == type);
 	REQUIRE(gpos->common.rdclass == rdclass);
 
@@ -128,7 +129,7 @@ tostruct_gpos(ARGS_TOSTRUCT) {
 	isc_region_t region;
 
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
-	REQUIRE(target != NULL);
+	REQUIRE(gpos != NULL);
 	REQUIRE(rdata->length != 0);
 
 	gpos->common.rdclass = rdata->rdclass;
@@ -139,37 +140,42 @@ tostruct_gpos(ARGS_TOSTRUCT) {
 	gpos->long_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	gpos->longitude = mem_maybedup(mctx, region.base, gpos->long_len);
-	if (gpos->longitude == NULL)
+	if (gpos->longitude == NULL) {
 		return (ISC_R_NOMEMORY);
+	}
 	isc_region_consume(&region, gpos->long_len);
 
 	gpos->lat_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	gpos->latitude = mem_maybedup(mctx, region.base, gpos->lat_len);
-	if (gpos->latitude == NULL)
+	if (gpos->latitude == NULL) {
 		goto cleanup_longitude;
+	}
 	isc_region_consume(&region, gpos->lat_len);
 
 	gpos->alt_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	if (gpos->lat_len > 0) {
-		gpos->altitude =
-			mem_maybedup(mctx, region.base, gpos->alt_len);
-		if (gpos->altitude == NULL)
+		gpos->altitude = mem_maybedup(mctx, region.base, gpos->alt_len);
+		if (gpos->altitude == NULL) {
 			goto cleanup_latitude;
-	} else
+		}
+	} else {
 		gpos->altitude = NULL;
+	}
 
 	gpos->mctx = mctx;
 	return (ISC_R_SUCCESS);
 
- cleanup_latitude:
-	if (mctx != NULL && gpos->longitude != NULL)
+cleanup_latitude:
+	if (mctx != NULL && gpos->longitude != NULL) {
 		isc_mem_free(mctx, gpos->longitude);
+	}
 
- cleanup_longitude:
-	if (mctx != NULL && gpos->latitude != NULL)
+cleanup_longitude:
+	if (mctx != NULL && gpos->latitude != NULL) {
 		isc_mem_free(mctx, gpos->latitude);
+	}
 	return (ISC_R_NOMEMORY);
 }
 
@@ -177,18 +183,22 @@ static inline void
 freestruct_gpos(ARGS_FREESTRUCT) {
 	dns_rdata_gpos_t *gpos = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(gpos != NULL);
 	REQUIRE(gpos->common.rdtype == dns_rdatatype_gpos);
 
-	if (gpos->mctx == NULL)
+	if (gpos->mctx == NULL) {
 		return;
+	}
 
-	if (gpos->longitude != NULL)
+	if (gpos->longitude != NULL) {
 		isc_mem_free(gpos->mctx, gpos->longitude);
-	if (gpos->latitude != NULL)
+	}
+	if (gpos->latitude != NULL) {
 		isc_mem_free(gpos->mctx, gpos->latitude);
-	if (gpos->altitude != NULL)
+	}
+	if (gpos->altitude != NULL) {
 		isc_mem_free(gpos->mctx, gpos->altitude);
+	}
 	gpos->mctx = NULL;
 }
 
@@ -216,7 +226,6 @@ digest_gpos(ARGS_DIGEST) {
 
 static inline bool
 checkowner_gpos(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_gpos);
 
 	UNUSED(name);
@@ -229,7 +238,6 @@ checkowner_gpos(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_gpos(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
 
 	UNUSED(rdata);
@@ -244,4 +252,4 @@ casecompare_gpos(ARGS_COMPARE) {
 	return (compare_gpos(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_GPOS_27_C */
+#endif /* RDATA_GENERIC_GPOS_27_C */

@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -31,8 +33,9 @@ generic_fromtext_tlsa(ARGS_FROMTEXT) {
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      false));
-	if (token.value.as_ulong > 0xffU)
+	if (token.value.as_ulong > 0xffU) {
 		RETTOK(ISC_R_RANGE);
+	}
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
 
 	/*
@@ -40,8 +43,9 @@ generic_fromtext_tlsa(ARGS_FROMTEXT) {
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      false));
-	if (token.value.as_ulong > 0xffU)
+	if (token.value.as_ulong > 0xffU) {
 		RETTOK(ISC_R_RANGE);
+	}
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
 
 	/*
@@ -49,14 +53,15 @@ generic_fromtext_tlsa(ARGS_FROMTEXT) {
 	 */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      false));
-	if (token.value.as_ulong > 0xffU)
+	if (token.value.as_ulong > 0xffU) {
 		RETTOK(ISC_R_RANGE);
+	}
 	RETERR(uint8_tobuffer(token.value.as_ulong, target));
 
 	/*
 	 * Certificate Association Data.
 	 */
-	return (isc_hex_tobuffer(lexer, target, -1));
+	return (isc_hex_tobuffer(lexer, target, -2));
 }
 
 static inline isc_result_t
@@ -98,16 +103,19 @@ generic_totext_tlsa(ARGS_TOTEXT) {
 	/*
 	 * Certificate Association Data.
 	 */
-	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
+	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
 		RETERR(str_totext(" (", target));
+	}
 	RETERR(str_totext(tctx->linebreak, target));
-	if (tctx->width == 0) /* No splitting */
+	if (tctx->width == 0) { /* No splitting */
 		RETERR(isc_hex_totext(&sr, 0, "", target));
-	else
-		RETERR(isc_hex_totext(&sr, tctx->width - 2,
-				      tctx->linebreak, target));
-	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
+	} else {
+		RETERR(isc_hex_totext(&sr, tctx->width - 2, tctx->linebreak,
+				      target));
+	}
+	if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
 		RETERR(str_totext(" )", target));
+	}
 	return (ISC_R_SUCCESS);
 }
 
@@ -122,8 +130,10 @@ generic_fromwire_tlsa(ARGS_FROMWIRE) {
 
 	isc_buffer_activeregion(source, &sr);
 
-	if (sr.length < 3)
+	/* Usage(1), Selector(1), Type(1), Data(1+) */
+	if (sr.length < 4) {
 		return (ISC_R_UNEXPECTEDEND);
+	}
 
 	isc_buffer_forward(source, sr.length);
 	return (mem_tobuffer(target, sr.base, sr.length));
@@ -131,28 +141,23 @@ generic_fromwire_tlsa(ARGS_FROMWIRE) {
 
 static inline isc_result_t
 fromtext_tlsa(ARGS_FROMTEXT) {
-
 	REQUIRE(type == dns_rdatatype_tlsa);
 
-	return (generic_fromtext_tlsa(rdclass, type, lexer, origin, options,
-				      target, callbacks));
+	return (generic_fromtext_tlsa(CALL_FROMTEXT));
 }
 
 static inline isc_result_t
 totext_tlsa(ARGS_TOTEXT) {
-
 	REQUIRE(rdata->type == dns_rdatatype_tlsa);
 
-	return (generic_totext_tlsa(rdata, tctx, target));
+	return (generic_totext_tlsa(CALL_TOTEXT));
 }
 
 static inline isc_result_t
 fromwire_tlsa(ARGS_FROMWIRE) {
-
 	REQUIRE(type == dns_rdatatype_tlsa);
 
-	return (generic_fromwire_tlsa(rdclass, type, source, dctx, options,
-				      target));
+	return (generic_fromwire_tlsa(CALL_FROMWIRE));
 }
 
 static inline isc_result_t
@@ -188,7 +193,7 @@ static inline isc_result_t
 generic_fromstruct_tlsa(ARGS_FROMSTRUCT) {
 	dns_rdata_tlsa_t *tlsa = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(tlsa != NULL);
 	REQUIRE(tlsa->common.rdtype == type);
 	REQUIRE(tlsa->common.rdclass == rdclass);
 
@@ -207,7 +212,7 @@ generic_tostruct_tlsa(ARGS_TOSTRUCT) {
 	dns_rdata_tlsa_t *tlsa = target;
 	isc_region_t region;
 
-	REQUIRE(rdata != NULL);
+	REQUIRE(tlsa != NULL);
 	REQUIRE(rdata->length != 0);
 
 	REQUIRE(tlsa != NULL);
@@ -226,8 +231,9 @@ generic_tostruct_tlsa(ARGS_TOSTRUCT) {
 	tlsa->length = region.length;
 
 	tlsa->data = mem_maybedup(mctx, region.base, region.length);
-	if (tlsa->data == NULL)
+	if (tlsa->data == NULL) {
 		return (ISC_R_NOMEMORY);
+	}
 
 	tlsa->mctx = mctx;
 	return (ISC_R_SUCCESS);
@@ -239,20 +245,21 @@ generic_freestruct_tlsa(ARGS_FREESTRUCT) {
 
 	REQUIRE(tlsa != NULL);
 
-	if (tlsa->mctx == NULL)
+	if (tlsa->mctx == NULL) {
 		return;
+	}
 
-	if (tlsa->data != NULL)
+	if (tlsa->data != NULL) {
 		isc_mem_free(tlsa->mctx, tlsa->data);
+	}
 	tlsa->mctx = NULL;
 }
 
 static inline isc_result_t
 fromstruct_tlsa(ARGS_FROMSTRUCT) {
-
 	REQUIRE(type == dns_rdatatype_tlsa);
 
-	return (generic_fromstruct_tlsa(rdclass, type, source, target));
+	return (generic_fromstruct_tlsa(CALL_FROMSTRUCT));
 }
 
 static inline isc_result_t
@@ -260,20 +267,20 @@ tostruct_tlsa(ARGS_TOSTRUCT) {
 	dns_rdata_tlsa_t *tlsa = target;
 
 	REQUIRE(rdata->type == dns_rdatatype_tlsa);
-	REQUIRE(target != NULL);
+	REQUIRE(tlsa != NULL);
 
 	tlsa->common.rdclass = rdata->rdclass;
 	tlsa->common.rdtype = rdata->type;
 	ISC_LINK_INIT(&tlsa->common, link);
 
-	return (generic_tostruct_tlsa(rdata, target, mctx));
+	return (generic_tostruct_tlsa(CALL_TOSTRUCT));
 }
 
 static inline void
 freestruct_tlsa(ARGS_FREESTRUCT) {
 	dns_rdata_tlsa_t *tlsa = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(tlsa != NULL);
 	REQUIRE(tlsa->common.rdtype == dns_rdatatype_tlsa);
 
 	generic_freestruct_tlsa(source);
@@ -303,7 +310,6 @@ digest_tlsa(ARGS_DIGEST) {
 
 static inline bool
 checkowner_tlsa(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_tlsa);
 
 	UNUSED(name);
@@ -316,7 +322,6 @@ checkowner_tlsa(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_tlsa(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_tlsa);
 
 	UNUSED(rdata);
@@ -331,4 +336,4 @@ casecompare_tlsa(ARGS_COMPARE) {
 	return (compare_tlsa(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_TLSA_52_C */
+#endif /* RDATA_GENERIC_TLSA_52_C */

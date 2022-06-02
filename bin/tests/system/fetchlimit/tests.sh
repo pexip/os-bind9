@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -12,7 +14,7 @@
 SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
 
-DIGCMD="$DIG @10.53.0.3 -p ${PORT} +tries=1 +time=1"
+DIGCMD="$DIG @10.53.0.3 -p ${PORT} +tcp +tries=1 +time=1"
 RNDCCMD="$RNDC -p ${CONTROLPORT} -s 10.53.0.3 -c ../common/rndc.conf"
 
 burst() {
@@ -112,11 +114,8 @@ quota=$5
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
-if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-
 copy_setports ns3/named2.conf.in ns3/named.conf
-$RNDCCMD reconfig 2>&1 | sed 's/^/ns3 /' | cat_i
+rndc_reconfig ns3 10.53.0.3
 
 echo_i "checking lame server clients are dropped at the per-domain limit"
 ret=0
@@ -155,9 +154,9 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 copy_setports ns3/named3.conf.in ns3/named.conf
-$RNDCCMD reconfig 2>&1 | sed 's/^/ns3 /' | cat_i
+rndc_reconfig ns3 10.53.0.3
 
-echo_i "checking lame server clients are dropped at the soft limit"
+echo_i "checking lame server clients are dropped below the hard limit"
 ret=0
 fail=0
 exceeded=0
@@ -165,8 +164,8 @@ success=0
 touch ans4/norespond
 for try in 1 2 3 4 5; do
     burst b $try 400
-    $DIG @10.53.0.3 -p ${PORT}  a ${try}.example > dig.out.ns3.$try
-    stat 360 || exceeded=`expr $exceeded + 1`
+    $DIGCMD +time=2 a ${try}.example > dig.out.ns3.$try
+    stat 400 || exceeded=`expr $exceeded + 1`
     grep "status: NOERROR" dig.out.ns3.$try > /dev/null 2>&1 && \
             success=`expr $success + 1`
     grep "status: SERVFAIL" dig.out.ns3.$try > /dev/null 2>&1 && \
@@ -177,8 +176,20 @@ echo_i "$success successful valid queries (expected 5)"
 [ "$success" -eq 5 ] || { echo_i "failed"; ret=1; }
 echo_i "$fail SERVFAIL responses (expected 0)"
 [ "$fail" -eq 0 ] || { echo_i "failed"; ret=1; }
-echo_i "clients count exceeded 360 on $exceeded trials (expected 0)"
+echo_i "clients count exceeded 400 on $exceeded trials (expected 0)"
 [ "$exceeded" -eq 0 ] || { echo_i "failed"; ret=1; }
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "checking drop statistics"
+rm -f ns3/named.stats
+$RNDCCMD stats
+for try in 1 2 3 4 5; do
+    [ -f ns3/named.stats ] && break
+    sleep 1
+done
+drops=`grep 'queries dropped due to recursive client limit' ns3/named.stats | sed 's/\([0-9][0-9]*\) queries.*/\1/'`
+[ "${drops:-0}" -ne 0 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 

@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -191,7 +193,7 @@ fromstruct_doa(ARGS_FROMSTRUCT) {
 	dns_rdata_doa_t *doa = source;
 
 	REQUIRE(type == dns_rdatatype_doa);
-	REQUIRE(source != NULL);
+	REQUIRE(doa != NULL);
 	REQUIRE(doa->common.rdtype == dns_rdatatype_doa);
 	REQUIRE(doa->common.rdclass == rdclass);
 
@@ -210,6 +212,7 @@ tostruct_doa(ARGS_TOSTRUCT) {
 
 	REQUIRE(rdata != NULL);
 	REQUIRE(rdata->type == dns_rdatatype_doa);
+	REQUIRE(doa != NULL);
 	REQUIRE(rdata->length != 0);
 
 	doa->common.rdclass = rdata->rdclass;
@@ -288,7 +291,7 @@ static inline void
 freestruct_doa(ARGS_FREESTRUCT) {
 	dns_rdata_doa_t *doa = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(doa != NULL);
 	REQUIRE(doa->common.rdtype == dns_rdatatype_doa);
 
 	if (doa->mctx == NULL) {
@@ -355,4 +358,4 @@ casecompare_doa(ARGS_COMPARE) {
 	return (compare_doa(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_DOA_259_C */
+#endif /* RDATA_GENERIC_DOA_259_C */

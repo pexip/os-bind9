@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -34,18 +36,21 @@ fromtext_l32(ARGS_FROMTEXT) {
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_number,
 				      false));
-	if (token.value.as_ulong > 0xffffU)
+	if (token.value.as_ulong > 0xffffU) {
 		RETTOK(ISC_R_RANGE);
+	}
 	RETERR(uint16_tobuffer(token.value.as_ulong, target));
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
 				      false));
 
-	if (getquad(DNS_AS_STR(token), &addr, lexer, callbacks) != 1)
+	if (inet_pton(AF_INET, DNS_AS_STR(token), &addr) != 1) {
 		RETTOK(DNS_R_BADDOTTEDQUAD);
+	}
 	isc_buffer_availableregion(target, &region);
-	if (region.length < 4)
+	if (region.length < 4) {
 		return (ISC_R_NOSPACE);
+	}
 	memmove(region.base, &addr, 4);
 	isc_buffer_add(target, 4);
 	return (ISC_R_SUCCESS);
@@ -70,7 +75,7 @@ totext_l32(ARGS_TOTEXT) {
 
 	RETERR(str_totext(" ", target));
 
-	return (inet_totext(AF_INET, &region, target));
+	return (inet_totext(AF_INET, tctx->flags, &region, target));
 }
 
 static inline isc_result_t
@@ -85,15 +90,15 @@ fromwire_l32(ARGS_FROMWIRE) {
 	UNUSED(dctx);
 
 	isc_buffer_activeregion(source, &sregion);
-	if (sregion.length != 6)
+	if (sregion.length != 6) {
 		return (DNS_R_FORMERR);
+	}
 	isc_buffer_forward(source, sregion.length);
 	return (mem_tobuffer(target, sregion.base, sregion.length));
 }
 
 static inline isc_result_t
 towire_l32(ARGS_TOWIRE) {
-
 	REQUIRE(rdata->type == dns_rdatatype_l32);
 	REQUIRE(rdata->length == 6);
 
@@ -124,7 +129,7 @@ fromstruct_l32(ARGS_FROMSTRUCT) {
 	uint32_t n;
 
 	REQUIRE(type == dns_rdatatype_l32);
-	REQUIRE(source != NULL);
+	REQUIRE(l32 != NULL);
 	REQUIRE(l32->common.rdtype == type);
 	REQUIRE(l32->common.rdclass == rdclass);
 
@@ -143,7 +148,7 @@ tostruct_l32(ARGS_TOSTRUCT) {
 	uint32_t n;
 
 	REQUIRE(rdata->type == dns_rdatatype_l32);
-	REQUIRE(target != NULL);
+	REQUIRE(l32 != NULL);
 	REQUIRE(rdata->length == 6);
 
 	UNUSED(mctx);
@@ -163,7 +168,7 @@ static inline void
 freestruct_l32(ARGS_FREESTRUCT) {
 	dns_rdata_l32_t *l32 = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(l32 != NULL);
 	REQUIRE(l32->common.rdtype == dns_rdatatype_l32);
 
 	return;
@@ -171,7 +176,6 @@ freestruct_l32(ARGS_FREESTRUCT) {
 
 static inline isc_result_t
 additionaldata_l32(ARGS_ADDLDATA) {
-
 	REQUIRE(rdata->type == dns_rdatatype_l32);
 	REQUIRE(rdata->length == 6);
 
@@ -196,7 +200,6 @@ digest_l32(ARGS_DIGEST) {
 
 static inline bool
 checkowner_l32(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_l32);
 
 	UNUSED(name);
@@ -209,7 +212,6 @@ checkowner_l32(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_l32(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_l32);
 	REQUIRE(rdata->length == 6);
 
@@ -225,4 +227,4 @@ casecompare_l32(ARGS_COMPARE) {
 	return (compare_l32(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_L32_105_C */
+#endif /* RDATA_GENERIC_L32_105_C */

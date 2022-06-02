@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -40,206 +42,16 @@
 
 /*! \file */
 
-#include <config.h>
+#ifdef _GNU_SOURCE
+#undef _GNU_SOURCE
+#endif /* ifdef _GNU_SOURCE */
+#include <string.h>
 
-#include <ctype.h>
+#include <isc/string.h> /* IWYU pragma: keep */
 
-#include <isc/mem.h>
-#include <isc/print.h>
-#include <isc/region.h>
-#include <isc/string.h>
-#include <isc/util.h>
-
-static const char digits[] = "0123456789abcdefghijklmnoprstuvwxyz";
-
-uint64_t
-isc_string_touint64(char *source, char **end, int base) {
-	uint64_t tmp;
-	uint64_t overflow;
-	char *s = source;
-	const char *o;
-	char c;
-
-	if ((base < 0) || (base == 1) || (base > 36)) {
-		*end = source;
-		return (0);
-	}
-
-	while (*s != 0 && isascii(*s&0xff) && isspace(*s&0xff))
-		s++;
-	if (*s == '+' /* || *s == '-' */)
-		s++;
-	if (base == 0) {
-		if (*s == '0' && (*(s+1) == 'X' || *(s+1) == 'x')) {
-			s += 2;
-			base = 16;
-		} else if (*s == '0')
-			base = 8;
-		else
-			base = 10;
-	}
-	if (*s == 0) {
-		*end = source;
-		return (0);
-	}
-	overflow = ~0;
-	overflow /= base;
-	tmp = 0;
-
-	while ((c = *s) != 0) {
-		c = tolower(c&0xff);
-		/* end ? */
-		if ((o = strchr(digits, c)) == NULL) {
-			*end = s;
-			return (tmp);
-		}
-		/* end ? */
-		if ((o - digits) >= base) {
-			*end = s;
-			return (tmp);
-		}
-		/* overflow ? */
-		if (tmp > overflow) {
-			*end = source;
-			return (0);
-		}
-		tmp *= base;
-		/* overflow ? */
-		if ((tmp + (o - digits)) < tmp) {
-			*end = source;
-			return (0);
-		}
-		tmp += o - digits;
-		s++;
-	}
-	*end = s;
-	return (tmp);
-}
-
-isc_result_t
-isc_string_copy(char *target, size_t size, const char *source) {
-	REQUIRE(size > 0U);
-
-	if (strlcpy(target, source, size) >= size) {
-		memset(target, ISC_STRING_MAGIC, size);
-		return (ISC_R_NOSPACE);
-	}
-
-	ENSURE(strlen(target) < size);
-
-	return (ISC_R_SUCCESS);
-}
-
-void
-isc_string_copy_truncate(char *target, size_t size, const char *source) {
-	REQUIRE(size > 0U);
-
-	strlcpy(target, source, size);
-
-	ENSURE(strlen(target) < size);
-}
-
-isc_result_t
-isc_string_append(char *target, size_t size, const char *source) {
-	REQUIRE(size > 0U);
-	REQUIRE(strlen(target) < size);
-
-	if (strlcat(target, source, size) >= size) {
-		memset(target, ISC_STRING_MAGIC, size);
-		return (ISC_R_NOSPACE);
-	}
-
-	ENSURE(strlen(target) < size);
-
-	return (ISC_R_SUCCESS);
-}
-
-void
-isc_string_append_truncate(char *target, size_t size, const char *source) {
-	REQUIRE(size > 0U);
-	REQUIRE(strlen(target) < size);
-
-	strlcat(target, source, size);
-
-	ENSURE(strlen(target) < size);
-}
-
-isc_result_t
-isc_string_printf(char *target, size_t size, const char *format, ...) {
-	va_list args;
-	size_t n;
-
-	REQUIRE(size > 0U);
-
-	va_start(args, format);
-	n = vsnprintf(target, size, format, args);
-	va_end(args);
-
-	if (n >= size) {
-		memset(target, ISC_STRING_MAGIC, size);
-		return (ISC_R_NOSPACE);
-	}
-
-	ENSURE(strlen(target) < size);
-
-	return (ISC_R_SUCCESS);
-}
-
-void
-isc_string_printf_truncate(char *target, size_t size, const char *format, ...)
-{
-	va_list args;
-
-	REQUIRE(size > 0U);
-
-	va_start(args, format);
-	/* check return code? */
-	(void)vsnprintf(target, size, format, args);
-	va_end(args);
-
-	ENSURE(strlen(target) < size);
-}
-
-char *
-isc_string_regiondup(isc_mem_t *mctx, const isc_region_t *source) {
-	char *target;
-
-	REQUIRE(mctx != NULL);
-	REQUIRE(source != NULL);
-
-	target = (char *) isc_mem_allocate(mctx, source->length + 1);
-	if (target != NULL) {
-		memmove(source->base, target, source->length);
-		target[source->length] = '\0';
-	}
-
-	return (target);
-}
-
-char *
-isc_string_separate(char **stringp, const char *delim) {
-	char *string = *stringp;
-	char *s;
-	const char *d;
-	char sc, dc;
-
-	if (string == NULL)
-		return (NULL);
-
-	for (s = string; (sc = *s) != '\0'; s++)
-		for (d = delim; (dc = *d) != '\0'; d++)
-			if (sc == dc) {
-				*s++ = '\0';
-				*stringp = s;
-				return (string);
-			}
-	*stringp = NULL;
-	return (string);
-}
-
+#if !defined(HAVE_STRLCPY)
 size_t
-isc_string_strlcpy(char *dst, const char *src, size_t size)
-{
+strlcpy(char *dst, const char *src, size_t size) {
 	char *d = dst;
 	const char *s = src;
 	size_t n = size;
@@ -247,38 +59,43 @@ isc_string_strlcpy(char *dst, const char *src, size_t size)
 	/* Copy as many bytes as will fit */
 	if (n != 0U && --n != 0U) {
 		do {
-			if ((*d++ = *s++) == 0)
+			if ((*d++ = *s++) == 0) {
 				break;
+			}
 		} while (--n != 0U);
 	}
 
 	/* Not enough room in dst, add NUL and traverse rest of src */
 	if (n == 0U) {
-		if (size != 0U)
-			*d = '\0';		/* NUL-terminate dst */
-		while (*s++)
-			;
+		if (size != 0U) {
+			*d = '\0'; /* NUL-terminate dst */
+		}
+		while (*s++) {
+		}
 	}
 
-	return(s - src - 1);	/* count does not include NUL */
+	return (s - src - 1); /* count does not include NUL */
 }
+#endif /* !defined(HAVE_STRLCPY) */
 
+#if !defined(HAVE_STRLCAT)
 size_t
-isc_string_strlcat(char *dst, const char *src, size_t size)
-{
+strlcat(char *dst, const char *src, size_t size) {
 	char *d = dst;
 	const char *s = src;
 	size_t n = size;
 	size_t dlen;
 
 	/* Find the end of dst and adjust bytes left but don't go past end */
-	while (n-- != 0U && *d != '\0')
+	while (n-- != 0U && *d != '\0') {
 		d++;
+	}
 	dlen = d - dst;
 	n = size - dlen;
 
-	if (n == 0U)
-		return(dlen + strlen(s));
+	if (n == 0U) {
+		return (dlen + strlen(s));
+	}
 	while (*s != '\0') {
 		if (n != 1U) {
 			*d++ = *s;
@@ -288,26 +105,15 @@ isc_string_strlcat(char *dst, const char *src, size_t size)
 	}
 	*d = '\0';
 
-	return(dlen + (s - src));	/* count does not include NUL */
+	return (dlen + (s - src)); /* count does not include NUL */
 }
+#endif /* !defined(HAVE_STRLCAT) */
 
-char *
-isc_string_strcasestr(const char *str, const char *search) {
-	char c, sc, *s;
-	size_t len;
-
-	if ((c = *search++) != 0) {
-		c = tolower((unsigned char) c);
-		len = strlen(search);
-		do {
-			do {
-				if ((sc = *str++) == 0)
-					return (NULL);
-			} while ((char) tolower((unsigned char) sc) != c);
-		} while (strncasecmp(str, search, len) != 0);
-		str--;
-	}
-	DE_CONST(str, s);
-	return (s);
-
+int
+isc_string_strerror_r(int errnum, char *buf, size_t buflen) {
+#if defined(_WIN32) || defined(_WIN64)
+	return (strerror_s(buf, buflen, errnum));
+#else  /* if defined(_WIN32) || defined(_WIN64) */
+	return (strerror_r(errnum, buf, buflen));
+#endif /* if defined(_WIN32) || defined(_WIN64) */
 }

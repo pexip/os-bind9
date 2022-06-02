@@ -1,13 +1,13 @@
-############################################################################
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
-############################################################################
 
 import sys
 import unittest
@@ -24,15 +24,6 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(p.get_name(), "good_rsa.test")
         self.assertEqual(p.constructed(), False)
         self.assertEqual(p.validate(), (True, ""))
-
-        p = pol.policy('good_dsa.test', novalidate=True)
-        self.assertEqual(p.get_name(), "good_dsa.test")
-        self.assertEqual(p.constructed(), False)
-        self.assertEqual(p.validate(), (True, ""))
-
-        p = pol.policy('bad_dsa.test', novalidate=True)
-        self.assertEqual(p.validate(),
-                         (False, 'ZSK key size 769 not divisible by 64 as required for DSA'))
 
     def test_prepublish(self):
         pol = policy.dnssec_policy()

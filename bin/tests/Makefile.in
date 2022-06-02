@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -14,15 +16,15 @@ top_srcdir =	@top_srcdir@
 @BIND9_MAKE_INCLUDES@
 
 CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES} ${ISCCFG_INCLUDES} \
-		@DST_OPENSSL_INC@
+		${OPENSSL_CFLAGS}
 
-CDEFINES =	@CRYPTO@
+CDEFINES =
 CWARNINGS =
 BACKTRACECFLAGS = @BACKTRACECFLAGS@
 
-DNSLIBS =	../../lib/dns/libdns.@A@ @DNS_CRYPTO_LIBS@
-ISCLIBS =	../../lib/isc/libisc.@A@ @ISC_OPENSSL_LIBS@
-ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ @ISC_OPENSSL_LIBS@
+DNSLIBS =	../../lib/dns/libdns.@A@ @NO_LIBTOOL_DNSLIBS@
+ISCLIBS =	../../lib/isc/libisc.@A@ @NO_LIBTOOL_ISCLIBS@
+ISCNOSYMLIBS =	../../lib/isc/libisc-nosymtbl.@A@ @NO_LIBTOOL_ISCLIBS
 ISCCFGLIBS = 	../../lib/isccfg/libisccfg.@A@
 
 DNSDEPLIBS =	../../lib/dns/libdns.@A@
@@ -79,7 +81,7 @@ clean distclean::
 check: test
 
 test:
-	@for dir in $(SUBDIRS) ;\
+	@for dir in $(TESTDIRS) ;\
 	do \
 		( cd $$dir; $(MAKE) test ) ;\
 	done

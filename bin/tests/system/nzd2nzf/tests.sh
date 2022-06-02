@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -27,7 +29,7 @@ status=`expr $status + $ret`
 n=`expr $n + 1`
 echo_i "adding a new zone into default NZD using rndc addzone ($n)"
 $RNDCCMD 10.53.0.1 addzone "added.example { type master; file \"added.db\";
-};" 2>&1 | sed 's/^/ns1 /' | cat_i
+};" 2>&1 | sed 's/^/I:ns1 /' | cat_i
 sleep 2
 
 n=`expr $n + 1`
@@ -39,7 +41,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 echo_i "stopping ns1"
-$PERL $SYSTEMTESTTOP/stop.pl . ns1
+$PERL $SYSTEMTESTTOP/stop.pl nzd2nzf ns1
 
 n=`expr $n + 1`
 echo_i "dumping _default.nzd to _default.nzf ($n)"
@@ -57,13 +59,18 @@ echo_i "deleting _default.nzd database"
 rm -f ns1/_default.nzd
 
 echo_i "starting ns1 which should migrate the .nzf to .nzd"
-$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} . ns1
+$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} nzd2nzf ns1
 
 n=`expr $n + 1`
 echo_i "querying for zone data from migrated zone config ($n)"
-ret=0
-$DIG $DIGOPTS @10.53.0.1 a.added.example a > dig.out.ns1.$n || ret=1
-grep 'status: NOERROR' dig.out.ns1.$n > /dev/null || ret=1
+# retry loop in case the server restart above causes transient failures
+for try in 0 1 2 3 4 5 6 7 8 9; do
+    ret=0
+    $DIG $DIGOPTS @10.53.0.1 a.added.example a > dig.out.ns1.$n || ret=1
+    grep 'status: NOERROR' dig.out.ns1.$n > /dev/null || ret=1
+    [ "$ret" -eq 0 ] && break
+    sleep 1
+done
 n=`expr $n + 1`
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`

@@ -1,13 +1,17 @@
 #! /bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+# touch dnsrps-off to not test with DNSRPS
 
 set -e
 
@@ -16,7 +20,30 @@ SYSTEMTESTTOP=..
 
 QPERF=`$SHELL qperf.sh`
 
-$SHELL clean.sh
+USAGE="$0: [-DNx]"
+DEBUG=
+while getopts "DNx" c; do
+    case $c in
+	x) set -x; DEBUG=-x ;;
+        D) TEST_DNSRPS="-D" ;;
+	N) PARTIAL=-P ;;
+	*) echo "$USAGE" 1>&2; exit 1 ;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+if [ ${NOCLEAN:-unset} = unset ]; then
+    $SHELL clean.sh $PARTIAL $DEBUG
+fi
+
+for dir in ns*; do
+    touch $dir/named.run
+    nextpart $dir/named.run > /dev/null
+done
 
 copy_setports ns1/named.conf.in ns1/named.conf
 copy_setports ns2/named.conf.in ns2/named.conf
@@ -25,6 +52,16 @@ copy_setports ns4/named.conf.in ns4/named.conf
 copy_setports ns5/named.conf.in ns5/named.conf
 copy_setports ns6/named.conf.in ns6/named.conf
 copy_setports ns7/named.conf.in ns7/named.conf
+copy_setports ns8/named.conf.in ns8/named.conf
+copy_setports ns9/named.conf.in ns9/named.conf
+
+copy_setports dnsrpzd.conf.in dnsrpzd.conf
+
+# decide whether to test DNSRPS
+# Note that dnsrps.conf and dnsrps-slave.conf are included in named.conf
+# and differ from dnsrpz.conf which is used by dnsrpzd.
+$SHELL ../ckdnsrps.sh -A $TEST_DNSRPS $DEBUG
+test -z "`grep 'dnsrps-enable yes' dnsrps.conf`" && TEST_DNSRPS=
 
 # set up test policy zones.
 #   bl is the main test zone
@@ -35,21 +72,29 @@ copy_setports ns7/named.conf.in ns7/named.conf
 for NM in '' -2 -given -disabled -passthru -no-op -nodata -nxdomain -cname -wildcname -garden -drop -tcp-only; do
     sed -e "/SOA/s/blx/bl$NM/g" ns3/base.db >ns3/bl$NM.db
 done
+#  bl zones are dynamically updated.  Add one zone that is updated manually.
+cp ns3/manual-update-rpz.db.in ns3/manual-update-rpz.db
+cp ns8/manual-update-rpz.db.in ns8/manual-update-rpz.db
 
-# sign the root and a zone in ns2
-test -r $RANDFILE || $GENRANDOM 400 $RANDFILE
+cp ns3/mixed-case-rpz-1.db.in ns3/mixed-case-rpz.db
 
-# $1=directory, $2=domain name, $3=input zone file, $4=output file
+# a zone that expires quickly and then can't be refreshed
+cp ns5/fast-expire.db.in ns5/fast-expire.db
+cp ns5/expire.conf.in ns5/expire.conf
+
+# $1=directory
+# $2=domain name
+# $3=input zone file
+# $4=output file
 signzone () {
-    KEYNAME=`$KEYGEN -q -r $RANDFILE -b 512 -K $1 $2`
+    KEYNAME=`$KEYGEN -q -a rsasha256 -K $1 $2`
     cat $1/$3 $1/$KEYNAME.key > $1/tmp
-    $SIGNER -Pp -K $1 -o $2 -f $1/$4 $1/tmp >/dev/null
-    sed -n -e 's/\(.*\) IN DNSKEY \([0-9]\{1,\} [0-9]\{1,\} [0-9]\{1,\}\) \(.*\)/trusted-keys {"\1" \2 "\3";};/p' $1/$KEYNAME.key >>trusted.conf
-    DSFILENAME=dsset-`echo $2 |sed -e "s/\.$//g"`$TP
+    $SIGNER -P -K $1 -o $2 -f $1/$4 $1/tmp >/dev/null
+    sed -n -e 's/\(.*\) IN DNSKEY \([0-9]\{1,\} [0-9]\{1,\} [0-9]\{1,\}\) \(.*\)/trust-anchors {"\1" static-key \2 "\3";};/p' $1/$KEYNAME.key >>trusted.conf
+    DSFILENAME=dsset-${2}${TP}
     rm $DSFILENAME $1/tmp
 }
-signzone ns2 tld2s. base-tld2s.db tld2s.db
-
+signzone ns2 tld2s base-tld2s.db tld2s.db
 
 # Performance and a few other checks.
 cat <<EOF >ns5/rpz-switch
@@ -59,9 +104,11 @@ response-policy {
 	zone "bl10"; zone "bl11"; zone "bl12"; zone "bl13"; zone "bl14";
 	zone "bl15"; zone "bl16"; zone "bl17"; zone "bl18"; zone "bl19";
     } recursive-only no
+    qname-wait-recurse no
+    nsip-enable yes
+    nsdname-enable yes
     max-policy-ttl 90
     break-dnssec yes
-    qname-wait-recurse no
     ;
 EOF
 
@@ -121,3 +168,11 @@ $PERL -e 'for ($cnt = $val = 1; $cnt <= 3000; ++$cnt) {
 cp ns2/bl.tld2.db.in ns2/bl.tld2.db
 cp ns5/empty.db.in ns5/empty.db
 cp ns5/empty.db.in ns5/policy2.db
+
+# Run dnsrpzd to get the license and prime the static policy zones
+if test -n "$TEST_DNSRPS"; then
+   DNSRPZD="`../rpz/dnsrps -p`"
+   cd ns3
+   "$DNSRPZ" -D../dnsrpzd.rpzf -S../dnsrpzd.sock -C../dnsrpzd.conf \
+             -w 0 -dddd -L stdout >./dnsrpzd.run 2>&1
+fi

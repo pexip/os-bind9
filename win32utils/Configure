@@ -2,9 +2,11 @@
 #
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -24,57 +26,8 @@ use Cwd;
 my $configfile = "..\\config.h";
 my $platformfile = "..\\lib\\isc\\win32\\include\\isc\\platform.h";
 my $confshfile = "..\\bin\\tests\\system\\conf.sh";
-my $icshfile = "..\\isc-config.sh";
 
-my @filelist = ("..\\bin\\check\\win32\\checktool.dsp",
-                "..\\bin\\check\\win32\\checkconf.dsp",
-                "..\\bin\\check\\win32\\checkconf.mak",
-                "..\\bin\\check\\win32\\checkzone.dsp",
-                "..\\bin\\check\\win32\\checkzone.mak",
-                "..\\bin\\confgen\\win32\\confgentool.dsp",
-                "..\\bin\\confgen\\win32\\ddnsconfgen.dsp",
-                "..\\bin\\confgen\\win32\\ddnsconfgen.mak",
-                "..\\bin\\confgen\\win32\\rndcconfgen.dsp",
-                "..\\bin\\confgen\\win32\\rndcconfgen.mak",
-                "..\\bin\\delv\\win32\\delv.dsp",
-                "..\\bin\\delv\\win32\\delv.mak",
-                "..\\bin\\dig\\win32\\dig.dsp",
-                "..\\bin\\dig\\win32\\dig.mak",
-                "..\\bin\\dig\\win32\\dighost.dsp",
-                "..\\bin\\dig\\win32\\host.dsp",
-                "..\\bin\\dig\\win32\\host.mak",
-                "..\\bin\\dig\\win32\\nslookup.dsp",
-                "..\\bin\\dig\\win32\\nslookup.mak",
-                "..\\bin\\dnssec\\win32\\dnssectool.dsp",
-                "..\\bin\\dnssec\\win32\\dsfromkey.dsp",
-                "..\\bin\\dnssec\\win32\\dsfromkey.mak",
-                "..\\bin\\dnssec\\win32\\importkey.dsp",
-                "..\\bin\\dnssec\\win32\\importkey.mak",
-                "..\\bin\\dnssec\\win32\\keyfromlabel.dsp",
-                "..\\bin\\dnssec\\win32\\keyfromlabel.mak",
-                "..\\bin\\dnssec\\win32\\keygen.dsp",
-                "..\\bin\\dnssec\\win32\\keygen.mak",
-                "..\\bin\\dnssec\\win32\\revoke.dsp",
-                "..\\bin\\dnssec\\win32\\revoke.mak",
-                "..\\bin\\dnssec\\win32\\settime.dsp",
-                "..\\bin\\dnssec\\win32\\settime.mak",
-                "..\\bin\\dnssec\\win32\\signzone.dsp",
-                "..\\bin\\dnssec\\win32\\signzone.mak",
-                "..\\bin\\dnssec\\win32\\verify.dsp",
-                "..\\bin\\dnssec\\win32\\verify.mak",
-                "..\\bin\\named\\win32\\named.dsp",
-                "..\\bin\\named\\win32\\named.mak",
-                "..\\bin\\nsupdate\\win32\\nsupdate.dsp",
-                "..\\bin\\nsupdate\\win32\\nsupdate.mak",
-                "..\\bin\\pkcs11\\win32\\pk11destroy.dsp",
-                "..\\bin\\pkcs11\\win32\\pk11destroy.mak",
-                "..\\bin\\pkcs11\\win32\\pk11keygen.dsp",
-                "..\\bin\\pkcs11\\win32\\pk11keygen.mak",
-                "..\\bin\\pkcs11\\win32\\pk11list.dsp",
-                "..\\bin\\pkcs11\\win32\\pk11list.mak",
-                "..\\bin\\pkcs11\\win32\\pk11tokens.dsp",
-                "..\\bin\\pkcs11\\win32\\pk11tokens.mak",
-                "..\\bin\\python\\dnssec-checkds.py",
+my @filelist = ("..\\bin\\python\\dnssec-checkds.py",
                 "..\\bin\\python\\dnssec-coverage.py",
                 "..\\bin\\python\\dnssec-keymgr.py",
                 "..\\bin\\python\\isc\\__init__.py",
@@ -92,104 +45,8 @@ my @filelist = ("..\\bin\\check\\win32\\checktool.dsp",
                 "..\\bin\\python\\isc\\tests\\dnskey_test.py",
                 "..\\bin\\python\\isc\\tests\\policy_test.py",
                 "..\\bin\\python\\isc\\utils.py",
-                "..\\bin\\rndc\\win32\\rndc.dsp",
-                "..\\bin\\rndc\\win32\\rndc.mak",
-                "..\\bin\\rndc\\win32\\rndcutil.dsp",
-                "..\\bin\\tests\\system\\dlz\\prereq.sh",
-                "..\\bin\\tools\\win32\\arpaname.dsp",
-                "..\\bin\\tools\\win32\\arpaname.mak",
-                "..\\bin\\tools\\win32\\genrandom.dsp",
-                "..\\bin\\tools\\win32\\genrandom.mak",
-                "..\\bin\\tools\\win32\\ischmacfixup.dsp",
-                "..\\bin\\tools\\win32\\ischmacfixup.mak",
-                "..\\bin\\tools\\win32\\journalprint.dsp",
-                "..\\bin\\tools\\win32\\journalprint.mak",
-                "..\\bin\\tools\\win32\\mdig.dsp",
-                "..\\bin\\tools\\win32\\mdig.mak",
-                "..\\bin\\tools\\win32\\nsec3hash.dsp",
-                "..\\bin\\tools\\win32\\nsec3hash.mak",
-                "..\\bin\\tools\\win32\\rrchecker.dsp",
-                "..\\bin\\tools\\win32\\rrchecker.mak",
-                "..\\bin\\tests\\system\\win32\\bigkey.dsp",
-                "..\\bin\\tests\\system\\win32\\bigkey.mak",
-                "..\\bin\\tests\\system\\win32\\feature-test.dsp",
-                "..\\bin\\tests\\system\\win32\\feature-test.mak",
-                "..\\bin\\tests\\system\\win32\\gencheck.dsp",
-                "..\\bin\\tests\\system\\win32\\gencheck.mak",
-                "..\\bin\\tests\\system\\win32\\keycreate.dsp",
-                "..\\bin\\tests\\system\\win32\\keycreate.mak",
-                "..\\bin\\tests\\system\\win32\\keydelete.dsp",
-                "..\\bin\\tests\\system\\win32\\keydelete.mak",
-                "..\\bin\\tests\\system\\win32\\lwtest.dsp",
-                "..\\bin\\tests\\system\\win32\\lwtest.mak",
-                "..\\bin\\tests\\system\\win32\\pipequeries.dsp",
-                "..\\bin\\tests\\system\\win32\\pipequeries.mak",
-                "..\\bin\\tests\\win32\\backtrace_test.dsp",
-                "..\\bin\\tests\\win32\\backtrace_test.mak",
-                "..\\bin\\tests\\win32\\inter_test.dsp",
-                "..\\bin\\tests\\win32\\inter_test.mak",
-                "..\\bin\\tests\\win32\\makejournal.dsp",
-                "..\\bin\\tests\\win32\\makejournal.mak",
-                "..\\bin\\tests\\win32\\rwlock_test.dsp",
-                "..\\bin\\tests\\win32\\rwlock_test.mak",
-                "..\\bin\\tests\\win32\\shutdown_test.dsp",
-                "..\\bin\\tests\\win32\\shutdown_test.mak",
-                "..\\bin\\tests\\win32\\sock_test.dsp",
-                "..\\bin\\tests\\win32\\sock_test.mak",
-                "..\\bin\\tests\\win32\\task_test.dsp",
-                "..\\bin\\tests\\win32\\task_test.mak",
-                "..\\bin\\tests\\win32\\timer_test.dsp",
-                "..\\bin\\tests\\win32\\timer_test.mak",
-                "..\\bin\\tests\\win32\\inter_test.dsp",
-                "..\\bin\\tests\\win32\\inter_test.mak",
-                "..\\bin\\tests\\win32\\rwlock_test.dsp",
-                "..\\bin\\tests\\win32\\rwlock_test.mak",
-                "..\\bin\\tests\\win32\\shutdown_test.dsp",
-                "..\\bin\\tests\\win32\\shutdown_test.mak",
-                "..\\bin\\tests\\win32\\sock_test.dsp",
-                "..\\bin\\tests\\win32\\sock_test.mak",
-                "..\\bin\\tests\\win32\\task_test.dsp",
-                "..\\bin\\tests\\win32\\task_test.mak",
-                "..\\bin\\tests\\win32\\timer_test.dsp",
-                "..\\bin\\tests\\win32\\timer_test.mak",
-                "..\\bin\\win32\\BINDInstall\\BINDInstall.dsp",
-                "..\\bin\\win32\\BINDInstall\\BINDInstall.mak",
-                "..\\lib\\bind9\\win32\\libbind9.dsp",
-                "..\\lib\\bind9\\win32\\libbind9.mak",
-                "..\\lib\\dns\\win32\\gen.dsp",
-                "..\\lib\\dns\\win32\\gen.mak",
                 "..\\lib\\dns\\win32\\libdns.def",
-                "..\\lib\\dns\\win32\\libdns.dsp",
-                "..\\lib\\dns\\win32\\libdns.mak",
-                "..\\lib\\irs\\win32\\libirs.dsp",
-                "..\\lib\\irs\\win32\\libirs.mak",
-                "..\\lib\\isc\\win32\\libisc.def",
-                "..\\lib\\isc\\win32\\libisc.dsp",
-                "..\\lib\\isc\\win32\\libisc.mak",
-                "..\\lib\\isccc\\win32\\libisccc.dsp",
-                "..\\lib\\isccc\\win32\\libisccc.mak",
-                "..\\lib\\isccfg\\win32\\libisccfg.dsp",
-                "..\\lib\\isccfg\\win32\\libisccfg.mak",
-                "..\\lib\\lwres\\win32\\liblwres.dsp",
-                "..\\lib\\lwres\\win32\\liblwres.mak",
-                "..\\lib\\samples\\win32\\async.dsp",
-                "..\\lib\\samples\\win32\\async.mak",
-                "..\\lib\\samples\\win32\\gai.dsp",
-                "..\\lib\\samples\\win32\\gai.mak",
-                "..\\lib\\samples\\win32\\nsprobe.dsp",
-                "..\\lib\\samples\\win32\\nsprobe.mak",
-                "..\\lib\\samples\\win32\\request.dsp",
-                "..\\lib\\samples\\win32\\request.mak",
-                "..\\lib\\samples\\win32\\resolve.dsp",
-                "..\\lib\\samples\\win32\\resolve.mak",
-                "..\\lib\\samples\\win32\\update.dsp",
-                "..\\lib\\samples\\win32\\update.mak",
-                "..\\lib\\win32\\bindevt\\bindevt.dsp",
-                "..\\lib\\win32\\bindevt\\bindevt.mak",
-                "legacy\\BINDBuild.dsw",
-                "legacy\\BuildAll.bat",
-                "legacy\\BuildPost.bat",
-                "legacy\\BuildSetup.bat");
+                "..\\lib\\isc\\win32\\libisc.def");
 
 my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
                    "..\\bin\\check\\win32\\checkconf.vcxproj.filters",
@@ -213,6 +70,8 @@ my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
                    "..\\bin\\dig\\win32\\host.vcxproj.filters",
                    "..\\bin\\dig\\win32\\nslookup.vcxproj",
                    "..\\bin\\dig\\win32\\nslookup.vcxproj.filters",
+                   "..\\bin\\dnssec\\win32\\cds.vcxproj",
+                   "..\\bin\\dnssec\\win32\\cds.vcxproj.filters",
                    "..\\bin\\dnssec\\win32\\dnssectool.vcxproj",
                    "..\\bin\\dnssec\\win32\\dnssectool.vcxproj.filters",
                    "..\\bin\\dnssec\\win32\\dsfromkey.vcxproj",
@@ -249,10 +108,6 @@ my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
                    "..\\bin\\rndc\\win32\\rndcutil.vcxproj.filters",
                    "..\\bin\\tools\\win32\\arpaname.vcxproj",
                    "..\\bin\\tools\\win32\\arpaname.vcxproj.filters",
-                   "..\\bin\\tools\\win32\\genrandom.vcxproj",
-                   "..\\bin\\tools\\win32\\genrandom.vcxproj.filters",
-                   "..\\bin\\tools\\win32\\ischmacfixup.vcxproj",
-                   "..\\bin\\tools\\win32\\ischmacfixup.vcxproj.filters",
                    "..\\bin\\tools\\win32\\journalprint.vcxproj",
                    "..\\bin\\tools\\win32\\journalprint.vcxproj.filters",
                    "..\\bin\\tools\\win32\\mdig.vcxproj",
@@ -271,10 +126,10 @@ my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
                    "..\\bin\\tests\\system\\win32\\keycreate.vcxproj.filters",
                    "..\\bin\\tests\\system\\win32\\keydelete.vcxproj",
                    "..\\bin\\tests\\system\\win32\\keydelete.vcxproj.filters",
-                   "..\\bin\\tests\\system\\win32\\lwtest.vcxproj",
-                   "..\\bin\\tests\\system\\win32\\lwtest.vcxproj.filters",
                    "..\\bin\\tests\\system\\win32\\pipequeries.vcxproj",
                    "..\\bin\\tests\\system\\win32\\pipequeries.vcxproj.filters",
+                   "..\\bin\\tests\\system\\win32\\resolve.vcxproj",
+                   "..\\bin\\tests\\system\\win32\\resolve.vcxproj.filters",
                    "..\\bin\\tests\\win32\\backtrace_test.vcxproj",
                    "..\\bin\\tests\\win32\\backtrace_test.vcxproj.filters",
                    "..\\bin\\tests\\win32\\inter_test.vcxproj",
@@ -319,20 +174,7 @@ my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
                    "..\\lib\\isccc\\win32\\libisccc.vcxproj.filters",
                    "..\\lib\\isccfg\\win32\\libisccfg.vcxproj",
                    "..\\lib\\isccfg\\win32\\libisccfg.vcxproj.filters",
-                   "..\\lib\\lwres\\win32\\liblwres.vcxproj",
-                   "..\\lib\\lwres\\win32\\liblwres.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\resolve.vcxproj",
-                   "..\\lib\\samples\\win32\\resolve.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\async.vcxproj",
-                   "..\\lib\\samples\\win32\\async.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\gai.vcxproj",
-                   "..\\lib\\samples\\win32\\gai.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\update.vcxproj",
-                   "..\\lib\\samples\\win32\\update.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\request.vcxproj",
-                   "..\\lib\\samples\\win32\\request.vcxproj.filters",
-                   "..\\lib\\samples\\win32\\nsprobe.vcxproj",
-                   "..\\lib\\samples\\win32\\nsprobe.vcxproj.filters",
+                   "..\\lib\\ns\\win32\\libns.vcxproj",
                    "..\\lib\\win32\\bindevt\\bindevt.vcxproj",
                    "..\\lib\\win32\\bindevt\\bindevt.vcxproj.filters",
                    "bind9.sln");
@@ -341,68 +183,41 @@ my @projectlist = ("..\\bin\\check\\win32\\checkconf.vcxproj",
 
 my %configdefh;
 
-my @substdefh = ("AES_CC",
-                 "ALLOW_FILTER_AAAA",
-                 "CONFIGARGS",
+my @substdefh = ("CONFIGARGS",
                  "DNS_RDATASET_FIXED",
-                 "ENABLE_RPZ_NSDNAME",
-                 "ENABLE_RPZ_NSIP",
-                 "HAVE_EVP_SHA256",
-                 "HAVE_EVP_SHA384",
-                 "HAVE_EVP_SHA512",
-                 "HAVE_FIPS_MODE",
-                 "HAVE_GEOIP",
-                 "HAVE_GEOIP_CITY_V6",
-                 "HAVE_GEOIP_V6",
+                 "HAVE_GEOIP2",
                  "HAVE_LIBXML2",
-                 "HAVE_OPENSSL_AES",
-                 "HAVE_OPENSSL_DSA",
-                 "HAVE_OPENSSL_ECDSA",
-                 "HAVE_OPENSSL_ED25519",
-                 "HAVE_OPENSSL_ED448",
-                 "HAVE_OPENSSL_EVP_AES",
-                 "HAVE_OPENSSL_GOST",
-                 "HAVE_PKCS11_ECDSA",
-                 "HAVE_PKCS11_ED25519",
-                 "HAVE_PKCS11_ED448",
-                 "HAVE_PKCS11_GOST",
+                 "USE_BACKTRACE",
+                 "USE_OPENSSL",
+                 "USE_PKCS11",
                  "HAVE_READLINE",
                  "HAVE_ZLIB",
-                 "HMAC_SHA1_CC",
-                 "HMAC_SHA256_CC",
                  "ISC_LIST_CHECKINIT",
-                 "PREFER_GOSTASN1",
                  "TUNE_LARGE",
                  "WANT_QUERYTRACE",
-                 "WITH_IDN");
+                 "WITH_IDN",
+                 "CPU_RELAX",
+                 "VALIDATION_DEFAULT",
+    );
 
 # for platform.h
 
 my %configdefp;
 
-my @substdefp = ("ISC_PLATFORM_BUSYWAITNOP",
-                 "ISC_PLATFORM_HAVEATOMICSTORE",
-                 "ISC_PLATFORM_HAVEATOMICSTOREQ",
-                 "ISC_PLATFORM_HAVECMPXCHG",
-                 "ISC_PLATFORM_HAVEXADD",
-                 "ISC_PLATFORM_HAVEXADDQ",
-                 "ISC_PLATFORM_NEEDSTRCASESTR",
-                 "ISC_PLATFORM_USEBACKTRACE",
-                 "ISC_PLATFORM_WANTAES");
+my @substdefp = ();
 
 # for conf.sh
 
 my %configtest;
 
-my @substtest = ("CHECK_DSA",
-                 "CHECKDS",
+my @substtest = ("CHECKDS",
                  "COVERAGE",
+                 "CRYPTO",
                  "DNSTAP",
                  "FSTRM_CAPTURE",
                  "JSONSTATS",
                  "KEYMGR",
                  "NZD_TOOLS",
-                 "PKCS11_TEST",
                  "XMLSTATS",
                  "ZLIB"),
 
@@ -414,6 +229,7 @@ my @substinc = ("GSSAPI_INC",
                 "GEOIP_INC",
                 "IDN_INC",
                 "LIBXML2_INC",
+                "LIBUV_INC",
                 "OPENSSL_INC",
                 "READLINE_INC",
                 "ZLIB_INC");
@@ -427,7 +243,9 @@ my @substlib = ("GSSAPI_LIB",
                 "IDN_LIB",
                 "KRB5_LIB",
                 "LIBXML2_LIB",
-                "OPENSSL_LIB",
+                "LIBUV_LIB",
+                "OPENSSL_LIBCRYPTO",
+                "OPENSSL_LIBSSL",
                 "READLINE_LIB",
                 "READLINE_LIBD",
                 "ZLIB_LIB");
@@ -438,19 +256,22 @@ my %configdll;
 
 my @substdll = ("COMERR_DLL",
                 "GSSAPI_DLL",
-                "GEOIP_DLL",
                 "ICONV_DLL",
                 "IDN_DLL",
                 "KRB5_DLL",
                 "K5SPRT_DLL",
                 "LIBXML2_DLL",
-                "OPENSSL_DLL",
+                "LIBUV_DLL",
+                "OPENSSL_DLLCRYPTO",
+                "OPENSSL_DLLSSL",
                 "WSHELP_DLL",
                 "ZLIB_DLL");
 
 # variables
 
-my %configvar;
+my %configvar = (
+	"TOOLS_VERSION" => "4.0",
+);
 
 my @substvar = ("BIND9_VERSION",
                 "BUILD_MACHINE",
@@ -468,28 +289,28 @@ my @substvar = ("BIND9_VERSION",
                 "OPENSSL_PATH",
                 "PLATFORM",
                 "PKCS11_TOOLS",
+                "PLATFORM_TOOLSET",
                 "prefix",
+                "PSSUSPEND",
                 "PYTHON",
                 "PYTHON_INSTALL_DIR",
-                "VCREDIST_PATH"),
+                "TOOLS_VERSION",
+                "VCREDIST_PATH",
+                "WINDOWS_TARGET_PLATFORM_VERSION"),
 
 # defines
 
 my %configdefd;
 
-my @substdefd = ("CRYPTO",
-                 "PK11_LIB_LOCATION",
+my @substdefd = ("PK11_LIB_LOCATION",
                  "USE_GSSAPI",
-                 "USE_PKCS11",
-                 "USE_PYTHON",
-                 "USE_ISC_SPNEGO");
+                 "USE_PYTHON");
 
 # conditions
 
 my %configcond;
 
-my @substcond = ("AES",
-                 "ATOMIC",
+my @substcond = ("ATOMIC",
                  "GSSAPI",
                  "GEOIP",
                  "IDNKIT",
@@ -497,7 +318,6 @@ my @substcond = ("AES",
                  "OPENSSL",
                  "PKCS11",
                  "PYTHON",
-                 "SAMPLES",
                  "STESTS",
                  "TESTS",
                  "XTESTS",
@@ -512,36 +332,29 @@ my @allcond = (@substcond, "NOTYET", "NOLONGER");
 my @enablelist = ("developer",
                   "fixed-rrset",
                   "intrinsics",
-                  "isc-spnego",
                   "native-pkcs11",
                   "openssl-hash",
-                  "filter-aaaa",
-                  "querytrace",
-                  "rpz-nsdname",
-                  "rpz-nsip");
+                  "querytrace");
 
 # with-xxx/without-xxx
 
 my @withlist = ("aes",
-                "cc-alg",
                 "cross-compile",
-                "ecdsa",
-                "eddsa",
                 "extra-tests",
                 "gssapi",
-                "geoip",
-                "gost",
+                "geoip2",
                 "iconv",
                 "idn",
                 "openssl",
                 "libxml2",
                 "pkcs11",
+                "pssuspend",
                 "python",
                 "readline",
-                "samples",
                 "system-tests",
                 "tests",
                 "tuning",
+                "libuv",
                 "vcredist",
                 "zlib");
 
@@ -563,45 +376,40 @@ my @help = (
 "\nGeneral Options and Commands:\n",
 "  verbose               (options) print messages\n",
 "  help                  (command) print this help\n",
-"  legacy                (options) process only files for legacy build\n",
 "  win32                 (command) configure for Win32 platform\n",
 "  x64                   (command) configure for x64 platform\n",
 "  clean                 (command) clean up generated files\n",
 "  <none>                (command) print a summary of the configuration\n",
 "\nOptional Features:\n",
-"  enable-intrinsics     enable instrinsic/atomic functions [default=yes]\n",
+"  enable-intrinsics     enable intrinsic/atomic functions [default=yes]\n",
 "  enable-native-pkcs11  use native PKCS#11 for all crypto [default=no]\n",
 "  enable-openssl-hash   use OpenSSL for hash functions [default=yes]\n",
-"  enable-isc-spnego     use SPNEGO from lib/dns [default=yes]\n",
-"  enable-filter-aaaa    enable filtering of AAAA records [default=yes]\n",
 "  enable-fixed-rrset    enable fixed rrset ordering [default=no]\n",
 "  enable-developer      enable developer build settings [default=no]\n",
 "  enable-querytrace     enable very verbose query trace [default=no]\n",
-"  enable-rpz-nsip       enable rpz-nsip rules [default=yes]\n",
-"  enable-rpz-nsdname    enable rpz-nsdname rules [default=yes]\n",
 "\nOptional Packages:\n",
 "  with-tests            build with test suite\n",
 "  with-extra-tests      build with extra test suite\n",
 "  with-system-tests     build with system test suite\n",
-"  with-samples          build with sample programs\n",
-"  with-openssl[=PATH]   build with OpenSSL yes|no|path\n",
+"  with-openssl[=PATH]   build with OpenSSL yes|path (mandatory)\n",
+"  with-libuv[=PATH]     build with libuv yes|path (mandatory)\n",
 "  with-pkcs11[=PATH]    build with PKCS#11 support yes|no|provider-path\n",
-"  with-ecdsa            crypto ECDSA\n",
-"  with-eddsa            crypto EDDSA yes|all|no\n",
-"  with-gost[=ENC]       crypto GOST yes|no|raw|ans1\n",
-"  with-aes              crypto AES\n",
-"  with-cc-alg           choose the algorithm for cookies aes|sha1|sha256\n",
 "  with-gssapi[=PATH]    build with MIT KfW GSSAPI yes|no|path\n",
 "  with-libxml2[=PATH]   build with libxml2 library yes|no|path\n",
-"  with-geoip[=PATH]     build with GeoIP support yes|no|path\n",
+"  with-geoip2[=PATH]    build with GeoIP2 support yes|no|path\n",
+"  with-pssuspend[=COMMAND] specify pssuspend command\n",
 "  with-python[=COMMAND] specify python interpreter python|command\n",
 "  with-readline[=PATH]  build with readline library support yes|no|path\n",
 "  with-idn[=PATH]       build with IDN kit support yes|no|path\n",
 "  with-iconv[=PATH]     path of the iconv DLL [default=same than idn]\n",
 "  with-zlib[=PATH]      build with zlib library yes|no|path\n",
 "  with-vcredist[=PATH]  visual C++ redistributable package yes|path\n",
-"  with-tuning=OPTION    tune for plaform size (large|default)\n",
-"  with-cross-compile    32 / 64 bit build / host plaforms\n");
+"  with-tuning=OPTION    tune for platform size (small|default)\n",
+"  with-cross-compile    32 / 64 bit build / host platforms\n",
+"\nOptional Visual Studio project parameters:\n",
+"  with-tools-version=VERSION     set the ToolsVersion attribute to VERSION\n",
+"  with-platform-toolset=VERSION  use supplied toolset VERSION for building\n",
+"  with-platform-version=VERSION  use supplied Windows SDK VERSION for building\n");
 
 # Parse arguments
 
@@ -614,10 +422,9 @@ my $want_clean = "no";
 my $want_unknown = "no";
 my $unknown_value;
 my $enable_intrinsics = "yes";
+my $cryptolib = "";
 my $enable_native_pkcs11 = "no";
-my $enable_openssl_hash = "auto";
-my $enable_filter_aaaa = "yes";
-my $enable_isc_spnego = "yes";
+my $enable_crypto_rand = "yes";
 my $enable_fixed_rrset = "no";
 my $enable_developer = "no";
 my $enable_querytrace = "no";
@@ -626,24 +433,22 @@ my $enable_rpz_nsdname = "yes";
 my $use_tests = "no";
 my $use_xtests = "no";
 my $use_stests = "no";
-my $use_samples = "no";
+my $use_libuv = "auto";
+my $libuv_path = "..\\..\\";
 my $use_openssl = "auto";
 my $openssl_path = "..\\..\\";
 my $use_pkcs11 = "no";
 my $pkcs11_path = "unknown";
-my $use_ecdsa = "auto";
-my $use_eddsa = "auto";
-my $use_ed448 = "auto";
-my $use_gost = "auto";
-my $gost_encoding = "raw";
 my $use_aes = "auto";
-my $cookie_algorithm = "aes";
 my $use_gssapi = "no";
+my $validation_default = "auto";
 my $gssapi_path = "C:\\Program\ Files\\MIT\\Kerberos\\";
-my $use_geoip = "no";
-my $geoip_path = "";
+my $use_geoip2 = "no";
+my $geoip2_path = "";
 my $use_libxml2 = "auto";
 my $libxml2_path = "..\\..\\";
+my $with_pssuspend = "no";
+my $pssuspend_command = "pssuspend.exe";
 my $use_python = "auto";
 my $python_command = "python.exe";
 my $use_readline = "no";
@@ -707,26 +512,33 @@ foreach (@ARGV) {
     }
 }
 
-# legacy default to win32
+# old legacy mode
 
-if ($legacy_only && ($want_x64 ne "yes")) {
-    $want_win32 = "yes";
+if ($legacy_only) {
+    print "legacy mode is obsolete (so ignored)\n";
 }
 
 if ($want_checkfiles eq "yes") {
+        my $status=0;
         foreach (@filelist) {
+                my $name = $_;
+                $name =~ s/\\/\\\\/g;
                 next if -r $_ . ".in";
                 s/\\/\//g;
                 next if -r $_ . ".in";
-                print "missing $_.in from filelist\n";
+                print "remove '$name' from filelist in win32utils/Configure or add to repository\n";
+                $status = 1;
         }
         foreach (@projectlist) {
+                my $name = $_;
+                $name =~ s/\\/\\\\/g;
                 next if -r $_ . ".in";
                 s/\\/\//g;
                 next if -r $_ . ".in";
-                print "missing $_.in from projectlist\n";
+                print "remove '$name' from projectlist in win32utils/Configure or add to repository\n";
+                $status = 1;
         }
-        exit(0);
+        exit($status);
 }
 
 # configure the platform
@@ -738,13 +550,11 @@ if (($want_win32 eq "yes") && ($want_x64 eq "yes")) {
     $configvar{"BUILD_PLATFORM"} = "Win32";
     $configvar{"MACHINE"} = "/machine:X86";
     $configvar{"BUILD_MACHINE"} = "/machine:X86";
-    $configdefp{"ISC_PLATFORM_BUSYWAITNOP"} = "__asm { rep nop }";
 } elsif ($want_x64 eq "yes") {
     $configvar{"PLATFORM"} = "x64";
     $configvar{"BUILD_PLATFORM"} = "x64";
     $configvar{"MACHINE"} = "/machine:X64";
     $configvar{"BUILD_MACHINE"} = "/machine:X64";
-    $configdefp{"ISC_PLATFORM_BUSYWAITNOP"} = "_mm_pause()";
 }
 # Standard configure variable
 $configvar{"EXEEXT"} = ".exe";
@@ -792,8 +602,9 @@ getversion();
 
 sub appargs {
     my $arg = $_[0];
-    # escape backslashes, spaces and double quotes
-    $arg =~ s/([\\ "])/\\$1/g;
+    # escape backslashes and double quotes
+    $arg =~ s/([\\"])/\\$1/g;
+    $arg =~ s/([\s])/\\\\$1/g;
     if (defined($configdefh{"CONFIGARGS"})) {
         $configdefh{"CONFIGARGS"} .= " " . $arg;
     } else {
@@ -823,20 +634,6 @@ sub myenable {
         if ($val =~ /^yes$/i) {
             $enable_native_pkcs11 = "yes";
         }
-    } elsif ($key =~ /^openssl-hash$/i) {
-        if ($val =~ /^yes$/i) {
-            $enable_openssl_hash = "yes";
-        } elsif ($val =~ /^no$/i) {
-            $enable_openssl_hash = "no";
-        }
-    } elsif ($key =~ /^isc-spnego$/i) {
-        if ($val =~ /^no$/i) {
-            $enable_isc_spnego = "no";
-        }
-    } elsif ($key =~ /^filter-aaaa$/i) {
-        if ($val =~ /^no$/i) {
-            $enable_filter_aaaa = "no";
-        }
     } elsif ($key =~ /^fixed-rrset$/i) {
         if ($val =~ /^yes$/i) {
             $enable_fixed_rrset = "yes";
@@ -849,13 +646,9 @@ sub myenable {
         if ($val =~ /^yes$/i) {
             $enable_querytrace = "yes";
         }
-    } elsif ($key =~ /^rpz-nsip$/i) {
+    } elsif ($key =~ /^auto-validation$/i) {
         if ($val =~ /^no$/i) {
-            $enable_rpz_nsip = "no";
-        }
-    } elsif ($key =~ /^rpz-nsdname$/i) {
-        if ($val =~ /^no$/i) {
-            $enable_rpz_nsdname = "no";
+            $validation_default = "yes";
         }
     } else {
         $want_unknown = "yes";
@@ -871,7 +664,6 @@ sub myenable {
 
 if ($enable_developer eq "yes") {
     $configdefh{"ISC_LIST_CHECKINIT"} = 1;
-    $enable_filter_aaaa = "yes";
     $enable_querytrace = "yes";
     # no atf on WIN32
     $enable_fixed_rrset = "yes";
@@ -879,7 +671,6 @@ if ($enable_developer eq "yes") {
     $use_tests = "yes";
     $use_xtests = "yes";
     $use_stests = "yes";
-    $use_samples = "yes";
 }
 
 # parse with/without
@@ -902,16 +693,19 @@ sub mywith {
             $use_tests = "yes";
             $use_stests = "yes";
         }
-    } elsif ($key =~ /^samples$/i) {
-        if ($val =~ /^yes$/i) {
-            $use_samples = "yes";
-        }
     } elsif ($key =~ /^openssl$/i) {
         if ($val =~ /^no$/i) {
-            $use_openssl = "no";
+            die "OpenSSL support is now mandatory\n";
         } elsif ($val !~ /^yes$/i) {
             $use_openssl = "yes";
             $openssl_path = $val;
+        }
+    } elsif ($key =~ /^libuv$/i) {
+        if ($val =~ /^no$/i) {
+            die "libuv is required\n";
+        } elsif ($val !~ /^yes$/i) {
+            $use_libuv = "yes";
+            $libuv_path = $val;
         }
     } elsif ($key =~ /^pkcs11$/i) {
         if ($val =~ /^yes$/i) {
@@ -921,36 +715,12 @@ sub mywith {
             $pkcs11_path = $val;
             $pkcs11_path =~ s/\.dll$//i;
         }
-    } elsif ($key =~ /^ecdsa$/i) {
-        if ($val =~ /^no$/i) {
-            $use_ecdsa = "no";
-        } elsif ($val =~ /^yes$/i) {
-            $use_ecdsa = "yes";
-        }
-    } elsif ($key =~ /^eddsa$/i) {
-        if ($val =~ /^no$/i) {
-            $use_eddsa = "no";
-        } elsif ($val !~ /^no$/i) {
-            $use_eddsa = "yes";
-            if ($val =~ /^all$/i) {
-                $use_ed448 = "yes";
-            }
-        }
-    } elsif ($key =~ /^gost$/i) {
-        if ($val =~ /^no$/i) {
-            $use_gost = "no";
-        } elsif ($val !~ /^no$/i) {
-            $use_gost = "yes";
-            $gost_encoding = $val;
-        }
     } elsif ($key =~ /^aes$/i) {
         if ($val =~ /^no$/i) {
             $use_aes = "no";
         } elsif ($val =~ /^yes$/i) {
             $use_aes = "yes";
         }
-    } elsif ($key =~ /^cc-alg$/i) {
-        $cookie_algorithm = $val;
     } elsif ($key =~ /^gssapi$/i) {
         if ($val !~ /^no$/i) {
             $use_gssapi = "yes";
@@ -965,11 +735,13 @@ sub mywith {
             $use_libxml2 = "yes";
             $libxml2_path = $val;
         }
-    } elsif ($key =~ /^geoip$/i) {
+    } elsif ($key =~ /^geoip2$/i) {
         if ($val !~ /^no$/i) {
-            $use_geoip = "yes";
+            $use_geoip2 = "yes";
             if ($val !~ /^yes$/i) {
-                $geoip_path = $val;
+                $geoip2_path = $val;
+            } else {
+                $geoip2_path = "..\\..\\GeoIP2";
             }
         }
     } elsif ($key =~ /^readline$/i) {
@@ -1000,6 +772,14 @@ sub mywith {
                 $zlib_path = $val;
             }
         }
+    } elsif ($key =~ /^pssuspend$/i) {
+        if ($val =~ /^no$/i) {
+            $with_pssuspend = "no";
+        } else {
+            if ($val !~ /^yes$/i) {
+                $pssuspend_command = $val;
+            }
+        }
     } elsif ($key =~ /^python$/i) {
         if ($val =~ /^no$/i) {
             $use_python = "no";
@@ -1021,9 +801,15 @@ sub mywith {
             $cross_compile = "yes";
         }
     } elsif ($key =~ /^tuning$/i) {
-        if ($val =~ /^large$/i) {
-            $tuning = "large";
+        if ($val =~ /^small$/i) {
+            $tuning = "small";
         }
+    } elsif ($key =~ /^tools-version$/i) {
+        $configvar{"TOOLS_VERSION"} = $val;
+    } elsif ($key =~ /^platform-version$/i) {
+        $configvar{"WINDOWS_TARGET_PLATFORM_VERSION"} = "<WindowsTargetPlatformVersion>$val</WindowsTargetPlatformVersion>";
+    } elsif ($key =~ /^platform-toolset$/i) {
+        $configvar{"PLATFORM_TOOLSET"} = "<PlatformToolset>$val</PlatformToolset>";
     } else {
         $want_unknown = "yes";
         if ($val eq "no") {
@@ -1031,19 +817,6 @@ sub mywith {
         } else {
             $unknown_value = "with-" . $key;
         }
-    }
-}
-
-# resolve enable-openssl-hash
-if ($enable_openssl_hash eq "auto") {
-    if ($use_openssl ne "no") {
-        if ($enable_native_pkcs11 eq "yes") {
-            $enable_openssl_hash="no";
-        } else {
-            $enable_openssl_hash="yes";
-        }
-    } else {
-        $enable_openssl_hash="no";
     }
 }
 
@@ -1061,7 +834,6 @@ if ($want_clean eq "yes") {
     unlink($configfile);
     unlink($platformfile);
     unlink($confshfile);
-    unlink($icshfile);
 
     foreach $file (@filelist) {
         unlink($file);
@@ -1106,21 +878,7 @@ if ($verbose) {
     } else {
         print "native-pkcs11: disabled\n";
     }
-    if ($enable_openssl_hash eq "yes") {
-        print "openssl-hash: enabled\n";
-    } else {
-        print "openssl-hash: disabled\n";
-    }
-    if ($enable_isc_spnego eq "yes") {
-        print "isc-spnego: enabled\n";
-    } else {
-        print "isc-spnego: disabled\n";
-    }
-    if ($enable_filter_aaaa eq "yes") {
-        print "filter-aaaa: enabled\n";
-    } else {
-        print "filter-aaaa: disabled\n";
-    }
+    print "openssl-hash: enabled\n";
     if ($enable_fixed_rrset eq "yes") {
         print "fixed-rrset: enabled\n";
     } else {
@@ -1136,22 +894,8 @@ if ($verbose) {
     } else {
         print "querytrace: disabled\n";
     }
-    if ($enable_rpz_nsip eq "yes") {
-        print "rpz-nsip: enabled\n";
-    } else {
-        print "rpz-nsip: disabled\n";
-    }
-    if ($enable_rpz_nsdname eq "yes") {
-        print "rpz-nsdname: enabled\n";
-    } else {
-        print "rpz-nsdname: disabled\n";
-    }
-    print "cookie algorithm: $cookie_algorithm\n";
-    if ($use_openssl eq "no") {
-        print "openssl: disabled\n";
-    } else {
-        print "openssl-path: $openssl_path\n";
-    }
+    print "libuv-path: $libuv_path\n";
+    print "openssl-path: $openssl_path\n";
     if ($use_tests eq "yes") {
         print "tests: enabled\n";
     }
@@ -1161,34 +905,10 @@ if ($verbose) {
     if ($use_stests eq "yes") {
         print "system tests: enabled\n";
     }
-    if ($use_samples eq "yes") {
-        print "sample programs: enabled\n";
-    }
     if ($use_pkcs11 eq "no") {
         print "pkcs11: disabled\n";
     } else {
         print "pkcs11-provider-path: $pkcs11_path\n";
-    }
-    if ($use_ecdsa eq "no") {
-        print "ecdsa: disabled\n";
-    } else {
-        print "ecdsa: enabled\n";
-    }
-    if ($use_eddsa eq "no") {
-        print "eddsa: disabled\n";
-    } else {
-        print "ed25519: enabled\n";
-        if ($use_ed448 eq "no") {
-            print "ed448: disabled\n";
-        } else {
-            print "ed448: enabled\n";
-        }
-    }
-    if ($use_gost eq "no") {
-        print "gost: disabled\n";
-    } else {
-        print "gost: enabled\n";
-        print "gost private key encoding: $gost_encoding\n";
     }
     if ($use_aes eq "no") {
         print "aes: disabled\n";
@@ -1205,10 +925,10 @@ if ($verbose) {
     } else {
         print "libxml2-path: $libxml2_path\n";
     }
-    if ($use_geoip eq "no") {
-        print "geoip: disabled\n";
+    if ($use_geoip2 eq "no") {
+        print "geoip2: disabled\n";
     } else {
-        print "geoip-path: $geoip_path\n";
+        print "geoip2-path: $geoip2_path\n";
     }
     if ($use_readline eq "no") {
         print "readline: disabled\n";
@@ -1227,6 +947,11 @@ if ($verbose) {
         print "zlib: disabled\n";
     } else {
         print "zlib-path: $zlib_path\n";
+    }
+    if ($with_pssuspend eq "no") {
+        print "pssuspend: disabled\n";
+    } else {
+        print "pssuspend-command: $pssuspend_command\n";
     }
     if ($use_python eq "no") {
         print "python: disabled\n";
@@ -1337,8 +1062,8 @@ if ($verbose) {
     print "_MSC_VER == $msc_ver\n";
 }
 if ($msc_ver < 1600) {
-    print STDERR "warning: old version of C++ compiler/Visual Studio\n";
-    print STDERR "only the legacy (cf legacy\\win32-build.txt) will work\n";
+    print STDERR "too old version of C++ compiler/Visual Studio\n";
+    exit 1;
 }
 
 # gen single threaded for < VS 2005
@@ -1365,11 +1090,8 @@ if ($msc_ver < 1400) {
 # backtrace for >= VS 2012
 
 if ($msc_ver >= 1700) {
-    $configdefp{"ISC_PLATFORM_USEBACKTRACE"} = 1;
+    $configdefh{"USE_BACKTRACE"} = 1;
 }
-
-# no version of MSVS supports strcasestr() yet
-$configdefp{"ISC_PLATFORM_NEEDSTRCASESTR"} = 1;
 
 # warn when cross compiling
 
@@ -1436,30 +1158,9 @@ EOF
 
 # Process arguments
 
-# enable-intrinsics
-if ($enable_intrinsics eq "yes") {
-    $configcond{"ATOMIC"} = 1;
-    $configvar{"INTRINSIC"} = "true";
-    $configvar{"COPTI"} = "/Oi";
-    $configdefp{"ISC_PLATFORM_HAVEXADD"} = 1;
-    if ($want_x64 eq "yes") {
-        $configdefp{"ISC_PLATFORM_HAVEXADDQ"} = 1;
-        $configdefp{"ISC_PLATFORM_HAVEATOMICSTOREQ"} = 1;
-    }
-    $configdefp{"ISC_PLATFORM_HAVEATOMICSTORE"} = 1;
-    $configdefp{"ISC_PLATFORM_HAVECMPXCHG"} = 1;
-} else {
-    $configvar{"INTRINSIC"} = "false";
-}
-
 # enable-native-pkcs11
 if ($enable_native_pkcs11 eq "yes") {
-    if ($use_openssl eq "auto") {
-        $use_openssl = "no";
-    }
-    if ($use_openssl ne "no") {
-        die "can't have both OpenSSL and native PKCS#11\n";
-    }
+    $cryptolib = "pkcs11";
     if ($use_pkcs11 ne "yes") {
         if ($verbose) {
             print "native PKCS#11 support: force with-pkcs11\n";
@@ -1471,62 +1172,6 @@ if ($enable_native_pkcs11 eq "yes") {
             print "native PKCS#11 support: no PKCS#11 provider defined?\n";
         }
     }
-    $configdefd{"CRYPTO"} = "PKCS11CRYPTO";
-    if ($use_ecdsa eq "no") {
-        if ($verbose) {
-            print "no ECDSA support in native PKCS#11\n";
-        }
-    } else {
-        if ($verbose) {
-            print "enabled ECDSA support in native PKCS#11\n";
-        }
-        $configdefh{"HAVE_PKCS11_ECDSA"} = 1;
-    }
-    if ($use_eddsa eq "no") {
-        if ($verbose) {
-            print "no EDDSA support in native PKCS#11\n";
-        }
-    } else {
-        if ($verbose) {
-            print "enabled Ed25519 support in native PKCS#11\n";
-        }
-        $configdefh{"HAVE_PKCS11_ED25519"} = 1;
-        if ($use_ed448 eq "no") {
-            if ($verbose) {
-                print "no Ed448 support in native PKCS#11\n";
-            }
-        } else {
-            if ($verbose) {
-                print "enabled Ed448 support in native PKCS#11\n";
-            }
-            $configdefh{"HAVE_PKCS11_ED448"} = 1;
-        }
-    }
-    if ($use_gost eq "no") {
-        if ($verbose) {
-            print "no GOST support in native PKCS#11\n";
-        }
-    } else {
-        if ($verbose) {
-            print "enabled GOST support in native PKCS#11\n";
-        }
-        $configdefh{"HAVE_PKCS11_GOST"} = 1;
-    }
-    if ($use_aes eq "no") {
-        if ($verbose) {
-            print "no AES support in native PKCS#11\n";
-        }
-    } else {
-        if ($verbose) {
-            print "enabled AES support in native PKCS#11\n";
-        }
-        $use_aes = "pkcs11";
-    }
-}
-
-# enable-filter-aaaa
-if ($enable_filter_aaaa eq "yes") {
-    $configdefh{"ALLOW_FILTER_AAAA"} = 1;
 }
 
 # enable-fixed-rrset
@@ -1534,19 +1179,9 @@ if ($enable_fixed_rrset eq "yes") {
     $configdefh{"DNS_RDATASET_FIXED"} = 1;
 }
 
-# enable-rpz-nsip
-if ($enable_rpz_nsip ne "no") {
-    $configdefh{"ENABLE_RPZ_NSIP"} = 1;
-}
-
 # enable-querytrace
 if ($enable_querytrace eq "yes") {
     $configdefh{"WANT_QUERYTRACE"} = 1;
-}
-
-# enable-rpz-nsdname
-if ($enable_rpz_nsdname ne "no") {
-    $configdefh{"ENABLE_RPZ_NSDNAME"} = 1;
 }
 
 # with-tests
@@ -1564,17 +1199,67 @@ if ($use_stests eq "yes") {
     $configcond{"STESTS"} = 1;
 }
 
-# with-samples
-if ($use_samples eq "yes") {
-    $configcond{"SAMPLES"} = 1;
+# with-libuv
+if ($use_libuv eq "auto") {
+    if ($verbose) {
+        print "checking for an libuv built directory at sibling root\n";
+    }
+    opendir DIR, $libuv_path || die "No Directory: $!\n";
+    my @dirlist = grep (/^libuv-v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+){0,1}$/i,
+                        readdir(DIR));
+    closedir(DIR);
+
+    # Make sure we have something
+    if (scalar(@dirlist) == 0) {
+        die "can't find an libuv at sibling root\n";
+    }
+    # Now see if we have a directory or just a file.
+    # Make sure we are case insensitive
+    my $file;
+    foreach $file (sort {uc($b) cmp uc($a)} @dirlist) {
+        if (-f File::Spec->catfile($libuv_path,
+                                   $file,
+                                   "include\\uv.h")) {
+            $libuv_path = File::Spec->catdir($libuv_path, $file);
+            $use_libuv = "yes";
+            last;
+        }
+    }
+
+    # If we have one use it otherwise report the error
+    if ($use_libuv eq "auto") {
+        die "can't find an libuv built directory at sibling root\n";
+    }
+}
+# falls into (so no else)
+if ($use_libuv eq "yes") {
+    $libuv_path = File::Spec->rel2abs($libuv_path);
+    if ($verbose) {
+        print "checking for libuv built directory at \"$libuv_path\"\n";
+    }
+    my $libuv_new = 0;
+    if (!-f File::Spec->catfile($libuv_path,
+                                "include\\uv.h")) {
+        die "can't find libuv uv.h include\n";
+    }
+    my $libuv_inc = File::Spec->catdir($libuv_path, "include");
+    my $libuv_libdir = File::Spec->catdir($libuv_path, "build\\Release");
+    my $libuv_lib = File::Spec->catfile($libuv_libdir, "uv.lib");
+    my $libuv_dll = File::Spec->catfile($libuv_libdir, "uv.dll");
+    if (!-f $libuv_lib) {
+       die "can't find uv.lib library\n";
+    }
+    if (!-f $libuv_dll) {
+       die "can't find uv.dll library\n";
+    }
+    $configvar{"LIBUV_PATH"} = "$libuv_path";
+    $configinc{"LIBUV_INC"} = "$libuv_inc";
+    $configlib{"LIBUV_LIB"} = "$libuv_lib";
+    $configdll{"LIBUV_DLL"} = "$libuv_dll";
 }
 
 # with-openssl
-if ($use_openssl eq "no") {
-    if ($verbose) {
-        print "OpenSSL library is disabled\n";
-    }
-} elsif ($use_openssl eq "auto") {
+if ($use_openssl eq "auto") {
     if ($verbose) {
         print "checking for an OpenSSL built directory at sibling root\n";
     }
@@ -1614,78 +1299,93 @@ if ($use_openssl eq "no") {
 }
 # falls into (so no else)
 if ($use_openssl eq "yes") {
+    my @dirlist;
     $openssl_path = File::Spec->rel2abs($openssl_path);
     if ($verbose) {
         print "checking for OpenSSL built directory at \"$openssl_path\"\n";
     }
-    my $openssl_new = 0;
     if (!-f File::Spec->catfile($openssl_path,
-                                "inc32\\openssl\\opensslv.h")) {
-        $openssl_new = 1;
-        if (!-f File::Spec->catfile($openssl_path,
-                                "include\\openssl\\opensslv.h")) {
-            die "can't find OpenSSL opensslv.h include\n";
-        }
+                                "include/openssl/opensslv.h")) {
+	die "can't find OpenSSL 1.1 opensslv.h include\n";
     }
-    my $openssl_inc = File::Spec->catdir($openssl_path, "inc32");
-    my $openssl_libdir = File::Spec->catdir($openssl_path, "out32dll");
-    my $openssl_lib = File::Spec->catfile($openssl_libdir, "libeay32.lib");
-    my $openssl_dll = File::Spec->catfile($openssl_libdir, "libeay32.dll");
-    if (!$openssl_new) {
-        # Check libraries are where we expect
-        if (!-f $openssl_lib) {
-            die "can't find OpenSSL libeay32.lib library\n";
-        }
-        if (!-f $openssl_dll) {
-            die "can't find OpenSSL libeay32.dll DLL\n";
-        }
-    } else {
-        # OpenSSL >= 1.1 is easier at the exception of the DLL
-        if ($verbose) {
-            print "new (>= 1.1) OpenSSL version\n";
-        }
-        $openssl_inc = File::Spec->catdir($openssl_path, "include");
-        $openssl_libdir = $openssl_path;
-        $openssl_lib = File::Spec->catfile($openssl_path, "libcrypto.lib");
-        if (!-f $openssl_lib) {
-            die "can't find OpenSSL libcrypto.lib library\n";
-        }
-        opendir DIR, $openssl_path || die "No Directory: $!\n";
-        my @dirlist = grep (/^libcrypto-[^.]+\.dll$/i, readdir(DIR));
-        closedir(DIR);
-        # We must get one file only
-        if (scalar(@dirlist) == 0) {
-            die "can't find OpenSSL libcrypto-*.dll DLL\n";
-        }
-        if (scalar(@dirlist) != 1) {
-            die "find more than one OpenSSL libcrypto-*.dll DLL candidate\n";
-        }
-        $openssl_dll = File::Spec->catdir($openssl_path, "@dirlist[0]");
-    }   
+    my $openssl_inc = File::Spec->catdir($openssl_path, "include");
+    my $openssl_libdir = $openssl_path;
+    my $openssl_libcrypto = File::Spec->catfile($openssl_path, "libcrypto.lib");
+    my $openssl_libssl = File::Spec->catfile($openssl_libdir, "libssl.lib");
+    my $openssl_dllcrypto = File::Spec->catfile($openssl_libdir, "libcrypto.dll");
+    my $openssl_dllssl = File::Spec->catfile($openssl_libdir, "libssl.dll");
 
-    $configcond{"OPENSSL"} = 1;
-    $configdefd{"CRYPTO"} = "OPENSSL";
+    if (!-f $openssl_libcrypto) {
+	die "can't find OpenSSL libcrypto.lib library\n";
+    }
+    opendir DIR, $openssl_path || die "No Directory: $!\n";
+    @dirlist = grep (/^libcrypto-[^.]+\.dll$/i, readdir(DIR));
+    closedir(DIR);
+    # We must get one file only
+    if (scalar(@dirlist) == 0) {
+	die "can't find OpenSSL libcrypto-*.dll DLL\n";
+    }
+    if (scalar(@dirlist) != 1) {
+	die "found more than one OpenSSL libcrypto-*.dll DLL candidate\n";
+    }
+    $openssl_dllcrypto = File::Spec->catdir($openssl_path, "$dirlist[0]");
+
+    if (!-f $openssl_libssl) {
+	die "can't find OpenSSL libssl.lib library\n";
+    }
+    opendir DIR, $openssl_path || die "No Directory: $!\n";
+    @dirlist = grep (/^libssl-[^.]+\.dll$/i, readdir(DIR));
+    closedir(DIR);
+    # We must get one file only
+    if (scalar(@dirlist) == 0) {
+	die "can't find OpenSSL libssl-*.dll DLL\n";
+    }
+    if (scalar(@dirlist) != 1) {
+	die "found more than one OpenSSL libssl-*.dll DLL candidate\n";
+    }
+    $openssl_dllssl = File::Spec->catdir($openssl_path, "$dirlist[0]");
+
+    $cryptolib = "openssl";
     $configvar{"OPENSSL_PATH"} = "$openssl_path";
     $configinc{"OPENSSL_INC"} = "$openssl_inc";
-    $configlib{"OPENSSL_LIB"} = "$openssl_lib";
-    $configdll{"OPENSSL_DLL"} = "$openssl_dll";
-    if (-f File::Spec->catfile($openssl_inc, "openssl", "dsa.h")) {
-        $configdefh{"HAVE_OPENSSL_DSA"} = 1;
-    } elsif ($verbose) {
-        print "OpenSSL DSA support is disabled\n";
-    }
+    $configlib{"OPENSSL_LIBCRYPTO"} = "$openssl_libcrypto";
+    $configdll{"OPENSSL_DLLCRYPTO"} = "$openssl_dllcrypto";
+    $configlib{"OPENSSL_LIBSSL"} = "$openssl_libssl";
+    $configdll{"OPENSSL_DLLSSL"} = "$openssl_dllssl";
+}
+
+if ($cryptolib eq "openssl") {
+    $configdefh{"USE_OPENSSL"} = 1;
+    $configtest{"CRYPTO"} = "OpenSSL";
+} else {
+    $configdefh{"USE_PKCS11"} = 1;
+    $configtest{"CRYPTO"} = "pkcs11";
 }
 
 # check OpenSSL
 if ($use_openssl eq "yes") {
-    if ($verbose) {
-        print "checking whether linking with OpenSSL works\n";
-    }
-    my $dll = $configdll{"OPENSSL_DLL"};
+#prepare the environment
+    my $dll = $configdll{"OPENSSL_DLLCRYPTO"};
     my $ret = `copy "$dll" .`;
     if ($? != 0) {
         die "Can't copy OpenSSL DLL to working directory: $ret\n";
     }
+
+    $dll = $configdll{"OPENSSL_DLLSSL"};
+    $ret = `copy "$dll" .`;
+    if ($? != 0) {
+        die "Can't copy OpenSSL DLL to working directory: $ret\n";
+    }
+
+    my $include = $configinc{"OPENSSL_INC"};
+    my $libcrypto = $configlib{"OPENSSL_LIBCRYPTO"};
+    my $libssl = $configlib{"OPENSSL_LIBSSL"};
+
+# check libcrypto
+    if ($verbose) {
+        print "checking whether linking with OpenSSL libcrypto works\n";
+    }
+
     open F, ">testossl.c" || die $!;
     print F << 'EOF';
 #include <openssl/err.h>
@@ -1698,21 +1398,45 @@ main(void)
 }
 EOF
     close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testossl.c "$library"`;
-    if (grep { -f and -x } ".\\testossl.exe") {
-        `.\\testossl.exe`;
+
+    $compret = `cl /nologo /MD /I "$include" testossl.c "$libcrypto"`;
+    if (grep { -f and -x } "./testossl.exe") {
+        `./testossl.exe`;
         if ($? != 0) {
-            die "OpenSSL test failed\n";
+            die "OpenSSL libcrypto test failed\n";
         }
     } else {
-        die "can't compile OpenSSL test: $compret\n";
+        die "can't compile OpenSSL libcrypto test: $compret\n";
     }
+
+    if ($verbose) {
+	print "checking whether linking with OpenSSL libssl works\n";
+    }
+
+    open F, ">testossl.c" || die $!;
+    print F << 'EOF';
+#include <openssl/ssl.h>
+
+int
+main(void)
+{
+        SSL_CTX *ctx = SSL_CTX_new(SSLv23_method());
+        SSL_CTX_free(ctx);
+        return(0);
 }
+EOF
+    close F;
+    $compret = `cl /nologo /MD /I "$include" testossl.c "$libcrypto" "$libssl"`;
+    if (grep { -f and -x } "./testossl.exe") {
+        `./testossl.exe`;
+        if ($? != 0) {
+            die "OpenSSL libssl test failed\n";
+        }
+    } else {
+        die "can't compile OpenSSL libssl test: $compret\n";
+    }
 
 # check OpenSSL version
-if ($use_openssl eq "yes") {
     if ($verbose) {
         printf "checking OpenSSL library version\n";
     }
@@ -1722,218 +1446,29 @@ if ($use_openssl eq "yes") {
 #include <openssl/opensslv.h>
 
 int main() {
-        if ((OPENSSL_VERSION_NUMBER >= 0x009070cfL &&
-             OPENSSL_VERSION_NUMBER < 0x00908000L) ||
-             OPENSSL_VERSION_NUMBER >= 0x0090804fL)
+        if (OPENSSL_VERSION_NUMBER >= 0x10101000L) {
                 return (0);
+        }
         printf("\n\nFound   OPENSSL_VERSION_NUMBER %#010x\n",
                OPENSSL_VERSION_NUMBER);
-        printf("Require OPENSSL_VERSION_NUMBER 0x009070cf or greater (0.9.7l)\n"
-               "Require OPENSSL_VERSION_NUMBER 0x0090804f or greater (0.9.8d)\n\n");
+        printf("Require OPENSSL_VERSION_NUMBER 0x10101000L or greater (1.1.1)\n\n");
         return (1);
 }
 EOF
     close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testosslv.c "$library"`;
-    if (grep { -f and -x } ".\\testosslv.exe") {
-        `.\\testosslv.exe`;
+
+    $compret = `cl /nologo /MD /I "$include" testosslv.c "$libcrypto"`;
+    if (grep { -f and -x } "./testosslv.exe") {
+        `./testosslv.exe`;
         if ($? != 0) {
             die "OpenSSL version test failed\n";
         }
     } else {
         die "can't compile OpenSSL version test: $compret\n";
     }
-}
-
-# check FIPS_mode
-
-if ($use_openssl eq "yes") {
-    if ($verbose) {
-        printf "checking for FIPS_mode\n";
-    }
-    open F, ">testfips.c" || die $!;
-    print F << 'EOF';
-extern int FIPS_mode();
-
-int main() {
-    return FIPS_mode();
-}
-EOF
-    close F;
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD testfips.c "$library"`;
-    if (grep { -f and -x } ".\\testfips.exe") {
-        $configdefh{"HAVE_FIPS_MODE"} = 1;
-    } else {
-        if ($verbose) {
-            print "can't compile FIPS_mode test: $compret\n";
-            print "disabling FIPS_mode\n";
-        }
-    }
-}
-
-# check EVP_sha256 / EVP_sha384 / EVP_sha512
-
-if ($use_openssl eq "yes") {
-    if ($verbose) {
-        printf "checking for EVP_sha256\n";
-    }
-    open F, ">testsha256.c" || die $!;
-    print F << 'EOF';
-extern void *EVP_sha256();
-
-int main() {
-        return EVP_sha256() != 0;
-}
-EOF
-    close F;
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD testsha256.c "$library"`;
-    if (grep { -f and -x } ".\\testsha256.exe") {
-        `.\\testsha256.exe`;
-        if ($? == 0) {
-            if ($verbose) {
-                print "EVP_sha256 test failed: disabling EVP_sha256\n";
-            }
-            $use_ecdsa = "no";
-            $enable_openssl_hash = "no";
-        } else {
-            $configdefh{"HAVE_EVP_SHA256"} = 1;
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile EVP_sha256 test: $compret\n";
-            print "disabling EVP_sha256\n";
-        }
-        $use_ecdsa = "no";
-        $enable_openssl_hash = "no";
-    }
 
     if ($verbose) {
-        printf "checking for EVP_sha384\n";
-    }
-    open F, ">testsha384.c" || die $!;
-    print F << 'EOF';
-extern void *EVP_sha384();
-
-int main() {
-        return EVP_sha384() != 0;
-}
-EOF
-    close F;
-    $compret = `cl /nologo /MD testsha384.c "$library"`;
-    if (grep { -f and -x } ".\\testsha384.exe") {
-        `.\\testsha384.exe`;
-        if ($? == 0) {
-            if ($verbose) {
-                print "EVP_sha384 test failed: disabling EVP_sha384\n";
-            }
-            $use_ecdsa = "no";
-            $enable_openssl_hash = "no";
-        } else {
-            $configdefh{"HAVE_EVP_SHA384"} = 1;
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile EVP_sha384 test: $compret\n";
-            print "disabling EVP_sha384\n";
-        }
-        $use_ecdsa = "no";
-        $enable_openssl_hash = "no";
-    }
-
-    if ($verbose) {
-        printf "checking for EVP_sha512\n";
-    }
-    open F, ">testsha512.c" || die $!;
-    print F << 'EOF';
-extern void *EVP_sha512();
-
-int main() {
-        return EVP_sha512() != 0;
-}
-EOF
-    close F;
-    $compret = `cl /nologo /MD testsha512.c "$library"`;
-    if (grep { -f and -x } ".\\testsha512.exe") {
-        `.\\testsha512.exe`;
-        if ($? == 0) {
-            if ($verbose) {
-                print "EVP_sha512 test failed: disabling EVP_sha512\n";
-            }
-            $use_eddsa = "no";
-        } else {
-            $configdefh{"HAVE_EVP_SHA512"} = 1;
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile EVP_sha512 test: $compret\n";
-            print "disabling EVP_sha512\n";
-        }
-        $use_eddsa = "no";
-    }
-}
-
-# with-ecdsa
-if ($use_openssl eq "no") {
-    $use_ecdsa = "no";
-}
-if ($use_ecdsa eq "auto") {
-    if ($verbose) {
-        print "checking for OpenSSL ECDSA support\n";
-    }
-    open F, ">testecdsa.c" || die $!;
-    print F << 'EOF';
-#include <openssl/ecdsa.h>
-#include <openssl/objects.h>
-
-int
-main(void)
-{
-        EC_KEY *ec256, *ec384;
-
-        ec256 = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-        ec384 = EC_KEY_new_by_curve_name(NID_secp384r1);
-        if (ec256 == NULL || ec384 == NULL)
-                return (2);
-        return (0);
-}
-EOF
-    close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testecdsa.c "$library"`;
-    if (grep { -f and -x } ".\\testecdsa.exe") {
-        `.\\testecdsa.exe`;
-        if ($? != 0) {
-            if ($verbose) {
-                print "ECDSA test failed: disabling ECDSA\n";
-            }
-            $use_ecdsa = "no";
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile ECDSA test: $compret\n";
-            print "disabling ECDSA\n";
-        }
-    $use_ecdsa = "no";
-    }
-}
-
-if ($use_ecdsa ne "no") {
-    $use_ecdsa = "yes";
-    $configdefh{"HAVE_OPENSSL_ECDSA"} = 1;
-}
-
-# with-eddsa
-if ($use_openssl eq "no") {
-    $use_eddsa = "no";
-}
-if ($use_eddsa eq "auto") {
-    if ($verbose) {
-        print "checking for OpenSSL ED25519 support\n";
+        print "checking for OpenSSL Ed25519 support\n";
     }
     open F, ">tested25519.c" || die $!;
     print F << 'EOF';
@@ -1952,36 +1487,26 @@ main(void)
 }
 EOF
     close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" tested25519.c "$library"`;
-    if (grep { -f and -x } ".\\tested25519.exe") {
-        `.\\tested25519.exe`;
-        if ($? != 0) {
+
+    $compret = `cl /nologo /MD /I "$include" tested25519.c "$libcrypto"`;
+    if (grep { -f and -x } "./tested25519.exe") {
+        `./tested25519.exe`;
+        if ($? == 0) {
+            $configdefh{"HAVE_OPENSSL_ED25519"} = 1;
+        } else {
             if ($verbose) {
-                print "EDDSA test failed: disabling EDDSA\n";
+                print "Ed25519 test failed: disabling Ed25519\n";
             }
-            $use_eddsa = "no";
         }
     } else {
         if ($verbose) {
-            print "can't compile EDDSA test: $compret\n";
-            print "disabling EDDSA\n";
+            print "can't compile Ed25519 test: $compret\n";
+            print "disabling Ed25519\n";
         }
-    $use_eddsa = "no";
     }
-}
 
-if ($use_eddsa ne "no") {
-    $use_eddsa = "yes";
-    $configdefh{"HAVE_OPENSSL_ED25519"} = 1;
-} else {
-    $use_ed448 = "no";
-}
-
-if ($use_ed448 eq "auto") {
     if ($verbose) {
-        print "checking for OpenSSL ED448 support\n";
+        print "checking for OpenSSL Ed448 support\n";
     }
     open F, ">tested448.c" || die $!;
     print F << 'EOF';
@@ -2000,95 +1525,23 @@ main(void)
 }
 EOF
     close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" tested448.c "$library"`;
-    if (grep { -f and -x } ".\\tested448.exe") {
-        `.\\tested448.exe`;
-        if ($? != 0) {
+
+    $compret = `cl /nologo /MD /I "$include" tested448.c "$libcrypto"`;
+    if (grep { -f and -x } "./tested448.exe") {
+        `./tested448.exe`;
+        if ($? == 0) {
+            $configdefh{"HAVE_OPENSSL_ED448"} = 1;
+        } else {
             if ($verbose) {
-                print "ED448 test failed: disabling ED448\n";
+                print "Ed448 test failed: disabling Ed448\n";
             }
-            $use_ed448 = "no";
         }
     } else {
         if ($verbose) {
-            print "can't compile ED448 test: $compret\n";
-            print "disabling ED448\n";
+            print "can't compile Ed448 test: $compret\n";
+            print "disabling Ed448\n";
         }
-    $use_ed448 = "no";
     }
-}
-
-if ($use_ed448 ne "no") {
-    $use_ed448 = "yes";
-    $configdefh{"HAVE_OPENSSL_ED448"} = 1;
-}
-
-# with-gost
-if ($use_openssl eq "no") {
-    $use_gost = "no";
-}
-if ($use_gost eq "auto") {
-    if ($verbose) {
-        print "checking for OpenSSL GOST support\n";
-    }
-    open F, ">testgost.c" || die $!;
-    print F << 'EOF';
-#include <openssl/conf.h>
-#include <openssl/engine.h>
-
-int
-main(void)
-{
-#if (OPENSSL_VERSION_NUMBER >= 0x10000000L)
-        ENGINE *e;
-        EC_KEY *ek;
-
-        ek = NULL;
-        OPENSSL_config(NULL);
-
-        e = ENGINE_by_id("gost");
-        if (e == NULL)
-                return (1);
-        if (ENGINE_init(e) <= 0)
-                return (1);
-        return (0);
-#else
-        return (1);
-#endif
-}
-EOF
-    close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testgost.c "$library"`;
-    if (grep { -f and -x } ".\\testgost.exe") {
-        `.\\testgost.exe`;
-        if ($? != 0) {
-            if ($verbose) {
-                print "GOST test failed: disabling GOST\n";
-            }
-            $use_gost = "no";
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile GOST test: $compret\n";
-            print "disabling GOST\n";
-        }
-    $use_gost = "no";
-    }
-}
-
-if ($use_gost ne "no") {
-    $use_gost = "yes";
-    $configdefh{"HAVE_OPENSSL_GOST"} = 1;
-}
-
-if ($gost_encoding eq "ans1") {
-    $configdefh{"PREFER_GOSTASN1"} = 1;
-} elsif ($gost_encoding ne "raw") {
-    die "Unrecognized GOST private key encoding: $gost_encoding\n";
 }
 
 # with-aes
@@ -2097,135 +1550,16 @@ if ($use_openssl eq "no") {
         $use_aes = "no";
     }
 }
-if ($use_aes eq "auto") {
-    if ($verbose) {
-        print "checking for OpenSSL EVP AES support\n";
-    }
-    $use_aes = "evp";
-    open F, ">testevpaes.c" || die $!;
-    print F << 'EOF';
-#include <openssl/evp.h>
 
-int
-main(void)
-{
-        EVP_CIPHER *aes128, *aes192, *aes256;
-
-        aes128 = EVP_aes_128_ecb();
-        aes192 = EVP_aes_192_ecb();
-        aes256 = EVP_aes_256_ecb();
-        if (aes128 == NULL || aes192 == NULL || aes256 == NULL)
-                return (1);
-        return (0);
-}
-EOF
-    close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testevpaes.c "$library"`;
-    if (grep { -f and -x } ".\\testevpaes.exe") {
-        `.\\testevpaes.exe`;
-        if ($? != 0) {
-            if ($verbose) {
-                print "EVP AES test failed: disabling EVP AES\n";
-            }
-            $use_aes = "auto";
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile EVP AES test: $compret\n";
-            print "disabling EVP AES\n";
-        }
-        $use_aes = "auto";
-    }
-}
-
-if ($use_aes eq "auto") {
-    if ($verbose) {
-        print "checking for OpenSSL native AES support\n";
-    }
-    $use_aes = "native";
-    open F, ">testaes.c" || die $!;
-    print F << 'EOF';
-#include <openssl/aes.h>
-
-AES_KEY k;
-const unsigned char bufin[16];
-unsigned char bufout[16];
-
-int
-main(void)
-{
-        AES_encrypt(bufin, bufout, &k);
-        return (0);
-}
-EOF
-    close F;
-    my $include = $configinc{"OPENSSL_INC"};
-    my $library = $configlib{"OPENSSL_LIB"};
-    $compret = `cl /nologo /MD /I "$include" testaes.c "$library"`;
-    if (grep { -f and -x } ".\\testaes.exe") {
-        `.\\testaes.exe`;
-        if ($? != 0) {
-            if ($verbose) {
-                print "native AES test failed: disabling AES\n";
-            }
-            $use_aes = "no";
-        }
-    } else {
-        if ($verbose) {
-            print "can't compile native AES test: $compret\n";
-            print "disabling AES\n";
-        }
-        $use_aes = "no";
-    }
-}
-
-if ($use_aes eq "yes") {
-    $configdefh{"HAVE_OPENSSL_EVP_AES"} = 1;
-} elsif ($use_aes eq "evp") {
-    $configdefh{"HAVE_OPENSSL_EVP_AES"} = 1;
-    $use_aes = "yes";
-} elsif ($use_aes eq "native") {
-    $configdefh{"HAVE_OPENSSL_AES"} = 1;
-    $use_aes = "yes";
-} elsif ($use_aes eq "pkcs11") {
-    $use_aes = "yes";
-}
-
-if ($use_aes eq "yes") {
-    $configdefp{"ISC_PLATFORM_WANTAES"} = 1;
-    $configcond{"AES"} = 1;
-}
-
-# with-cc-alg
-if ($cookie_algorithm eq "aes") {
-    if ($use_aes ne "yes") {
-        $cookie_algorithm = "sha256";
-    } else {
-        $configdefh{"AES_CC"} = 1;
-    }
-}
-if ($cookie_algorithm eq "sha1") {
-    $configdefh{"HMAC_SHA1_CC"} = 1;
-} elsif ($cookie_algorithm eq "sha256") {
-    $configdefh{"HMAC_SHA256_CC"} = 1;
-} elsif ($cookie_algorithm ne "aes") {
-    die "Unrecognized cookie algorithm: $cookie_algorithm\n";
-}
-
-# enable-openssl-hash
-if ($enable_openssl_hash eq "yes") {
-    if ($use_openssl eq "no") {
-        die "No OpenSSL for hash functions\n";
-    }
-    $configdefp{"ISC_PLATFORM_OPENSSLHASH"} = 1;
+if ($cryptolib ne "") {
+    print "Cryptographic library for DNSSEC: $cryptolib\n";
+} else {
+    die "No cryptography library has been found or provided."
 }
 
 # with-pkcs11
 if ($use_pkcs11 ne "no") {
     $configcond{"PKCS11"} = 1;
-    $configdefd{"USE_PKCS11"} = "USE_PKCS11";
     $configvar{"PKCS11_TOOLS"} = "pkcs11";
     $configdefd{"PK11_LIB_LOCATION"} = "PK11_LIB_LOCATION=\"$pkcs11_path\"";
 }
@@ -2323,128 +1657,56 @@ if ($use_gssapi eq "no") {
     $configdll{"WSHELP_DLL"} = "$wshelp_dll";
 }
 
-# enable-isc-spnego
-if ($use_gssapi ne "yes") {
-    $enable_isc_spnego = "no";
-} elsif ($enable_isc_spnego eq "yes") {
-    if ($use_gssapi eq "no") {
-        die "No GSSAPI for SPNEGO\n";
-    }
-    $configdefd{"USE_ISC_SPNEGO"} = "USE_ISC_SPNEGO";
-}
+# disable-auto-validation
+$configdefh{"VALIDATION_DEFAULT"} = "\"$validation_default\"";
 
-# with-geoip
-if ($use_geoip eq "no") {
+# with-geoip2
+if ($use_geoip2 eq "no") {
     if ($verbose) {
-        print "geoip library is disabled\n";
+        print "geoip2 library is disabled\n";
     }
 } else {
     $configcond{"GEOIP"} = 1;
-    $geoip_path = File::Spec->rel2abs($geoip_path);
+    $geoip2_path = File::Spec->rel2abs($geoip2_path);
     if ($verbose) {
-        print "checking for geoip directory at \"$geoip_path\"\n";
+        print "checking for geoip2 directory at \"$geoip2_path\"\n";
     }
-    if (!-f File::Spec->catfile($geoip_path, "GeoIP.h")) {
-        die "can't find GeoIP.h include\n";
+    if (!-f File::Spec->catfile($geoip2_path, "maxminddb.h")) {
+        die "can't find maxminddb.h include\n";
     }
-    if (!-f File::Spec->catfile($geoip_path, "GeoIP.lib")) {
-        die "can't find Geoip.lib library\n";
+    if (!-f File::Spec->catfile($geoip2_path, "maxminddb_config.h")) {
+        die "can't find maxminddb_config.h include\n";
     }
-    if (!-f File::Spec->catfile($geoip_path, "GeoIP.dll")) {
-        die "can't find Geoip.dll DLL\n";
+    if (!-f File::Spec->catfile($geoip2_path, "libmaxminddb.lib")) {
+        die "can't find libmaxminddb.lib library\n";
     }
-    $configinc{"GEOIP_INC"} = "$geoip_path";
-    my $geoip_lib = File::Spec->catfile($geoip_path, "GeoIP.lib");
-    $configlib{"GEOIP_LIB"} = "$geoip_lib";
-    my $geoip_dll = File::Spec->catfile($geoip_path, "GeoIP.dll");
-    $configdll{"GEOIP_DLL"} = "$geoip_dll";
-
-    if ($verbose) {
-        print "checking for GeoIP support\n";
-    }
-    my $ret = `copy "$geoip_dll" .`;
-    if ($? != 0) {
-        die "Can't copy GeoIP DLL to working directory: $ret\n";
-    }
-    open F, ">testgeoip.c" || die $!;
-    print F << 'EOF';
-extern void *GeoIP_open();
-
-int main() {
-        return GeoIP_open != 0;
-}
-EOF
-    close F;
-    $compret = `cl /nologo /MD testgeoip.c "$geoip_lib"`;
-    if (grep { -f and -x } ".\\testgeoip.exe") {
-        `.\\testgeoip.exe`;
-        if ($? == 0) {
-            die "GeoIP test failed\n";
-        }
-    } else {
-        die "can't compile GeoIP test: $compret\n";
-    }
-    $configdefh{"HAVE_GEOIP"} = 1;
+    $configinc{"GEOIP_INC"} = "$geoip2_path";
+    my $geoip2_lib = File::Spec->catfile($geoip2_path, "libmaxminddb.lib");
+    $configlib{"GEOIP_LIB"} = "$geoip2_lib";
+    my $geoip_inc = qq(/I "$geoip2_path");
+    my $geoip2_libs = qq("$geoip2_lib" Ws2_32.Lib);
 
     if ($verbose) {
-        print "checking for GeoIP Country IPv6 support\n";
-    }
-    my $geoip_inc = qq(/I "$geoip_path");
-    my $geoip_libs = qq("$geoip_lib" ws2_32.lib);
-    open F, ">testgeoip1.c" || die $!;
-    print F << 'EOF';
-#include <GeoIP.h>
-
-struct in6_addr in6;
-int flag = 1;
-
-int main() {
-        if (flag)
-                return 1;
-        return GeoIP_country_name_by_ipnum_v6(NULL, in6) != NULL;
-}
-EOF
-    close F;
-    $compret = `cl /nologo $geoip_inc /MD testgeoip1.c $geoip_libs`;
-    if (grep { -f and -x } ".\\testgeoip1.exe") {
-        `.\\testgeoip1.exe`;
-        if ($? == 0) {
-            die "GeoIP Country IPv6 test failed\n";
-        }
-    } else {
-        die "can't compile GeoIP Country IPv6 test: $compret\n";
-    }
-    $configdefh{"HAVE_GEOIP_V6"} = 1;
-
-    if ($verbose) {
-        print "checking for GeoIP City IPv6 support\n";
+        print "checking for GeoIP2 support\n";
     }
     open F, ">testgeoip2.c" || die $!;
     print F << 'EOF';
-#include <GeoIP.h>
-#include <GeoIPCity.h>
-
-struct in6_addr in6;
-int i = GEOIP_CITY_EDITION_REV0_V6;
-int flag = 1;
-
-int main() {
-        if (flag)
-                return 1;
-        return GeoIP_record_by_ipnum_v6(NULL, in6) != NULL;
+#include <maxminddb.h>
+int main(void) {
+       return MMDB_lib_version() != 0;
 }
 EOF
     close F;
-    $compret = `cl /nologo $geoip_inc /MD testgeoip2.c $geoip_libs`;
+    $compret = `cl /nologo $geoip_inc /MD testgeoip2.c $geoip2_libs`;
     if (grep { -f and -x } ".\\testgeoip2.exe") {
         `.\\testgeoip2.exe`;
         if ($? == 0) {
-            die "GeoIP City IPv6 test failed\n";
+            die "GeoIP2 test failed\n";
         }
     } else {
-        die "can't compile GeoIP City IPv6 test: $compret\n";
+        die "can't compile GeoIP2 test: $compret\n";
     }
-    $configdefh{"HAVE_GEOIP_CITY_V6"} = 1;
+    $configdefh{"HAVE_GEOIP2"} = 1;
 }
 
 # with-readline
@@ -2611,6 +1873,10 @@ if ($use_zlib eq "no") {
     $configdll{"ZLIB_DLL"} = "$zlib_dll";
 }
 
+if ($with_pssuspend ne "no") {
+    $configvar{"PSSUSPEND"} = "$pssuspend_command";
+}
+
 # with-python
 if ($use_python eq "no") {
     if ($verbose) {
@@ -2700,7 +1966,7 @@ if ($use_python ne "no") {
         $configcond{"PYTHON"} = 1;
         $configdefd{"USE_PYTHON"} = "USE_PYTHON";
         $configvar{"PYTHON"} = "$python_command";
-        $configtest{"CHECKDS"} = "checkds";
+        $configtest{"CHECKDS"} = "checkdstool";
         $configtest{"COVERAGE"} = "coverage";
         $configtest{"KEYMGR"} = "keymgr";
         # Doesn't matter
@@ -2718,7 +1984,7 @@ if (!grep { -f and -x } $vcredist_path) {
 }
 
 # tuning
-if ($tuning eq "large") {
+if ($tuning ne "small") {
     $configdefh{"TUNE_LARGE"} = 1;
 }
 
@@ -2831,44 +2097,6 @@ sub setupconfsh {
     open F, ">" . $confshfile || die $!;
     if ($verbose) {
         print "Setting up $confshfile\n";
-    }
-    binmode(F);
-    foreach $line (@Lines) {
-        print F $line . "\n";
-    }
-    close F;
-}
-
-# setup isc-config.sh with %configvar accepting undefined
-
-sub setupicsh {
-    my $line;
-    my @Lines;
-    my $val;
-
-    open F, $icshfile . ".in" || die $!;
-    @Lines = <F>;
-    close F;
-
-    foreach $line (@Lines) {
-        chomp $line;
-        while ($line =~ /@([^@]+)\@/) {
-            if ($1 ~~ @substvar) {
-                if (defined($configvar{$1})) {
-                    $val = kw($configvar{$1});
-                    $line = "$`$val$'";
-                } else {
-                    $line = "$`$'";
-                }
-            }  else {
-                $line = "$`__$1__$'";
-            }
-        }
-    }
-
-    open F, ">" . $icshfile || die $!;
-    if ($verbose) {
-        print "Setting up $icshfile\n";
     }
     binmode(F);
     foreach $line (@Lines) {
@@ -2990,9 +2218,7 @@ sub setupfile {
     if ($verbose) {
         print "Setting up $filename\n";
     }
-    if (!$legacy_only) {
-        binmode(F);
-    }
+    binmode(F);
     foreach $line (@Linesout) {
         print F $line . "\n";
     }
@@ -3121,18 +2347,7 @@ sub setupproject {
 sub makeversion {
     # List of directories with version files
 
-    my @dirlist = ("isc", "dns", "isccc", "isccfg", "lwres", "bind9", "irs");
-    my %LibMacros = (
-        "bind9"   => "LIBBIND9_EXPORTS",
-        "dns"     => "LIBDNS_EXPORTS",
-        "irs"     => "LIBIRS_EXPORTS",
-        "isc"     => "LIBISC_EXPORTS",
-        "isccc"   => "LIBISCCC_EXPORTS",
-        "isccfg"  => "LIBISCCFG_EXPORTS",
-        "lwres"   => "LIBLWRES_EXPORTS");
-    my @VersionNames = ("LIBINTERFACE", "LIBREVISION", "LIBAGE");
     my $Version;
-    my %ApiVersions;
     my $Mapapi;
     my $versionfile = "versions.h";
     my $versionpath = "..\\$versionfile";
@@ -3208,30 +2423,6 @@ sub makeversion {
         "#define MAJOR \"$Versions{'MAJORVER'}.$Versions{'MINORVER'}\"\n\n";
     print O "#define MAPAPI \"$Mapapi\"\n\n";
 
-    my $dir;
-    my $apifile;
-    foreach $dir (@dirlist) {
-        $apifile = "..\\lib\\$dir\\api";
-        open A, $apifile || die $!;
-        while (<A>) {
-            chomp;
-            ($data) = split(/\#/);
-            if ($data) {
-                ($name, $value) = split(/=/, $data);
-                $name =~ s/\s+//;
-                $value =~ s/\s+//;
-                $ApiVersions{$name} = $value;
-            }
-        }
-        close A;
-
-        print O "\n#ifdef $LibMacros{$dir}\n";
-        foreach $name (@VersionNames) {
-            print O "#define $name\t$ApiVersions{$name}\n";
-        }
-        print O "#endif\n\n";
-    }
-
     print O "#endif /* VERSIONS_H */\n";
     close O;
 }
@@ -3258,6 +2449,13 @@ sub makesrcid {
           }
         }
         close SIN;
+    }
+
+    if ($srcid eq "unset_id" and -d "..\\.git") {
+        $data = `git rev-list --max-count=1 HEAD`;
+        if (length($data) > 0) {
+            $srcid = substr($data, 0, 7);
+        }
     }
 
     # Now set up the output version file
@@ -3326,13 +2524,16 @@ sub makeinstallfile {
     print LOUT "libisccfg.dll-BCFT\n";
     print LOUT "libisccc.dll-BCFT\n";
     print LOUT "libdns.dll-BCFT\n";
-    print LOUT "liblwres.dll-BCFT\n";
     print LOUT "libirs.dll-BCFT\n";
+    print LOUT "libns.dll-BCFT\n";
+    print LOUT "uv.dll-BCFT\n";
     if ($use_openssl eq "yes") {
         my $v;
         my $d;
         my $name;
-        ($v, $d, $name) =File::Spec->splitpath($configdll{"OPENSSL_DLL"});
+        ($v, $d, $name) =File::Spec->splitpath($configdll{"OPENSSL_DLLCRYPTO"});
+        print LOUT "${name}-BCFT\n";
+        ($v, $d, $name) =File::Spec->splitpath($configdll{"OPENSSL_DLLSSL"});
         print LOUT "${name}-BCFT\n";
     }
     if ($use_libxml2 eq "yes") {
@@ -3346,9 +2547,6 @@ sub makeinstallfile {
             print LOUT "gssapi32.dll-BCFT\n";
             print LOUT "krb5_32.dll-BCFT\n";
         }
-    }
-    if ($use_geoip eq "yes") {
-        print LOUT "libgeoip.dll-BCFT\n";
     }
     if ($use_idn eq "yes") {
         print LOUT "idnkit.dll-BCFT\n";
@@ -3367,7 +2565,6 @@ sub makeinstallfile {
     print LOUT "delv.exe-BNFT\n";
     print LOUT "arpaname.exe-BNFT\n";
     print LOUT "nsec3hash.exe-BNFF\n";
-    print LOUT "genrandom.exe-BNFF\n";
     print LOUT "rndc-confgen.exe-BNFF\n";
     print LOUT "ddns-confgen.exe-BNFF\n";
     print LOUT "tsig-keygen.exe-BNFF\n";
@@ -3384,7 +2581,6 @@ sub makeinstallfile {
     print LOUT "named-compilezone.exe-BNFF\n";
     print LOUT "named-journalprint.exe-BNFF\n";
     print LOUT "named-rrchecker.exe-BNFF\n";
-    print LOUT "isc-hmax-fixup.exe-BNFF\n";
     if ($use_pkcs11 eq "yes") {
         print LOUT "pkcs11-destroy.exe-BNFF\n";
         print LOUT "pkcs11-keygen.exe-BNFF\n";
@@ -3401,9 +2597,6 @@ sub makeinstallfile {
 }
 
 # Adjust system tests
-
-# WIN32 not a BSD
-$configtest{"CHECK_DSA"} = 0;
 
 # dnstap not supported
 #$configtest{"DNSTAP"} = "dnstap";
@@ -3506,17 +2699,13 @@ if (($want_win32 eq "yes") || ($want_x64 eq "yes")) {
 
     setupconfsh();
 
-    setupicsh();
-
     my $file;
     foreach $file (@filelist) {
         setupfile($file);
     }
 
-    if (!$legacy_only) {
-        foreach $file (@projectlist) {
-            setupproject($file);
-        }
+    foreach $file (@projectlist) {
+        setupproject($file);
     }
 
     makeversion();
@@ -3543,29 +2732,22 @@ exit 0;
 #  --enable-symtable incompatible with DLLs (or libtool)
 #  --enable-ipv6 included without a way to disable it
 #  --enable-atomic supported (renamed to intrinsic)
-#  --enable-isc-spnego supported (part of GSSAPI)
 #  --enable-fixed-rrset supported
 #  --enable-querytrace supported
-#  --disable-rpz-nsip supported
-#  --disable-rpz-nsdname supported
-#  --enable-filter-aaaa supported
 #  --enable-full-report supported by verbose
 #  --enable-dnstap not supported (requires libfstrm support on WIN32)
-#  --enable-seccomp not supported (Linux specific)
 #  --enable-afl not supported (not yet available on Visual Studio C++)
+#  --disable-auto-validation supported
 #  --with-python supported
 #  --with-openssl supported
 #  --with-pkcs11 supported
-#  --with-ecdsa supported
-#  --with-eddsa supported
-#  --with-gost supported
 #  --with-aes supported
-#  --with-cc-alg supported
-#  --with-geoip supported
+#  --with-randomdev not supported on WIN32 (makes no sense)
+#  --with-geoip2 supported
 #  --with-gssapi supported with MIT (K)erberos (f)or (W)indows
 #  --with-lmdb no supported on WIN32 (port is not reliable)
 #  --with-libxml2 supported
-#  --with-libjson not supported on WIN32 (package not available on WIN32)
+#  --with-json-c not supported on WIN32 (package not available on WIN32)
 #  --with-zlib supported
 #  --with-purify not supported (package available on WIN32 but for free?)
 #  --with-gperftools-profiler not supported (package not available on WIN32)

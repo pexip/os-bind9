@@ -1,35 +1,33 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 /*! \file */
-
-#include <config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <isc/error.h>
-#include <isc/msgs.h>
 #include <isc/print.h>
 
 /*% Default unexpected callback. */
 static void
 default_unexpected_callback(const char *, int, const char *, va_list)
-     ISC_FORMAT_PRINTF(3, 0);
+	ISC_FORMAT_PRINTF(3, 0);
 
 /*% Default fatal callback. */
 static void
 default_fatal_callback(const char *, int, const char *, va_list)
-     ISC_FORMAT_PRINTF(3, 0);
+	ISC_FORMAT_PRINTF(3, 0);
 
 /*% unexpected_callback */
 static isc_errorcallback_t unexpected_callback = default_unexpected_callback;
@@ -37,18 +35,20 @@ static isc_errorcallback_t fatal_callback = default_fatal_callback;
 
 void
 isc_error_setunexpected(isc_errorcallback_t cb) {
-	if (cb == NULL)
+	if (cb == NULL) {
 		unexpected_callback = default_unexpected_callback;
-	else
+	} else {
 		unexpected_callback = cb;
+	}
 }
 
 void
 isc_error_setfatal(isc_errorcallback_t cb) {
-	if (cb == NULL)
+	if (cb == NULL) {
 		fatal_callback = default_fatal_callback;
-	else
+	} else {
 		fatal_callback = cb;
+	}
 }
 
 void
@@ -72,15 +72,12 @@ isc_error_fatal(const char *file, int line, const char *format, ...) {
 
 void
 isc_error_runtimecheck(const char *file, int line, const char *expression) {
-	isc_error_fatal(file, line, "RUNTIME_CHECK(%s) %s", expression,
-			isc_msgcat_get(isc_msgcat, ISC_MSGSET_GENERAL,
-				       ISC_MSG_FAILED, "failed"));
+	isc_error_fatal(file, line, "RUNTIME_CHECK(%s) failed", expression);
 }
 
 static void
 default_unexpected_callback(const char *file, int line, const char *format,
-			    va_list args)
-{
+			    va_list args) {
 	fprintf(stderr, "%s:%d: ", file, line);
 	vfprintf(stderr, format, args);
 	fprintf(stderr, "\n");
@@ -89,11 +86,8 @@ default_unexpected_callback(const char *file, int line, const char *format,
 
 static void
 default_fatal_callback(const char *file, int line, const char *format,
-		       va_list args)
-{
-	fprintf(stderr, "%s:%d: %s: ", file, line,
-		isc_msgcat_get(isc_msgcat, ISC_MSGSET_GENERAL,
-			       ISC_MSG_FATALERROR, "fatal error"));
+		       va_list args) {
+	fprintf(stderr, "%s:%d: fatal error: ", file, line);
 	vfprintf(stderr, format, args);
 	fprintf(stderr, "\n");
 	fflush(stderr);

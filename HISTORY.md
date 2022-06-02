@@ -10,6 +10,206 @@
 -->
 ### Functional enhancements from prior major releases of BIND 9
 
+#### BIND 9.14
+
+BIND 9.14 (a stable branch based on the 9.13 development branch)
+includes a number of changes from BIND 9.12 and earlier releases.
+New features include:
+
+* A new "plugin" mechanism has been added to allow query functionality
+  to be extended using dynamically loadable libraries. The "filter-aaaa"
+  feature has been removed from named and is now implemented as a plugin.
+* Socket and task code has been refactored to improve performance.
+* QNAME minimization, as described in RFC 7816, is now supported.
+* "Root key sentinel" support, enabling validating resolvers to indicate
+  via a special query which trust anchors are configured for the root zone.
+* Secondary zones can now be configured as "mirror" zones; their contents
+  are transferred in as with traditional slave zones, but are subject to
+  DNSSEC validation and are not treated as authoritative data when
+  answering. This makes it easier to configure a local copy of the root
+  zone as described in RFC 7706.
+* The "validate-except" option allows configuration of domains below which
+  DNSSEC validation should not be performed.
+* The default value of "dnssec-validation" is now "auto".
+* IDNA2008 is now supported when linking with `libidn2`.
+* "named -V" now outputs the default paths for files used by named
+  and other tools.
+
+In addition, workarounds that were formerly in place to enable resolution
+of domains whose authoritative servers did not respond to EDNS queries
+have been removed. See [https://dnsflagday.net](https://dnsflagday.net)
+for more details.
+
+Cryptographic support has been modernized. BIND now uses the
+best available pseudo-random number generator for the platform on which
+it's built. Very old versions of OpenSSL are no longer supported.
+Cryptography is now mandatory: building BIND without DNSSEC is no
+longer supported.
+
+Special code to support certain legacy operating systems has also
+been removed; see the [doc/arm/platforms.rst](platforms) file for details
+of supported platforms. In addition to OpenSSL, BIND now requires
+support for IPv6, threads, and standard atomic operations provided
+by the C compiler.
+
+#### BIND 9.12
+
+BIND 9.12 includes a number of changes from BIND 9.11 and earlier releases.
+New features include:
+
+* `named` and related libraries have been substantially refactored for
+  improved query performance -- particularly on delegation heavy zones --
+  and for improved readability, maintainability, and testability.
+* Code implementing the name server query processing logic has been moved
+  into a new `libns` library, for easier testing and use in tools other
+  than `named`.
+* Cached, validated NSEC and other records can now be used to synthesize
+  NXDOMAIN responses.
+* The DNS Response Policy Service API (DNSRPS) is now supported.
+* Setting `'max-journal-size default'` now limits the size of journal files
+  to twice the size of the zone.
+* `dnstap-read -x` prints a hex dump of the wire format of each logged
+  DNS message.
+* `dnstap` output files can now be configured to roll automatically when
+  reaching a given size.
+* Log file timestamps can now also be formatted in ISO 8601 (local) or ISO
+  8601 (UTC) formats.
+* Logging channels and `dnstap` output files can now be configured to use a
+  timestamp as the suffix when rolling to a new file.
+* `'named-checkconf -l'` lists zones found in `named.conf`.
+* Added support for the EDNS Padding and Keepalive options.
+* 'new-zones-directory' option sets the location where the configuration
+  data for zones added by rndc addzone is stored.
+* The default key algorithm in `rndc-confgen` is now hmac-sha256.
+* `filter-aaaa-on-v4` and `filter-aaaa-on-v6` options are now available
+  by default without a configure option.
+* The obsolete `isc-hmac-fixup` command has been removed.
+
+#### BIND 9.11
+
+BIND 9.11.0 includes a number of changes from BIND 9.10 and earlier
+releases.  New features include:
+
+- Added support for Catalog Zones, a new method for provisioning servers: a
+  list of zones to be served is stored in a DNS zone, along with their
+  configuration parameters. Changes to the catalog zone are propagated to
+  slaves via normal AXFR/IXFR, whereupon the zones that are listed in it
+  are automatically added, deleted or reconfigured.
+- Added support for "dnstap", a fast and flexible method of capturing and
+  logging DNS traffic.
+- Added support for "dyndb", a new API for loading zone data from an
+  external database, developed by Red Hat for the FreeIPA project.
+- "fetchlimit" quotas are now compiled in by default.  These are for the
+  use of recursive resolvers that are are under high query load for domains
+  whose authoritative servers are nonresponsive or are experiencing a
+  denial of service attack:
+    - "fetches-per-server" limits the number of simultaneous queries that
+      can be sent to any single authoritative server.  The configured value
+      is a starting point; it is automatically adjusted downward if the
+      server is partially or completely non-responsive. The algorithm used
+      to adjust the quota can be configured via the "fetch-quota-params"
+      option.
+    - "fetches-per-zone" limits the number of simultaneous queries that can
+      be sent for names within a single domain.  (Note: Unlike
+      "fetches-per-server", this value is not self-tuning.)
+    - New stats counters have been added to count queries spilled due to
+      these quotas.
+- Added a new "dnssec-keymgr" key mainenance utility, which can generate or
+  update keys as needed to ensure that a zone's keys match a defined DNSSEC
+  policy.
+- The experimental "SIT" feature in BIND 9.10 has been renamed "COOKIE" and
+  is no longer optional. EDNS COOKIE is a mechanism enabling clients to
+  detect off-path spoofed responses, and servers to detect spoofed-source
+  queries.  Clients that identify themselves using COOKIE options are not
+  subject to response rate limiting (RRL) and can receive larger UDP
+  responses.
+- SERVFAIL responses can now be cached for a limited time (defaulting to 1
+  second, with an upper limit of 30).  This can reduce the frequency of
+  retries when a query is persistently failing.
+- Added an "nsip-wait-recurse" switch to RPZ. This causes NSIP rules to be
+  skipped if a name server IP address isn't in the cache yet; the address
+  will be looked up and the rule will be applied on future queries.
+- Added a Python RNDC module. This allows multiple commands to sent over a
+  persistent RNDC channel, which saves time.
+- The "controls" block in named.conf can now grant read-only "rndc" access
+  to specified clients or keys. Read-only clients could, for example, check
+  "rndc status" but could not reconfigure or shut down the server.
+- "rndc" commands can now return arbitrarily large amounts of text to the
+  caller.
+- The zone serial number of a dynamically updatable zone can now be set via
+  "rndc signing -serial <number> <zonename>".  This allows inline-signing
+  zones to be set to a specific serial number.
+- The new "rndc nta" command can be used to set a Negative Trust Anchor
+  (NTA), disabling DNSSEC validation for a specific domain; this can be
+  used when responses from a domain are known to be failing validation due
+  to administrative error rather than because of a spoofing attack.
+  Negative trust anchors are strictly temporary; by default they expire
+  after one hour, but can be configured to last up to one week.
+- "rndc delzone" can now be used on zones that were not originally created
+  by "rndc addzone".
+- "rndc modzone" reconfigures a single zone, without requiring the entire
+  server to be reconfigured.
+- "rndc showzone" displays the current configuration of a zone.
+- "rndc managed-keys" can be used to check the status of RFC 5011 managed
+  trust anchors, or to force trust anchors to be refreshed.
+- "max-cache-size" can now be set to a percentage of available memory. The
+  default is 90%.
+- Update forwarding performance has been improved by allowing a single TCP
+  connection to be shared by multiple updates.
+- The EDNS Client Subnet (ECS) option is now supported for authoritative
+  servers; if a query contains an ECS option then ACLs containing "geoip"
+  or "ecs" elements can match against the the address encoded in the
+  option.  This can be used to select a view for a query, so that different
+  answers can be provided depending on the client network.
+- The EDNS EXPIRE option has been implemented on the client side, allowing
+  a slave server to set the expiration timer correctly when transferring
+  zone data from another slave server.
+- The key generation and manipulation tools (dnssec-keygen, dnssec-settime,
+  dnssec-importkey, dnssec-keyfromlabel) now take "-Psync" and "-Dsync"
+  options to set the publication and deletion times of CDS and CDNSKEY
+  parent-synchronization records.  Both named and dnssec-signzone can now
+  publish and remove these records at the scheduled times.
+- A new "minimal-any" option reduces the size of UDP responses for query
+  type ANY by returning a single arbitrarily selected RRset instead of all
+  RRsets.
+- A new "masterfile-style" zone option controls the formatting of text zone
+  files:  When set to "full", a zone file is dumped in
+  single-line-per-record format.
+- "serial-update-method" can now be set to "date". On update, the serial
+  number will be set to the current date in YYYYMMDDNN format.
+- "dnssec-signzone -N date" sets the serial number to YYYYMMDDNN.
+- "named -L <filename>" causes named to send log messages to the specified
+  file by default instead of to the system log.
+- "dig +ttlunits" prints TTL values with time-unit suffixes: w, d, h, m, s
+  for weeks, days, hours, minutes, and seconds.
+- "dig +unknownformat" prints dig output in RFC 3597 "unknown record"
+  presentation format.
+- "dig +ednsopt" allows dig to set arbitrary EDNS options on requests.
+- "dig +ednsflags" allows dig to set yet-to-be-defined EDNS flags on
+  requests.
+- "mdig" is an alternate version of dig which sends multiple pipelined TCP
+  queries to a server.  Instead of waiting for a response after sending a
+  query, it sends all queries immediately and displays responses in the
+  order received.
+- "serial-query-rate" no longer controls NOTIFY messages.  These are
+  separately controlled by "notify-rate" and "startup-notify-rate".
+- "nsupdate" now performs "check-names" processing by default on records to
+  be added.  This can be disabled with "check-names no".
+- The statistics channel now supports DEFLATE compression, reducing the
+  size of the data sent over the network when querying statistics.
+- New counters have been added to the statistics channel to track the sizes
+  of incoming queries and outgoing responses in histogram buckets, as
+  specified in RSSAC002.
+- A new NXDOMAIN redirect method (option "nxdomain-redirect") has been
+  added, allowing redirection to a specified DNS namespace instead of a
+  single redirect zone.
+- When starting up, named now ensures that no other named process is
+  already running.
+- Files created by named to store information, including "mkeys" and "nzf"
+  files, are now named after their corresponding views unless the view name
+  contains characters incompatible with use as a filename. Old style
+  filenames (based on the hash of the view name) will still work.
+
 #### BIND 9.10.0
 
 BIND 9.10.0 includes a number of changes from BIND 9.9 and earlier
@@ -333,8 +533,8 @@ BIND 9.4.0
 - dig: report the number of extra bytes still left in the packet after
   processing all the records.
 - Support for IPSECKEY rdata type.
-- Raise the UDP recieve buffer size to 32k if it is less than 32k.
-- x86 and x86_64 now have seperate atomic locking implementations.
+- Raise the UDP receive buffer size to 32k if it is less than 32k.
+- x86 and x86_64 now have separate atomic locking implementations.
 - named-checkconf now validates update-policy entries.
 - Attempt to make the amount of work performed in a iteration self tuning.
   The covers nodes clean from the cache per iteration, nodes written to
@@ -351,8 +551,8 @@ BIND 9.4.0
 - dig now warns if 'RA' is not set in the answer when 'RD' was set in the
   query.  host/nslookup skip servers that fail to set 'RA' when 'RD' is set
   unless a server is explicitly set.
-- Integrate contibuted DLZ code into named.
-- Integrate contibuted IDN code from JPNIC.
+- Integrate contributed DLZ code into named.
+- Integrate contributed IDN code from JPNIC.
 - libbind: corresponds to that from BIND 8.4.7.
 
 #### BIND 9.3.0

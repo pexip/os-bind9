@@ -1,20 +1,20 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 /*! \file */
 
-#include <config.h>
-
 #include <stdbool.h>
+
 #include <isc/app.h>
 #include <isc/event.h>
 #include <isc/lex.h>
@@ -35,8 +35,8 @@
 #include <named/os.h>
 #include <named/server.h>
 #ifdef HAVE_LIBSCF
-#include <named/ns_smf_globals.h>
-#endif
+#include <named/smf_globals.h>
+#endif /* ifdef HAVE_LIBSCF */
 
 static isc_result_t
 getcommand(isc_lex_t *lex, char **cmdp) {
@@ -46,13 +46,15 @@ getcommand(isc_lex_t *lex, char **cmdp) {
 	REQUIRE(cmdp != NULL && *cmdp == NULL);
 
 	result = isc_lex_gettoken(lex, ISC_LEXOPT_EOF, &token);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		return (result);
+	}
 
 	isc_lex_ungettoken(lex, &token);
 
-	if (token.type != isc_tokentype_string)
+	if (token.type != isc_tokentype_string) {
 		return (ISC_R_FAILURE);
+	}
 
 	*cmdp = token.value.as_textregion.base;
 
@@ -69,9 +71,8 @@ command_compare(const char *str, const char *command) {
  * when a control channel message is received.
  */
 isc_result_t
-ns_control_docommand(isccc_sexpr_t *message, bool readonly,
-		     isc_buffer_t **text)
-{
+named_control_docommand(isccc_sexpr_t *message, bool readonly,
+			isc_buffer_t **text) {
 	isccc_sexpr_t *data;
 	char *cmdline = NULL;
 	char *command = NULL;
@@ -80,8 +81,8 @@ ns_control_docommand(isccc_sexpr_t *message, bool readonly,
 	isc_buffer_t src;
 	isc_lex_t *lex = NULL;
 #ifdef HAVE_LIBSCF
-	ns_smf_want_disable = 0;
-#endif
+	named_smf_want_disable = 0;
+#endif /* ifdef HAVE_LIBSCF */
 
 	data = isccc_alist_lookup(message, "_data");
 	if (!isccc_alist_alistp(data)) {
@@ -99,25 +100,29 @@ ns_control_docommand(isccc_sexpr_t *message, bool readonly,
 		return (result);
 	}
 
-	result = isc_lex_create(ns_g_mctx, strlen(cmdline), &lex);
-	if (result != ISC_R_SUCCESS)
+	result = isc_lex_create(named_g_mctx, strlen(cmdline), &lex);
+	if (result != ISC_R_SUCCESS) {
 		return (result);
+	}
 
 	isc_buffer_init(&src, cmdline, strlen(cmdline));
 	isc_buffer_add(&src, strlen(cmdline));
 	result = isc_lex_openbuffer(lex, &src);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
+	}
 
 	result = getcommand(lex, &command);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
+	}
 
 	/*
 	 * Compare the 'command' parameter against all known control commands.
 	 */
-	if (command_compare(command, NS_COMMAND_NULL) ||
-	    command_compare(command, NS_COMMAND_STATUS))
+	if ((command_compare(command, NAMED_COMMAND_NULL) &&
+	     strlen(cmdline) == 4) ||
+	    command_compare(command, NAMED_COMMAND_STATUS))
 	{
 		log_level = ISC_LOG_DEBUG(1);
 	} else {
@@ -129,165 +134,178 @@ ns_control_docommand(isccc_sexpr_t *message, bool readonly,
 	 * restricted commands here. rndc nta is handled specially
 	 * below.
 	 */
-	if (readonly &&
-	    !command_compare(command, NS_COMMAND_NTA) &&
-	    !command_compare(command, NS_COMMAND_NULL) &&
-	    !command_compare(command, NS_COMMAND_STATUS) &&
-	    !command_compare(command, NS_COMMAND_SHOWZONE) &&
-	    !command_compare(command, NS_COMMAND_TESTGEN) &&
-	    !command_compare(command, NS_COMMAND_ZONESTATUS))
+	if (readonly && !command_compare(command, NAMED_COMMAND_NTA) &&
+	    !command_compare(command, NAMED_COMMAND_NULL) &&
+	    !command_compare(command, NAMED_COMMAND_STATUS) &&
+	    !command_compare(command, NAMED_COMMAND_SHOWZONE) &&
+	    !command_compare(command, NAMED_COMMAND_TESTGEN) &&
+	    !command_compare(command, NAMED_COMMAND_ZONESTATUS))
 	{
-		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
-			      NS_LOGMODULE_CONTROL, log_level,
+		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+			      NAMED_LOGMODULE_CONTROL, log_level,
 			      "rejecting restricted control channel "
-			      "command '%s'", cmdline);
+			      "command '%s'",
+			      cmdline);
 		result = ISC_R_FAILURE;
 		goto cleanup;
 	}
 
-	isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
-		      NS_LOGMODULE_CONTROL, log_level,
-		      "received control channel command '%s'",
-		      cmdline);
+	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+		      NAMED_LOGMODULE_CONTROL, log_level,
+		      "received control channel command '%s'", cmdline);
 
-	if (command_compare(command, NS_COMMAND_RELOAD)) {
-		result = ns_server_reloadcommand(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_RECONFIG)) {
-		result = ns_server_reconfigcommand(ns_g_server);
-	} else if (command_compare(command, NS_COMMAND_REFRESH)) {
-		result = ns_server_refreshcommand(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_RETRANSFER)) {
-		result = ns_server_retransfercommand(ns_g_server,
-						     lex, text);
-	} else if (command_compare(command, NS_COMMAND_HALT)) {
+	/*
+	 * After the lengthy "halt" and "stop", the commands are
+	 * handled in alphabetical order of the NAMED_COMMAND_ macros.
+	 */
+	if (command_compare(command, NAMED_COMMAND_HALT)) {
 #ifdef HAVE_LIBSCF
 		/*
 		 * If we are managed by smf(5), AND in chroot, then
 		 * we cannot connect to the smf repository, so just
 		 * return with an appropriate message back to rndc.
 		 */
-		if (ns_smf_got_instance == 1 && ns_smf_chroot == 1) {
-			result = ns_smf_add_message(text);
+		if (named_smf_got_instance == 1 && named_smf_chroot == 1) {
+			result = named_smf_add_message(text);
 			goto cleanup;
 		}
 		/*
 		 * If we are managed by smf(5) but not in chroot,
 		 * try to disable ourselves the smf way.
 		 */
-		if (ns_smf_got_instance == 1 && ns_smf_chroot == 0)
-			ns_smf_want_disable = 1;
+		if (named_smf_got_instance == 1 && named_smf_chroot == 0) {
+			named_smf_want_disable = 1;
+		}
 		/*
-		 * If ns_smf_got_instance = 0, ns_smf_chroot
+		 * If named_smf_got_instance = 0, named_smf_chroot
 		 * is not relevant and we fall through to
 		 * isc_app_shutdown below.
 		 */
-#endif
+#endif /* ifdef HAVE_LIBSCF */
 		/* Do not flush master files */
-		ns_server_flushonshutdown(ns_g_server, false);
-		ns_os_shutdownmsg(cmdline, *text);
+		named_server_flushonshutdown(named_g_server, false);
+		named_os_shutdownmsg(cmdline, *text);
 		isc_app_shutdown();
 		result = ISC_R_SUCCESS;
-	} else if (command_compare(command, NS_COMMAND_STOP)) {
+	} else if (command_compare(command, NAMED_COMMAND_STOP)) {
 		/*
 		 * "stop" is the same as "halt" except it does
 		 * flush master files.
 		 */
 #ifdef HAVE_LIBSCF
-		if (ns_smf_got_instance == 1 && ns_smf_chroot == 1) {
-			result = ns_smf_add_message(text);
+		if (named_smf_got_instance == 1 && named_smf_chroot == 1) {
+			result = named_smf_add_message(text);
 			goto cleanup;
 		}
-		if (ns_smf_got_instance == 1 && ns_smf_chroot == 0)
-			ns_smf_want_disable = 1;
-#endif
-		ns_server_flushonshutdown(ns_g_server, true);
-		ns_os_shutdownmsg(cmdline, *text);
+		if (named_smf_got_instance == 1 && named_smf_chroot == 0) {
+			named_smf_want_disable = 1;
+		}
+#endif /* ifdef HAVE_LIBSCF */
+		named_server_flushonshutdown(named_g_server, true);
+		named_os_shutdownmsg(cmdline, *text);
 		isc_app_shutdown();
 		result = ISC_R_SUCCESS;
-	} else if (command_compare(command, NS_COMMAND_DUMPSTATS)) {
-		result = ns_server_dumpstats(ns_g_server);
-	} else if (command_compare(command, NS_COMMAND_QUERYLOG)) {
-		result = ns_server_togglequerylog(ns_g_server, lex);
-	} else if (command_compare(command, NS_COMMAND_DUMPDB)) {
-		ns_server_dumpdb(ns_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_ADDZONE) ||
+		   command_compare(command, NAMED_COMMAND_MODZONE))
+	{
+		result = named_server_changezone(named_g_server, cmdline, text);
+	} else if (command_compare(command, NAMED_COMMAND_DELZONE)) {
+		result = named_server_delzone(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_DNSSEC)) {
+		result = named_server_dnssec(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_DNSTAP) ||
+		   command_compare(command, NAMED_COMMAND_DNSTAPREOPEN))
+	{
+		result = named_server_dnstap(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_DUMPDB)) {
+		named_server_dumpdb(named_g_server, lex, text);
 		result = ISC_R_SUCCESS;
-	} else if (command_compare(command, NS_COMMAND_SECROOTS)) {
-		result = ns_server_dumpsecroots(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_TRACE)) {
-		result = ns_server_setdebuglevel(ns_g_server, lex);
-	} else if (command_compare(command, NS_COMMAND_NOTRACE)) {
-		ns_g_debuglevel = 0;
-		isc_log_setdebuglevel(ns_g_lctx, ns_g_debuglevel);
+	} else if (command_compare(command, NAMED_COMMAND_DUMPSTATS)) {
+		result = named_server_dumpstats(named_g_server);
+	} else if (command_compare(command, NAMED_COMMAND_FLUSH)) {
+		result = named_server_flushcache(named_g_server, lex);
+	} else if (command_compare(command, NAMED_COMMAND_FLUSHNAME)) {
+		result = named_server_flushnode(named_g_server, lex, false);
+	} else if (command_compare(command, NAMED_COMMAND_FLUSHTREE)) {
+		result = named_server_flushnode(named_g_server, lex, true);
+	} else if (command_compare(command, NAMED_COMMAND_FREEZE)) {
+		result = named_server_freeze(named_g_server, true, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_LOADKEYS) ||
+		   command_compare(command, NAMED_COMMAND_SIGN))
+	{
+		result = named_server_rekey(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_MKEYS)) {
+		result = named_server_mkeys(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_NOTIFY)) {
+		result = named_server_notifycommand(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_NOTRACE)) {
+		named_g_debuglevel = 0;
+		isc_log_setdebuglevel(named_g_lctx, named_g_debuglevel);
 		result = ISC_R_SUCCESS;
-	} else if (command_compare(command, NS_COMMAND_FLUSH)) {
-		result = ns_server_flushcache(ns_g_server, lex);
-	} else if (command_compare(command, NS_COMMAND_FLUSHNAME)) {
-		result = ns_server_flushnode(ns_g_server, lex, false);
-	} else if (command_compare(command, NS_COMMAND_FLUSHTREE)) {
-		result = ns_server_flushnode(ns_g_server, lex, true);
-	} else if (command_compare(command, NS_COMMAND_STATUS)) {
-		result = ns_server_status(ns_g_server, text);
-	} else if (command_compare(command, NS_COMMAND_TSIGLIST)) {
-		result = ns_server_tsiglist(ns_g_server, text);
-	} else if (command_compare(command, NS_COMMAND_TSIGDELETE)) {
-		result = ns_server_tsigdelete(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_FREEZE)) {
-		result = ns_server_freeze(ns_g_server, true, lex,
-					  text);
-	} else if (command_compare(command, NS_COMMAND_UNFREEZE) ||
-		   command_compare(command, NS_COMMAND_THAW)) {
-		result = ns_server_freeze(ns_g_server, false, lex,
-					  text);
-	} else if (command_compare(command, NS_COMMAND_SCAN)) {
+	} else if (command_compare(command, NAMED_COMMAND_NTA)) {
+		result = named_server_nta(named_g_server, lex, readonly, text);
+	} else if (command_compare(command, NAMED_COMMAND_NULL)) {
 		result = ISC_R_SUCCESS;
-		ns_server_scan_interfaces(ns_g_server);
-	} else if (command_compare(command, NS_COMMAND_SYNC)) {
-		result = ns_server_sync(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_RECURSING)) {
-		result = ns_server_dumprecursing(ns_g_server);
-	} else if (command_compare(command, NS_COMMAND_TIMERPOKE)) {
+	} else if (command_compare(command, NAMED_COMMAND_QUERYLOG)) {
+		result = named_server_togglequerylog(named_g_server, lex);
+	} else if (command_compare(command, NAMED_COMMAND_RECONFIG)) {
+		result = named_server_reconfigcommand(named_g_server);
+	} else if (command_compare(command, NAMED_COMMAND_RECURSING)) {
+		result = named_server_dumprecursing(named_g_server);
+	} else if (command_compare(command, NAMED_COMMAND_REFRESH)) {
+		result = named_server_refreshcommand(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_RELOAD)) {
+		result = named_server_reloadcommand(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_RETRANSFER)) {
+		result = named_server_retransfercommand(named_g_server, lex,
+							text);
+	} else if (command_compare(command, NAMED_COMMAND_SCAN)) {
+		named_server_scan_interfaces(named_g_server);
 		result = ISC_R_SUCCESS;
-		isc_timermgr_poke(ns_g_timermgr);
-	} else if (command_compare(command, NS_COMMAND_NULL)) {
+	} else if (command_compare(command, NAMED_COMMAND_SECROOTS)) {
+		result = named_server_dumpsecroots(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_SERVESTALE)) {
+		result = named_server_servestale(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_SHOWZONE)) {
+		result = named_server_showzone(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_SIGNING)) {
+		result = named_server_signing(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_STATUS)) {
+		result = named_server_status(named_g_server, text);
+	} else if (command_compare(command, NAMED_COMMAND_SYNC)) {
+		result = named_server_sync(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_TCPTIMEOUTS)) {
+		result = named_server_tcptimeouts(lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_TESTGEN)) {
+		result = named_server_testgen(lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_THAW) ||
+		   command_compare(command, NAMED_COMMAND_UNFREEZE))
+	{
+		result = named_server_freeze(named_g_server, false, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_TIMERPOKE)) {
+		isc_timermgr_poke(named_g_timermgr);
 		result = ISC_R_SUCCESS;
-	} else if (command_compare(command, NS_COMMAND_NOTIFY)) {
-		result = ns_server_notifycommand(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_VALIDATION)) {
-		result = ns_server_validation(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_SIGN) ||
-		   command_compare(command, NS_COMMAND_LOADKEYS)) {
-		result = ns_server_rekey(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_ADDZONE) ||
-		   command_compare(command, NS_COMMAND_MODZONE)) {
-		result = ns_server_changezone(ns_g_server, cmdline, text);
-	} else if (command_compare(command, NS_COMMAND_DELZONE)) {
-		result = ns_server_delzone(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_SHOWZONE)) {
-		result = ns_server_showzone(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_SIGNING)) {
-		result = ns_server_signing(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_ZONESTATUS)) {
-		result = ns_server_zonestatus(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_NTA)) {
-		result = ns_server_nta(ns_g_server, lex, readonly, text);
-	} else if (command_compare(command, NS_COMMAND_TESTGEN)) {
-		result = ns_server_testgen(lex, text);
-	} else if (command_compare(command, NS_COMMAND_MKEYS)) {
-		result = ns_server_mkeys(ns_g_server, lex, text);
-	} else if (command_compare(command, NS_COMMAND_DNSTAP) ||
-		   command_compare(command, NS_COMMAND_DNSTAPREOPEN)) {
-		result = ns_server_dnstap(ns_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_TRACE)) {
+		result = named_server_setdebuglevel(named_g_server, lex);
+	} else if (command_compare(command, NAMED_COMMAND_TSIGDELETE)) {
+		result = named_server_tsigdelete(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_TSIGLIST)) {
+		result = named_server_tsiglist(named_g_server, text);
+	} else if (command_compare(command, NAMED_COMMAND_VALIDATION)) {
+		result = named_server_validation(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_ZONESTATUS)) {
+		result = named_server_zonestatus(named_g_server, lex, text);
 	} else {
-		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
-			      NS_LOGMODULE_CONTROL, ISC_LOG_WARNING,
-			      "unknown control channel command '%s'",
-			      command);
+		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+			      NAMED_LOGMODULE_CONTROL, ISC_LOG_WARNING,
+			      "unknown control channel command '%s'", command);
 		result = DNS_R_UNKNOWNCOMMAND;
 	}
 
- cleanup:
-	if (lex != NULL)
+cleanup:
+	if (lex != NULL) {
 		isc_lex_destroy(&lex);
+	}
 
 	return (result);
 }

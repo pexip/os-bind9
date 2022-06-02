@@ -1,5 +1,16 @@
 # Doxyfile 1.4.7
 
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
+
 # This file describes the settings to be used by the documentation system
 # doxygen (www.doxygen.org) for a project
 #
@@ -463,6 +474,7 @@ INPUT                  = @BIND9_TOP_BUILDDIR@/lib/isc		\
 			 @BIND9_TOP_BUILDDIR@/lib/dns		\
 			 @BIND9_TOP_BUILDDIR@/lib/isccfg	\
 			 @BIND9_TOP_BUILDDIR@/lib/isccc		\
+			 @BIND9_TOP_BUILDDIR@/lib/ns		\
 			 @BIND9_TOP_BUILDDIR@/lib/bind9		\
 			 @BIND9_TOP_BUILDDIR@/bin/check		\
 			 @BIND9_TOP_BUILDDIR@/bin/dig		\
@@ -661,13 +673,13 @@ HTML_FILE_EXTENSION    = .html
 # each generated HTML page. If it is left blank doxygen will generate a 
 # standard header.
 
-HTML_HEADER            = isc-header.html
+HTML_HEADER            = @srcdir@/isc-header.html
 
 # The HTML_FOOTER tag can be used to specify a personal HTML footer for 
 # each generated HTML page. If it is left blank doxygen will generate a 
 # standard footer.
 
-HTML_FOOTER            = isc-footer.html
+HTML_FOOTER            = @srcdir@/isc-footer.html
 
 # The HTML_STYLESHEET tag can be used to specify a user-defined cascading 
 # style sheet that is used by each HTML page. It can be used to 

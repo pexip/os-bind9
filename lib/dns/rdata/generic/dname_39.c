@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -33,8 +35,9 @@ fromtext_dname(ARGS_FROMTEXT) {
 
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	if (origin == NULL)
+	if (origin == NULL) {
 		origin = dns_rootname;
+	}
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 	return (ISC_R_SUCCESS);
 }
@@ -72,7 +75,7 @@ fromwire_dname(ARGS_FROMWIRE) {
 	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
 
 	dns_name_init(&name, NULL);
-	return(dns_name_fromwire(&name, source, dctx, options, target));
+	return (dns_name_fromwire(&name, source, dctx, options, target));
 }
 
 static inline isc_result_t
@@ -123,7 +126,7 @@ fromstruct_dname(ARGS_FROMSTRUCT) {
 	isc_region_t region;
 
 	REQUIRE(type == dns_rdatatype_dname);
-	REQUIRE(source != NULL);
+	REQUIRE(dname != NULL);
 	REQUIRE(dname->common.rdtype == type);
 	REQUIRE(dname->common.rdclass == rdclass);
 
@@ -141,7 +144,7 @@ tostruct_dname(ARGS_TOSTRUCT) {
 	dns_name_t name;
 
 	REQUIRE(rdata->type == dns_rdatatype_dname);
-	REQUIRE(target != NULL);
+	REQUIRE(dname != NULL);
 	REQUIRE(rdata->length != 0);
 
 	dname->common.rdclass = rdata->rdclass;
@@ -161,11 +164,12 @@ static inline void
 freestruct_dname(ARGS_FREESTRUCT) {
 	dns_rdata_dname_t *dname = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(dname != NULL);
 	REQUIRE(dname->common.rdtype == dns_rdatatype_dname);
 
-	if (dname->mctx == NULL)
+	if (dname->mctx == NULL) {
 		return;
+	}
 
 	dns_name_free(&dname->dname, dname->mctx);
 	dname->mctx = NULL;
@@ -198,7 +202,6 @@ digest_dname(ARGS_DIGEST) {
 
 static inline bool
 checkowner_dname(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_dname);
 
 	UNUSED(name);
@@ -211,7 +214,6 @@ checkowner_dname(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_dname(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_dname);
 
 	UNUSED(rdata);
@@ -225,4 +227,4 @@ static inline int
 casecompare_dname(ARGS_COMPARE) {
 	return (compare_dname(rdata1, rdata2));
 }
-#endif	/* RDATA_GENERIC_DNAME_39_C */
+#endif /* RDATA_GENERIC_DNAME_39_C */

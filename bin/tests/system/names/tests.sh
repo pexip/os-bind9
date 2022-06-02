@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -29,7 +31,7 @@ cat dig.compdis.test  |grep -v ';;' |sort > dig.compdis.sorted.test
 # the compression disabled message should be at least twice as large as with
 # compression disabled, but the content should be the same
 echo_i "Checking if responses are identical other than in message size"
-diff dig.compdis.sorted.test dig.compen.sorted.test >/dev/null
+$DIFF dig.compdis.sorted.test dig.compen.sorted.test >/dev/null
 ret=$?
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`

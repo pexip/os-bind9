@@ -1,23 +1,23 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
-#include <config.h>
-
-#include <stdbool.h>
-
-#include <winsock2.h>
 #include "errno2result.h"
+#include <stdbool.h>
+#include <winsock2.h>
+
 #include <isc/result.h>
-#include <isc/strerror.h>
+#include <isc/strerr.h>
+#include <isc/string.h>
 #include <isc/util.h>
 
 /*
@@ -27,16 +27,14 @@
  * not already there.
  */
 isc_result_t
-isc__errno2resultx(int posixerrno, bool dolog,
-		   const char *file, int line)
-{
+isc__errno2resultx(int posixerrno, bool dolog, const char *file, int line) {
 	char strbuf[ISC_STRERRORSIZE];
 
 	switch (posixerrno) {
 	case ENOTDIR:
 	case WSAELOOP:
 	case WSAEINVAL:
-	case EINVAL:		/* XXX sometimes this is not for files */
+	case EINVAL: /* XXX sometimes this is not for files */
 	case ENAMETOOLONG:
 	case WSAENAMETOOLONG:
 	case EBADF:
@@ -57,11 +55,13 @@ isc__errno2resultx(int posixerrno, bool dolog,
 #ifdef EOVERFLOW
 	case EOVERFLOW:
 		return (ISC_R_RANGE);
-#endif
+#endif /* ifdef EOVERFLOW */
 	case ENFILE:
 	case EMFILE:
 	case WSAEMFILE:
 		return (ISC_R_TOOMANYOPENFILES);
+	case ENOSPC:
+		return (ISC_R_DISCFULL);
 	case ERROR_CANCELLED:
 		return (ISC_R_CANCELED);
 	case ERROR_CONNECTION_REFUSED:
@@ -101,7 +101,7 @@ isc__errno2resultx(int posixerrno, bool dolog,
 		return (ISC_R_NORESOURCES);
 	default:
 		if (dolog) {
-			isc__strerror(posixerrno, strbuf, sizeof(strbuf));
+			strerror_r(posixerrno, strbuf, sizeof(strbuf));
 			UNEXPECTED_ERROR(file, line,
 					 "unable to convert errno "
 					 "to isc_result: %d: %s",

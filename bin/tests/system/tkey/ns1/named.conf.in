@@ -1,15 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
-/* $Id: named.conf.in,v 1.10 2011/11/03 23:46:26 tbox Exp $ */
 
 controls { /* empty */ };
 
@@ -26,7 +26,6 @@ options {
 	tkey-domain "server";
 	tkey-dhkey "server" KEYID;
 	allow-query-cache { any; };
-	random-device "RANDFILE";
 };
 
 key rndc_key {
@@ -44,7 +43,7 @@ key "tkeytest." {
 };
 
 zone example {
-	type master;
+	type primary;
 	file "example.db";
 	allow-query { key tkeytest.; none; };
 };

@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef DNS_RCODE_H
 #define DNS_RCODE_H 1
@@ -21,7 +22,8 @@
 
 ISC_LANG_BEGINDECLS
 
-isc_result_t dns_rcode_fromtext(dns_rcode_t *rcodep, isc_textregion_t *source);
+isc_result_t
+dns_rcode_fromtext(dns_rcode_t *rcodep, isc_textregion_t *source);
 /*%<
  * Convert the text 'source' refers to into a DNS error value.
  *
@@ -35,7 +37,8 @@ isc_result_t dns_rcode_fromtext(dns_rcode_t *rcodep, isc_textregion_t *source);
  *\li	#DNS_R_UNKNOWN			type is unknown
  */
 
-isc_result_t dns_rcode_totext(dns_rcode_t rcode, isc_buffer_t *target);
+isc_result_t
+dns_rcode_totext(dns_rcode_t rcode, isc_buffer_t *target);
 /*%<
  * Put a textual representation of error 'rcode' into 'target'.
  *
@@ -53,8 +56,8 @@ isc_result_t dns_rcode_totext(dns_rcode_t rcode, isc_buffer_t *target);
  *\li	#ISC_R_NOSPACE			target buffer is too small
  */
 
-isc_result_t dns_tsigrcode_fromtext(dns_rcode_t *rcodep,
-				    isc_textregion_t *source);
+isc_result_t
+dns_tsigrcode_fromtext(dns_rcode_t *rcodep, isc_textregion_t *source);
 /*%<
  * Convert the text 'source' refers to into a TSIG/TKEY error value.
  *
@@ -68,7 +71,8 @@ isc_result_t dns_tsigrcode_fromtext(dns_rcode_t *rcodep,
  *\li	#DNS_R_UNKNOWN			type is unknown
  */
 
-isc_result_t dns_tsigrcode_totext(dns_rcode_t rcode, isc_buffer_t *target);
+isc_result_t
+dns_tsigrcode_totext(dns_rcode_t rcode, isc_buffer_t *target);
 /*%<
  * Put a textual representation of TSIG/TKEY error 'rcode' into 'target'.
  *

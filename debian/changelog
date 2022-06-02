@@ -1,16 +1,516 @@
+bind9 (1:9.16.27-1~deb11u1) bullseye-security; urgency=high
+
+  * New upstream version 9.16.27
+  * CVE-2022-0396: A synchronous call to closehandle_cb() caused
+    isc__nm_process_sock_buffer() to be called recursively, which in turn
+    left TCP connections hanging in the CLOSE_WAIT state blocking
+    indefinitely when out-of-order processing was disabled.
+  * CVE-2021-25220: The rules for acceptance of records into the cache
+    have been tightened to prevent the possibility of poisoning if
+    forwarders send records outside the configured bailiwick
+  * Remove patch to fix sphinx-build failure (fixed upstream)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 14 Mar 2022 15:25:15 +0100
+
+bind9 (1:9.16.22-1~deb11u1) bullseye-security; urgency=high
+
+  * New upstream version 9.16.22
+   + CVE-2021-25219: The "lame-ttl" option is now forcibly set to 0. This
+     effectively disables the lame server cache, as it could previously be
+     abused by an attacker to significantly degrade resolver performance.
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 13:29:14 +0200
+
+bind9 (1:9.16.15-1) unstable; urgency=high
+
+  * New upstream version 9.16.15 (Closes: #987741, #987742, #987743)
+   + CVE-2021-25214: A malformed incoming IXFR transfer could trigger an
+     assertion failure in ``named``, causing it to quit abnormally.
+   + CVE-2021-25215: ``named`` crashed when a DNAME record placed in the
+     ANSWER section during DNAME chasing turned out to be the final
+     answer to a client query.
+   + CVE-2021-25216: When a server's configuration set the
+    ``tkey-gssapi-keytab`` or ``tkey-gssapi-credential`` option, a
+    specially crafted GSS-TSIG query could cause a buffer overflow in
+    the ISC implementation of SPNEGO (a protocol enabling negotiation of
+    the security mechanism used for GSSAPI authentication).
+  * Add patches to implement I-D draft-hardaker-dnsop-nsec3-guidance
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 29 Apr 2021 09:11:32 +0200
+
+bind9 (1:9.16.13-1) unstable; urgency=medium
+
+  * New upstream version 9.16.13
+  * Add upstream patches to fix TCP timeouts firing too early
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Mar 2021 14:23:49 +0100
+
+bind9 (1:9.16.12-3) unstable; urgency=medium
+
+  * Add most important patches from upcoming 9.16.13 release
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 12 Mar 2021 09:59:49 +0100
+
+bind9 (1:9.16.12-2) unstable; urgency=medium
+
+  * Add patch to fix sphinx-build failure on Ubuntu Xenial
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Feb 2021 12:26:09 +0100
+
+bind9 (1:9.16.12-1) unstable; urgency=high
+
+  * New upstream version 9.16.12
+   + [CVE-2020-8625]: Fix off-by-one bug in ISC SPNEGO implementation.
+     (Closes: #983004)
+  * Adjust the bind9-libs and bind9-dev packages for new upstream library
+    names
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Feb 2021 08:13:58 +0100
+
+bind9 (1:9.16.11-3) unstable; urgency=medium
+
+  * Split the simple validation test to separate file and mark it as flaky
+    (Closes: #976045)
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 14 Feb 2021 20:04:39 +0100
+
+bind9 (1:9.16.11-2) unstable; urgency=medium
+
+  * Cherry-pick upstream commit to fix segfault with named ACLs used in
+    allow-update (Closes: #980786)
+
+ -- Bernhard Schmidt <berni@debian.org>  Fri, 29 Jan 2021 08:27:31 +0100
+
+bind9 (1:9.16.11-1) unstable; urgency=medium
+
+  * Add the ISC code-signing key for 2021-2022
+  * New upstream version 9.16.11
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Jan 2021 09:58:33 +0100
+
+bind9 (1:9.16.10-1) unstable; urgency=medium
+
+  * New upstream version 9.16.10
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Dec 2020 22:22:25 +0100
+
+bind9 (1:9.16.9-1) unstable; urgency=medium
+
+  * New upstream version 9.16.9
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 26 Nov 2020 12:52:28 +0100
+
+bind9 (1:9.16.8-1) unstable; urgency=medium
+
+  [ Ondřej Surý ]
+  * New upstream version 9.16.8
+
+  [ Bernhard Schmidt ]
+  * d/t/control:
+    - tag autopkgtest with needs-internet (Closes: #973955)
+    - depend on bind9-dnsutils insead of the transitional dnsutils
+  * d/rules: change deprecated --with-libjson-c configure argument to
+    --with-json-c
+
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 09 Nov 2020 23:03:53 +0100
+
+bind9 (1:9.16.7-1) unstable; urgency=medium
+
+  * New upstream version 9.16.7
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Sep 2020 10:36:51 +0200
+
+bind9 (1:9.16.6-3) unstable; urgency=medium
+
+  [ Ondřej Surý ]
+  * Add upstream patches to fix some rare conditions (Closes: #969448)
+
+  [ Bernhard Schmidt ]
+  * Set Restart=on-failure in systemd unit
+
+ -- Bernhard Schmidt <berni@debian.org>  Tue, 15 Sep 2020 00:26:14 +0200
+
+bind9 (1:9.16.6-2) unstable; urgency=medium
+
+  * Move Build-Depends for documentation to Build-Depends-Indep, this
+    should fix the arch-any build on s390x where xindy is not available.
+
+ -- Bernhard Schmidt <berni@debian.org>  Sat, 22 Aug 2020 20:06:00 +0200
+
+bind9 (1:9.16.6-1) unstable; urgency=medium
+
+  * New upstream version 9.16.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 Aug 2020 21:32:46 +0200
+
+bind9 (1:9.16.5-1) unstable; urgency=medium
+
+  * New upstream version 9.16.5
+  * Add fonts-freefont-otf, latexmk, texlive-fonts-recommended,
+    texlive-latex-recommended, texlive-xetex, xindy to Build-Depends
+  * Install man pages for tsig-gen and named-compilezone
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Jul 2020 00:29:57 +0200
+
+bind9 (1:9.16.4-1) unstable; urgency=medium
+
+  * New upstream version 9.16.4
+  * Update Debian packaging for sphinx-doc documentation
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 17 Jun 2020 09:27:29 +0200
+
+bind9 (1:9.16.3-1) unstable; urgency=medium
+
+  * New upstream version 9.16.3
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 19 May 2020 14:14:35 +0200
+
+bind9 (1:9.16.2-3) unstable; urgency=medium
+
+  [ Simon Deziel ]
+  * apparmor: use profile name specifier
+
+ -- Bernhard Schmidt <berni@debian.org>  Thu, 23 Apr 2020 11:45:43 +0200
+
+bind9 (1:9.16.2-2) unstable; urgency=medium
+
+  * Update gbp.conf to debian/master and upstream/latest
+  * Reintroduce the bind9-dev package (Closes: #954906)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Apr 2020 12:14:44 +0200
+
+bind9 (1:9.16.2-1) unstable; urgency=medium
+
+  * Update d/copyright (Closes: #947978)
+  * New upstream version 9.16.2 (Closes: #952946, #954919)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Apr 2020 10:07:07 +0200
+
+bind9 (1:9.16.1-2) unstable; urgency=medium
+
+  [ Andreas Hasenack ]
+  * Bring back the DEP8 test from sid
+  * Use iproute2 instead of net-tools
+  * d/control: drop hardcoded python3 dependency
+
+  [ Bernhard Schmidt ]
+  * Fix apparmor profile name.
+    Thanks to Andreas Hasenack
+  * Enable readline support
+
+  [ Andreas Hasenack ]
+  * Update apparmor profile with what is in sid
+  * Create the missing transitional packages for dnsutils, bind9utils
+  * There is a licensing conflict with adding libreadline and we should
+    use libedit-dev instead.
+
+  [ Ondřej Surý ]
+  * Add Breaks: freeipa, so the package doesn't migrate to testing before freeipa is fixed
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 22 Mar 2020 09:21:21 +0100
+
+bind9 (1:9.16.1-1) experimental; urgency=medium
+
+  * New upstream version 9.16.1
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Mar 2020 13:59:34 +0100
+
+bind9 (1:9.16.0-1) experimental; urgency=medium
+
+  * Change the branch to 9.16
+  * New upstream version 9.16.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 Feb 2020 10:54:34 +0100
+
+bind9 (1:9.15.8-1) experimental; urgency=medium
+
+  * New upstream version 9.15.8
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 23 Jan 2020 14:58:01 +0100
+
+bind9 (1:9.15.7-1) experimental; urgency=medium
+
+  * Add libuv1-dev, libcmocka-dev, libedit-dev and zlib1g-dev to B-D
+  * Update d/watch to use tar.xz
+  * New upstream version 9.15.7
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 19 Dec 2019 09:40:52 +0100
+
+bind9 (1:9.15.6-1) experimental; urgency=medium
+
+  * Remove useless patches
+  * New upstream version 9.15.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Nov 2019 21:58:06 +0100
+
+bind9 (1:9.15.5-1) experimental; urgency=medium
+
+  * New upstream version 9.15.5
+  * Install python files to dist-packages (Courtesy of Jim Popovitch)
+  * Remove GPL licensed apport file until one with better license is available
+  * Remove debian/nslookup.1
+  * Remove 4-clause BSD content from the package
+
+ -- Ondřej Surý <ondrej@sury.org>  Thu, 17 Oct 2019 08:41:55 +0200
+
+bind9 (1:9.15.4-1) unstable; urgency=medium
+
+  * New upstream version 9.15.4
+
+ -- Ondřej Surý <ondrej@sury.org>  Mon, 23 Sep 2019 11:54:32 +0200
+
+bind9 (1:9.15.3-2) unstable; urgency=medium
+
+  * Fix the section for bind9 alias in the systemd unit [GL #1193]
+
+ -- Ondřej Surý <ondrej@sury.org>  Wed, 28 Aug 2019 21:35:44 +0200
+
+bind9 (1:9.15.3-1) unstable; urgency=medium
+
+  * New upstream version 9.15.3
+  * isc-config has been removed, remove it from the debian/
+
+ -- Ondřej Surý <ondrej@sury.org>  Mon, 26 Aug 2019 10:26:41 +0200
+
+bind9 (1:9.15.2-2) unstable; urgency=medium
+
+  * Tighten libmaxminddb-dev dependency
+  * Install the tmpfile for named service again
+
+ -- Ondřej Surý <ondrej@sury.org>  Wed, 07 Aug 2019 11:11:13 +0200
+
+bind9 (1:9.15.2-1) unstable; urgency=medium
+
+  * New upstream version 9.15.2
+  * Disable old GeoIP and enable new GeoIP2
+
+ -- Ondřej Surý <ondrej@sury.org>  Thu, 18 Jul 2019 10:09:29 +0200
+
+bind9 (1:9.15.1-2) experimental; urgency=medium
+
+  * Change --with-json=/usr to --with-json-c (and use pkg-config)
+
+ -- Ondřej Surý <ondrej@sury.org>  Thu, 20 Jun 2019 00:34:27 +0200
+
+bind9 (1:9.15.1-1) experimental; urgency=medium
+
+  * New upstream version 9.15.1
+  * Rebase patches for 9.15.1
+
+ -- Ondřej Surý <ondrej@sury.org>  Thu, 20 Jun 2019 00:27:55 +0200
+
+bind9 (1:9.15.0-2) experimental; urgency=medium
+
+  * Fix Debian buster armhf build
+
+ -- Ondřej Surý <ondrej@sury.org>  Tue, 21 May 2019 20:04:34 +0200
+
+bind9 (1:9.15.0-1) experimental; urgency=medium
+
+  * Update debian/ for BIND 9.15
+  * New upstream version 9.15.0
+
+ -- Ondřej Surý <ondrej@sury.org>  Tue, 21 May 2019 13:19:38 +0200
+
+bind9 (1:9.14.2-1) experimental; urgency=medium
+
+  * Make named.service to be known as bind9.service
+  * New upstream version 9.14.2
+
+ -- Ondřej Surý <ondrej@sury.org>  Tue, 21 May 2019 13:08:43 +0200
+
+bind9 (1:9.14.1-1) experimental; urgency=medium
+
+  [ Ondřej Surý ]
+  * New upstream version 9.14.1
+  * Remove the transitional packages and only keep bind9 names as the
+    product name is 'BIND 9'
+
+  [ Bernhard Schmidt ]
+  * Update AppArmor policy for Samba AD DLZ.
+    Thanks to Steven Monai (Closes: #920530)
+  * More fixes to the AppArmor policy
+  * AppArmor policy: Allow access to /dev/urandom
+  * AppArmor: Also add /var/lib/samba/bind-dns/dns/** (Closes: #927827)
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 26 Apr 2019 08:57:57 +0000
+
+bind9 (1:9.14.0-1) experimental; urgency=medium
+
+  * New upstream version 9.14.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 22 Mar 2019 09:17:03 +0000
+
+bind9 (1:9.14.0~rc3-1) experimental; urgency=medium
+
+  * New upstream version 9.14.0~rc3
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 18 Mar 2019 12:34:17 +0000
+
+bind9 (1:9.14.0~rc2-1) experimental; urgency=medium
+
+  * New upstream version 9.14.0~rc2
+  * Plugins are now in /usr/lib/<triplet>/named/*.so
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 11 Mar 2019 12:42:47 +0000
+
+bind9 (1:9.14.0~rc1-1) experimental; urgency=medium
+
+  * Update branches for DEP-14
+  * Bump the d/watch from 9.13 -> 9.14
+  * New upstream version 9.14.0~rc1
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 01 Mar 2019 10:44:30 +0000
+
+bind9 (1:9.13.6-2) experimental; urgency=medium
+
+  * Add B/R for dnsutils
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Feb 2019 12:20:08 +0000
+
+bind9 (1:9.13.6-1) experimental; urgency=medium
+
+  [ Ondřej Surý ]
+  * New upstream version 9.13.6
+  * Add usr/share/man/man8/filter-aaaa.8 to the bind package
+  * Rename packages back to BIND 9
+  * Rename the init scripts to named to match the name of the daemon
+  * Bump to debhelper compat level 12
+  * Fix dh_install, dh_installinit and dh_installsystemd invocation for
+    debhelper-compat level 12
+  * Add new upstream GPG signing-key
+  * Disable building in subdirectory
+  * Add bind-libs transitional package to cleanly remove src:bind from the
+    archive
+  * Disable subdirectory build in dh_auto_install target
+  * Disable dh_auto_test as neither kyua (needed for unit tests) or
+    setting up virtual interfaces on lo (needed for system tests) is
+    available in Debian builds
+
+  [ Dominik George ]
+  * Support dyndb modules in apparmor.
+  * Also allow mapping from dyndb modules.
+
+  [ Bernhard Schmidt ]
+  * apparmor-policy: permit locking of the allow-new-zones database
+    (Closes: #922065)
+  * apparmor-policy: allow access to Samba DLZ files (Closes: #920530)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 18 Feb 2019 20:02:55 +0000
+
+bind (1:9.13.5-1) experimental; urgency=medium
+
+  * New upstream version 9.13.5
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 18 Dec 2018 14:50:46 +0000
+
+bind (1:9.13.4-1) experimental; urgency=medium
+
+  * Use team+dns@tracker.debian.org as Maintainer address
+  * New upstream version 9.13.4
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 22 Nov 2018 14:56:03 +0000
+
+bind (1:9.13.3-3) experimental; urgency=medium
+
+  * Remove deprecated -r /dev/urandom option from rndc invocation
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 22 Nov 2018 14:55:53 +0000
+
+bind (1:9.13.3-2) experimental; urgency=medium
+
+  * Remove --disable-static from the dh_auto_configure call
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 26 Sep 2018 10:38:05 +0000
+
+bind (1:9.13.3-1) experimental; urgency=medium
+
+  * New upstream version 9.13.3
+  * Rebase patches for BIND 9.13.3
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 10 Sep 2018 08:13:47 +0000
+
+bind (1:9.13.3~400-g47066d3d01-1) experimental; urgency=medium
+
+  * New upstream version 9.13.3~400-g47066d3d01
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 31 Aug 2018 12:47:48 +0000
+
+bind (1:9.13.3~398-g5c00162f54-1) experimental; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * Enable IDN support for dig+host using libidn2 (Closes: #459010)
+  * Use root.hints from dns-root-data (Closes: #888491)
+  * Adjust apparmor profile for dns-root-data
+  * Fix missing colon in AppArmor profile (Closes: #904983)
+  * d/watch: Properly deal with -P patch releases
+
+  [ Timo Aaltonen ]
+  * skip-rtld-deepbind-for-dyndb.diff: Add a patch to fix named-pkcs11 crashing on startup. (LP: #1769440)
+
+  [ Ondřej Surý ]
+  * New upstream version 9.13.3~398-g5c00162f54
+  * Rebase patches for new upstream snapshot release
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 31 Aug 2018 11:39:51 +0000
+
+bind (1:9.13.2-1~exp0) experimental; urgency=medium
+
+  * Don't repack, all non-free files are gone from BIND 9.13
+  * New upstream version 9.13.2
+  * Rebase patches for BIND 9.13.2
+  * Stop providing bind-dev package and checking for symbols, they are not
+    tightly coupled with rest of the package.
+  * Add docbook-xsl and docbook-xml to Build-Depends
+  * Add pkg-config to Build-Depends and cleanup versioned Build-Depends
+  * Enable dnstap support (Courtesy of Richard James Salts)
+  * Remove auth-nxdomain no; from named.conf.options (Closes: #896889)
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 17 Jul 2018 11:15:07 +0000
+
+bind (1:9.13.1+dfsg-1) experimental; urgency=medium
+
+  * New upstream version 9.13.1+dfsg
+  * d/watch: Always package the latest version
+  * d/patches: Remove 0003-Add-min-cache-ttl-and-min-ncache-ttl-keywords.patch,
+    so we less divert from upstream
+  * d/patches: Refresh patches on top of BIND 9.13.1
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Jun 2018 08:10:49 +0000
+
+bind (1:9.12.0+dfsg-1~exp1) experimental; urgency=medium
+
+  * Move to standard master/upstream/pristine-tar branching
+  * Add /etc/default/bind file to bind package
+  * Don't fail the systemd unit if /etc/default/bind doesn't exist
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 24 Jan 2018 14:16:43 +0000
+
+bind (1:9.12.0+dfsg-1~exp0) experimental; urgency=medium
+
+  * New upstream version 9.12.0+dfsg
+  * Rename bind9 to just bind, and merge all shared libraries into bind-libs.
+  * Update Vcs-* links to salsa.d.o
+  * Update d/watch and d/gbp.conf for BIND 9.12
+  * Remove export version of the libraries; we really need to deprecate ISC-DHCP in buster+1
+  * d/patches changes:
+   + Convert 02_version.diff to sed rule in d/rules
+   + Remove the extra native-pkcs11 patch that double builds everything; a solution with OpenSSL engines is far more suitable and less intrusive
+   + Remove stdatomic.h patches; already merged upstream into BIND 9.12
+   + Refresh all the other patches for BIND 9.12.0
+   + Fix the min-(n)cache-ttl patch for BIND 9.12
+  * Remove isc-hmac-fixup from bind package
+  * Remove man3 from bind-dev package as they are not installed
+  * Add dnssec-cds to bind-utils package
+  * Update missing and new symbols for BIND 9.12
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 24 Jan 2018 09:18:13 +0000
+
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u7pexip1) pexip; urgency=medium
 
   * New upstream version
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Sun, 20 Mar 2022 19:08:25 +0000
-
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u7) buster-security; urgency=high
-
-  * CVE-2021-25220: The rules for acceptance of records into the cache
-    have been tightened to prevent the possibility of poisoning if
-    forwarders send records outside the configured bailiwick.
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 14 Mar 2022 15:21:48 +0100
 
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6pexip1) pexip; urgency=medium
 
@@ -18,32 +518,11 @@ bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6pexip1) pexip; urgency=medium
 
  -- Mark Hymers <mark.hymers@pexip.com>  Fri, 29 Oct 2021 10:24:36 +0100
 
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u6) buster-security; urgency=high
-
-  * CVE-2021-25219: The "lame-ttl" option is now forcibly set to 0. This
-    effectively disables the lame server cache, as it could previously be
-    abused by an attacker to significantly degrade resolver performance.
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 13:42:31 +0200
-
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u5pexip1) pexip; urgency=medium
 
   * New upstream version
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Wed, 05 May 2021 10:22:32 +0100
-
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u5) buster-security; urgency=high
-
-  * CVE-2021-25214: A malformed incoming IXFR transfer could trigger
-    an assertion failure in ``named``, causing it to quit abnormally.
-  * CVE-2021-25215: ``named`` crashed when a DNAME record placed in
-    the ANSWER section during DNAME chasing turned out to be the final
-    answer to a client query.
-  * CVE-2021-25216: Compile with system provided SPNEGO
-  * Ensure all resources are properly cleaned up when a call to
-    gss_accept_sec_context() fails.
-
- -- Ondřej Surý <ondrej@debian.org>  Thu, 29 Apr 2021 12:42:26 +0200
 
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u3pexip1) pexip; urgency=medium
 
@@ -51,35 +530,11 @@ bind9 (1:9.11.5.P4+dfsg-5.1+deb10u3pexip1) pexip; urgency=medium
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 23 Feb 2021 09:27:38 +0000
 
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u3) buster-security; urgency=high
-
-  * Non-maintainer upload by the Security Team.
-  * Buffer overflow in GSSAPI security policy negotiation (CVE-2020-8625)
-
- -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 15 Feb 2021 08:51:28 +0100
-
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u2pexip1) pexip; urgency=medium
 
   * New upstream version
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 01 Sep 2020 11:13:37 +0100
-
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u2) buster-security; urgency=high
-
-  [ Salvatore Bonaccorso ]
-  * [CVE-2020-8622] Properly handle malformed truncated responses to TSIG
-    queries
-  * [CVE-2020-8623] Fix crash in pk11_numbits() with crafted packet when
-    native-pkcs11 is used
-  * Wait more than 1 second for NSEC3 chain changes
-  * [CVE-2020-8624] Fix processing of "update-policy" rules of type
-    "subdomain" (Closes: #966497)
-
-  [ Ondřej Surý ]
-  * [CVE-2020-8619]: It was possible to trigger a INSIST when a zone with
-    interior (non-leaf) wildcard label
-
- -- Salvatore Bonaccorso <carnil@debian.org>  Tue, 25 Aug 2020 10:10:23 +0200
 
 bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1pexip2) pexip; urgency=medium
 
@@ -94,236 +549,11 @@ bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1pexip1) pexip; urgency=medium
 
  -- Vincent Sanders <vince@pexip.com>  Mon, 08 Jun 2020 07:49:58 +0000
 
-bind9 (1:9.11.5.P4+dfsg-5.1+deb10u1) buster-security; urgency=high
-
-  * [CVE-2019-6477]: TCP-pipelined queries can bypass tcp-clients limit.
-    (Closes: #945171)
-  * [CVE-2020-8616]: Fix NXNSATTACK amplification attack on BIND 9
-  * [CVE-2020-8617]: Fix assertion failure in TSIG processing code
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 18 May 2020 10:02:41 +0200
-
 bind9 (1:9.11.5.P4+dfsg-5.1pexip1) pexip; urgency=medium
 
   * Migrate to Buster
 
  -- Vincent Sanders <vince@pexip.com>  Thu, 27 Feb 2020 22:38:34 +0000
-
-bind9 (1:9.11.5.P4+dfsg-5.1) unstable; urgency=high
-
-  * Non-maintainer upload.
-  * move item_out test inside lock in dns_dispatch_getnext() (CVE-2019-6471)
-    (Closes: #930746)
-
- -- Salvatore Bonaccorso <carnil@debian.org>  Fri, 21 Jun 2019 11:24:31 +0200
-
-bind9 (1:9.11.5.P4+dfsg-5) unstable; urgency=medium
-
-  * AppArmor: Allow /var/tmp/krb5_* (owner-only) for Samba AD DLZ.
-    Thanks to Steven Monai (Closes: 928398)
-
- -- Bernhard Schmidt <berni@debian.org>  Fri, 03 May 2019 19:44:57 +0200
-
-bind9 (1:9.11.5.P4+dfsg-4) unstable; urgency=medium
-
-  [ Bernhard Schmidt ]
-  * AppArmor: Also add /var/lib/samba/bind-dns/dns/** (Closes: #927827)
-
-  [ Ondřej Surý ]
-  * [CVE-2018-5743]: Limiting simultaneous TCP clients is ineffective
-    (Closes: #927932)
-  * Update symbols file for new symbol in libisc
-  * Enable EDDSA again, but disable broken Ed448 support (Closes: #927962)
-
- -- Ondřej Surý <ondrej@debian.org>  Fri, 26 Apr 2019 08:33:13 +0000
-
-bind9 (1:9.11.5.P4+dfsg-3) unstable; urgency=medium
-
-  * More fixes to the AppArmor policy for Samba AD DLZ
-    - allow access to /dev/urandom
-    - allow locking for dns.keytab
-    - fix path to smb.conf
-
- -- Bernhard Schmidt <berni@debian.org>  Mon, 22 Apr 2019 22:31:06 +0200
-
-bind9 (1:9.11.5.P4+dfsg-2) unstable; urgency=medium
-
-  [ Ondřej Surý ]
-  * Update d/gbp.conf for Debian Buster
-
-  [ Bernhard Schmidt ]
-  * Cherry-Pick upstream commit to prevent dnssec-keymgr from immediately
-    expiring and deleting old DNSSEC keys when being run for the first
-    time (Closes: #923984)
-  * Update AppArmor policy for Samba AD DLZ
-    - Add changed default location for named.conf
-    - Allow read/mmap on some Samba libraries
-    Thanks to Steven Monai (Closes: #920530)
-
-  [ Andreas Beckmann ]
-  * bind9.preinst: cope with ancient conffile named.conf.options
-    (Closes: #905177)
-
- -- Bernhard Schmidt <berni@debian.org>  Tue, 02 Apr 2019 21:12:50 +0200
-
-bind9 (1:9.11.5.P4+dfsg-1) unstable; urgency=high
-
-  [ Bernhard Schmidt ]
-  * New upstream version 9.11.5.P4+dfsg
-    - CVE-2018-5744: A specially crafted packet can cause named to leak memory
-    - CVE-2018-5745: An assertion failure can occur if a trust anchor rolls over
-      to an unsupported key algorithm when using managed-keys
-    - CVE-2019-6465: Controls for zone transfers might not be properly applied
-      to Dynamically Loadable Zones (DLZs) if the zones are writable.
-  * d/watch: Do not use beta or RC versions
-  * d/libdns1104.symbols: fix symbols-file-contains-debian-revision for dnstap
-    symbols
-
-  [ Ondřej Surý ]
-  * Add new upstream GPG signing-key
-
- -- Bernhard Schmidt <berni@debian.org>  Fri, 22 Feb 2019 17:54:10 +0100
-
-bind9 (1:9.11.5.P1+dfsg-2) unstable; urgency=medium
-
-  [ Dominik George ]
-  * Support dyndb modules with apparmor. (Closes: #900879)
-
-  [ Bernhard Schmidt ]
-  * apparmor-policy: permit locking of the allow-new-zones database
-    (Closes: #922065)
-  * apparmor-policy: allow access to Samba DLZ files (Closes: #920530)
-
- -- Bernhard Schmidt <berni@debian.org>  Tue, 12 Feb 2019 00:34:21 +0100
-
-bind9 (1:9.11.5.P1+dfsg-1) unstable; urgency=medium
-
-  * New upstream version 9.11.5.P1+dfsg
-
- -- Ondřej Surý <ondrej@debian.org>  Tue, 18 Dec 2018 13:59:25 +0000
-
-bind9 (1:9.11.5+dfsg-1) unstable; urgency=medium
-
-  * Use team+dns@tracker.debian.org as Maintainer address
-  * New upstream version 9.11.5+dfsg
-  * Add EXTENSIONS= to version file programmatically, not with the patch
-  * Rebase patches for BIND 9.11.5
-  * Adjust package names for new SONAMEs
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 22 Oct 2018 10:30:28 +0000
-
-bind9 (1:9.11.4.P2+dfsg-3) unstable; urgency=medium
-
-  * Also avoid OpenSSL 1.1.1 in udebs.
-    Thanks to KiBi for the hint
-  * autopkgtest: Make an external query and check for DNSSEC
-
- -- Bernhard Schmidt <berni@debian.org>  Wed, 26 Sep 2018 11:21:35 +0200
-
-bind9 (1:9.11.4.P2+dfsg-2) unstable; urgency=medium
-
-  * Temporarily disable EDDSA to relax OpenSSL version requirement
-
- -- Bernhard Schmidt <berni@debian.org>  Mon, 24 Sep 2018 11:08:15 +0200
-
-bind9 (1:9.11.4.P2+dfsg-1) unstable; urgency=medium
-
-  [ Bernhard Schmidt ]
-  * Add a very simple autopkgtest (dig @127.0.0.1)
-
-  [ Ondřej Surý ]
-  * New upstream version 9.11.4.P2+dfsg
-  * Rebase patches for BIND 9.11.4-P2
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 10 Sep 2018 08:36:06 +0000
-
-bind9 (1:9.11.4.P1+dfsg-1) unstable; urgency=medium
-
-  [ Timo Aaltonen ]
-  * skip-rtld-deepbind-for-dyndb.diff: Add a patch to fix named-pkcs11
-    crashing on startup. (LP: #1769440)
-
-  [ Bernhard Schmidt ]
-  * Add gbp.conf for pristine-tar usage
-  * d/watch: Properly deal with -P patch releases
-
-  [ Ondřej Surý ]
-  * Don't fail to start if /etc/default/bind9 doesn't exist
-  * New upstream version 9.11.4.P1+dfsg
-  * Rebase patches for BIND 9.11.4-P1
-  * Add new dst__openssleddsa_init optional symbol (it depends on OpenSSL version) (Closes: #897643)
-  * Put aside named.conf.option from stretch when upgrading (Closes: #905177)
-
- -- Ondřej Surý <ondrej@debian.org>  Fri, 31 Aug 2018 09:53:27 +0000
-
-bind9 (1:9.11.4+dfsg-4) unstable; urgency=medium
-
-  * Brown-paper-bag release :-(
-  * Fix missing colon in AppArmor profile (Closes: #904983)
-
- -- Bernhard Schmidt <berni@debian.org>  Mon, 30 Jul 2018 16:28:21 +0200
-
-bind9 (1:9.11.4+dfsg-3) unstable; urgency=medium
-
-  * Enable IDN support for dig+host using libidn2 (Closes: #459010)
-  * Use root.hints from dns-root-data (Closes: #888491)
-
- -- Bernhard Schmidt <berni@debian.org>  Sun, 29 Jul 2018 23:26:09 +0200
-
-bind9 (1:9.11.4+dfsg-2) unstable; urgency=medium
-
-  * Enable dnstap support (Courtesy of Richard James Salts) (Closes: #890483)
-  * Remove auth-nxdomain no; from named.conf.options (Closes: #896889)
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 16 Jul 2018 18:49:50 +0000
-
-bind9 (1:9.11.4+dfsg-1) unstable; urgency=medium
-
-  [ Bernhard Schmidt ]
-  * Use systemd Type=forking to signal daemon init.
-    Thanks to Elie Roudninski (Closes: #900788)
-
-  [ Ondřej Surý ]
-  * New upstream version 9.11.4+dfsg
-  * Rebase patches for 9.11.4+dfsg release
-  * Bump libdns SONAME to libdns.so.1102
-  * Add a SONAME version check early in a build process
-  * Use debian/getapi to dynamically pick soversions for dh_makeshlibs
-  * Update the symbols in libdns and libisccfg packages
-
- -- Ondřej Surý <ondrej@debian.org>  Sat, 14 Jul 2018 12:27:56 +0000
-
-bind9 (1:9.11.3+dfsg-2) unstable; urgency=medium
-
-  * [CVE-2018-5738]: Add upstream fix to close the default open recursion
-    (Closes: #901483)
-  * Change the maintainer address (Closes: #899959)
-
- -- Ondřej Surý <ondrej@debian.org>  Thu, 14 Jun 2018 13:01:47 +0000
-
-bind9 (1:9.11.3+dfsg-1) unstable; urgency=medium
-
-  [ Bernhard Schmidt ]
-  * New upstream version 9.11.3+dfsg
-    (Closes: #867570, #888463)
-    - Refresh patches
-    - Drop stdatomic.h patches applied upstream
-  * Follow SONAME bump of libdns
-  * Follow SONAME bump of libisc
-  * Add missing symbols for libisccfg160
-  * Add python3-distutils Build-Dependency
-  * Drop Priority: standard for library packages
-  * Fix apparmor profile name (Closes: #893005)
-    Thanks to Andreas Hasenack
-  * Update bind9-host description (Closes: #729561)
-  * Add flags=(attach_disconnected) to AppArmor profile to prepare
-    to use more systemd hardening options, see #863841
-  * Add myself to Uploaders
-
-  [ Ondřej Surý ]
-  * Update Vcs-* links to salsa.d.o
-
- -- Bernhard Schmidt <berni@debian.org>  Fri, 23 Mar 2018 00:09:58 +0100
 
 bind9 (1:9.11.2.P1-1) unstable; urgency=medium
 

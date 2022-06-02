@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -93,7 +95,7 @@ addr=`eval echo "$out" | cut -f1 -d'#'`
 status=`expr $status + $ret`
 
 newtest "testing DLZ driver is cleaned up on reload"
-$RNDCCMD 10.53.0.1 reload 2>&1 | sed 's/^/ns1 /' | cat_i
+rndc_reload ns1 10.53.0.1
 for i in 0 1 2 3 4 5 6 7 8 9; do
     ret=0
     grep 'dlz_example: shutting down zone example.nil' ns1/named.run > /dev/null 2>&1 || ret=1
@@ -122,6 +124,16 @@ $DIG $DIGOPTS -b 10.53.0.5 +noall +answer axfr example.nil > dig.out.example.ns1
 grep "; Transfer failed" dig.out.example.ns1.test$n > /dev/null || ret=1
 $DIG $DIGOPTS -b 10.53.0.5 +noall +answer axfr alternate.nil > dig.out.alternate.ns1.test$n
 grep "; Transfer failed" dig.out.alternate.ns1.test$n > /dev/null || ret=1
+[ "$ret" -eq 0 ] || echo_i "failed"
+status=`expr $status + $ret`
+
+newtest "testing AXFR denied based on view ACL"
+# 10.53.0.1 should be disallowed
+$DIG $DIGOPTS -b 10.53.0.1 +noall +answer axfr example.org > dig.out.example.ns1.test$n.1
+grep "; Transfer failed" dig.out.example.ns1.test$n.1 > /dev/null || ret=1
+# 10.53.0.2 should be allowed
+$DIG $DIGOPTS -b 10.53.0.2 +noall +answer axfr example.org > dig.out.example.ns1.test$n.2
+grep "; Transfer failed" dig.out.example.ns1.test$n.2 > /dev/null && ret=1
 [ "$ret" -eq 0 ] || echo_i "failed"
 status=`expr $status + $ret`
 
@@ -203,6 +215,14 @@ grep "^long.name.*A.*100.100.100.3" dig.out.ns1.test$n > /dev/null || ret=1
 grep "flags:[^;]* aa[ ;]" dig.out.ns1.test$n > /dev/null || ret=1
 lookups=`grep "lookup #.*\.not\.there" ns1/named.run | wc -l`
 [ "$lookups" -eq 1 ] || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+newtest "checking ECS data is passed to driver in clientinfo"
+$DIG $DIGOPTS +short +subnet=192.0/16 source-addr.example.nil txt > dig.out.ns1.test$n.1 || ret=1
+grep "192.0.0.0/16/0" dig.out.ns1.test$n.1 > /dev/null || ret=1
+$DIG $DIGOPTS +short source-addr.example.nil txt > dig.out.ns1.test$n.2 || ret=1
+grep "not.*present" dig.out.ns1.test$n.2 > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 

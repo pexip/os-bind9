@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Library Header Files">
@@ -26,18 +26,25 @@
     <None Include="libisc.def" />
   </ItemGroup>
   <ItemGroup>
-@IF AES
     <ClInclude Include="..\include\isc\aes.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-@END AES
     <ClInclude Include="..\include\isc\app.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\assertions.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\isc\astack.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\isc\atomic.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\isc\backtrace.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\isc\barrier.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\base32.h">
@@ -67,7 +74,7 @@
     <ClInclude Include="..\include\isc\crc64.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\entropy.h">
+    <ClInclude Include="..\include\isc\endian.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\errno.h">
@@ -100,10 +107,10 @@
     <ClInclude Include="..\include\isc\hex.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\hmacmd5.h">
+    <ClInclude Include="..\include\isc\hmac.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\hmacsha.h">
+    <ClInclude Include="..\include\isc\hp.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\ht.h">
@@ -111,9 +118,6 @@
     </ClInclude>
     <ClInclude Include="..\include\isc\httpd.h">
       <Filter>Library Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\isc\int.h">
-      <Filter>Win32 Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\interfaceiter.h">
       <Filter>Library Header Files</Filter>
@@ -145,7 +149,7 @@
     <ClInclude Include="..\include\isc\magic.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\md5.h">
+    <ClInclude Include="..\include\isc\managers.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\mem.h">
@@ -153,12 +157,6 @@
     </ClInclude>
     <ClInclude Include="..\include\isc\meminfo.h">
       <Filter>Win32 Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\isc\msgcat.h">
-      <Filter>Library Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\isc\msgs.h">
-      <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\mutexblock.h">
       <Filter>Library Header Files</Filter>
@@ -169,7 +167,7 @@
     <ClInclude Include="..\include\isc\netscope.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\ondestroy.h">
+    <ClInclude Include="..\include\isc\nonce.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\os.h">
@@ -229,10 +227,7 @@
     <ClInclude Include="..\include\isc\serial.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\isc\sha1.h">
-      <Filter>Library Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\isc\sha2.h">
+    <ClInclude Include="..\include\isc\siphash.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\sockaddr.h">
@@ -248,6 +243,9 @@
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\stdlib.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\isc\strerr.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\string.h">
@@ -271,13 +269,16 @@
     <ClInclude Include="..\include\isc\types.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\isc\url.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\isc\utf8.h">
+      <Filter>Library Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\isc\util.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\isc\version.h">
-      <Filter>Library Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\isc\xml.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
 @IF PKCS11
@@ -296,12 +297,6 @@
     <ClInclude Include="..\include\pkcs11\pkcs11.h">
       <Filter>Pkcs11 Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\pkcs11\pkcs11f.h">
-      <Filter>Pkcs11 Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\pkcs11\pkcs11t.h">
-      <Filter>Pkcs11 Header Files</Filter>
-    </ClInclude>
 @END PKCS11
     <ClInclude Include="include\isc\bind_registry.h">
       <Filter>Win32 Header Files</Filter>
@@ -316,9 +311,6 @@
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\isc\ipv6.h">
-      <Filter>Win32 Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\isc\keyboard.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\isc\mutex.h">
@@ -348,6 +340,9 @@
     <ClInclude Include="include\isc\stat.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\isc\stdatomic.h">
+      <Filter>Win32 Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\isc\stdtime.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
@@ -366,6 +361,18 @@
     <ClInclude Include="include\isc\win32os.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\entropy_private.h">
+      <Filter>Win32 Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\netmgr_p.h">
+      <Filter>Win32 Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\openssl_shim.h">
+      <Filter>Win32 Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\trampoline_p.h">
+      <Filter>Win32 Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="errno2result.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
@@ -375,18 +382,6 @@
     <ClInclude Include="unistd.h">
       <Filter>Win32 Header Files</Filter>
     </ClInclude>
-@IF PKCS11
-    <ClInclude Include="include\pkcs11\cryptoki.h">
-      <Filter>Win32 Header Files</Filter>
-    </ClInclude>
-@END PKCS11
-@IF ATOMIC
-    <ClInclude Include="include\isc\atomic.h">
-@ELSE ATOMIC
-    <ClInclude Include="..\noatomic\include\isc\atomic.h">
-@END ATOMIC
-      <Filter>Library Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\config.h">
       <Filter>Library Header Files</Filter>
     </ClInclude>
@@ -395,9 +390,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="app.c">
-      <Filter>Win32 Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="condition.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
@@ -405,9 +397,6 @@
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DLLMain.c">
-      <Filter>Win32 Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="entropy.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
     <ClCompile Include="errno.c">
@@ -426,9 +415,6 @@
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ipv6.c">
-      <Filter>Win32 Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="keyboard.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
     <ClCompile Include="meminfo.c">
@@ -458,9 +444,6 @@
     <ClCompile Include="stdtime.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="strerror.c">
-      <Filter>Win32 Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="syslog.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
@@ -481,12 +464,16 @@
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
 @END PKCS11
-@IF AES
     <ClCompile Include="..\aes.c">
       <Filter>Win32 Source Files</Filter>
     </ClCompile>
-@END AES
+    <ClCompile Include="..\app.c">
+      <Filter>Win32 Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\assertions.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\astack.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\backtrace.c">
@@ -525,6 +512,9 @@
     <ClCompile Include="..\event.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\entropy.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\hash.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
@@ -534,25 +524,16 @@
     <ClCompile Include="..\hex.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\hmacmd5.c">
+    <ClCompile Include="..\hmac.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\hmacsha.c">
+    <ClCompile Include="..\hp.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\ht.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\httpd.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\inet_aton.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\inet_ntop.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\inet_pton.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\iterated_hash.c">
@@ -570,13 +551,10 @@
     <ClCompile Include="..\log.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\md5.c">
+    <ClCompile Include="..\managers.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\mem.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\nls\msgcat.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\mutexblock.c">
@@ -585,10 +563,31 @@
     <ClCompile Include="..\netaddr.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\netmgr\netmgr.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\netmgr\tcp.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\netmgr\udp.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\netmgr\uverr2result.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\netmgr\uv-compat.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\netmgr\tcpdns.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\netscope.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\ondestroy.c">
+    <ClCompile Include="..\nonce.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\openssl_shim.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\parseint.c">
@@ -598,6 +597,9 @@
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\portset.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\queue.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\quota.c">
@@ -610,9 +612,6 @@
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\ratelimiter.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\refcount.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\regex.c">
@@ -633,10 +632,7 @@
     <ClCompile Include="..\serial.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\sha1.c">
-      <Filter>Library Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\sha2.c">
+    <ClCompile Include="..\siphash.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\sockaddr.c">
@@ -660,7 +656,19 @@
     <ClCompile Include="..\timer.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\tls.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\trampoline.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\tm.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\url.c">
+      <Filter>Library Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\utf8.c">
       <Filter>Library Source Files</Filter>
     </ClCompile>
 @IF PKCS11

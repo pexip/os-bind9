@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -18,7 +20,7 @@ do
 	echo_i "checking $db ($n)"
 	ret=0
 	case $db in
-	zones/good-gc-msdcs.db)
+	zones/good-gc-msdcs.db|zones/good-spf-exception.db)
 		$CHECKZONE -k fail -i local example $db > test.out.$n 2>&1 || ret=1
 		;;
 	zones/good-dns-sd-reverse.db)
@@ -36,15 +38,16 @@ done
 for db in zones/bad*.db
 do
 	echo_i "checking $db ($n)"
-	ret=0
+	ret=0 v=0
 	case $db in
-	zones/bad-dns-sd-reverse.db)
-		$CHECKZONE -k fail -i local 0.0.0.0.in-addr.arpa $db > test.out.$n 2>&1 && ret=1
+	zones/bad-dns-sd-reverse.db|zones/bad-svcb-servername.db)
+		$CHECKZONE -k fail -i local 0.0.0.0.in-addr.arpa $db > test.out.$n 2>&1 || v=$?
 		;;
 	*)
-                $CHECKZONE -i local example $db > test.out.$n 2>&1 && ret=1
+                $CHECKZONE -i local example $db > test.out.$n 2>&1 || v=$?
 		;;
 	esac
+	test $v = 1 || ret=1
 	n=`expr $n + 1`
 	if [ $ret != 0 ]; then echo_i "failed"; fi
 	status=`expr $status + $ret`

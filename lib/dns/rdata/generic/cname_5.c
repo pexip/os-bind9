@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -32,8 +34,9 @@ fromtext_cname(ARGS_FROMTEXT) {
 
 	dns_name_init(&name, NULL);
 	buffer_fromregion(&buffer, &token.value.as_region);
-	if (origin == NULL)
+	if (origin == NULL) {
 		origin = dns_rootname;
+	}
 	RETTOK(dns_name_fromtext(&name, &buffer, origin, options, target));
 	return (ISC_R_SUCCESS);
 }
@@ -123,7 +126,7 @@ fromstruct_cname(ARGS_FROMSTRUCT) {
 	isc_region_t region;
 
 	REQUIRE(type == dns_rdatatype_cname);
-	REQUIRE(source != NULL);
+	REQUIRE(cname != NULL);
 	REQUIRE(cname->common.rdtype == type);
 	REQUIRE(cname->common.rdclass == rdclass);
 
@@ -141,7 +144,7 @@ tostruct_cname(ARGS_TOSTRUCT) {
 	dns_name_t name;
 
 	REQUIRE(rdata->type == dns_rdatatype_cname);
-	REQUIRE(target != NULL);
+	REQUIRE(cname != NULL);
 	REQUIRE(rdata->length != 0);
 
 	cname->common.rdclass = rdata->rdclass;
@@ -161,10 +164,11 @@ static inline void
 freestruct_cname(ARGS_FREESTRUCT) {
 	dns_rdata_cname_t *cname = source;
 
-	REQUIRE(source != NULL);
+	REQUIRE(cname != NULL);
 
-	if (cname->mctx == NULL)
+	if (cname->mctx == NULL) {
 		return;
+	}
 
 	dns_name_free(&cname->cname, cname->mctx);
 	cname->mctx = NULL;
@@ -197,7 +201,6 @@ digest_cname(ARGS_DIGEST) {
 
 static inline bool
 checkowner_cname(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_cname);
 
 	UNUSED(name);
@@ -210,7 +213,6 @@ checkowner_cname(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_cname(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_cname);
 
 	UNUSED(rdata);
@@ -225,4 +227,4 @@ casecompare_cname(ARGS_COMPARE) {
 	return (compare_cname(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_CNAME_5_C */
+#endif /* RDATA_GENERIC_CNAME_5_C */

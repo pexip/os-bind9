@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
+ */
+
+/*
+ * Copyright (C) Red Hat
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND AUTHORS DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
  * Driver API implementation and main entry point for BIND.
  *
  * BIND calls dyndb_version() before loading, dyndb_init() during startup
@@ -11,16 +40,12 @@
  * each section even if they reference the same driver/library. It is
  * up to driver implementation to detect and catch this situation if
  * it is undesirable.
- *
- * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
  */
-
-#include <config.h>
 
 #include <isc/commandline.h>
 #include <isc/hash.h>
-#include <isc/mem.h>
 #include <isc/lib.h>
+#include <isc/mem.h>
 #include <isc/util.h>
 
 #include <dns/db.h>
@@ -29,8 +54,8 @@
 #include <dns/types.h>
 
 #include "db.h"
-#include "log.h"
 #include "instance.h"
+#include "log.h"
 #include "util.h"
 
 dns_dyndb_destroy_t dyndb_destroy;
@@ -59,9 +84,8 @@ dns_dyndb_version_t dyndb_version;
  */
 isc_result_t
 dyndb_init(isc_mem_t *mctx, const char *name, const char *parameters,
-	   const char *file, unsigned long line,
-	   const dns_dyndbctx_t *dctx, void **instp)
-{
+	   const char *file, unsigned long line, const dns_dyndbctx_t *dctx,
+	   void **instp) {
 	isc_result_t result;
 	unsigned int argc;
 	char **argv = NULL;
@@ -74,46 +98,60 @@ dyndb_init(isc_mem_t *mctx, const char *name, const char *parameters,
 	/*
 	 * Depending on how dlopen() was called, we may not have
 	 * access to named's global namespace, in which case we need
-	 * to initialize libisc/libdns
+	 * to initialize libisc/libdns. We check this by comparing
+	 * the value of isc_mem_debugging to the value passed via
+	 * the context object.
 	 */
-	if (dctx->refvar != &isc_bind9) {
+	if (dctx->memdebug != &isc_mem_debugging) {
 		isc_lib_register();
 		isc_log_setcontext(dctx->lctx);
 		dns_log_setcontext(dctx->lctx);
+		isc_hash_set_initializer(dctx->hashinit);
+		isc_mem_debugging = *(unsigned int *)dctx->memdebug;
 	}
-
-	isc_hash_set_initializer(dctx->hashinit);
 
 	s = isc_mem_strdup(mctx, parameters);
-	if (s == NULL) {
-		result = ISC_R_NOMEMORY;
+
+	result = isc_commandline_strtoargv(mctx, s, &argc, &argv, 0);
+	if (result != ISC_R_SUCCESS) {
+		log_write(ISC_LOG_ERROR,
+			  "dyndb_init: isc_commandline_strtoargv -> %s\n",
+			  isc_result_totext(result));
 		goto cleanup;
 	}
 
-	result = isc_commandline_strtoargv(mctx, s, &argc, &argv, 0);
-	if (result != ISC_R_SUCCESS)
-		goto cleanup;
-
-	log_write(ISC_LOG_DEBUG(9),
-		  "loading params for dyndb '%s' from %s:%lu",
+	log_write(ISC_LOG_DEBUG(9), "loading params for dyndb '%s' from %s:%lu",
 		  name, file, line);
 
 	/* Finally, create the instance. */
-	CHECK(new_sample_instance(mctx, name, argc, argv, dctx, &sample_inst));
+	result = new_sample_instance(mctx, name, argc, argv, dctx,
+				     &sample_inst);
+	if (result != ISC_R_SUCCESS) {
+		log_write(ISC_LOG_ERROR,
+			  "dyndb_init: new_sample_instance -> %s\n",
+			  isc_result_totext(result));
+		goto cleanup;
+	}
 
 	/*
 	 * This is an example so we create and load zones
 	 * right now.  This step can be arbitrarily postponed.
 	 */
-	CHECK(load_sample_instance_zones(sample_inst));
+	result = load_sample_instance_zones(sample_inst);
+	if (result != ISC_R_SUCCESS) {
+		log_write(ISC_LOG_ERROR,
+			  "dyndb_init: load_sample_instance_zones -> %s\n",
+			  isc_result_totext(result));
+		goto cleanup;
+	}
 
 	*instp = sample_inst;
 
- cleanup:
-	if (s != NULL)
-		isc_mem_free(mctx, s);
-	if (argv != NULL)
+cleanup:
+	isc_mem_free(mctx, s);
+	if (argv != NULL) {
 		isc_mem_put(mctx, argv, argc * sizeof(*argv));
+	}
 
 	return (result);
 }
@@ -131,7 +169,7 @@ dyndb_destroy(void **instp) {
 
 /*
  * Driver version is called when loading the driver to ensure there
- * is no API mismatch betwen the driver and the caller.
+ * is no API mismatch between the driver and the caller.
  */
 int
 dyndb_version(unsigned int *flags) {

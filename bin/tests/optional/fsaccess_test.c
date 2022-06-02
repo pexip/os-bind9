@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -11,14 +13,11 @@
 
 /*! \file */
 
-#include <config.h>
-
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-
-#include <sys/types.h>		/* Non-portable. */
-#include <sys/stat.h>		/* Non-portable. */
+#include <sys/stat.h>  /* Non-portable. */
+#include <sys/types.h> /* Non-portable. */
 
 #include <isc/fsaccess.h>
 #include <isc/print.h>
@@ -52,8 +51,7 @@ main(void) {
 	access = 0;
 
 	isc_fsaccess_add(ISC_FSACCESS_OWNER | ISC_FSACCESS_GROUP,
-			 ISC_FSACCESS_READ | ISC_FSACCESS_WRITE,
-			 &access);
+			 ISC_FSACCESS_READ | ISC_FSACCESS_WRITE, &access);
 
 	printf("fsaccess=%u\n", access);
 
@@ -62,8 +60,9 @@ main(void) {
 	printf("fsaccess=%u\n", access);
 
 	result = isc_fsaccess_set(PATH, access);
-	if (result != ISC_R_SUCCESS)
+	if (result != ISC_R_SUCCESS) {
 		fprintf(stderr, "result = %s\n", isc_result_totext(result));
+	}
 	(void)fclose(fp);
 
 	return (0);

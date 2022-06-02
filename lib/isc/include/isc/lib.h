@@ -1,33 +1,24 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
-#ifndef ISC_LIB_H
-#define ISC_LIB_H 1
+#pragma once
 
 /*! \file isc/lib.h */
 
-#include <isc/types.h>
 #include <isc/lang.h>
+#include <isc/types.h>
 
 ISC_LANG_BEGINDECLS
-
-LIBISC_EXTERNAL_DATA extern isc_msgcat_t *isc_msgcat;
-
-void
-isc_lib_initmsgcat(void);
-/*!<
- * \brief Initialize the ISC library's message catalog, isc_msgcat, if it
- * has not already been initialized.
- */
 
 void
 isc_lib_register(void);
@@ -38,6 +29,19 @@ isc_lib_register(void);
  * function very early in main().
  */
 
-ISC_LANG_ENDDECLS
+#ifdef WIN32
+int
+isc_lib_ntservice(int(WINAPI *mainfunc)(int argc, char *argv[]), int argc,
+		  char *argv[]);
+/*!<
+ * \brief Execute a special routine needed when running as a Windows Service.
+ */
+#endif /* ifdef WIN32 */
 
-#endif /* ISC_LIB_H */
+extern void
+isc_enable_constructors(void);
+/*!<
+ * \brief Enable constructor linkage in non-libtool static builds.
+ */
+
+ISC_LANG_ENDDECLS

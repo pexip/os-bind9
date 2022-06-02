@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 /*! \file
  * \brief
@@ -26,20 +27,21 @@
 #ifndef DNS_GEN_UNIX_H
 #define DNS_GEN_UNIX_H 1
 
-#include <sys/types.h>          /* Required on some systems for dirent.h. */
-
 #include <dirent.h>
+#include <errno.h>
 #include <stdbool.h>
-#include <unistd.h>		/* XXXDCL Required for ?. */
+#include <stdlib.h>
+#include <sys/types.h> /* Required on some systems for dirent.h. */
+#include <unistd.h>    /* XXXDCL Required for ?. */
 
 #include <isc/lang.h>
 
 #ifdef NEED_OPTARG
 extern char *optarg;
-#endif
+#endif /* ifdef NEED_OPTARG */
 
-#define isc_commandline_parse		getopt
-#define isc_commandline_argument 	optarg
+#define isc_commandline_parse	 getopt
+#define isc_commandline_argument optarg
 
 typedef struct {
 	DIR *handle;
@@ -52,11 +54,11 @@ static bool
 start_directory(const char *path, isc_dir_t *dir) {
 	dir->handle = opendir(path);
 
-	if (dir->handle != NULL)
+	if (dir->handle != NULL) {
 		return (true);
-	else
+	} else {
 		return (false);
-
+	}
 }
 
 static bool
@@ -66,21 +68,29 @@ next_file(isc_dir_t *dir) {
 	dir->filename = NULL;
 
 	if (dir->handle != NULL) {
+		errno = 0;
 		dirent = readdir(dir->handle);
-		if (dirent != NULL)
+		if (dirent != NULL) {
 			dir->filename = dirent->d_name;
+		} else {
+			if (errno != 0) {
+				exit(1);
+			}
+		}
 	}
 
-	if (dir->filename != NULL)
+	if (dir->filename != NULL) {
 		return (true);
-	else
+	} else {
 		return (false);
+	}
 }
 
 static void
 end_directory(isc_dir_t *dir) {
-	if (dir->handle != NULL)
+	if (dir->handle != NULL) {
 		(void)closedir(dir->handle);
+	}
 
 	dir->handle = NULL;
 }

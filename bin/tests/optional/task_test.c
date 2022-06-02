@@ -1,19 +1,20 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-#include <config.h>
-
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <isc/managers.h>
 #include <isc/mem.h>
 #include <isc/print.h>
 #include <isc/task.h>
@@ -29,8 +30,9 @@ my_callback(isc_task_t *task, isc_event_t *event) {
 	char *name = event->ev_arg;
 
 	j = 0;
-	for (i = 0; i < 1000000; i++)
+	for (i = 0; i < 1000000; i++) {
 		j += 100;
+	}
 	printf("task %s (%p): %d\n", name, task, j);
 	isc_event_free(&event);
 }
@@ -60,7 +62,8 @@ static char bar[] = "bar";
 
 int
 main(int argc, char *argv[]) {
-	isc_taskmgr_t *manager = NULL;
+	isc_nm_t *netmgr = NULL;
+	isc_taskmgr_t *taskmgr = NULL;
 	isc_task_t *t1 = NULL, *t2 = NULL;
 	isc_task_t *t3 = NULL, *t4 = NULL;
 	isc_event_t *event;
@@ -71,23 +74,26 @@ main(int argc, char *argv[]) {
 
 	if (argc > 1) {
 		workers = atoi(argv[1]);
-		if (workers < 1)
+		if (workers < 1) {
 			workers = 1;
-		if (workers > 8192)
+		}
+		if (workers > 8192) {
 			workers = 8192;
-	} else
+		}
+	} else {
 		workers = 2;
+	}
 	printf("%u workers\n", workers);
 
-	RUNTIME_CHECK(isc_mem_create(0, 0, &mctx) == ISC_R_SUCCESS);
+	isc_mem_create(&mctx);
 
-	RUNTIME_CHECK(isc_taskmgr_create(mctx, workers, 0, &manager) ==
-		      ISC_R_SUCCESS);
+	RUNTIME_CHECK(isc_managers_create(mctx, workers, 0, &netmgr,
+					  &taskmgr) == ISC_R_SUCCESS);
 
-	RUNTIME_CHECK(isc_task_create(manager, 0, &t1) == ISC_R_SUCCESS);
-	RUNTIME_CHECK(isc_task_create(manager, 0, &t2) == ISC_R_SUCCESS);
-	RUNTIME_CHECK(isc_task_create(manager, 0, &t3) == ISC_R_SUCCESS);
-	RUNTIME_CHECK(isc_task_create(manager, 0, &t4) == ISC_R_SUCCESS);
+	RUNTIME_CHECK(isc_task_create(taskmgr, 0, &t1) == ISC_R_SUCCESS);
+	RUNTIME_CHECK(isc_task_create(taskmgr, 0, &t2) == ISC_R_SUCCESS);
+	RUNTIME_CHECK(isc_task_create(taskmgr, 0, &t3) == ISC_R_SUCCESS);
+	RUNTIME_CHECK(isc_task_create(taskmgr, 0, &t4) == ISC_R_SUCCESS);
 
 	RUNTIME_CHECK(isc_task_onshutdown(t1, my_shutdown, one) ==
 		      ISC_R_SUCCESS);
@@ -104,22 +110,22 @@ main(int argc, char *argv[]) {
 
 	isc_interval_set(&interval, 1, 0);
 	RUNTIME_CHECK(isc_timer_create(timgr, isc_timertype_ticker, NULL,
-				       &interval, t1, my_tick, foo, &ti1) ==
-		      ISC_R_SUCCESS);
+				       &interval, t1, my_tick, foo,
+				       &ti1) == ISC_R_SUCCESS);
 
 	ti2 = NULL;
 	isc_interval_set(&interval, 1, 0);
 	RUNTIME_CHECK(isc_timer_create(timgr, isc_timertype_ticker, NULL,
-				       &interval, t2, my_tick, bar, &ti2) ==
-		      ISC_R_SUCCESS);
+				       &interval, t2, my_tick, bar,
+				       &ti2) == ISC_R_SUCCESS);
 
 	printf("task 1 = %p\n", t1);
 	printf("task 2 = %p\n", t2);
 #ifndef WIN32
 	sleep(2);
-#else
+#else  /* ifndef WIN32 */
 	Sleep(2000);
-#endif
+#endif /* ifndef WIN32 */
 
 	/*
 	 * Note:  (void *)1 is used as a sender here, since some compilers
@@ -174,9 +180,7 @@ main(int argc, char *argv[]) {
 	event = isc_event_allocate(mctx, (void *)1, 1, my_callback, four,
 				   sizeof(*event));
 	isc_task_send(t4, &event);
-	isc_task_purgerange(t3,
-			    NULL,
-			    ISC_EVENTTYPE_FIRSTEVENT,
+	isc_task_purgerange(t3, NULL, ISC_EVENTTYPE_FIRSTEVENT,
 			    ISC_EVENTTYPE_LASTEVENT, NULL);
 
 	isc_task_detach(&t1);
@@ -186,14 +190,14 @@ main(int argc, char *argv[]) {
 
 #ifndef WIN32
 	sleep(10);
-#else
+#else  /* ifndef WIN32 */
 	Sleep(10000);
-#endif
+#endif /* ifndef WIN32 */
 	printf("destroy\n");
 	isc_timer_detach(&ti1);
 	isc_timer_detach(&ti2);
 	isc_timermgr_destroy(&timgr);
-	isc_taskmgr_destroy(&manager);
+	isc_managers_destroy(&netmgr, &taskmgr);
 	printf("destroyed\n");
 
 	isc_mem_stats(mctx, stdout);

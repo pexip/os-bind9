@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -102,7 +104,7 @@ grep "1st sub test data" dig.out.ns2.test1.$n > /dev/null || ret=1
 # temporarily disable the the parent zone
 copy_setports ns3/named.conf.in tmp
 sed 's/EXAMPLE_ZONE_PLACEHOLDER//' tmp > ns3/named.conf
-$RNDCCMD 10.53.0.3 reload 2>&1 | sed 's/^/ns3 /' | cat_i
+rndc_reload ns3 10.53.0.3
 # query the child zone again.  this should directly go to the child and
 # succeed.
 for i in 0 1 2 3 4 5 6 7 8 9
@@ -115,7 +117,7 @@ grep "2nd sub test data" dig.out.ns2.test2.$n > /dev/null || ret=1
 # re-enable the parent
 copy_setports ns3/named.conf.in tmp
 sed 's/EXAMPLE_ZONE_PLACEHOLDER/zone "example" { type master; file "example.db.signed"; };/' tmp > ns3/named.conf
-$RNDCCMD 10.53.0.3 reload 2>&1 | sed 's/^/ns3 /' | cat_i
+rndc_reload ns3 10.53.0.3
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -128,7 +130,7 @@ grep "10.53.0.4" dig.out.ns2.test1.$n > /dev/null || ret=1
 $DIG $DIGOPTS +tcp example. @10.53.0.2 aaaa > dig.out.ns2.test2.$n || ret=1
 grep "::1" dig.out.ns2.test2.$n > /dev/null || ret=1
 # reload the server.  this will flush the ADB.
-$RNDCCMD 10.53.0.2 reload 2>&1 | sed 's/^/ns2 /' | cat_i
+rndc_reload ns2 10.53.0.2
 # ask another RR that would require delegation.  static-stub configuration
 # should still be used instead of the authoritative A/AAAA cached above.
 $DIG $DIGOPTS +tcp data3.example. @10.53.0.2 txt > dig.out.ns2.test3.$n || ret=1
@@ -160,7 +162,7 @@ n=`expr $n + 1`
 # Note: for a short term workaround we use ::1, assuming it's configured and
 # usable for our tests.  We should eventually use the test ULA and available
 # checks introduced in change 2916.
-if $TESTSOCK6 ../testsock6.pl ::1 2> /dev/null
+if testsock6 ::1
 then
     echo_i "checking IPv6 static-stub address ($n)"
     ret=0
@@ -190,13 +192,13 @@ grep "3rd sub test data" dig.out.ns2.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
-# reload with a different name server: exisitng zone shouldn't be reused.
+# reload with a different name server: existing zone shouldn't be reused.
 n=`expr $n + 1`
 echo_i "checking server reload with a different static-stub config ($n)"
 ret=0
 copy_setports ns2/named.conf.in tmp
 sed 's/SERVER_CONFIG_PLACEHOLDER/server-addresses { 10.53.0.4; };/' tmp > ns2/named.conf
-$RNDCCMD 10.53.0.2 reload 2>&1 | sed 's/^/ns2 /' | cat_i
+rndc_reload ns2 10.53.0.2
 $DIG $DIGOPTS +tcp data2.example.org. @10.53.0.2 txt > dig.out.ns2.test$n || ret=1
 grep "2nd example org data" dig.out.ns2.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi

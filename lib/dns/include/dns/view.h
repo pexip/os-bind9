@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -13,8 +15,8 @@
 #define DNS_VIEW_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/view.h
  * \brief
@@ -52,13 +54,13 @@
  *\li	None.
  */
 
-#include <stdio.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdio.h>
 
+#include <isc/event.h>
 #include <isc/lang.h>
 #include <isc/magic.h>
-#include <isc/event.h>
 #include <isc/mutex.h>
 #include <isc/net.h>
 #include <isc/refcount.h>
@@ -70,9 +72,9 @@
 #include <dns/clientinfo.h>
 #include <dns/dnstap.h>
 #include <dns/fixedname.h>
-#include <dns/rrl.h>
 #include <dns/rdatastruct.h>
 #include <dns/rpz.h>
+#include <dns/rrl.h>
 #include <dns/types.h>
 #include <dns/zt.h>
 
@@ -80,133 +82,136 @@ ISC_LANG_BEGINDECLS
 
 struct dns_view {
 	/* Unlocked. */
-	unsigned int			magic;
-	isc_mem_t *			mctx;
-	dns_rdataclass_t		rdclass;
-	char *				name;
-	dns_zt_t *			zonetable;
-	dns_resolver_t *		resolver;
-	dns_adb_t *			adb;
-	dns_requestmgr_t *		requestmgr;
-	dns_acache_t *			acache;
-	dns_cache_t *			cache;
-	dns_db_t *			cachedb;
-	dns_db_t *			hints;
+	unsigned int	  magic;
+	isc_mem_t	  *mctx;
+	dns_rdataclass_t  rdclass;
+	char	     *name;
+	dns_zt_t	 *zonetable;
+	dns_resolver_t   *resolver;
+	dns_adb_t	  *adb;
+	dns_requestmgr_t *requestmgr;
+	dns_cache_t	    *cache;
+	dns_db_t	 *cachedb;
+	dns_db_t	 *hints;
 
 	/*
 	 * security roots and negative trust anchors.
 	 * internal use only; access via * dns_view_getsecroots()
 	 */
-	dns_keytable_t *		secroots_priv;
-	dns_ntatable_t *		ntatable_priv;
+	dns_keytable_t *secroots_priv;
+	dns_ntatable_t *ntatable_priv;
 
-	isc_mutex_t			lock;
-	bool			frozen;
-	isc_task_t *			task;
-	isc_event_t			resevent;
-	isc_event_t			adbevent;
-	isc_event_t			reqevent;
-	isc_stats_t *			adbstats;
-	isc_stats_t *			resstats;
-	dns_stats_t *			resquerystats;
-	bool			cacheshared;
+	isc_mutex_t  lock;
+	bool	     frozen;
+	isc_task_t  *task;
+	isc_event_t  resevent;
+	isc_event_t  adbevent;
+	isc_event_t  reqevent;
+	isc_stats_t *adbstats;
+	isc_stats_t *resstats;
+	dns_stats_t *resquerystats;
+	bool	     cacheshared;
 
 	/* Configurable data. */
-	dns_tsig_keyring_t *		statickeys;
-	dns_tsig_keyring_t *		dynamickeys;
-	dns_peerlist_t *		peers;
-	dns_order_t *			order;
-	dns_fwdtable_t *		fwdtable;
-	bool			recursion;
-	bool			auth_nxdomain;
-	bool			additionalfromcache;
-	bool			additionalfromauth;
-	bool			minimal_any;
-	dns_minimaltype_t		minimalresponses;
-	bool			enablednssec;
-	bool			enablevalidation;
-	bool			acceptexpired;
-	bool			requireservercookie;
-	bool			trust_anchor_telemetry;
-	bool			root_key_sentinel;
-	dns_transfer_format_t		transfer_format;
-	dns_acl_t *			cacheacl;
-	dns_acl_t *			cacheonacl;
-	dns_acl_t *			queryacl;
-	dns_acl_t *			queryonacl;
-	dns_acl_t *			recursionacl;
-	dns_acl_t *			recursiononacl;
-	dns_acl_t *			sortlist;
-	dns_acl_t *			notifyacl;
-	dns_acl_t *			transferacl;
-	dns_acl_t *			updateacl;
-	dns_acl_t *			upfwdacl;
-	dns_acl_t *			denyansweracl;
-	dns_acl_t *			nocasecompress;
-	bool			msgcompression;
-	dns_rbt_t *			answeracl_exclude;
-	dns_rbt_t *			denyanswernames;
-	dns_rbt_t *			answernames_exclude;
-	dns_rrl_t *			rrl;
-	bool			provideixfr;
-	bool			requestnsid;
-	bool			sendcookie;
-	dns_ttl_t			maxcachettl;
-	dns_ttl_t			maxncachettl;
-	uint32_t			nta_lifetime;
-	uint32_t			nta_recheck;
-	char				*nta_file;
-	dns_ttl_t			prefetch_trigger;
-	dns_ttl_t			prefetch_eligible;
-	in_port_t			dstport;
-	dns_aclenv_t			aclenv;
-	dns_rdatatype_t			preferred_glue;
-	bool			flush;
-	dns_namelist_t *		delonly;
-	bool			rootdelonly;
-	dns_namelist_t *		rootexclude;
-	bool			checknames;
-	dns_name_t *			dlv;
-	dns_fixedname_t			dlv_fixed;
-	uint16_t			maxudp;
-	uint16_t			nocookieudp;
-	unsigned int			maxbits;
-	dns_aaaa_t			v4_aaaa;
-	dns_aaaa_t			v6_aaaa;
-	dns_acl_t *			aaaa_acl;
-	dns_dns64list_t 		dns64;
-	unsigned int 			dns64cnt;
-	dns_rpz_zones_t			*rpzs;
-	dns_catz_zones_t		*catzs;
-	dns_dlzdblist_t 		dlz_searched;
-	dns_dlzdblist_t 		dlz_unsearched;
-	uint32_t			fail_ttl;
-	dns_badcache_t			*failcache;
+	dns_tsig_keyring_t   *statickeys;
+	dns_tsig_keyring_t   *dynamickeys;
+	dns_peerlist_t       *peers;
+	dns_order_t	    *order;
+	dns_fwdtable_t       *fwdtable;
+	bool		      recursion;
+	bool		      qminimization;
+	bool		      qmin_strict;
+	bool		      auth_nxdomain;
+	bool		      use_glue_cache;
+	bool		      minimal_any;
+	dns_minimaltype_t     minimalresponses;
+	bool		      enablevalidation;
+	bool		      acceptexpired;
+	bool		      requireservercookie;
+	bool		      synthfromdnssec;
+	bool		      trust_anchor_telemetry;
+	bool		      root_key_sentinel;
+	dns_transfer_format_t transfer_format;
+	dns_acl_t		  *cacheacl;
+	dns_acl_t		  *cacheonacl;
+	dns_acl_t		  *queryacl;
+	dns_acl_t		  *queryonacl;
+	dns_acl_t		  *recursionacl;
+	dns_acl_t		  *recursiononacl;
+	dns_acl_t		  *sortlist;
+	dns_acl_t		  *notifyacl;
+	dns_acl_t		  *transferacl;
+	dns_acl_t		  *updateacl;
+	dns_acl_t		  *upfwdacl;
+	dns_acl_t		  *denyansweracl;
+	dns_acl_t		  *nocasecompress;
+	bool		      msgcompression;
+	dns_rbt_t		  *answeracl_exclude;
+	dns_rbt_t		  *denyanswernames;
+	dns_rbt_t		  *answernames_exclude;
+	dns_rrl_t		  *rrl;
+	bool		      provideixfr;
+	bool		      requestnsid;
+	bool		      sendcookie;
+	dns_ttl_t	      maxcachettl;
+	dns_ttl_t	      maxncachettl;
+	dns_ttl_t	      mincachettl;
+	dns_ttl_t	      minncachettl;
+	uint32_t	      nta_lifetime;
+	uint32_t	      nta_recheck;
+	char		     *nta_file;
+	dns_ttl_t	      prefetch_trigger;
+	dns_ttl_t	      prefetch_eligible;
+	in_port_t	      dstport;
+	dns_aclenv_t	      aclenv;
+	dns_rdatatype_t	      preferred_glue;
+	bool		      flush;
+	dns_namelist_t       *delonly;
+	bool		      rootdelonly;
+	dns_namelist_t       *rootexclude;
+	bool		      checknames;
+	uint16_t	      maxudp;
+	dns_ttl_t	      staleanswerttl;
+	dns_stale_answer_t    staleanswersok;	  /* rndc setting */
+	bool		      staleanswersenable; /* named.conf setting
+						   * */
+	uint32_t	  staleanswerclienttimeout;
+	uint16_t	  nocookieudp;
+	uint16_t	  padding;
+	dns_acl_t	  *pad_acl;
+	unsigned int	  maxbits;
+	dns_dns64list_t	  dns64;
+	unsigned int	  dns64cnt;
+	dns_rpz_zones_t	*rpzs;
+	dns_catz_zones_t *catzs;
+	dns_dlzdblist_t	  dlz_searched;
+	dns_dlzdblist_t	  dlz_unsearched;
+	uint32_t	  fail_ttl;
+	dns_badcache_t   *failcache;
 
 	/*
 	 * Configurable data for server use only,
 	 * locked by server configuration lock.
 	 */
-	dns_acl_t *			matchclients;
-	dns_acl_t *			matchdestinations;
-	bool			matchrecursiveonly;
+	dns_acl_t *matchclients;
+	dns_acl_t *matchdestinations;
+	bool	   matchrecursiveonly;
 
 	/* Locked by themselves. */
-	isc_refcount_t			references;
+	isc_refcount_t	     references;
+	isc_refcount_t	     weakrefs;
+	atomic_uint_fast32_t attributes;
 
-	/* Locked by lock. */
-	unsigned int			weakrefs;
-	unsigned int			attributes;
 	/* Under owner's locking control. */
-	ISC_LINK(struct dns_view)	link;
-	dns_viewlist_t *		viewlist;
+	ISC_LINK(struct dns_view) link;
+	dns_viewlist_t *viewlist;
 
-	dns_zone_t *			managed_keys;
-	dns_zone_t *			redirect;
-	dns_name_t *			redirectzone;	/* points to
-							 * redirectfixed
-							 * when valid */
-	dns_fixedname_t 		redirectfixed;
+	dns_zone_t *managed_keys;
+	dns_zone_t *redirect;
+	dns_name_t *redirectzone; /* points to
+				   * redirectfixed
+				   * when valid */
+	dns_fixedname_t redirectfixed;
 
 	/*
 	 * File and configuration data for zones added at runtime
@@ -215,51 +220,41 @@ struct dns_view {
 	 * XXX: This should be a pointer to an opaque type that
 	 * named implements.
 	 */
-	char *				new_zone_file;
-	char *			        new_zone_db;
-	void *				new_zone_dbenv;
-	uint64_t			new_zone_mapsize;
-	void *				new_zone_config;
-	void				(*cfg_destroy)(void **);
-	isc_mutex_t			new_zone_lock;
+	char    *new_zone_dir;
+	char    *new_zone_file;
+	char    *new_zone_db;
+	void    *new_zone_dbenv;
+	uint64_t new_zone_mapsize;
+	void    *new_zone_config;
+	void (*cfg_destroy)(void **);
+	isc_mutex_t new_zone_lock;
 
-	unsigned char			secret[32];	/* Client secret */
-	unsigned int			v6bias;
+	unsigned char secret[32]; /* Client secret */
+	unsigned int  v6bias;
 
-	dns_dtenv_t			*dtenv;		/* Dnstap environment */
-	dns_dtmsgtype_t			dttypes;	/* Dnstap message types
-							   to log */
+	dns_dtenv_t    *dtenv;	 /* Dnstap environment */
+	dns_dtmsgtype_t dttypes; /* Dnstap message types
+				  * to log */
+
+	/* Registered module instances */
+	void *plugins;
+	void (*plugins_free)(isc_mem_t *, void **);
+
+	/* Hook table */
+	void *hooktable; /* ns_hooktable */
+	void (*hooktable_free)(isc_mem_t *, void **);
 };
 
-#define DNS_VIEW_MAGIC			ISC_MAGIC('V','i','e','w')
-#define DNS_VIEW_VALID(view)		ISC_MAGIC_VALID(view, DNS_VIEW_MAGIC)
+#define DNS_VIEW_MAGIC	     ISC_MAGIC('V', 'i', 'e', 'w')
+#define DNS_VIEW_VALID(view) ISC_MAGIC_VALID(view, DNS_VIEW_MAGIC)
 
-#define DNS_VIEWATTR_RESSHUTDOWN	0x01
-#define DNS_VIEWATTR_ADBSHUTDOWN	0x02
-#define DNS_VIEWATTR_REQSHUTDOWN	0x04
-
-#ifdef HAVE_LMDB
-#include <lmdb.h>
-/*
- * MDB_NOTLS is used to prevent problems after configuration is reloaded, due
- * to the way LMDB's use of thread-local storage (TLS) interacts with the BIND9
- * thread model.
- */
-#define DNS_LMDB_COMMON_FLAGS		(MDB_CREATE | MDB_NOSUBDIR | MDB_NOTLS)
-#ifndef __OpenBSD__
-#define DNS_LMDB_FLAGS			(DNS_LMDB_COMMON_FLAGS)
-#else /* __OpenBSD__ */
-/*
- * OpenBSD does not have a unified buffer cache, which requires both reads and
- * writes to be performed using mmap().
- */
-#define DNS_LMDB_FLAGS			(DNS_LMDB_COMMON_FLAGS | MDB_WRITEMAP)
-#endif /* __OpenBSD__ */
-#endif /* HAVE_LMDB */
+#define DNS_VIEWATTR_RESSHUTDOWN 0x01
+#define DNS_VIEWATTR_ADBSHUTDOWN 0x02
+#define DNS_VIEWATTR_REQSHUTDOWN 0x04
 
 isc_result_t
-dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
-		const char *name, dns_view_t **viewp);
+dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass, const char *name,
+		dns_view_t **viewp);
 /*%<
  * Create a view.
  *
@@ -384,15 +379,11 @@ dns_view_createzonetable(dns_view_t *view);
  */
 
 isc_result_t
-dns_view_createresolver(dns_view_t *view,
-			isc_taskmgr_t *taskmgr,
+dns_view_createresolver(dns_view_t *view, isc_taskmgr_t *taskmgr,
 			unsigned int ntasks, unsigned int ndisp,
-			isc_socketmgr_t *socketmgr,
-			isc_timermgr_t *timermgr,
-			unsigned int options,
-			dns_dispatchmgr_t *dispatchmgr,
-			dns_dispatch_t *dispatchv4,
-			dns_dispatch_t *dispatchv6);
+			isc_socketmgr_t *socketmgr, isc_timermgr_t *timermgr,
+			unsigned int options, dns_dispatchmgr_t *dispatchmgr,
+			dns_dispatch_t *dispatchv4, dns_dispatch_t *dispatchv6);
 /*%<
  * Create a resolver and address database for the view.
  *
@@ -414,9 +405,7 @@ dns_view_createresolver(dns_view_t *view,
  */
 
 void
-dns_view_setcache(dns_view_t *view, dns_cache_t *cache);
-void
-dns_view_setcache2(dns_view_t *view, dns_cache_t *cache, bool shared);
+dns_view_setcache(dns_view_t *view, dns_cache_t *cache, bool shared);
 /*%<
  * Set the view's cache database.  If 'shared' is true, this means the cache
  * is created by another view and is shared with that view.  dns_view_setcache()
@@ -502,7 +491,6 @@ dns_view_setdstport(dns_view_t *view, in_port_t dstport);
  *	times out from the view's address database.
  */
 
-
 isc_result_t
 dns_view_addzone(dns_view_t *view, dns_zone_t *zone);
 /*%<
@@ -544,17 +532,13 @@ dns_view_thaw(dns_view_t *view);
  *
  *\li	'view' is no longer frozen.
  */
+
 isc_result_t
-dns_view_find(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
+dns_view_find(dns_view_t *view, const dns_name_t *name, dns_rdatatype_t type,
 	      isc_stdtime_t now, unsigned int options, bool use_hints,
-	      dns_db_t **dbp, dns_dbnode_t **nodep, dns_name_t *foundname,
-	      dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
-isc_result_t
-dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
-	       isc_stdtime_t now, unsigned int options,
-	       bool use_hints, bool use_static_stub,
-	       dns_db_t **dbp, dns_dbnode_t **nodep, dns_name_t *foundname,
-	       dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
+	      bool use_static_stub, dns_db_t **dbp, dns_dbnode_t **nodep,
+	      dns_name_t *foundname, dns_rdataset_t *rdataset,
+	      dns_rdataset_t *sigrdataset);
 /*%<
  * Find an rdataset whose owner name is 'name', and whose type is
  * 'type'.
@@ -641,9 +625,9 @@ dns_view_find2(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
  */
 
 isc_result_t
-dns_view_simplefind(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
-		    isc_stdtime_t now, unsigned int options,
-		    bool use_hints,
+dns_view_simplefind(dns_view_t *view, const dns_name_t *name,
+		    dns_rdatatype_t type, isc_stdtime_t now,
+		    unsigned int options, bool use_hints,
 		    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
 /*%<
  * Find an rdataset whose owner name is 'name', and whose type is
@@ -701,18 +685,11 @@ dns_view_simplefind(dns_view_t *view, dns_name_t *name, dns_rdatatype_t type,
  *					or an error occurred.
  */
 
-/*% See dns_view_findzonecut2() */
 isc_result_t
-dns_view_findzonecut(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
-		     isc_stdtime_t now, unsigned int options,
-		     bool use_hints,
+dns_view_findzonecut(dns_view_t *view, const dns_name_t *name,
+		     dns_name_t *fname, dns_name_t *dcname, isc_stdtime_t now,
+		     unsigned int options, bool use_hints, bool use_cache,
 		     dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
-
-isc_result_t
-dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
-		      isc_stdtime_t now, unsigned int options,
-		      bool use_hints, bool use_cache,
-		      dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset);
 /*%<
  * Find the best known zonecut containing 'name'.
  *
@@ -734,6 +711,8 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
  *
  *\li	If the DNS_DBFIND_NOEXACT option is set, then the zonecut returned
  *	(if any) will be the deepest known ancestor of 'name'.
+ *
+ *\li	If dcname is not NULL the deepest cached name is copied to it.
  *
  * Requires:
  *
@@ -770,8 +749,9 @@ dns_viewlist_find(dns_viewlist_t *list, const char *name,
  */
 
 isc_result_t
-dns_viewlist_findzone(dns_viewlist_t *list, dns_name_t *name, bool allclasses,
-		      dns_rdataclass_t rdclass, dns_zone_t **zonep);
+dns_viewlist_findzone(dns_viewlist_t *list, const dns_name_t *name,
+		      bool allclasses, dns_rdataclass_t rdclass,
+		      dns_zone_t **zonep);
 
 /*%<
  * Search zone with 'name' in view with 'rdclass' in viewlist 'list'
@@ -784,7 +764,7 @@ dns_viewlist_findzone(dns_viewlist_t *list, dns_name_t *name, bool allclasses,
  */
 
 isc_result_t
-dns_view_findzone(dns_view_t *view, dns_name_t *name, dns_zone_t **zonep);
+dns_view_findzone(dns_view_t *view, const dns_name_t *name, dns_zone_t **zonep);
 /*%<
  * Search for the zone 'name' in the zone table of 'view'.
  * If found, 'zonep' is (strongly) attached to it.  There
@@ -801,22 +781,15 @@ dns_view_findzone(dns_view_t *view, dns_name_t *name, dns_zone_t **zonep);
  */
 
 isc_result_t
-dns_view_load(dns_view_t *view, bool stop);
+dns_view_load(dns_view_t *view, bool stop, bool newonly);
 
 isc_result_t
-dns_view_loadnew(dns_view_t *view, bool stop);
-
-isc_result_t
-dns_view_asyncload(dns_view_t *view, dns_zt_allloaded_t callback, void *arg);
-
-isc_result_t
-dns_view_asyncload2(dns_view_t *view, dns_zt_allloaded_t callback, void *arg,
-		    bool newonly);
+dns_view_asyncload(dns_view_t *view, bool newonly, dns_zt_allloaded_t callback,
+		   void *arg);
 /*%<
  * Load zones attached to this view.  dns_view_load() loads
  * all zones whose master file has changed since the last
- * load; dns_view_loadnew() loads only zones that have never
- * been loaded.
+ * load
  *
  * dns_view_asyncload() loads zones asynchronously.  When all zones
  * in the view have finished loading, 'callback' is called with argument
@@ -825,13 +798,15 @@ dns_view_asyncload2(dns_view_t *view, dns_zt_allloaded_t callback, void *arg,
  * If 'stop' is true, stop on the first error and return it.
  * If 'stop' is false (or we are loading asynchronously), ignore errors.
  *
+ * If 'newonly' is true load only zones that were never loaded.
+ *
  * Requires:
  *
  *\li	'view' is valid.
  */
 
 isc_result_t
-dns_view_gettsig(dns_view_t *view, dns_name_t *keyname,
+dns_view_gettsig(dns_view_t *view, const dns_name_t *keyname,
 		 dns_tsigkey_t **keyp);
 /*%<
  * Find the TSIG key configured in 'view' with name 'keyname',
@@ -847,7 +822,7 @@ dns_view_gettsig(dns_view_t *view, dns_name_t *keyname,
  */
 
 isc_result_t
-dns_view_getpeertsig(dns_view_t *view, isc_netaddr_t *peeraddr,
+dns_view_getpeertsig(dns_view_t *view, const isc_netaddr_t *peeraddr,
 		     dns_tsigkey_t **keyp);
 /*%<
  * Find the TSIG key configured in 'view' for the server whose
@@ -906,9 +881,7 @@ dns_view_dumpdbtostream(dns_view_t *view, FILE *fp);
  */
 
 isc_result_t
-dns_view_flushcache(dns_view_t *view);
-isc_result_t
-dns_view_flushcache2(dns_view_t *view, bool fixuponly);
+dns_view_flushcache(dns_view_t *view, bool fixuponly);
 /*%<
  * Flush the view's cache (and ADB).  If 'fixuponly' is true, it only updates
  * the internal reference to the cache DB with omitting actual flush operation.
@@ -927,7 +900,7 @@ dns_view_flushcache2(dns_view_t *view, bool fixuponly);
  */
 
 isc_result_t
-dns_view_flushnode(dns_view_t *view, dns_name_t *name, bool tree);
+dns_view_flushnode(dns_view_t *view, const dns_name_t *name, bool tree);
 /*%<
  * Flush the given name from the view's cache (and optionally ADB/badcache).
  *
@@ -944,7 +917,7 @@ dns_view_flushnode(dns_view_t *view, dns_name_t *name, bool tree);
  */
 
 isc_result_t
-dns_view_flushname(dns_view_t *view, dns_name_t *name);
+dns_view_flushname(dns_view_t *view, const dns_name_t *name);
 /*%<
  * Flush the given name from the view's cache, ADB and badcache.
  * Equivalent to dns_view_flushnode(view, name, false).
@@ -960,7 +933,7 @@ dns_view_flushname(dns_view_t *view, dns_name_t *name);
  */
 
 isc_result_t
-dns_view_adddelegationonly(dns_view_t *view, dns_name_t *name);
+dns_view_adddelegationonly(dns_view_t *view, const dns_name_t *name);
 /*%<
  * Add the given name to the delegation only table.
  *
@@ -974,7 +947,7 @@ dns_view_adddelegationonly(dns_view_t *view, dns_name_t *name);
  */
 
 isc_result_t
-dns_view_excludedelegationonly(dns_view_t *view, dns_name_t *name);
+dns_view_excludedelegationonly(dns_view_t *view, const dns_name_t *name);
 /*%<
  * Add the given name to be excluded from the root-delegation-only.
  *
@@ -989,7 +962,7 @@ dns_view_excludedelegationonly(dns_view_t *view, dns_name_t *name);
  */
 
 bool
-dns_view_isdelegationonly(dns_view_t *view, dns_name_t *name);
+dns_view_isdelegationonly(dns_view_t *view, const dns_name_t *name);
 /*%<
  * Check if 'name' is in the delegation only table or if
  * rootdelonly is set that name is not being excluded.
@@ -1120,8 +1093,8 @@ dns_view_iscacheshared(dns_view_t *view);
  */
 
 isc_result_t
-dns_view_initntatable(dns_view_t *view,
-		      isc_taskmgr_t *taskmgr, isc_timermgr_t *timermgr);
+dns_view_initntatable(dns_view_t *view, isc_taskmgr_t *taskmgr,
+		      isc_timermgr_t *timermgr);
 /*%<
  * Initialize the negative trust anchor table for the view.
  *
@@ -1188,15 +1161,17 @@ dns_view_getsecroots(dns_view_t *view, dns_keytable_t **ktp);
  */
 
 isc_result_t
-dns_view_issecuredomain(dns_view_t *view, dns_name_t *name,
-			isc_stdtime_t now, bool checknta,
+dns_view_issecuredomain(dns_view_t *view, const dns_name_t *name,
+			isc_stdtime_t now, bool checknta, bool *ntap,
 			bool *secure_domain);
 /*%<
  * Is 'name' at or beneath a trusted key, and not covered by a valid
  * negative trust anchor?  Put answer in '*secure_domain'.
  *
  * If 'checknta' is false, ignore the NTA table in determining
- * whether this is a secure domain.
+ * whether this is a secure domain. If 'checknta' is not false, and if
+ * 'ntap' is non-NULL, then '*ntap' will be updated with true if the
+ * name is covered by an NTA.
  *
  * Requires:
  * \li	'view' is valid.
@@ -1207,8 +1182,8 @@ dns_view_issecuredomain(dns_view_t *view, dns_name_t *name,
  */
 
 bool
-dns_view_ntacovers(dns_view_t *view, isc_stdtime_t now,
-		   dns_name_t *name, dns_name_t *anchor);
+dns_view_ntacovers(dns_view_t *view, isc_stdtime_t now, const dns_name_t *name,
+		   const dns_name_t *anchor);
 /*%<
  * Is there a current negative trust anchor above 'name' and below 'anchor'?
  *
@@ -1221,8 +1196,8 @@ dns_view_ntacovers(dns_view_t *view, isc_stdtime_t now,
  */
 
 void
-dns_view_untrust(dns_view_t *view, dns_name_t *keyname,
-		 dns_rdata_dnskey_t *dnskey, isc_mem_t *mctx);
+dns_view_untrust(dns_view_t *view, const dns_name_t *keyname,
+		 dns_rdata_dnskey_t *dnskey);
 /*%<
  * Remove keys that match 'keyname' and 'dnskey' from the views trust
  * anchors.
@@ -1236,7 +1211,6 @@ dns_view_untrust(dns_view_t *view, dns_name_t *keyname,
  * Requires:
  * \li	'view' is valid.
  * \li	'keyname' is valid.
- * \li	'mctx' is valid.
  * \li	'dnskey' is valid.
  */
 
@@ -1266,14 +1240,25 @@ dns_view_setnewzones(dns_view_t *view, bool allow, void *cfgctx,
  */
 
 void
+dns_view_setnewzonedir(dns_view_t *view, const char *dir);
+const char *
+dns_view_getnewzonedir(dns_view_t *view);
+/*%<
+ * Set/get the path to the directory in which NZF or NZD files should
+ * be stored. If the path was previously set to a non-NULL value,
+ * the previous value is freed.
+ *
+ * Requires:
+ * \li 'view' is valid.
+ */
+
+void
 dns_view_restorekeyring(dns_view_t *view);
 
 isc_result_t
-dns_view_searchdlz(dns_view_t *view, dns_name_t *name,
-		   unsigned int minlabels,
-		   dns_clientinfomethods_t *methods,
-		   dns_clientinfo_t *clientinfo,
-		   dns_db_t **dbp);
+dns_view_searchdlz(dns_view_t *view, const dns_name_t *name,
+		   unsigned int minlabels, dns_clientinfomethods_t *methods,
+		   dns_clientinfo_t *clientinfo, dns_db_t **dbp);
 
 /*%<
  * Search through the DLZ database(s) in view->dlz_searched to find
@@ -1347,6 +1332,14 @@ dns_view_setviewrevert(dns_view_t *view);
  *\li	'view' to be valid.
  */
 
+bool
+dns_view_staleanswerenabled(dns_view_t *view);
+/*%<
+ * Check if stale answers are enabled for this view.
+ *
+ * Requires:
+ *\li	'view' to be valid.
+ */
 
 ISC_LANG_ENDDECLS
 

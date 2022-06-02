@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -20,7 +22,7 @@ options {
 	recursion no;
 	notify yes;
 	minimal-responses no;
-	tkey-gssapi-keytab "dns.keytab";
+	@TKEY_CONFIGURATION@
 };
 
 key rndc_key {
@@ -33,13 +35,13 @@ controls {
 };
 
 zone "in-addr.arpa" {
-	type master;
+	type primary;
 	file "in-addr.db";
 	update-policy {	grant EXAMPLE.COM ms-subdomain . PTR; };
 };
 
 zone "example.com" {
-	type master;
+	type primary;
 	file "example.com.db";
 	update-policy {
 		grant EXAMPLE.COM ms-selfsub . ANY;

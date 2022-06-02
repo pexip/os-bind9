@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -21,9 +23,22 @@ options {
 	listen-on-v6 { none; };
 	forward only;
 	forwarders { 10.53.0.3; };
+	minimal-responses no;
+	recursion yes;
+	dnssec-validation yes;
+	qname-minimization disabled;
 
-	response-policy { zone "policy1"; };
+	response-policy {
+	    zone "policy1" min-update-interval 0;
+	} qname-wait-recurse yes
+	// add-soa yes # leave add-soa as default for unset test
+	nsip-enable yes
+	nsdname-enable yes;
+
+	include "../dnsrps-slave.conf";
 };
+
+logging { category rpz { default_debug; }; };
 
 key rndc_key {
 	secret "1234abcd8765";
@@ -37,8 +52,10 @@ controls {
 include "../trusted.conf";
 
 zone "policy1" {
-	type slave;
-	masters { 10.53.0.5; };
+	type secondary;
+	primaries { 10.53.0.5; };
 	file "empty.db";
+	also-notify { 10.53.0.3 port @EXTRAPORT1@; };
+	notify-delay 0;
 	allow-transfer  { any; };
 };

@@ -1,8 +1,10 @@
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -81,8 +83,11 @@ burst () {
         eval BURST_DOM="$BURST_DOM_BASE"
         DOMS="$DOMS $BURST_DOM"
     done
-    ARGS="+nocookie +continue +time=1 +tries=1 -p ${PORT} $* @$ns2 $DOMS"
-    $MDIG $ARGS 2>&1 | tee -a full-$FILENAME | sed -n -e '/^;; AUTHORITY/,/^$/d'			\
+    ARGS="+burst +nocookie +continue +time=1 +tries=1 -p ${PORT} $* @$ns2 $DOMS"
+    $MDIG $ARGS 2>&1 |                                                  \
+        tr -d '\r' |                                                    \
+        tee -a full-$FILENAME |                                         \
+        sed -n -e '/^;; AUTHORITY/,/^$/d'			        \
 		-e '/^;; ADDITIONAL/,/^$/d'				\
 		-e 's/^[^;].*	\([^	 ]\{1,\}\)$/\1/p'		\
 		-e 's/;; flags.* tc .*/TC/p'				\
@@ -90,7 +95,7 @@ burst () {
 		-e 's/;; .* status: NOERROR.*/NOERROR/p'		\
 		-e 's/;; .* status: SERVFAIL.*/SERVFAIL/p'		\
 		-e 's/response failed with timed out.*/drop/p'		\
-		-e 's/;; communications error to.*/drop/p' >> $FILENAME
+		-e 's/;; communications error to.*/drop/p' >> $FILENAME &
     QNUM=`expr $QNUM + $BURST_LIMIT`
 }
 
@@ -102,6 +107,8 @@ range () {
 #   $1=domain  $2=IP address  $3=# of IP addresses  $4=TC  $5=drop
 #	$6=NXDOMAIN  $7=SERVFAIL or other errors
 ck_result() {
+    # wait to the background mdig calls to complete.
+    wait
     BAD=no
     ADDRS=`egrep "^$2$" mdig.out-$1				2>/dev/null | wc -l`
     # count simple truncated and truncated NXDOMAIN as TC
@@ -146,8 +153,9 @@ ckstats () {
     LABEL="$1"; shift
     TYPE="$1"; shift
     EXPECTED="$1"; shift
-    C=`sed -n -e "s/[	 ]*\([0-9]*\).responses $TYPE for rate limits.*/\1/p"  \
-	    ns2/named.stats | tail -1`
+    C=`tr -d '\r' < ns2/named.stats |
+        sed -n -e "s/[	 ]*\([0-9]*\).responses $TYPE for rate limits.*/\1/p" |
+        tail -1`
     C=`expr 0$C + 0`
     
     range "$C" $EXPECTED 1 ||
@@ -266,10 +274,14 @@ $DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
 $DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
 $DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
 
+# regression test for GL #2839
+DIGOPTS="+bufsize=4096 +ignore -p ${PORT}"
+$DIG $DIGOPTS @$ns4 TXT big.tld4 > /dev/null 2>&1
+
 grep "would limit" ns4/named.run >/dev/null 2>&1 ||
 setret "\"would limit\" not found in log file."
 
-$NAMED -gc broken.conf > broken.out 2>&1 & 
+$NAMED -D rrl-ns5 -gc broken.conf > broken.out 2>&1 &
 sleep 2
 grep "min-table-size 1" broken.out > /dev/null || setret "min-table-size 0 was not changed to 1"
 

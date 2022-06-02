@@ -1,44 +1,41 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-#include <config.h>
-#include <stdarg.h>
-#include <stdbool.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <io.h>
 #include <process.h>
-#include <fcntl.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <syslog.h>
 
+#include <isc/ntpaths.h>
 #include <isc/print.h>
 #include <isc/result.h>
-#include <isc/strerror.h>
 #include <isc/string.h>
-#include <isc/ntpaths.h>
 #include <isc/util.h>
 #include <isc/win32os.h>
 
-#include <named/main.h>
-#include <named/log.h>
-#include <named/os.h>
 #include <named/globals.h>
+#include <named/log.h>
+#include <named/main.h>
 #include <named/ntservice.h>
-
+#include <named/os.h>
 
 static char *lockfile = NULL;
 static char *pidfile = NULL;
@@ -47,23 +44,21 @@ static int lockfilefd = -1;
 
 static BOOL Initialized = FALSE;
 
-static char *version_error =
-	"named requires Windows 2000 Service Pack 2 or later to run correctly";
+static char *version_error = "named requires Windows 2000 Service Pack 2 or "
+			     "later to run correctly";
 
 void
-ns_paths_init(void) {
-	if (!Initialized)
+named_paths_init(void) {
+	if (!Initialized) {
 		isc_ntpaths_init();
+	}
 
-	lwresd_g_conffile = isc_ntpaths_get(LWRES_CONF_PATH);
-	lwresd_g_resolvconffile = isc_ntpaths_get(RESOLV_CONF_PATH);
-	ns_g_conffile = isc_ntpaths_get(NAMED_CONF_PATH);
-	ns_g_defaultpidfile = isc_ntpaths_get(NAMED_PID_PATH);
-	lwresd_g_defaultpidfile = isc_ntpaths_get(LWRESD_PID_PATH);
-	ns_g_defaultlockfile = isc_ntpaths_get(NAMED_LOCK_PATH);
-	ns_g_keyfile = isc_ntpaths_get(RNDC_KEY_PATH);
-	ns_g_defaultsessionkeyfile = isc_ntpaths_get(SESSION_KEY_PATH);
-	ns_g_defaultdnstap = NULL;
+	named_g_conffile = isc_ntpaths_get(NAMED_CONF_PATH);
+	named_g_defaultpidfile = isc_ntpaths_get(NAMED_PID_PATH);
+	named_g_defaultlockfile = isc_ntpaths_get(NAMED_LOCK_PATH);
+	named_g_keyfile = isc_ntpaths_get(RNDC_KEY_PATH);
+	named_g_defaultsessionkeyfile = isc_ntpaths_get(SESSION_KEY_PATH);
+	named_g_defaultbindkeys = isc_ntpaths_get(BIND_KEYS_PATH);
 
 	Initialized = TRUE;
 }
@@ -75,15 +70,18 @@ ns_paths_init(void) {
  */
 static void
 version_check(const char *progname) {
-
 	if ((isc_win32os_versioncheck(4, 0, 0, 0) >= 0) &&
 	    (isc_win32os_versioncheck(5, 0, 0, 0) < 0))
-		return;	/* No problem with Version 4.0 */
-	if (isc_win32os_versioncheck(5, 0, 2, 0) < 0)
-		if (ntservice_isservice())
+	{
+		return; /* No problem with Version 4.0 */
+	}
+	if (isc_win32os_versioncheck(5, 0, 2, 0) < 0) {
+		if (ntservice_isservice()) {
 			NTReportError(progname, version_error);
-		else
+		} else {
 			fprintf(stderr, "%s\n", version_error);
+		}
+	}
 }
 
 static void
@@ -93,18 +91,18 @@ setup_syslog(const char *progname) {
 	options = LOG_PID;
 #ifdef LOG_NDELAY
 	options |= LOG_NDELAY;
-#endif
+#endif /* ifdef LOG_NDELAY */
 
 	openlog(progname, options, LOG_DAEMON);
 }
 
 void
-ns_os_init(const char *progname) {
-	ns_paths_init();
+named_os_init(const char *progname) {
+	named_paths_init();
 	setup_syslog(progname);
 	/*
 	 * XXXMPA. We may need to split ntservice_init() in two and
-	 * just mark as running in ns_os_started().  If we do that
+	 * just mark as running in named_os_started().  If we do that
 	 * this is where the first part of ntservice_init() should be
 	 * called from.
 	 *
@@ -113,10 +111,20 @@ ns_os_init(const char *progname) {
 	 * ntservice_init();
 	 */
 	version_check(progname);
+	/*
+	 * If running in a Cygwin environment, clear the SEM_NOGPFAULTERRORBOX
+	 * bit in the process error mode to prevent Cygwin from concealing
+	 * non-abort() crashes, giving Windows Error Reporting a chance to
+	 * handle such crashes.  This is done to ensure all crashes triggered
+	 * by system tests can be detected.
+	 */
+	if (getenv("CYGWIN") != NULL) {
+		SetErrorMode(GetErrorMode() & ~SEM_NOGPFAULTERRORBOX);
+	}
 }
 
 void
-ns_os_daemonize(void) {
+named_os_daemonize(void) {
 	/*
 	 * Try to set stdin, stdout, and stderr to /dev/null, but press
 	 * on even if it fails.
@@ -138,33 +146,32 @@ ns_os_daemonize(void) {
 }
 
 void
-ns_os_opendevnull(void) {
+named_os_opendevnull(void) {
 	devnullfd = open("NUL", O_RDWR, 0);
 }
 
 void
-ns_os_closedevnull(void) {
-	if (devnullfd != _fileno(stdin) &&
-	    devnullfd != _fileno(stdout) &&
-	    devnullfd != _fileno(stderr)) {
+named_os_closedevnull(void) {
+	if (devnullfd != _fileno(stdin) && devnullfd != _fileno(stdout) &&
+	    devnullfd != _fileno(stderr))
+	{
 		close(devnullfd);
 		devnullfd = -1;
 	}
 }
 
 void
-ns_os_chroot(const char *root) {
-	if (root != NULL)
-		ns_main_earlyfatal("chroot(): isn't supported by Win32 API");
+named_os_chroot(const char *root) {
+	if (root != NULL) {
+		named_main_earlyfatal("chroot(): isn't supported by Win32 API");
+	}
 }
 
 void
-ns_os_inituserinfo(const char *username) {
-}
+named_os_inituserinfo(const char *username) {}
 
 void
-ns_os_changeuser(void) {
-}
+named_os_changeuser(void) {}
 
 unsigned int
 ns_os_uid(void) {
@@ -172,12 +179,10 @@ ns_os_uid(void) {
 }
 
 void
-ns_os_adjustnofile(void) {
-}
+named_os_adjustnofile(void) {}
 
 void
-ns_os_minprivs(void) {
-}
+named_os_minprivs(void) {}
 
 static int
 safe_open(const char *filename, int mode, bool append) {
@@ -185,16 +190,18 @@ safe_open(const char *filename, int mode, bool append) {
 	struct stat sb;
 
 	if (stat(filename, &sb) == -1) {
-		if (errno != ENOENT)
+		if (errno != ENOENT) {
 			return (-1);
-	} else if ((sb.st_mode & S_IFREG) == 0)
+		}
+	} else if ((sb.st_mode & S_IFREG) == 0) {
 		return (-1);
+	}
 
-	if (append)
-		fd = open(filename, O_WRONLY|O_CREAT|O_APPEND, mode);
-	else {
+	if (append) {
+		fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, mode);
+	} else {
 		(void)unlink(filename);
-		fd = open(filename, O_WRONLY|O_CREAT|O_EXCL, mode);
+		fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, mode);
 	}
 	return (fd);
 }
@@ -217,15 +224,17 @@ cleanup_lockfile(void) {
 
 	if (lockfile != NULL) {
 		int n = unlink(lockfile);
-		if (n == -1 && errno != ENOENT)
-			ns_main_earlywarning("unlink '%s': failed", lockfile);
+		if (n == -1 && errno != ENOENT) {
+			named_main_earlywarning("unlink '%s': failed",
+						lockfile);
+		}
 		free(lockfile);
 		lockfile = NULL;
 	}
 }
 
 FILE *
-ns_os_openfile(const char *filename, int mode, bool switch_user) {
+named_os_openfile(const char *filename, int mode, bool switch_user) {
 	char strbuf[ISC_STRERRORSIZE];
 	FILE *fp;
 	int fd;
@@ -233,17 +242,17 @@ ns_os_openfile(const char *filename, int mode, bool switch_user) {
 	UNUSED(switch_user);
 	fd = safe_open(filename, mode, false);
 	if (fd < 0) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
-		ns_main_earlywarning("could not open file '%s': %s",
-				     filename, strbuf);
+		strerror_s(strbuf, sizeof(strbuf), errno);
+		named_main_earlywarning("could not open file '%s': %s",
+					filename, strbuf);
 		return (NULL);
 	}
 
 	fp = fdopen(fd, "w");
 	if (fp == NULL) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
-		ns_main_earlywarning("could not fdopen() file '%s': %s",
-				     filename, strbuf);
+		strerror_s(strbuf, sizeof(strbuf), errno);
+		named_main_earlywarning("could not fdopen() file '%s': %s",
+					filename, strbuf);
 		close(fd);
 	}
 
@@ -251,7 +260,7 @@ ns_os_openfile(const char *filename, int mode, bool switch_user) {
 }
 
 void
-ns_os_writepidfile(const char *filename, bool first_time) {
+named_os_writepidfile(const char *filename, bool first_time) {
 	FILE *pidlockfile;
 	pid_t pid;
 	char strbuf[ISC_STRERRORSIZE];
@@ -261,22 +270,23 @@ ns_os_writepidfile(const char *filename, bool first_time) {
 	 * The caller must ensure any required synchronization.
 	 */
 
-	report = first_time ? ns_main_earlyfatal : ns_main_earlywarning;
+	report = first_time ? named_main_earlyfatal : named_main_earlywarning;
 
 	cleanup_pidfile();
 
-	if (filename == NULL)
+	if (filename == NULL) {
 		return;
+	}
 
 	pidfile = strdup(filename);
 	if (pidfile == NULL) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_s(strbuf, sizeof(strbuf), errno);
 		(*report)("couldn't strdup() '%s': %s", filename, strbuf);
 		return;
 	}
 
-	pidlockfile = ns_os_openfile(filename, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
-				     false);
+	pidlockfile = named_os_openfile(
+		filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, false);
 	if (pidlockfile == NULL) {
 		free(pidfile);
 		pidfile = NULL;
@@ -301,29 +311,31 @@ ns_os_writepidfile(const char *filename, bool first_time) {
 }
 
 bool
-ns_os_issingleton(const char *filename) {
+named_os_issingleton(const char *filename) {
 	char strbuf[ISC_STRERRORSIZE];
 	OVERLAPPED o;
 
-	if (lockfilefd != -1)
+	if (lockfilefd != -1) {
 		return (true);
+	}
 
-	if (strcasecmp(filename, "none") == 0)
+	if (strcasecmp(filename, "none") == 0) {
 		return (true);
+	}
 
 	lockfile = strdup(filename);
 	if (lockfile == NULL) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
-		ns_main_earlyfatal("couldn't allocate memory for '%s': %s",
-				   filename, strbuf);
+		strerror_s(strbuf, sizeof(strbuf), errno);
+		named_main_earlyfatal("couldn't allocate memory for '%s': %s",
+				      filename, strbuf);
 	}
 
 	/*
-	 * ns_os_openfile() uses safeopen() which removes any existing
+	 * named_os_openfile() uses safeopen() which removes any existing
 	 * files. We can't use that here.
 	 */
 	lockfilefd = open(filename, O_WRONLY | O_CREAT,
-			  S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+			  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (lockfilefd == -1) {
 		cleanup_lockfile();
 		return (false);
@@ -331,9 +343,10 @@ ns_os_issingleton(const char *filename) {
 
 	memset(&o, 0, sizeof(o));
 	/* Expect ERROR_LOCK_VIOLATION if already locked */
-	if (!LockFileEx((HANDLE) _get_osfhandle(lockfilefd),
-			LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-			0, 0, 1, &o)) {
+	if (!LockFileEx((HANDLE)_get_osfhandle(lockfilefd),
+			LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0,
+			0, 1, &o))
+	{
 		cleanup_lockfile();
 		return (false);
 	}
@@ -341,23 +354,22 @@ ns_os_issingleton(const char *filename) {
 	return (true);
 }
 
-
 void
-ns_os_shutdown(void) {
+named_os_shutdown(void) {
 	closelog();
 	cleanup_pidfile();
 
 	if (lockfilefd != -1) {
-		(void) UnlockFile((HANDLE) _get_osfhandle(lockfilefd),
-				  0, 0, 0, 1);
-		close(lockfilefd);
-		lockfilefd = -1;
+		(void)UnlockFile((HANDLE)_get_osfhandle(lockfilefd), 0, 0, 0,
+				 1);
 	}
-	ntservice_shutdown();	/* This MUST be the last thing done */
+	cleanup_lockfile();
+
+	ntservice_shutdown(); /* This MUST be the last thing done */
 }
 
 isc_result_t
-ns_os_gethostname(char *buf, size_t len) {
+named_os_gethostname(char *buf, size_t len) {
 	int n;
 
 	n = gethostname(buf, (int)len);
@@ -365,25 +377,25 @@ ns_os_gethostname(char *buf, size_t len) {
 }
 
 void
-ns_os_shutdownmsg(char *command, isc_buffer_t *text) {
+named_os_shutdownmsg(char *command, isc_buffer_t *text) {
 	UNUSED(command);
 	UNUSED(text);
 }
 
 void
-ns_os_tzset(void) {
+named_os_tzset(void) {
 #ifdef HAVE_TZSET
 	tzset();
-#endif
+#endif /* ifdef HAVE_TZSET */
 }
 
 void
-ns_os_started(void) {
+named_os_started(void) {
 	ntservice_init();
 }
 
 static char unamebuf[BUFSIZ];
-static char *unamep = NULL;
+static const char *unamep = NULL;
 
 static void
 getuname(void) {
@@ -409,8 +421,9 @@ getuname(void) {
 	}
 	ffi = NULL;
 	ffilen = 0;
-	if ((VerQueryValue(fvi, "\\", &ffi, &ffilen) == 0) ||
-	    (ffi == NULL) || (ffilen == 0)) {
+	if ((VerQueryValue(fvi, "\\", &ffi, &ffilen) == 0) || (ffi == NULL) ||
+	    (ffilen == 0))
+	{
 		goto err;
 	}
 	memset(&sysinfo, 0, sizeof(sysinfo));
@@ -438,10 +451,9 @@ getuname(void) {
 		 (ffi->dwProductVersionMS >> 16) & 0xffff,
 		 ffi->dwProductVersionMS & 0xffff,
 		 (ffi->dwProductVersionLS >> 16) & 0xffff,
-		 ffi->dwProductVersionLS & 0xffff,
-		 arch);
+		 ffi->dwProductVersionLS & 0xffff, arch);
 
-    err:
+err:
 	if (fvi != NULL) {
 		free(fvi);
 	}
@@ -452,9 +464,10 @@ getuname(void) {
  * GetVersionEx() returns 6.2 (aka Windows 8.1) since it was obsoleted
  * so we had to switch to the recommended way to get the Windows version.
  */
-char *
-ns_os_uname(void) {
-	if (unamep == NULL)
+const char *
+named_os_uname(void) {
+	if (unamep == NULL) {
 		getuname();
+	}
 	return (unamep);
 }

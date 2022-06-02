@@ -1,14 +1,15 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
-
 
 #ifndef CHECK_TOOL_H
 #define CHECK_TOOL_H
@@ -24,6 +25,7 @@
 
 #include <dns/masterdump.h>
 #include <dns/types.h>
+#include <dns/zone.h>
 
 ISC_LANG_BEGINDECLS
 
@@ -41,9 +43,11 @@ dump_zone(const char *zonename, dns_zone_t *zone, const char *filename,
 	  const uint32_t rawversion);
 
 #ifdef _WIN32
-void InitSockets(void);
-void DestroySockets(void);
-#endif
+void
+InitSockets(void);
+void
+DestroySockets(void);
+#endif /* ifdef _WIN32 */
 
 extern int debug;
 extern const char *journal;
@@ -51,9 +55,8 @@ extern bool nomerge;
 extern bool docheckmx;
 extern bool docheckns;
 extern bool dochecksrv;
-extern unsigned int zone_options;
-extern unsigned int zone_options2;
+extern dns_zoneopt_t zone_options;
 
 ISC_LANG_ENDDECLS
 
-#endif
+#endif /* ifndef CHECK_TOOL_H */

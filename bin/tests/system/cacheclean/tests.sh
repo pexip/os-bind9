@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -57,13 +59,7 @@ EOF
 }
 
 dump_cache () {
-        $RNDC $RNDCOPTS dumpdb -cache _default
-        for i in 0 1 2 3 4 5 6 7 8 9
-        do
-                grep '^; Dump complete$' ns2/named_dump.db > /dev/null && break
-                sleep 1
-        done
-        mv ns2/named_dump.db ns2/named_dump.db.$n
+        rndc_dumpdb ns2 -cache _default
 }
 
 clear_cache () {
@@ -79,6 +75,21 @@ in_cache () {
         }
         [ "$ttl" -ge 3599 ] && return 1
         return 0
+}
+
+# Extract records at and below name "$1" from the cache dump in file "$2".
+filter_tree () {
+	tree="$1"
+	file="$2"
+	perl -n -e '
+		next if /^;/;
+		if (/'"$tree"'/ || (/^\t/ && $print)) {
+			$print = 1;
+		} else {
+			$print = 0;
+		}
+		print if $print;
+	' "$file"
 }
 
 n=`expr $n + 1`
@@ -98,8 +109,8 @@ echo_i "reset and check that records are correctly cached initially ($n)"
 ret=0
 load_cache
 dump_cache
-nrecords=`grep flushtest.example ns2/named_dump.db.$n | grep -v '^;' | egrep '(TXT|ANY)'|  wc -l`
-[ $nrecords -eq 17 ] || { ret=1; echo_i "found $nrecords records expected 17"; }
+nrecords=`filter_tree flushtest.example ns2/named_dump.db.test$n | egrep '(TXT|ANY)' | wc -l`
+[ $nrecords -eq 18 ] || { ret=1; echo_i "found $nrecords records expected 18"; }
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -108,7 +119,7 @@ echo_i "check flushing of the full cache ($n)"
 ret=0
 clear_cache
 dump_cache
-nrecords=`grep flushtest.example ns2/named_dump.db.$n | grep -v '^;' | wc -l`
+nrecords=`filter_tree flushtest.example ns2/named_dump.db.test$n | wc -l`
 [ $nrecords -eq 0 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -192,7 +203,7 @@ n=`expr $n + 1`
 echo_i "check the number of cached records remaining ($n)"
 ret=0
 dump_cache
-nrecords=`grep flushtest.example ns2/named_dump.db.$n | grep -v '^;' | egrep '(TXT|ANY)' |  wc -l`
+nrecords=`filter_tree flushtest.example ns2/named_dump.db.test$n | grep -v '^;' | egrep '(TXT|ANY)' | wc -l`
 [ $nrecords -eq 17 ] || { ret=1; echo_i "found $nrecords records expected 17"; }
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -210,7 +221,7 @@ n=`expr $n + 1`
 echo_i "check the number of cached records remaining ($n)"
 ret=0
 dump_cache
-nrecords=`grep flushtest.example ns2/named_dump.db.$n | grep -v '^;' | egrep '(TXT|ANY)' |  wc -l`
+nrecords=`filter_tree flushtest.example ns2/named_dump.db.test$n | egrep '(TXT|ANY)' | wc -l`
 [ $nrecords -eq 1 ] || { ret=1; echo_i "found $nrecords records expected 1"; }
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
@@ -220,17 +231,17 @@ echo_i "check flushtree clears adb correctly ($n)"
 ret=0
 load_cache
 dump_cache
-mv ns2/named_dump.db.$n ns2/named_dump.db.$n.a
+mv ns2/named_dump.db.test$n ns2/named_dump.db.test$n.a
 sed -n '/plain success\/timeout/,/Unassociated entries/p' \
-	ns2/named_dump.db.$n.a > sed.out.$n.a
+	ns2/named_dump.db.test$n.a > sed.out.$n.a
 grep 'plain success/timeout' sed.out.$n.a > /dev/null 2>&1 || ret=1
 grep 'Unassociated entries' sed.out.$n.a > /dev/null 2>&1 || ret=1
 grep 'ns.flushtest.example' sed.out.$n.a > /dev/null 2>&1 || ret=1
 $RNDC $RNDCOPTS flushtree flushtest.example || ret=1
 dump_cache
-mv ns2/named_dump.db.$n ns2/named_dump.db.$n.b
+mv ns2/named_dump.db.test$n ns2/named_dump.db.test$n.b
 sed -n '/plain success\/timeout/,/Unassociated entries/p' \
-	ns2/named_dump.db.$n.b > sed.out.$n.b
+	ns2/named_dump.db.test$n.b > sed.out.$n.b
 grep 'plain success/timeout' sed.out.$n.b > /dev/null 2>&1 || ret=1
 grep 'Unassociated entries' sed.out.$n.b > /dev/null 2>&1 || ret=1
 grep 'ns.flushtest.example' sed.out.$n.b > /dev/null 2>&1 && ret=1
@@ -238,7 +249,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 n=`expr $n + 1`
-echo_i "check expire option returned from master zone ($n)"
+echo_i "check expire option returned from primary zone ($n)"
 ret=0
 $DIG @10.53.0.1 -p ${PORT} +expire soa expire-test > dig.out.expire
 grep EXPIRE: dig.out.expire > /dev/null || ret=1
@@ -246,7 +257,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
 n=`expr $n + 1`
-echo_i "check expire option returned from slave zone ($n)"
+echo_i "check expire option returned from secondary zone ($n)"
 ret=0
 $DIG @10.53.0.2 -p ${PORT} +expire soa expire-test > dig.out.expire
 grep EXPIRE: dig.out.expire > /dev/null || ret=1

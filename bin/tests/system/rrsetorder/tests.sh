@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -17,6 +19,9 @@ DIGCMD="$DIG $DIGOPTS -p ${PORT}"
 
 status=0
 
+GOOD_RANDOM="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24"
+GOOD_RANDOM_NO=24
+
 if grep "^#define DNS_RDATASET_FIXED" $TOP/config.h > /dev/null 2>&1 ; then
     test_fixed=true
 else
@@ -28,7 +33,7 @@ fi
 #
 #
 if $test_fixed; then
-    echo_i "Checking order fixed (master)"
+    echo_i "Checking order fixed (primary)"
     ret=0
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     do
@@ -38,7 +43,7 @@ if $test_fixed; then
     if [ $ret != 0 ]; then echo_i "failed"; fi
     status=`expr $status + $ret`
 else
-    echo_i "Checking order fixed behaves as cyclic when disabled (master)"
+    echo_i "Checking order fixed behaves as cyclic when disabled (primary)"
     ret=0
     matches=0
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -65,7 +70,7 @@ fi
 #
 #
 #
-echo_i "Checking order cyclic (master + additional)"
+echo_i "Checking order cyclic (primary + additional)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -91,7 +96,7 @@ status=`expr $status + $ret`
 #
 #
 #
-echo_i "Checking order cyclic (master)"
+echo_i "Checking order cyclic (primary)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -113,9 +118,9 @@ $DIFF dig.out.2 dig.out.3 >/dev/null && ret=1
 if [ $matches -ne 16 ]; then ret=1; fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
-echo_i "Checking order random (master)"
+echo_i "Checking order random (primary)"
 ret=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 	eval match$i=0
 done
@@ -123,7 +128,7 @@ for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 9
 do
     $DIGCMD @10.53.0.1 random.example > dig.out.random || ret=1
     match=0
-    for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+    for j in $GOOD_RANDOM
     do
 	eval "$DIFF dig.out.random dig.out.random.good$j >/dev/null && match$j=1 match=1"
 	if [ $match -eq 1 ]; then break; fi
@@ -131,12 +136,27 @@ do
     if [ $match -eq 0 ]; then ret=1; fi
 done
 match=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 	eval "match=\`expr \$match + \$match$i\`"
 done
-echo_i "Random selection return $match of 24 possible orders in 36 samples"
-if [ $match -lt 8 ]; then echo ret=1; fi
+echo_i "Random selection return $match of ${GOOD_RANDOM_NO} possible orders in 36 samples"
+if [ $match -lt `expr ${GOOD_RANDOM_NO} / 3` ]; then ret=1; fi
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "Checking order none (primary)"
+ret=0
+# Fetch the "reference" response and ensure it contains the expected records.
+$DIGCMD @10.53.0.1 none.example > dig.out.none || ret=1
+for i in 1 2 3 4; do
+	grep -F -q 1.2.3.$i dig.out.none || ret=1
+done
+# Ensure 20 further queries result in the same response as the "reference" one.
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	$DIGCMD @10.53.0.1 none.example > dig.out.test$i || ret=1
+	$DIFF dig.out.none dig.out.test$i >/dev/null || ret=1
+done
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -144,7 +164,7 @@ status=`expr $status + $ret`
 #
 #
 if $test_fixed; then
-    echo_i "Checking order fixed (slave)"
+    echo_i "Checking order fixed (secondary)"
     ret=0
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     do
@@ -158,7 +178,7 @@ fi
 #
 #
 #
-echo_i "Checking order cyclic (slave + additional)"
+echo_i "Checking order cyclic (secondary + additional)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -184,7 +204,7 @@ status=`expr $status + $ret`
 #
 #
 #
-echo_i "Checking order cyclic (slave)"
+echo_i "Checking order cyclic (secondary)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -207,9 +227,9 @@ if [ $matches -ne 16 ]; then ret=1; fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
-echo_i "Checking order random (slave)"
+echo_i "Checking order random (secondary)"
 ret=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 	eval match$i=0
 done
@@ -217,7 +237,7 @@ for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 9
 do
     $DIGCMD @10.53.0.2 random.example > dig.out.random || ret=1
     match=0
-    for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+    for j in $GOOD_RANDOM
     do
 	eval "$DIFF dig.out.random dig.out.random.good$j >/dev/null && match$j=1 match=1"
 	if [ $match -eq 1 ]; then break; fi
@@ -225,20 +245,35 @@ do
     if [ $match -eq 0 ]; then ret=1; fi
 done
 match=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 eval "match=\`expr \$match + \$match$i\`"
 done
-echo_i "Random selection return $match of 24 possible orders in 36 samples"
-if [ $match -lt 8 ]; then echo ret=1; fi
+echo_i "Random selection return $match of ${GOOD_RANDOM_NO} possible orders in 36 samples"
+if [ $match -lt `expr ${GOOD_RANDOM_NO} / 3` ]; then ret=1; fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
-echo_i "Shutting down slave"
+echo_i "Checking order none (secondary)"
+ret=0
+# Fetch the "reference" response and ensure it contains the expected records.
+$DIGCMD @10.53.0.2 none.example > dig.out.none || ret=1
+for i in 1 2 3 4; do
+	grep -F -q 1.2.3.$i dig.out.none || ret=1
+done
+# Ensure 20 further queries result in the same response as the "reference" one.
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	$DIGCMD @10.53.0.2 none.example > dig.out.test$i || ret=1
+	$DIFF dig.out.none dig.out.test$i >/dev/null || ret=1
+done
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "Shutting down secondary"
 
 (cd ..; $SHELL stop.sh rrsetorder ns2 )
 
-echo_i "Checking for slave's on disk copy of zone"
+echo_i "Checking for secondary's on disk copy of zone"
 
 if [ ! -f ns2/root.bk ]
 then
@@ -246,15 +281,15 @@ then
 	status=`expr $status + 1`
 fi
 
-echo_i "Re-starting slave"
+echo_i "Re-starting secondary"
 
-(cd ..; $PERL start.pl --noclean --port ${PORT} rrsetorder ns2 )
+$PERL $SYSTEMTESTTOP/start.pl --noclean --port ${PORT} rrsetorder ns2
 
 #
 #
 #
 if $test_fixed; then
-    echo_i "Checking order fixed (slave loaded from disk)"
+    echo_i "Checking order fixed (secondary loaded from disk)"
     ret=0
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     do
@@ -268,7 +303,7 @@ fi
 #
 #
 #
-echo_i "Checking order cyclic (slave + additional, loaded from disk)"
+echo_i "Checking order cyclic (secondary + additional, loaded from disk)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -294,7 +329,7 @@ status=`expr $status + $ret`
 #
 #
 #
-echo_i "Checking order cyclic (slave loaded from disk)"
+echo_i "Checking order cyclic (secondary loaded from disk)"
 ret=0
 matches=0
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
@@ -317,9 +352,9 @@ if [ $matches -ne 16 ]; then ret=1; fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
-echo_i "Checking order random (slave loaded from disk)"
+echo_i "Checking order random (secondary loaded from disk)"
 ret=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 	eval match$i=0
 done
@@ -327,7 +362,7 @@ for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 9
 do
 	$DIGCMD @10.53.0.2 random.example > dig.out.random || ret=1
 	match=0
-	for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+	for j in $GOOD_RANDOM
 	do
 		eval "$DIFF dig.out.random dig.out.random.good$j >/dev/null && match$j=1 match=1"
 		if [ $match -eq 1 ]; then break; fi
@@ -335,12 +370,27 @@ do
 	if [ $match -eq 0 ]; then ret=1; fi
 done
 match=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 eval "match=\`expr \$match + \$match$i\`"
 done
-echo_i "Random selection return $match of 24 possible orders in 36 samples"
-if [ $match -lt 8 ]; then echo ret=1; fi
+echo_i "Random selection return $match of ${GOOD_RANDOM_NO} possible orders in 36 samples"
+if [ $match -lt `expr ${GOOD_RANDOM_NO} / 3` ]; then ret=1; fi
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "Checking order none (secondary loaded from disk)"
+ret=0
+# Fetch the "reference" response and ensure it contains the expected records.
+$DIGCMD @10.53.0.2 none.example > dig.out.none || ret=1
+for i in 1 2 3 4; do
+	grep -F -q 1.2.3.$i dig.out.none || ret=1
+done
+# Ensure 20 further queries result in the same response as the "reference" one.
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	$DIGCMD @10.53.0.2 none.example > dig.out.test$i || ret=1
+	$DIFF dig.out.none dig.out.test$i >/dev/null || ret=1
+done
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 
@@ -417,7 +467,7 @@ status=`expr $status + $ret`
 
 echo_i "Checking order random (cache)"
 ret=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 	eval match$i=0
 done
@@ -425,7 +475,7 @@ for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 9
 do
 	$DIGCMD @10.53.0.3 random.example > dig.out.random || ret=1
 	match=0
-	for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+	for j in $GOOD_RANDOM
 	do
 		eval "$DIFF dig.out.random dig.out.random.good$j >/dev/null && match$j=1 match=1"
 		if [ $match -eq 1 ]; then break; fi
@@ -433,25 +483,40 @@ do
 	if [ $match -eq 0 ]; then ret=1; fi
 done
 match=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 eval "match=\`expr \$match + \$match$i\`"
 done
-echo_i "Random selection return $match of 24 possible orders in 36 samples"
-if [ $match -lt 8 ]; then echo ret=1; fi
+echo_i "Random selection return $match of ${GOOD_RANDOM_NO} possible orders in 36 samples"
+if [ $match -lt `expr ${GOOD_RANDOM_NO} / 3` ]; then ret=1; fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
 
-echo_i "Checking default order no match in rrset-order (random)"
+echo_i "Checking order none (cache)"
 ret=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+# Fetch the "reference" response and ensure it contains the expected records.
+$DIGCMD @10.53.0.3 none.example > dig.out.none || ret=1
+for i in 1 2 3 4; do
+	grep -F -q 1.2.3.$i dig.out.none || ret=1
+done
+# Ensure 20 further queries result in the same response as the "reference" one.
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	$DIGCMD @10.53.0.3 none.example > dig.out.test$i || ret=1
+	$DIFF dig.out.none dig.out.test$i >/dev/null || ret=1
+done
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "Checking default order (cache)"
+ret=0
+for i in $GOOD_RANDOM
 do
 	eval match$i=0
 done
 for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 9
 do
-        $DIGCMD @10.53.0.4 random.example > dig.out.random|| ret=1
+	$DIGCMD @10.53.0.5 random.example > dig.out.random || ret=1
 	match=0
-	for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+	for j in $GOOD_RANDOM
 	do
 		eval "$DIFF dig.out.random dig.out.random.good$j >/dev/null && match$j=1 match=1"
 		if [ $match -eq 1 ]; then break; fi
@@ -459,12 +524,27 @@ do
 	if [ $match -eq 0 ]; then ret=1; fi
 done
 match=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+for i in $GOOD_RANDOM
 do
 eval "match=\`expr \$match + \$match$i\`"
 done
-echo_i "Random selection return $match of 24 possible orders in 36 samples"
-if [ $match -lt 8 ]; then echo ret=1; fi
+echo_i "Default selection return $match of ${GOOD_RANDOM_NO} possible orders in 36 samples"
+if [ $match -lt `expr ${GOOD_RANDOM_NO} / 3` ]; then ret=1; fi
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=`expr $status + $ret`
+
+echo_i "Checking default order no match in rrset-order (cache)"
+ret=0
+# Fetch the "reference" response and ensure it contains the expected records.
+$DIGCMD @10.53.0.4 nomatch.example > dig.out.nomatch || ret=1
+for i in 1 2 3 4; do
+	grep -F -q 1.2.3.$i dig.out.nomatch || ret=1
+done
+# Ensure 20 further queries result in the same response as the "reference" one.
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	$DIGCMD @10.53.0.4 nomatch.example > dig.out.test$i || ret=1
+	$DIFF dig.out.nomatch dig.out.test$i >/dev/null || ret=1
+done
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=`expr $status + $ret`
 

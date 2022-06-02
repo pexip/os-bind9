@@ -1,21 +1,22 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
  */
 
-
 #ifndef DNS_REQUEST_H
 #define DNS_REQUEST_H 1
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file dns/request.h
  *
@@ -35,19 +36,20 @@
  */
 
 #include <stdbool.h>
-#include <isc/lang.h>
+
 #include <isc/event.h>
+#include <isc/lang.h>
 
 #include <dns/types.h>
 
-#define DNS_REQUESTOPT_TCP 0x00000001U
-#define DNS_REQUESTOPT_CASE 0x00000002U
+#define DNS_REQUESTOPT_TCP     0x00000001U
+#define DNS_REQUESTOPT_CASE    0x00000002U
 #define DNS_REQUESTOPT_FIXEDID 0x00000004U
-#define DNS_REQUESTOPT_SHARE 0x00000008U
+#define DNS_REQUESTOPT_SHARE   0x00000008U
 
 typedef struct dns_requestevent {
 	ISC_EVENT_COMMON(struct dns_requestevent);
-	isc_result_t result;
+	isc_result_t   result;
 	dns_request_t *request;
 } dns_requestevent_t;
 
@@ -158,9 +160,8 @@ dns_requestmgr_detach(dns_requestmgr_t **requestmgrp);
 
 isc_result_t
 dns_request_create(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		   isc_sockaddr_t *address, unsigned int options,
-		   dns_tsigkey_t *key,
-		   unsigned int timeout, isc_task_t *task,
+		   const isc_sockaddr_t *address, unsigned int options,
+		   dns_tsigkey_t *key, unsigned int timeout, isc_task_t *task,
 		   isc_taskaction_t action, void *arg,
 		   dns_request_t **requestp);
 /*%<
@@ -193,42 +194,15 @@ dns_request_create(dns_requestmgr_t *requestmgr, dns_message_t *message,
  *\li	requestp != NULL && *requestp == NULL
  */
 
-/*% See dns_request_createvia4() */
 isc_result_t
 dns_request_createvia(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		      isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
+		      const isc_sockaddr_t *srcaddr,
+		      const isc_sockaddr_t *destaddr, isc_dscp_t dscp,
 		      unsigned int options, dns_tsigkey_t *key,
-		      unsigned int timeout, isc_task_t *task,
+		      unsigned int timeout, unsigned int udptimeout,
+		      unsigned int udpretries, isc_task_t *task,
 		      isc_taskaction_t action, void *arg,
 		      dns_request_t **requestp);
-
-/*% See dns_request_createvia4() */
-isc_result_t
-dns_request_createvia2(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       unsigned int options, dns_tsigkey_t *key,
-		       unsigned int timeout, unsigned int udptimeout,
-		       isc_task_t *task, isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
-
-/*% See dns_request_createvia4() */
-isc_result_t
-dns_request_createvia3(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       unsigned int options, dns_tsigkey_t *key,
-		       unsigned int timeout, unsigned int udptimeout,
-		       unsigned int udpretries, isc_task_t *task,
-		       isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
-
-isc_result_t
-dns_request_createvia4(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       isc_dscp_t dscp, unsigned int options,
-		       dns_tsigkey_t *key, unsigned int timeout,
-		       unsigned int udptimeout, unsigned int udpretries,
-		       isc_task_t *task, isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
 /*%<
  * Create and send a request.
  *
@@ -264,40 +238,14 @@ dns_request_createvia4(dns_requestmgr_t *requestmgr, dns_message_t *message,
  *\li	requestp != NULL && *requestp == NULL
  */
 
-/*% See dns_request_createraw4() */
 isc_result_t
 dns_request_createraw(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
-		      isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
+		      const isc_sockaddr_t *srcaddr,
+		      const isc_sockaddr_t *destaddr, isc_dscp_t dscp,
 		      unsigned int options, unsigned int timeout,
+		      unsigned int udptimeout, unsigned int udpretries,
 		      isc_task_t *task, isc_taskaction_t action, void *arg,
 		      dns_request_t **requestp);
-
-/*% See dns_request_createraw4() */
-isc_result_t
-dns_request_createraw2(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       unsigned int options, unsigned int timeout,
-		       unsigned int udptimeout, isc_task_t *task,
-		       isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
-
-/*% See dns_request_createraw4() */
-isc_result_t
-dns_request_createraw3(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       unsigned int options, unsigned int timeout,
-		       unsigned int udptimeout, unsigned int udpretries,
-		       isc_task_t *task, isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
-
-isc_result_t
-dns_request_createraw4(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
-		       isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
-		       isc_dscp_t dscp, unsigned int options,
-		       unsigned int timeout, unsigned int udptimeout,
-		       unsigned int udpretries, isc_task_t *task,
-		       isc_taskaction_t action, void *arg,
-		       dns_request_t **requestp);
 /*!<
  * \brief Create and send a request.
  *
@@ -366,6 +314,20 @@ dns_request_getresponse(dns_request_t *request, dns_message_t *message,
  *\li	ISC_R_SUCCESS
  *
  *\li	Any result that dns_message_parse() can return.
+ */
+isc_buffer_t *
+dns_request_getanswer(dns_request_t *request);
+/*
+ * Get the response to 'request' as a buffer.
+ *
+ * Requires:
+ *
+ *\li	'request' is a valid request for which the caller has received the
+ *	completion event.
+ *
+ * Returns:
+ *
+ *\li	a pointer to the answer buffer.
  */
 
 bool

@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -22,7 +24,7 @@ ISC_LANG_BEGINDECLS
 
 /*!
  * \brief
- * Context for intializing a dyndb module.
+ * Context for initializing a dyndb module.
  *
  * This structure passes global server data to which a dyndb
  * module will need access -- the server memory context, hash
@@ -33,18 +35,18 @@ ISC_LANG_BEGINDECLS
  */
 struct dns_dyndbctx {
 	unsigned int	magic;
-	const void	*hashinit;
-	isc_mem_t	*mctx;
-	isc_log_t	*lctx;
-	dns_view_t	*view;
-	dns_zonemgr_t	*zmgr;
-	isc_task_t	*task;
-	isc_timermgr_t	*timermgr;
-	bool	*refvar;
+	const void	   *hashinit;
+	isc_mem_t	  *mctx;
+	isc_log_t	  *lctx;
+	dns_view_t	   *view;
+	dns_zonemgr_t  *zmgr;
+	isc_task_t	   *task;
+	isc_timermgr_t *timermgr;
+	unsigned int   *memdebug;
 };
 
-#define DNS_DYNDBCTX_MAGIC	ISC_MAGIC('D', 'd', 'b', 'c')
-#define DNS_DYNDBCTX_VALID(d)	ISC_MAGIC_VALID(d, DNS_DYNDBCTX_MAGIC)
+#define DNS_DYNDBCTX_MAGIC    ISC_MAGIC('D', 'd', 'b', 'c')
+#define DNS_DYNDBCTX_VALID(d) ISC_MAGIC_VALID(d, DNS_DYNDBCTX_MAGIC)
 
 /*
  * API version
@@ -56,22 +58,19 @@ struct dns_dyndbctx {
  */
 #ifndef DNS_DYNDB_VERSION
 #define DNS_DYNDB_VERSION 1
-#define DNS_DYNDB_AGE 0
-#endif
+#define DNS_DYNDB_AGE	  0
+#endif /* ifndef DNS_DYNDB_VERSION */
 
-typedef isc_result_t dns_dyndb_register_t(isc_mem_t *mctx,
-					  const char *name,
-					  const char *parameters,
-					  const char *file,
-					  unsigned long line,
-					  const dns_dyndbctx_t *dctx,
-					  void **instp);
+typedef isc_result_t
+dns_dyndb_register_t(isc_mem_t *mctx, const char *name, const char *parameters,
+		     const char *file, unsigned long line,
+		     const dns_dyndbctx_t *dctx, void **instp);
 /*%
  * Called when registering a new driver instance. 'name' must be unique.
  * 'parameters' contains the driver configuration text. 'dctx' is the
  * initialization context set up in dns_dyndb_createctx().
  *
- * '*instp' must be set to the driver instance handle if the functino
+ * '*instp' will be set to the driver instance handle if the function
  * is successful.
  *
  * Returns:
@@ -80,7 +79,8 @@ typedef isc_result_t dns_dyndb_register_t(isc_mem_t *mctx,
  *\li	Other errors are possible
  */
 
-typedef void dns_dyndb_destroy_t(void **instp);
+typedef void
+dns_dyndb_destroy_t(void **instp);
 /*%
  * Destroy a driver instance. Dereference any reference-counted
  * variables passed in 'dctx' and 'inst' in the register function.
@@ -88,7 +88,8 @@ typedef void dns_dyndb_destroy_t(void **instp);
  * \c *instp must be set to \c NULL by the function before it returns.
  */
 
-typedef int dns_dyndb_version_t(unsigned int *flags);
+typedef int
+dns_dyndb_version_t(unsigned int *flags);
 /*%
  * Return the API version number a dyndb module was compiled with.
  *

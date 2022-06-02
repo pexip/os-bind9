@@ -1,14 +1,18 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,8 +29,6 @@
 
 /*! \file */
 
-#include <config.h>
-
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -34,21 +36,23 @@
 
 #include <isc/assertions.h>
 #include <isc/print.h>
+
 #include <isccc/sexpr.h>
 #include <isccc/util.h>
 
 static isccc_sexpr_t sexpr_t = { ISCCC_SEXPRTYPE_T, { NULL } };
 
-#define CAR(s)			(s)->value.as_dottedpair.car
-#define CDR(s)			(s)->value.as_dottedpair.cdr
+#define CAR(s) (s)->value.as_dottedpair.car
+#define CDR(s) (s)->value.as_dottedpair.cdr
 
 isccc_sexpr_t *
 isccc_sexpr_cons(isccc_sexpr_t *car, isccc_sexpr_t *cdr) {
 	isccc_sexpr_t *sexpr;
 
 	sexpr = malloc(sizeof(*sexpr));
-	if (sexpr == NULL)
+	if (sexpr == NULL) {
 		return (NULL);
+	}
 	sexpr->type = ISCCC_SEXPRTYPE_DOTTEDPAIR;
 	CAR(sexpr) = car;
 	CDR(sexpr) = cdr;
@@ -66,8 +70,9 @@ isccc_sexpr_fromstring(const char *str) {
 	isccc_sexpr_t *sexpr;
 
 	sexpr = malloc(sizeof(*sexpr));
-	if (sexpr == NULL)
+	if (sexpr == NULL) {
 		return (NULL);
+	}
 	sexpr->type = ISCCC_SEXPRTYPE_STRING;
 	sexpr->value.as_string = strdup(str);
 	if (sexpr->value.as_string == NULL) {
@@ -84,8 +89,9 @@ isccc_sexpr_frombinary(const isccc_region_t *region) {
 	unsigned int region_size;
 
 	sexpr = malloc(sizeof(*sexpr));
-	if (sexpr == NULL)
+	if (sexpr == NULL) {
 		return (NULL);
+	}
 	sexpr->type = ISCCC_SEXPRTYPE_BINARY;
 	region_size = REGION_SIZE(*region);
 	/*
@@ -101,7 +107,7 @@ isccc_sexpr_frombinary(const isccc_region_t *region) {
 		return (NULL);
 	}
 	sexpr->value.as_region.rend = sexpr->value.as_region.rstart +
-		region_size;
+				      region_size;
 	memmove(sexpr->value.as_region.rstart, region->rstart, region_size);
 	/*
 	 * NUL terminate.
@@ -117,27 +123,29 @@ isccc_sexpr_free(isccc_sexpr_t **sexprp) {
 	isccc_sexpr_t *item;
 
 	sexpr = *sexprp;
-	if (sexpr == NULL)
+	*sexprp = NULL;
+	if (sexpr == NULL) {
 		return;
+	}
 	switch (sexpr->type) {
 	case ISCCC_SEXPRTYPE_STRING:
 		free(sexpr->value.as_string);
 		break;
 	case ISCCC_SEXPRTYPE_DOTTEDPAIR:
 		item = CAR(sexpr);
-		if (item != NULL)
+		if (item != NULL) {
 			isccc_sexpr_free(&item);
+		}
 		item = CDR(sexpr);
-		if (item != NULL)
+		if (item != NULL) {
 			isccc_sexpr_free(&item);
+		}
 		break;
 	case ISCCC_SEXPRTYPE_BINARY:
 		free(sexpr->value.as_region.rstart);
 		break;
 	}
 	free(sexpr);
-
-	*sexprp = NULL;
 }
 
 static bool
@@ -146,8 +154,9 @@ printable(isccc_region_t *r) {
 
 	curr = r->rstart;
 	while (curr != r->rend) {
-		if (!isprint(*curr))
+		if (!isprint(*curr)) {
 			return (false);
+		}
 		curr++;
 	}
 
@@ -196,12 +205,14 @@ isccc_sexpr_print(isccc_sexpr_t *sexpr, FILE *stream) {
 			fprintf(stream, "'%.*s'", (int)size, curr);
 		} else {
 			fprintf(stream, "0x");
-			for (i = 0; i < size; i++)
+			for (i = 0; i < size; i++) {
 				fprintf(stream, "%02x", *curr++);
+			}
 		}
 		break;
 	default:
 		INSIST(0);
+		ISC_UNREACHABLE();
 	}
 }
 
@@ -242,14 +253,16 @@ isccc_sexpr_addtolist(isccc_sexpr_t **l1p, isccc_sexpr_t *l2) {
 	REQUIRE(l1 == NULL || l1->type == ISCCC_SEXPRTYPE_DOTTEDPAIR);
 
 	elt = isccc_sexpr_cons(l2, NULL);
-	if (elt == NULL)
+	if (elt == NULL) {
 		return (NULL);
+	}
 	if (l1 == NULL) {
 		*l1p = elt;
 		return (elt);
 	}
-	for (last = l1; CDR(last) != NULL; last = CDR(last))
-		/* Nothing */;
+	for (last = l1; CDR(last) != NULL; last = CDR(last)) {
+		/* Nothing */
+	}
 	CDR(last) = elt;
 
 	return (elt);
@@ -257,40 +270,44 @@ isccc_sexpr_addtolist(isccc_sexpr_t **l1p, isccc_sexpr_t *l2) {
 
 bool
 isccc_sexpr_listp(isccc_sexpr_t *sexpr) {
-	if (sexpr == NULL || sexpr->type == ISCCC_SEXPRTYPE_DOTTEDPAIR)
+	if (sexpr == NULL || sexpr->type == ISCCC_SEXPRTYPE_DOTTEDPAIR) {
 		return (true);
+	}
 	return (false);
 }
 
 bool
 isccc_sexpr_emptyp(isccc_sexpr_t *sexpr) {
-	if (sexpr == NULL)
+	if (sexpr == NULL) {
 		return (true);
+	}
 	return (false);
 }
 
 bool
 isccc_sexpr_stringp(isccc_sexpr_t *sexpr) {
-	if (sexpr != NULL && sexpr->type == ISCCC_SEXPRTYPE_STRING)
+	if (sexpr != NULL && sexpr->type == ISCCC_SEXPRTYPE_STRING) {
 		return (true);
+	}
 	return (false);
 }
 
 bool
 isccc_sexpr_binaryp(isccc_sexpr_t *sexpr) {
-	if (sexpr != NULL && sexpr->type == ISCCC_SEXPRTYPE_BINARY)
+	if (sexpr != NULL && sexpr->type == ISCCC_SEXPRTYPE_BINARY) {
 		return (true);
+	}
 	return (false);
 }
 
 char *
 isccc_sexpr_tostring(isccc_sexpr_t *sexpr) {
-	REQUIRE(sexpr != NULL &&
-		(sexpr->type == ISCCC_SEXPRTYPE_STRING ||
-		 sexpr->type == ISCCC_SEXPRTYPE_BINARY));
+	REQUIRE(sexpr != NULL && (sexpr->type == ISCCC_SEXPRTYPE_STRING ||
+				  sexpr->type == ISCCC_SEXPRTYPE_BINARY));
 
-	if (sexpr->type == ISCCC_SEXPRTYPE_BINARY)
+	if (sexpr->type == ISCCC_SEXPRTYPE_BINARY) {
 		return ((char *)sexpr->value.as_region.rstart);
+	}
 	return (sexpr->value.as_string);
 }
 

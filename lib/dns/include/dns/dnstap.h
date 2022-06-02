@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -13,8 +15,8 @@
 #define _DNSTAP_H
 
 /*****
- ***** Module Info
- *****/
+***** Module Info
+*****/
 
 /*! \file
  * \brief
@@ -26,14 +28,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#ifdef HAVE_DNSTAP
-#include <fstrm.h>
-#include <protobuf-c/protobuf-c.h>
-#include <dns/dnstap.pb-c.h>
-#else
 struct fstrm_iothr_options;
-#endif /* HAVE_DNSTAP */
 
+#include <isc/log.h>
+#include <isc/refcount.h>
 #include <isc/region.h>
 #include <isc/sockaddr.h>
 #include <isc/time.h>
@@ -71,15 +69,16 @@ struct fstrm_iothr_options;
 #define DNS_DTTYPE_FR 0x0200
 #define DNS_DTTYPE_TQ 0x0400
 #define DNS_DTTYPE_TR 0x0800
+#define DNS_DTTYPE_UQ 0x1000
+#define DNS_DTTYPE_UR 0x2000
 
-#define DNS_DTTYPE_QUERY \
-	(DNS_DTTYPE_SQ|DNS_DTTYPE_CQ|DNS_DTTYPE_AQ|\
-	 DNS_DTTYPE_RQ|DNS_DTTYPE_FQ|DNS_DTTYPE_TQ)
-#define DNS_DTTYPE_RESPONSE \
-	(DNS_DTTYPE_SR|DNS_DTTYPE_CR|DNS_DTTYPE_AR|\
-	 DNS_DTTYPE_RR|DNS_DTTYPE_FR|DNS_DTTYPE_TR)
-#define DNS_DTTYPE_ALL \
-	(DNS_DTTYPE_QUERY|DNS_DTTYPE_RESPONSE)
+#define DNS_DTTYPE_QUERY                                                 \
+	(DNS_DTTYPE_SQ | DNS_DTTYPE_CQ | DNS_DTTYPE_AQ | DNS_DTTYPE_RQ | \
+	 DNS_DTTYPE_FQ | DNS_DTTYPE_TQ | DNS_DTTYPE_UQ)
+#define DNS_DTTYPE_RESPONSE                                              \
+	(DNS_DTTYPE_SR | DNS_DTTYPE_CR | DNS_DTTYPE_AR | DNS_DTTYPE_RR | \
+	 DNS_DTTYPE_FR | DNS_DTTYPE_TR | DNS_DTTYPE_UR)
+#define DNS_DTTYPE_ALL (DNS_DTTYPE_QUERY | DNS_DTTYPE_RESPONSE)
 
 typedef enum {
 	dns_dtmode_none = 0,
@@ -93,10 +92,10 @@ typedef struct dns_dthandle dns_dthandle_t;
 struct dns_dtdata {
 	isc_mem_t *mctx;
 
-	Dnstap__Dnstap *frame;
+	void *frame;
 
-	bool query;
-	bool tcp;
+	bool		query;
+	bool		tcp;
 	dns_dtmsgtype_t type;
 
 	isc_time_t qtime;
@@ -108,7 +107,7 @@ struct dns_dtdata {
 	uint32_t qport;
 	uint32_t rport;
 
-	isc_region_t msgdata;
+	isc_region_t   msgdata;
 	dns_message_t *msg;
 
 	char namebuf[DNS_NAME_FORMATSIZE];
@@ -119,7 +118,8 @@ struct dns_dtdata {
 
 isc_result_t
 dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
-	      struct fstrm_iothr_options **foptp, dns_dtenv_t **envp);
+	      struct fstrm_iothr_options **foptp, isc_task_t *reopen_task,
+	      dns_dtenv_t **envp);
 /*%<
  * Create and initialize the dnstap environment.
  *
@@ -139,13 +139,18 @@ dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
  *	should also be set.  Other options may be set if desired.
  *	If dns_dt_create succeeds the *foptp is set to NULL.
  *
+ *\li	'reopen_task' needs to be set to the task in the context of which
+ *	dns_dt_reopen() will be called.  This is not an optional parameter:
+ *	using dns_dt_create() (which sets 'reopen_task' to NULL) is only
+ *	allowed in unit tests.
+ *
  * Requires:
  *
  *\li	'mctx' is a valid memory context.
  *
  *\li	'path' is a valid C string.
  *
- *\li	'fopt' is non NULL.
+ *\li	'foptp' is non NULL.
  *
  *\li	envp != NULL && *envp == NULL
  *
@@ -158,9 +163,30 @@ dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
  */
 
 isc_result_t
+dns_dt_setupfile(dns_dtenv_t *env, uint64_t max_size, int rolls,
+		 isc_log_rollsuffix_t suffix);
+/*%<
+ * Sets up the dnstap logfile limits.
+ *
+ * 'max_size' is the size a log file may grow before it is rolled
+ *
+ * 'rolls' is the number of rolled files to retain.
+ *
+ * 'suffix' is the logfile suffix setting, increment or timestamp.
+ *
+ * Requires:
+ *
+ *\li	'env' is a valid dnstap environment.
+ *
+ * Returns:
+ *\li	#ISC_R_SUCCESS on success
+ *\li	#ISC_R_INVALIDFILE if dnstap is set to use a UNIX domain socket
+ */
+
+isc_result_t
 dns_dt_reopen(dns_dtenv_t *env, int roll);
 /*%<
- * Reopens files established by dns_dt_create().
+ * Reopens files established by dns_dt_create2().
  *
  * If 'roll' is non-negative and 'env->mode' is dns_dtmode_file,
  * then the file is automatically rolled over before reopening.
@@ -168,7 +194,8 @@ dns_dt_reopen(dns_dtenv_t *env, int roll);
  * keep.  If 'roll' is negative, or if 'env->mode' is dns_dtmode_unix,
  * then the channel is simply reopened.
  *
- * Note: dns_dt_reopen() must be called in task exclusive mode.
+ * Note: dns_dt_reopen() uses task-exclusive mode and must be run in the
+ * context of env->reopen_task.
  *
  * Requires:
  *\li	'env' is a valid dnstap environment.
@@ -235,17 +262,9 @@ dns_dt_getstats(dns_dtenv_t *env, isc_stats_t **statsp);
  */
 
 void
-dns_dt_shutdown(void);
-/*%<
- * Shuts down dnstap and frees global resources. This function must only
- * be called immediately before server shutdown.
- */
-
-void
-dns_dt_send(dns_view_t *view, dns_dtmsgtype_t msgtype,
-	    isc_sockaddr_t *qaddr, isc_sockaddr_t *dstaddr,
-	    bool tcp, isc_region_t *zone, isc_time_t *qtime,
-	    isc_time_t *rtime, isc_buffer_t *buf);
+dns_dt_send(dns_view_t *view, dns_dtmsgtype_t msgtype, isc_sockaddr_t *qaddr,
+	    isc_sockaddr_t *dstaddr, bool tcp, isc_region_t *zone,
+	    isc_time_t *qtime, isc_time_t *rtime, isc_buffer_t *buf);
 /*%<
  * Sends a dnstap message to the log, if 'msgtype' is one of the message
  * types represented in 'view->dttypes'.
@@ -312,8 +331,8 @@ dns_dtdata_free(dns_dtdata_t **dp);
  */
 
 isc_result_t
-dns_dt_open(const char *filename, dns_dtmode_t mode,
-	    isc_mem_t *mctx, dns_dthandle_t **handlep);
+dns_dt_open(const char *filename, dns_dtmode_t mode, isc_mem_t *mctx,
+	    dns_dthandle_t **handlep);
 /*%<
  * Opens a dnstap framestream at 'filename' and stores a pointer to the
  * reader object in a dns_dthandle_t structure.

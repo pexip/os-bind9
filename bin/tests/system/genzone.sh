@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -12,10 +14,10 @@
 #
 # Set up a test zone
 #
-# Usage: genzone.sh master-server-number slave-server-number...
+# Usage: genzone.sh master-server-number secondary-server-number...
 #
 # e.g., "genzone.sh 2 3 4" means ns2 is the master and ns3, ns4
-# are slaves.
+# are secondaries.
 #
 
 master="$1"
@@ -186,14 +188,21 @@ loc02			LOC 	60 09 00.000 N 24 39 00.000 E 10.00m 20.00m (
 ;nxt03			NXT	. 1
 ;nxt04			NXT	. 127
 
-; type 31 (EID - not implemented by BIND)
-; type 32 (NIMLOC - not implemented by BIND)
+; type 31
+eid01			EID	12 89 AB
+
+; type 32
+nimloc01		NIMLOC	12 89 AB
 
 ; type 33
-srv01			SRV 0 0 0 .
-srv02			SRV 65535 65535 65535  old-slow-box
+srv01			SRV	0 0 0 .
+srv02			SRV	65535 65535 65535  old-slow-box
 
-; type 34 (ATMA - not implemented by BIND)
+; type 34
+atma01			ATMA	+61200000000
+atma02			ATMA	+61.2.0000.0000
+atma03			ATMA	1234567890abcdef
+atma04			ATMA	f.e.d.c.b.a.0.9.8.7.6.5.4.3.2.1
 
 ; type 35
 naptr01			NAPTR   0 0 "" "" "" . 
@@ -229,6 +238,7 @@ sink02			SINK	8 0 2 l4ik
 
 ; type 42
 apl01			APL	!1:10.0.0.1/32 1:10.0.0.0/24
+apl02			APL
 
 ; type 43
 ds01			DS	12892 5 2 26584835CA80C81C91999F31CFAF2A0E89D4FF1C8FAFD0DDB31A85C7 19277C13
@@ -329,7 +339,7 @@ ninfo14			NINFO	"foo\;"
 ninfo15			NINFO	"bar\\;"
 
 ; type 57
-rkey01			RKEY	512 ( 255 1 AQMFD5raczCJHViKtLYhWGz8hMY
+rkey01			RKEY	0 ( 255 1 AQMFD5raczCJHViKtLYhWGz8hMY
 				9UGRuniJDBzC7w0aRyzWZriO6i2odGWWQVucZqKV
 				sENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esg
 				a60zyGW6LFe9r8n6paHrlG5ojqf0BaqHT+8= )
@@ -360,17 +370,36 @@ openpgpkey		OPENPGPKEY	( AQMFD5raczCJHViKtLYhWGz8hMY
 csync01			CSYNC	0 0 A NS AAAA
 csync02			CSYNC	0 0
 
-; type 63 -- 98 (unassigned)
+;type	63
+zonemd01		ZONEMD	2019020700 1 1 (
+                                C220B8A6ED5728A971902F7E3D4FD93A
+                                DEEA88B0453C2E8E8C863D465AB06CF3
+                                4EB95B266398C98B59124FA239CB7EEB
+				)
+zonemd02		ZONEMD	2019020700 1 2 (
+				08CFA1115C7B948C4163A901270395EA
+			        226A930CD2CBCF2FA9A5E6EB85F37C8A
+                                4E114D884E66F176EAB121CB02DB7D65
+                                2E0CC4827E7A3204F166B47E5613FD27
+				)
+
+; type 64 -- 98 (unassigned)
 
 ; type 99
 spf01			SPF	"v=spf1 -all"
 spf02			SPF	"v=spf1" " -all"
 
-; type 100 (UINFO - not implemented by BIND)
-; type 101 (UID - not implemented by BIND)
-; type 102 (GID - not implemented by BIND)
+; type 100 (UINFO - not implemented by BIND - unknown record format only)
+uinfo01			UINFO	\# 1 01
 
-; type 103 (UNSPEC - XXXMUKS TODO - this has some weird encoding - see btoa_totext())
+; type 101 (UID - not implemented by BIND - unknown record format only)
+uid01			UID	\# 1 02
+
+; type 102 (GID - not implemented by BIND - unknown record format only)
+gid01			GID	\# 1 03
+
+; type 103 (UNSPEC - not implemented by BIND - unknown record format only)
+unspec01		UNSPEC	\# 1 04
 
 ; type 104
 nid			NID	10 0014:4fff:ff20:ee64
@@ -397,7 +426,7 @@ eui64			EUI64	01-23-45-67-89-ab-cd-ef
 ; The text representation is not specified in the draft.
 ; This example was written based on the bind9 RR parsing code.
 ;tkey01			TKEY	928321914 928321915 (
-;				255		; algorithm
+;				algorithm-name.	; algorithm
 ;				65535 		; mode
 ;				0		; error
 ;				3 		; key size
@@ -407,7 +436,7 @@ eui64			EUI64	01-23-45-67-89-ab-cd-ef
 ;				)
 ;; A TKEY with empty "other data"
 ;tkey02			TKEY	928321914 928321915 (
-;				255		; algorithm
+;				algorithm-name.	; algorithm
 ;				65535 		; mode
 ;				0		; error
 ;				3 		; key size
@@ -442,7 +471,15 @@ doa01			DOA	( 1234567890 1234567890 1 "image/gif"
 				  hmsBich1awPAjkY1SZR8bJWrz382SGqIBQQFQd4IsUTaX+ceuudPEQA7 )
 doa02			DOA	0 1 2 "" aHR0cHM6Ly93d3cuaXNjLm9yZy8=
 
-; type 260 -- 32767 (unassigned)
+; type 260
+amtrelay01		AMTRELAY 0 0 0
+amtrelay02		AMTRELAY 0 1 0
+amtrelay03		AMTRELAY 0 0 1 0.0.0.0
+amtrelay04		AMTRELAY 0 0 2 ::
+amtrelay05		AMTRELAY 0 0 3 example.net.
+amtrelay06		AMTRELAY \# 2 0004
+
+; type 261 -- 32767 (unassigned)
 
 ; type 32768
 ta			TA	30795 1 1 (
@@ -458,7 +495,13 @@ dlv			DLV	30795 1 1 (
 
 ; type 65280-65534 (private use)
 
-; keydata (internal type used for managed-keys)
+https0			HTTPS	0 example.net.
+https1			HTTPS	1 . port=60
+
+svcb0			SVCB	0 example.net.
+svcb1			SVCB	1 . port=60
+
+; keydata (internal type used for managed keys)
 keydata			TYPE65533	\# 0
 keydata			TYPE65533	\# 6 010203040506 
 keydata			TYPE65533	\# 18 010203040506010203040506010203040506

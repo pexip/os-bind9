@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -34,8 +36,8 @@ ISC_LANG_BEGINDECLS
  ***/
 
 isc_result_t
-isc_base32_totext(isc_region_t *source, int wordlength,
-		  const char *wordbreak, isc_buffer_t *target);
+isc_base32_totext(isc_region_t *source, int wordlength, const char *wordbreak,
+		  isc_buffer_t *target);
 isc_result_t
 isc_base32hex_totext(isc_region_t *source, int wordlength,
 		     const char *wordbreak, isc_buffer_t *target);
@@ -96,18 +98,27 @@ isc_result_t
 isc_base32hexnp_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length);
 /*!<
  * \brief Convert text encoded in base32, base32hex, or base32hex
- * non-padded from a lexer context into data.
+ * non-padded from a lexer context into `target`. If 'length' is
+ * non-negative, it is the expected number of encoded octets to convert.
+ *
+ * If 'length' is -1 then 0 or more encoded octets are expected.
+ * If 'length' is -2 then 1 or more encoded octets are expected.
+ *
+ * Returns:
+ *\li	#ISC_R_BADBASE32 -- invalid base32 encoding.
+ *\li	#ISC_R_UNEXPECTEDEND: the text does not contain the expected
+ *			      number of encoded octets.
  *
  * Requires:
- *\li	'lex' is a valid lexer context
+ *\li	'lexer' is a valid lexer context
  *\li	'target' is a buffer containing binary data
- *\li	'length' is an integer
+ *\li	'length' is -2, -1, or non-negative
  *
  * Ensures:
  *\li	target will contain the data represented by the base32 encoded
- *	string parsed by the lexer.  No more than length bytes will be read,
- *	if length is positive.  The 'used' pointer in target will be
- *	advanced as necessary.
+ *	string parsed by the lexer.  No more than `length` octets will
+ *	be read, if `length` is non-negative.  The 'used' pointer in
+ *	'target' will be advanced as necessary.
  */
 
 isc_result_t

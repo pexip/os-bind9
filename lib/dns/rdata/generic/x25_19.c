@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -31,11 +33,15 @@ fromtext_x25(ARGS_FROMTEXT) {
 
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_qstring,
 				      false));
-	if (token.value.as_textregion.length < 4)
+	if (token.value.as_textregion.length < 4) {
 		RETTOK(DNS_R_SYNTAX);
-	for (i = 0; i < token.value.as_textregion.length; i++)
-		if (!isdigit(token.value.as_textregion.base[i] & 0xff))
+	}
+	for (i = 0; i < token.value.as_textregion.length; i++) {
+		if (!isdigit((unsigned char)token.value.as_textregion.base[i]))
+		{
 			RETTOK(ISC_R_RANGE);
+		}
+	}
 	RETTOK(txt_fromtext(&token.value.as_textregion, target));
 	return (ISC_R_SUCCESS);
 }
@@ -56,6 +62,7 @@ totext_x25(ARGS_TOTEXT) {
 static inline isc_result_t
 fromwire_x25(ARGS_FROMWIRE) {
 	isc_region_t sr;
+	unsigned int i;
 
 	REQUIRE(type == dns_rdatatype_x25);
 
@@ -65,8 +72,14 @@ fromwire_x25(ARGS_FROMWIRE) {
 	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
-	if (sr.length < 5)
+	if (sr.length < 5 || sr.base[0] != (sr.length - 1)) {
 		return (DNS_R_FORMERR);
+	}
+	for (i = 1; i < sr.length; i++) {
+		if (sr.base[i] < 0x30 || sr.base[i] > 0x39) {
+			return (DNS_R_FORMERR);
+		}
+	}
 	return (txt_fromwire(source, target));
 }
 
@@ -102,7 +115,7 @@ fromstruct_x25(ARGS_FROMSTRUCT) {
 	uint8_t i;
 
 	REQUIRE(type == dns_rdatatype_x25);
-	REQUIRE(source != NULL);
+	REQUIRE(x25 != NULL);
 	REQUIRE(x25->common.rdtype == type);
 	REQUIRE(x25->common.rdclass == rdclass);
 	REQUIRE(x25->x25 != NULL && x25->x25_len != 0);
@@ -110,12 +123,15 @@ fromstruct_x25(ARGS_FROMSTRUCT) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	if (x25->x25_len < 4)
+	if (x25->x25_len < 4) {
 		return (ISC_R_RANGE);
+	}
 
-	for (i = 0; i < x25->x25_len; i++)
-		if (!isdigit(x25->x25[i] & 0xff))
+	for (i = 0; i < x25->x25_len; i++) {
+		if (!isdigit((unsigned char)x25->x25[i])) {
 			return (ISC_R_RANGE);
+		}
+	}
 
 	RETERR(uint8_tobuffer(x25->x25_len, target));
 	return (mem_tobuffer(target, x25->x25, x25->x25_len));
@@ -127,7 +143,7 @@ tostruct_x25(ARGS_TOSTRUCT) {
 	isc_region_t r;
 
 	REQUIRE(rdata->type == dns_rdatatype_x25);
-	REQUIRE(target != NULL);
+	REQUIRE(x25 != NULL);
 	REQUIRE(rdata->length != 0);
 
 	x25->common.rdclass = rdata->rdclass;
@@ -138,8 +154,9 @@ tostruct_x25(ARGS_TOSTRUCT) {
 	x25->x25_len = uint8_fromregion(&r);
 	isc_region_consume(&r, 1);
 	x25->x25 = mem_maybedup(mctx, r.base, x25->x25_len);
-	if (x25->x25 == NULL)
+	if (x25->x25 == NULL) {
 		return (ISC_R_NOMEMORY);
+	}
 
 	x25->mctx = mctx;
 	return (ISC_R_SUCCESS);
@@ -148,14 +165,17 @@ tostruct_x25(ARGS_TOSTRUCT) {
 static inline void
 freestruct_x25(ARGS_FREESTRUCT) {
 	dns_rdata_x25_t *x25 = source;
-	REQUIRE(source != NULL);
+
+	REQUIRE(x25 != NULL);
 	REQUIRE(x25->common.rdtype == dns_rdatatype_x25);
 
-	if (x25->mctx == NULL)
+	if (x25->mctx == NULL) {
 		return;
+	}
 
-	if (x25->x25 != NULL)
+	if (x25->x25 != NULL) {
 		isc_mem_free(x25->mctx, x25->x25);
+	}
 	x25->mctx = NULL;
 }
 
@@ -183,7 +203,6 @@ digest_x25(ARGS_DIGEST) {
 
 static inline bool
 checkowner_x25(ARGS_CHECKOWNER) {
-
 	REQUIRE(type == dns_rdatatype_x25);
 
 	UNUSED(name);
@@ -196,7 +215,6 @@ checkowner_x25(ARGS_CHECKOWNER) {
 
 static inline bool
 checknames_x25(ARGS_CHECKNAMES) {
-
 	REQUIRE(rdata->type == dns_rdatatype_x25);
 
 	UNUSED(rdata);
@@ -211,4 +229,4 @@ casecompare_x25(ARGS_COMPARE) {
 	return (compare_x25(rdata1, rdata2));
 }
 
-#endif	/* RDATA_GENERIC_X25_19_C */
+#endif /* RDATA_GENERIC_X25_19_C */

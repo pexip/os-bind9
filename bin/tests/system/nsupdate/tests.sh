@@ -1,10 +1,12 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
@@ -33,6 +35,8 @@ RNDCCMD="$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p ${CONTROLPORT} -s"
 status=0
 n=0
 
+nextpartreset ns3/named.run
+
 # wait for zone transfer to complete
 tries=0
 while true; do
@@ -50,6 +54,16 @@ while true; do
         sleep 1
     fi
 done
+
+has_positive_response() {
+	zone=$1
+	type=$2
+	ns=$3
+	$DIG $DIGOPTS +tcp +norec $zone $type @$ns > dig.out.post.test$n || return 1
+	grep "status: NOERROR" dig.out.post.test$n > /dev/null || return 1
+	grep "ANSWER: 0," dig.out.post.test$n > /dev/null && return 1
+	return 0
+}
 
 ret=0
 echo_i "fetching first copy of zone before update"
@@ -111,7 +125,7 @@ pre=`$DIG $DIGOPTS +short new.other.nil. @10.53.0.1 a` || ret=1
 ret=0
 echo_i "updating zone"
 # nsupdate will print a ">" prompt to stdout as it gets each input line.
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > /dev/null <<END || ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > /dev/null <<END || ret=1
 zone other.nil.
 update add new.other.nil. 600 IN A 10.10.10.1
 send
@@ -135,13 +149,13 @@ digcomp knowngood.ns1.after dig.out.ns1 || ret=1
 ret=0
 echo_i "testing zone consistency checks"
 # inserting an NS record without a corresponding A or AAAA record should fail
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END && ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END && ret=1
 update add other.nil. 600 in ns ns3.other.nil.
 send
 END
 grep REFUSED nsupdate.out > /dev/null 2>&1 || ret=1
 # ...but should work if an A record is inserted first:
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
 update add ns4.other.nil 600 in a 10.53.0.1
 send
 update add other.nil. 600 in ns ns4.other.nil.
@@ -149,7 +163,7 @@ send
 END
 grep REFUSED nsupdate.out > /dev/null 2>&1 && ret=1
 # ...or if an AAAA record does:
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
 update add ns5.other.nil 600 in aaaa 2001:db8::1
 send
 update add other.nil. 600 in ns ns5.other.nil.
@@ -157,7 +171,7 @@ send
 END
 grep REFUSED nsupdate.out > /dev/null 2>&1 && ret=1
 # ...or if the NS and A/AAAA are inserted together:
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
 update add other.nil. 600 in ns ns6.other.nil.
 update add ns6.other.nil 600 in a 10.53.0.1
 send
@@ -190,7 +204,7 @@ grep "mx03.example.nil/MX:.*MX is an address" ns1/named.run > /dev/null 2>&1 && 
 
 ret=0
 echo_i "ensure 'check-mx warn' allows adding MX records containing an address with a warning"
-$NSUPDATE -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
+$NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > nsupdate.out 2>&1 << END || ret=1
 update add mx03.other.nil 600 IN MX 10 10.53.0.1
 send
 END
@@ -211,7 +225,7 @@ grep "mx03.update.nil/MX:.*MX is an address" ns1/named.run > /dev/null 2>&1 || r
 
 ret=0
 echo_i "check SIG(0) key is accepted"
-key=`$KEYGEN -q -r $RANDFILE -a NSEC3RSASHA1 -b 512 -T KEY -n ENTITY xxx`
+key=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -T KEY -n ENTITY xxx`
 echo "" | $NSUPDATE -k ${key}.private > /dev/null 2>&1 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
@@ -243,7 +257,7 @@ n=`expr $n + 1`
 ret=0
 echo_i "check that TYPE=0 update is handled ($n)"
 echo "a0e4280000010000000100000000060001c00c000000fe000000000000" |
-$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null
+$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null || ret=1
 $DIG $DIGOPTS +tcp version.bind txt ch @10.53.0.1 > dig.out.ns1.$n
 grep "status: NOERROR" dig.out.ns1.$n > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
@@ -252,7 +266,7 @@ n=`expr $n + 1`
 ret=0
 echo_i "check that TYPE=0 additional data is handled ($n)"
 echo "a0e4280000010000000000010000060001c00c000000fe000000000000" |
-$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null
+$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null || ret=1
 $DIG $DIGOPTS +tcp version.bind txt ch @10.53.0.1 > dig.out.ns1.$n
 grep "status: NOERROR" dig.out.ns1.$n > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
@@ -261,7 +275,7 @@ n=`expr $n + 1`
 ret=0
 echo_i "check that update to undefined class is handled ($n)"
 echo "a0e4280000010001000000000000060101c00c000000fe000000000000" |
-$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null
+$PERL ../packet.pl -a 10.53.0.1 -p ${PORT} -t tcp > /dev/null || ret=1
 $DIG $DIGOPTS +tcp version.bind txt ch @10.53.0.1 > dig.out.ns1.$n
 grep "status: NOERROR" dig.out.ns1.$n > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
@@ -302,32 +316,43 @@ elif [ "$serial" -gt "$now" ]; then
 fi
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
-ret=0
 if $PERL -e 'use Net::DNS;' 2>/dev/null
 then
-    echo_i "running update.pl test"
-    {
-      $PERL update_test.pl -s 10.53.0.1 -p ${PORT} update.nil. || ret=1
-    } | cat_i
+    n=`expr $n + 1`
+    ret=0
+    echo_i "running update.pl test ($n)"
+    $PERL update_test.pl -s 10.53.0.1 -p ${PORT} update.nil. > perl.update_test.out || ret=1
     [ $ret -eq 1 ] && { echo_i "failed"; status=1; }
+
+    if $PERL -e 'use Net::DNS; die "Net::DNS too old ($Net::DNS::VERSION < 1.01)" if ($Net::DNS::VERSION < 1.01)' > /dev/null
+    then
+	n=`expr $n + 1`
+	ret=0
+	echo_i "check for too many NSEC3 iterations log ($n)"
+	grep "updating zone 'update.nil/IN': too many NSEC3 iterations (151)" ns1/named.run > /dev/null || ret=1
+	[ $ret -eq 1 ] && { echo_i "failed"; status=1; }
+    fi
 else
     echo_i "The second part of this test requires the Net::DNS library." >&2
 fi
 
+n=`expr $n + 1`
 ret=0
-echo_i "fetching first copy of test zone"
+echo_i "fetching first copy of test zone ($n)"
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd example.nil.\
 	@10.53.0.1 axfr > dig.out.ns1 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
+n=`expr $n + 1`
 ret=0
-echo_i "fetching second copy of test zone"
+echo_i "fetching second copy of test zone ($n)"
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd example.nil.\
 	@10.53.0.2 axfr > dig.out.ns2 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
+n=`expr $n + 1`
 ret=0
-echo_i "comparing zones"
+echo_i "comparing zones ($n)"
 digcomp dig.out.ns1 dig.out.ns2 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
@@ -338,7 +363,7 @@ rm named.pid
 cd ..
 sleep 10
 if
-	$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} . ns1
+	$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} nsupdate ns1
 then
 	echo_i "restarted server ns1"
 else
@@ -347,21 +372,24 @@ else
 fi
 sleep 10
 
+n=`expr $n + 1`
 ret=0
-echo_i "fetching ns1 after hard restart"
+echo_i "fetching ns1 after hard restart ($n)"
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd example.nil.\
 	@10.53.0.1 axfr > dig.out.ns1.after || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
+n=`expr $n + 1`
 ret=0
-echo_i "comparing zones"
+echo_i "comparing zones ($n)"
 digcomp dig.out.ns1 dig.out.ns1.after || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
 echo_i "begin RT #482 regression test"
 
+n=`expr $n + 1`
 ret=0
-echo_i "update master"
+echo_i "update primary ($n)"
 $NSUPDATE -k ns1/ddns.key <<END > /dev/null || ret=1
 server 10.53.0.1 ${PORT}
 update add updated2.example.nil. 600 A 10.10.10.2
@@ -374,17 +402,18 @@ END
 sleep 5
 
 if [ ! "$CYGWIN" ]; then
-    echo_i "SIGHUP slave"
+    echo_i "SIGHUP secondary"
     $KILL -HUP `cat ns2/named.pid`
 else
-    echo_i "reload slave"
-    $RNDCCMD 10.53.0.2 reload > /dev/null 2>&1
+    echo_i "reload secondary"
+    rndc_reload ns2 10.53.0.2
 fi
 
 sleep 5
 
+n=`expr $n + 1`
 ret=0
-echo_i "update master again"
+echo_i "update primary again ($n)"
 $NSUPDATE -k ns1/ddns.key <<END > /dev/null || ret=1
 server 10.53.0.1 ${PORT}
 update add updated3.example.nil. 600 A 10.10.10.3
@@ -397,16 +426,17 @@ END
 sleep 5
 
 if [ ! "$CYGWIN" ]; then
-    echo_i "SIGHUP slave again"
+    echo_i "SIGHUP secondary again"
     $KILL -HUP `cat ns2/named.pid`
 else
-    echo_i "reload slave again"
-    $RNDCCMD 10.53.0.2 reload > /dev/null 2>&1
+    echo_i "reload secondary again"
+    rndc_reload ns2 10.53.0.2
 fi
 
 sleep 5
 
-echo_i "check to 'out of sync' message"
+n=`expr $n + 1`
+echo_i "check to 'out of sync' message ($n)"
 if grep "out of sync" ns2/named.run
 then
 	echo_i "failed (found 'out of sync')"
@@ -424,13 +454,11 @@ update add example 3600 nsec3param 1 0 0 -
 send
 EOF
 
-sleep 1
-
 # the zone is not signed.  The nsec3param records should be removed.
 # this also proves that the server is still running.
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec example.\
 	@10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
-grep "ANSWER: 0" dig.out.ns3.$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.ns3.$n > /dev/null || ret=1
 grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
@@ -443,29 +471,33 @@ update add nsec3param.test 3600 NSEC3PARAM 1 0 1 -
 send
 EOF
 
-sleep 1
-
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec nsec3param.test.\
         @10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
-grep "ANSWER: 1" dig.out.ns3.$n > /dev/null || ret=1
+grep "ANSWER: 1," dig.out.ns3.$n > /dev/null || ret=1
 grep "3600.*NSEC3PARAM" dig.out.ns3.$n > /dev/null || ret=1
 grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
 n=`expr $n + 1`
 ret=0
-echo_i "add a new the NSEC3PARAM via update ($n)"
+echo_i "add a new NSEC3PARAM via update ($n)"
 $NSUPDATE << EOF
 server 10.53.0.3 ${PORT}
 update add nsec3param.test 3600 NSEC3PARAM 1 0 4 -
 send
 EOF
 
-sleep 1
+_ret=1
+for i in 0 1 2 3 4 5 6 7 8 9; do
+	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
+	if grep "ANSWER: 2," dig.out.ns3.$n > /dev/null; then
+		_ret=0
+		break
+	fi
+	sleep 1
+done
 
-$DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec nsec3param.test.\
-        @10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
-grep "ANSWER: 2" dig.out.ns3.$n > /dev/null || ret=1
+if [ $_ret -ne 0 ]; then ret=1; fi
 grep "NSEC3PARAM 1 0 4 -" dig.out.ns3.$n > /dev/null || ret=1
 grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
 if [ $ret != 0 ] ; then echo_i "failed"; status=`expr $ret + $status`; fi
@@ -480,11 +512,17 @@ update add nsec3param.test 7200 NSEC3PARAM 1 0 5 -
 send
 EOF
 
-sleep 1
+_ret=1
+for i in 0 1 2 3 4 5 6 7 8 9; do
+	$DIG $DIGOPTS +tcp +norec +time=1 +tries=1 @10.53.0.3 nsec3param.test. NSEC3PARAM > dig.out.ns3.$n || _ret=1
+	if grep "ANSWER: 1," dig.out.ns3.$n > /dev/null; then
+		_ret=0
+		break
+	fi
+	sleep 1
+done
 
-$DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocmd +norec nsec3param.test.\
-        @10.53.0.3 nsec3param > dig.out.ns3.$n || ret=1
-grep "ANSWER: 1" dig.out.ns3.$n > /dev/null || ret=1
+if [ $_ret -ne 0 ]; then ret=1; fi
 grep "7200.*NSEC3PARAM 1 0 5 -" dig.out.ns3.$n > /dev/null || ret=1
 grep "flags:[^;]* aa[ ;]" dig.out.ns3.$n > /dev/null || ret=1
 $JOURNALPRINT ns3/nsec3param.test.db.signed.jnl > jp.out.ns3.$n
@@ -498,29 +536,36 @@ grep "add nsec3param.test.	0	IN	TYPE65534 .# 6 000140000400" jp.out.ns3.$n > /de
 if [ $ret != 0 ] ; then echo_i "failed"; status=`expr $ret + $status`; fi
 
 
-
 ret=0
-echo_i "testing that rndc stop updates the master file"
+echo_i "testing that rndc stop updates the file"
 $NSUPDATE -k ns1/ddns.key <<END > /dev/null || ret=1
 server 10.53.0.1 ${PORT}
 update add updated4.example.nil. 600 A 10.10.10.3
 send
 END
-$PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} . ns1
+sleep 3
+$PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} nsupdate ns1
+sleep 3
 # Removing the journal file and restarting the server means
 # that the data served by the new server process are exactly
-# those dumped to the master file by "rndc stop".
+# those dumped to the file by "rndc stop".
 rm -f ns1/*jnl
-$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} . ns1
-$DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd updated4.example.nil.\
-	@10.53.0.1 a > dig.out.ns1 || status=1
-digcomp knowngood.ns1.afterstop dig.out.ns1 || ret=1
-[ $ret = 0 ] || { echo_i "failed"; status=1; }
+$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} nsupdate ns1
+for try in 0 1 2 3 4 5 6 7 8 9; do
+    iret=0
+    $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
+	updated4.example.nil. @10.53.0.1 a > dig.out.ns1 || iret=1
+    digcomp knowngood.ns1.afterstop dig.out.ns1 || iret=1
+    [ "$iret" -eq 0 ] && break
+    sleep 1
+done
+[ "$iret" -ne 0 ] && ret=1
+[ "$ret" -eq 0 ] || { echo_i "failed"; status=1; }
 
 ret=0
 echo_i "check that 'nsupdate -l' with a missing keyfile reports the missing file"
-$NSUPDATE -l -p ${PORT} -k ns1/nonexistant.key 2> nsupdate.out < /dev/null
-grep ns1/nonexistant.key nsupdate.out > /dev/null || ret=1
+$NSUPDATE -4 -p ${PORT} -l -k ns1/nonexistent.key 2> nsupdate.out < /dev/null
+grep ns1/nonexistent.key nsupdate.out > /dev/null || ret=1
 if test $ret -ne 0
 then
 echo_i "failed"; status=1
@@ -625,12 +670,93 @@ fi
 
 n=`expr $n + 1`
 ret=0
+echo_i "check that 'update-policy subdomain' is properly enforced ($n)"
+# "restricted.example.nil" matches "grant ... subdomain restricted.example.nil"
+# and thus this UPDATE should succeed.
+$NSUPDATE -d <<END > nsupdate.out1-$n 2>&1 || ret=1
+server 10.53.0.1 ${PORT}
+key restricted.example.nil 1234abcd8765
+update add restricted.example.nil 0 IN TXT everywhere.
+send
+END
+$DIG $DIGOPTS +tcp @10.53.0.1 restricted.example.nil TXT > dig.out.1.test$n || ret=1
+grep "TXT.*everywhere" dig.out.1.test$n > /dev/null || ret=1
+# "example.nil" does not match "grant ... subdomain restricted.example.nil" and
+# thus this UPDATE should fail.
+$NSUPDATE -d <<END > nsupdate.out2-$n 2>&1 && ret=1
+server 10.53.0.1 ${PORT}
+key restricted.example.nil 1234abcd8765
+update add example.nil 0 IN TXT everywhere.
+send
+END
+$DIG $DIGOPTS +tcp @10.53.0.1 example.nil TXT > dig.out.2.test$n || ret=1
+grep "TXT.*everywhere" dig.out.2.test$n > /dev/null && ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that 'update-policy zonesub' is properly enforced ($n)"
+# grant zonesub-key.example.nil zonesub TXT;
+# the A record update should be rejected as it is not in the type list
+$NSUPDATE -d <<END > nsupdate.out1-$n 2>&1 && ret=1
+server 10.53.0.1 ${PORT}
+key zonesub-key.example.nil 1234subk8765
+update add zonesub.example.nil 0 IN A 1.2.3.4
+send
+END
+$DIG $DIGOPTS +tcp @10.53.0.1 zonesub.example.nil A > dig.out.1.test$n || ret=1
+grep "status: REFUSED" nsupdate.out1-$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.1.test$n > /dev/null || ret=1
+# the TXT record update should be accepted as it is in the type list
+$NSUPDATE -d <<END > nsupdate.out2-$n 2>&1 || ret=1
+server 10.53.0.1 ${PORT}
+key zonesub-key.example.nil 1234subk8765
+update add zonesub.example.nil 0 IN TXT everywhere.
+send
+END
+$DIG $DIGOPTS +tcp @10.53.0.1 zonesub.example.nil TXT > dig.out.2.test$n || ret=1
+grep "status: REFUSED" nsupdate.out2-$n > /dev/null && ret=1
+grep "ANSWER: 1," dig.out.2.test$n > /dev/null || ret=1
+grep "TXT.*everywhere" dig.out.2.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check 'grant' in deny name + grant subdomain ($n)"
+$NSUPDATE << EOF > nsupdate.out-$n 2>&1 || ret=1
+key hmac-sha256:subkey 1234abcd8765
+server 10.53.0.9 ${PORT}
+zone denyname.example
+update add foo.denyname.example 3600 IN TXT added
+send
+EOF
+$DIG $DIGOPTS +tcp @10.53.0.9 foo.denyname.example TXT > dig.out.ns9.test$n
+grep "added" dig.out.ns9.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check 'deny' in deny name + grant subdomain ($n)"
+$NSUPDATE << EOF > nsupdate.out-$n 2>&1 && ret=1
+key hmac-sha256:subkey 1234abcd8765
+server 10.53.0.9 ${PORT}
+zone denyname.example
+update add denyname.example 3600 IN TXT added
+send
+EOF
+$DIG $DIGOPTS +tcp @10.53.0.9 denyname.example TXT > dig.out.ns9.test$n
+grep "added" dig.out.ns9.test$n > /dev/null && ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
 echo_i "check that changes to the DNSKEY RRset TTL do not have side effects ($n)"
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd dnskey.test. \
         @10.53.0.3 dnskey | \
-	sed -n 's/\(.*\)10.IN/update add \1600 IN/p' |
-	(echo server 10.53.0.3 ${PORT}; cat - ; echo send ) |
-$NSUPDATE
+	awk -v port="${PORT}" 'BEGIN { print "server 10.53.0.3", port; }
+	$2 == 10 && $3 == "IN" && $4 == "DNSKEY" { $2 = 600; print "update add", $0 }
+	END { print "send" }' > update.in.$n
+$NSUPDATE update.in.$n
 
 $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd dnskey.test. \
 	@10.53.0.3 any > dig.out.ns3.$n
@@ -699,7 +825,7 @@ fi
 
 n=`expr $n + 1`
 ret=0
-echo_i "check TSIG key algorithms ($n)"
+echo_i "check TSIG key algorithms (nsupdate -k) ($n)"
 for alg in md5 sha1 sha224 sha256 sha384 sha512; do
     $NSUPDATE -k ns1/${alg}.key <<END > /dev/null || ret=1
 server 10.53.0.1 ${PORT}
@@ -710,6 +836,26 @@ done
 sleep 2
 for alg in md5 sha1 sha224 sha256 sha384 sha512; do
     $DIG $DIGOPTS +short @10.53.0.1 ${alg}.keytests.nil | grep 10.10.10.3 > /dev/null 2>&1 || ret=1
+done
+if [ $ret -ne 0 ]; then
+    echo_i "failed"
+    status=1
+fi
+
+n=`expr $n + 1`
+ret=0
+echo_i "check TSIG key algorithms (nsupdate -y) ($n)"
+for alg in md5 sha1 sha224 sha256 sha384 sha512; do
+    secret=$(sed -n 's/.*secret "\(.*\)";.*/\1/p' ns1/${alg}.key)
+    $NSUPDATE -y "hmac-${alg}:${alg}-key:$secret" <<END > /dev/null || ret=1
+server 10.53.0.1 ${PORT}
+update add ${alg}.keytests.nil. 600 A 10.10.10.50
+send
+END
+done
+sleep 2
+for alg in md5 sha1 sha224 sha256 sha384 sha512; do
+    $DIG $DIGOPTS +short @10.53.0.1 ${alg}.keytests.nil | grep 10.10.10.50 > /dev/null 2>&1 || ret=1
 done
 if [ $ret -ne 0 ]; then
     echo_i "failed"
@@ -795,6 +941,47 @@ test ${lines:-0} -eq 64 || ret=1
 fi
 
 n=`expr $n + 1`
+echo_i "check max-journal-size limits ($n)"
+ret=0
+rm -f nsupdate.out1-$n
+# add one record
+$NSUPDATE << EOF >> nsupdate.out1-$n 2>&1
+server 10.53.0.1 ${PORT}
+zone maxjournal.test
+update add z.maxjournal.test 300 IN A 10.20.30.40
+send
+EOF
+for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    # repeatedly add and remove the same set of records to fill up
+    # the journal file without changing the zone content
+    $NSUPDATE << EOF >> nsupdate.out1-$n 2>&1
+server 10.53.0.1 ${PORT}
+zone maxjournal.test
+update add a.maxjournal.test 300 IN A 1.2.3.4
+update add b.maxjournal.test 300 IN A 1.2.3.4
+update add c.maxjournal.test 300 IN A 1.2.3.4
+update add d.maxjournal.test 300 IN A 1.2.3.4
+send
+update del a.maxjournal.test
+update del b.maxjournal.test
+update del c.maxjournal.test
+update del d.maxjournal.test
+send
+EOF
+done
+# check that the journal is big enough to require truncation.
+size=`$PERL -e 'use File::stat; my $sb = stat(@ARGV[0]); printf("%s\n", $sb->size);' ns1/maxjournal.db.jnl`
+[ "$size" -gt 6000 ] || ret=1
+sleep 1
+$RNDCCMD 10.53.0.1 sync maxjournal.test
+check_size_lt_5000() (
+    size=`$PERL -e 'use File::stat; my $sb = stat(@ARGV[0]); printf("%s\n", $sb->size);' ns1/maxjournal.db.jnl`
+    [ "$size" -lt 5000 ]
+)
+retry_quiet 20 check_size_lt_5000 || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
 echo_i "check check-names processing ($n)"
 ret=0
 $NSUPDATE << EOF > nsupdate.out1-$n 2>&1
@@ -867,7 +1054,7 @@ grep "records in zone (4) exceeds max-records (3)" ns3/named.run > /dev/null || 
 
 n=`expr $n + 1`
 ret=0
-echo_i "check whether valid addresses are used for master failover ($n)"
+echo_i "check whether valid addresses are used for primary failover ($n)"
 $NSUPDATE -t 1 <<END > nsupdate.out-$n 2>&1 && ret=1
 server 10.53.0.4 ${PORT}
 zone unreachable.
@@ -922,7 +1109,7 @@ echo_i "ensure unresolvable server name is fatal in non-interactive mode ($n)"
 $NSUPDATE <<END > nsupdate.out 2>&1 && ret=1
     server unresolvable..
 END
-grep "couldn't get address for 'unresolvable..': not found" nsupdate.out > /dev/null || ret=1
+grep "couldn't get address for 'unresolvable..':" nsupdate.out > /dev/null || ret=1
 grep "syntax error" nsupdate.out > /dev/null || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
@@ -932,7 +1119,34 @@ echo_i "ensure unresolvable server name is not fatal in interactive mode ($n)"
 $NSUPDATE -i <<END > nsupdate.out 2>&1 || ret=1
     server unresolvable..
 END
-grep "couldn't get address for 'unresolvable..': not found" nsupdate.out > /dev/null || ret=1
+grep "couldn't get address for 'unresolvable..':" nsupdate.out > /dev/null || ret=1
+grep "syntax error" nsupdate.out > /dev/null && ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check nsupdate -4 -6 ($n)"
+$NSUPDATE -4 -6 <<END > nsupdate.out-$n 2>&1 && ret=1
+server 10.53.0.3 ${PORT}
+zone delegation.test.
+update del child.delegation.test. 3600 NS foo.example.net.
+update del child.delegation.test. 3600 NS bar.example.net.
+send
+END
+grep "only one of -4 and -6 allowed" nsupdate.out-$n > /dev/null 2>&1 || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check nsupdate -4 with an IPv6 server address ($n)"
+$NSUPDATE -4 <<END > nsupdate.out-$n 2>&1 && ret=1
+server fd92:7065:b8e:ffff::2 ${PORT}
+zone delegation.test.
+update del child.delegation.test. 3600 NS foo.example.net.
+update del child.delegation.test. 3600 NS bar.example.net.
+send
+END
+grep "address family not supported" nsupdate.out-$n > /dev/null 2>&1 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
 n=`expr $n + 1`
@@ -947,7 +1161,112 @@ grep "UPDATE, status: NOERROR" nsupdate.out-$n > /dev/null 2>&1 || ret=1
 grep "UPDATE, status: FORMERR" nsupdate.out-$n > /dev/null 2>&1 || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
-if $FEATURETEST --gssapi ; then
+
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that DS to the zone apex is ignored ($n)"
+$DIG $DIGOPTS +tcp +norec example DS @10.53.0.3 > dig.out.pre.test$n || ret=1
+grep "status: NOERROR" dig.out.pre.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.pre.test$n > /dev/null || ret=1
+nextpart ns3/named.run > /dev/null
+# specify zone to override the default of adding to parent zone
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 || ret=1
+server 10.53.0.3 ${PORT}
+zone example
+update add example 0 in DS 14364 10 2 FD03B2312C8F0FE72C1751EFA1007D743C94EC91594FF0047C23C37CE119BA0C
+send
+END
+msg=": attempt to add a DS record at zone apex ignored"
+nextpart ns3/named.run | grep "$msg" > /dev/null || ret=1
+$DIG $DIGOPTS +tcp +norec example DS @10.53.0.3 > dig.out.post.test$n || ret=1
+grep "status: NOERROR" dig.out.post.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.post.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that CDS with mismatched algorithm to DNSSEC multisigner zone is not allowed ($n)"
+$DIG $DIGOPTS +tcp +norec multisigner.test CDS @10.53.0.3 > dig.out.pre.test$n || ret=1
+grep "status: NOERROR" dig.out.pre.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.pre.test$n > /dev/null || ret=1
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 && ret=1
+server 10.53.0.3 ${PORT}
+zone multisigner.test
+update add multisigner.test 3600 IN CDS 14364 14 2 FD03B2312C8F0FE72C1751EFA1007D743C94EC91594FF0047C23C37CE119BA0C
+send
+END
+msg=": bad CDS RRset"
+nextpart ns3/named.run | grep "$msg" > /dev/null || ret=1
+$DIG $DIGOPTS +tcp +norec multisigner.test CDS @10.53.0.3 > dig.out.post.test$n || ret=1
+grep "status: NOERROR" dig.out.post.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.post.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that CDNSKEY with mismatched algorithm to DNSSEC multisigner zone is not allowed ($n)"
+$DIG $DIGOPTS +tcp +norec multisigner.test CDNSKEY @10.53.0.3 > dig.out.pre.test$n || ret=1
+grep "status: NOERROR" dig.out.pre.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.pre.test$n > /dev/null || ret=1
+nextpart ns3/named.run > /dev/null
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 && ret=1
+server 10.53.0.3 ${PORT}
+zone multisigner.test
+update add multisigner.test 3600 IN CDNSKEY 257 3 14 d0NQ5PKmDz6P0B1WPMH9/UKRux/toSFwV2nTJYPA1Cx8pB0sJGTXbVhG U+6gye7VCHDhGIn9CjVfb2RJPW7GnQ==
+send
+END
+msg=": bad CDNSKEY RRset"
+nextpart ns3/named.run | grep "$msg" > /dev/null || ret=1
+$DIG $DIGOPTS +tcp +norec multisigner.test CDNSKEY @10.53.0.3 > dig.out.post.test$n || ret=1
+grep "status: NOERROR" dig.out.post.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.post.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that CDS to DNSSEC multisigner zone is allowed ($n)"
+$DIG $DIGOPTS +tcp +norec multisigner.test CDS @10.53.0.3 > dig.out.pre.test$n || ret=1
+grep "status: NOERROR" dig.out.pre.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.pre.test$n > /dev/null || ret=1
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 || ret=1
+server 10.53.0.3 ${PORT}
+zone multisigner.test
+update add multisigner.test 3600 IN CDS 14364 13 2 FD03B2312C8F0FE72C1751EFA1007D743C94EC91594FF0047C23C37CE119BA0C
+send
+END
+retry_quiet 5 has_positive_response multisigner.test CDS 10.53.0.3 || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that CDNSKEY to DNSSEC multisigner zone is allowed ($n)"
+$DIG $DIGOPTS +tcp +norec multisigner.test CDNSKEY @10.53.0.3 > dig.out.pre.test$n || ret=1
+grep "status: NOERROR" dig.out.pre.test$n > /dev/null || ret=1
+grep "ANSWER: 0," dig.out.pre.test$n > /dev/null || ret=1
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 || ret=1
+server 10.53.0.3 ${PORT}
+zone multisigner.test
+update add multisigner.test 3600 IN CDNSKEY 257 3 13 d0NQ5PKmDz6P0B1WPMH9/UKRux/toSFwV2nTJYPA1Cx8pB0sJGTXbVhG U+6gye7VCHDhGIn9CjVfb2RJPW7GnQ==
+send
+END
+retry_quiet 5 has_positive_response multisigner.test CDNSKEY 10.53.0.3 || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=`expr $n + 1`
+ret=0
+echo_i "check that excessive NSEC3PARAM iterations are rejected by nsupdate ($n)"
+$NSUPDATE -d <<END > nsupdate.out-$n 2>&1 && ret=1
+server 10.53.0.3 ${PORT}
+zone example
+update add example 0 in NSEC3PARAM 1 0 151 -
+END
+grep "NSEC3PARAM has excessive iterations (> 150)" nsupdate.out-$n >/dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+if ! $FEATURETEST --gssapi ; then
+  echo_i "SKIPPED: GSSAPI tests"
+else
   n=`expr $n + 1`
   ret=0
   echo_i "check krb5-self match ($n)"
@@ -1166,88 +1485,6 @@ EOF
   [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
 fi
-#
-#  Add client library tests here
-#
-
-if test unset != "${SAMPLEUPDATE:-unset}" -a -x "${SAMPLEUPDATE}"
-then
-
-    n=`expr $n + 1`
-    ret=0
-    echo_i "check that dns_client_update handles prerequisite NXDOMAIN failure ($n)"
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.1 -a 10.53.0.2 -p "nxdomain exists.sample" \
-	add "nxdomain-exists.sample 0 in a 1.2.3.4" > update.out.test$n 2>&1
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.2 -p "nxdomain exists.sample" \
-	add "check-nxdomain-exists.sample 0 in a 1.2.3.4" > update.out.check$n 2>&1
-    $DIG $DIGOPTS +tcp @10.53.0.1 a nxdomain-exists.sample > dig.out.ns1.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a nxdomain-exists.sample > dig.out.ns2.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a check-nxdomain-exists.sample > check.out.ns2.test$n
-    grep "update failed: YXDOMAIN" update.out.test$n > /dev/null || ret=1
-    grep "update succeeded" update.out.check$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns1.test$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns2.test$n > /dev/null || ret=1
-    grep "status: NOERROR" check.out.ns2.test$n > /dev/null || ret=1
-    [ $ret = 0 ] || { echo_i "failed"; status=1; }
-
-    n=`expr $n + 1`
-    ret=0
-    echo_i "check that dns_client_update handles prerequisite YXDOMAIN failure ($n)"
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.1 -a 10.53.0.2 -p "yxdomain nxdomain.sample" \
-	add "yxdomain-nxdomain.sample 0 in a 1.2.3.4" > update.out.test$n 2>&1
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.2 -p "yxdomain nxdomain.sample" \
-	add "check-yxdomain-nxdomain.sample 0 in a 1.2.3.4" > update.out.check$n 2>&1
-    $DIG $DIGOPTS +tcp @10.53.0.1 a nxdomain-exists.sample > dig.out.ns1.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a nxdomain-exists.sample > dig.out.ns2.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a check-nxdomain-exists.sample > check.out.ns2.test$n
-    grep "update failed: NXDOMAIN" update.out.test$n > /dev/null || ret=1
-    grep "update succeeded" update.out.check$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns1.test$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns2.test$n > /dev/null || ret=1
-    grep "status: NOERROR" check.out.ns2.test$n > /dev/null || ret=1
-    [ $ret = 0 ] || { echo_i "failed"; status=1; }
-
-    n=`expr $n + 1`
-    ret=0
-    echo_i "check that dns_client_update handles prerequisite NXRRSET failure ($n)"
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.1 -a 10.53.0.2 -p "nxrrset exists.sample TXT This RRset exists." \
-	add "nxrrset-exists.sample 0 in a 1.2.3.4" > update.out.test$n 2>&1
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.2 -p "nxrrset exists.sample TXT This RRset exists." \
-	add "check-nxrrset-exists.sample 0 in a 1.2.3.4" > update.out.check$n 2>&1
-    $DIG $DIGOPTS +tcp @10.53.0.1 a nxrrset-exists.sample > dig.out.ns1.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a nxrrset-exists.sample > dig.out.ns2.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a check-nxrrset-exists.sample > check.out.ns2.test$n
-    grep "update failed: YXRRSET" update.out.test$n > /dev/null || ret=1
-    grep "update succeeded" update.out.check$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns1.test$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns2.test$n > /dev/null || ret=1
-    grep "status: NOERROR" check.out.ns2.test$n > /dev/null || ret=1
-    [ $ret = 0 ] || { echo_i "failed"; status=1; }
-
-    n=`expr $n + 1`
-    ret=0
-    echo_i "check that dns_client_update handles prerequisite YXRRSET failure ($n)"
-    $SAMPLEUPDATE -s -P ${PORT} -a 10.53.0.1 -a 10.53.0.2 \
-	-p "yxrrset no-txt.sample TXT" \
-	add "yxrrset-nxrrset.sample 0 in a 1.2.3.4" > update.out.test$n 2>&1
-    $SAMPLEUPDATE -P ${PORT} -a 10.53.0.2 -p "yxrrset no-txt.sample TXT" \
-	add "check-yxrrset-nxrrset.sample 0 in a 1.2.3.4" > update.out.check$n 2>&1
-    $DIG $DIGOPTS +tcp @10.53.0.1 a yxrrset-nxrrset.sample > dig.out.ns1.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a yxrrset-nxrrset.sample > dig.out.ns2.test$n
-    $DIG $DIGOPTS +tcp @10.53.0.2 a check-yxrrset-nxrrset.sample > check.out.ns2.test$n
-    grep "update failed: NXRRSET" update.out.test$n > /dev/null || ret=1
-    grep "update succeeded" update.out.check$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns1.test$n > /dev/null || ret=1
-    grep "status: NXDOMAIN" dig.out.ns2.test$n > /dev/null || ret=1
-    grep "status: NOERROR" check.out.ns2.test$n > /dev/null || ret=1
-    grep "2nd update failed: NXRRSET" update.out.test$n > /dev/null || ret=1
-    [ $ret = 0 ] || { echo_i "failed"; status=1; }
-
-fi
-
-#
-# End client library tests here
-#
 
 echo_i "exit status: $status"
 [ $status -eq 0 ] || exit 1

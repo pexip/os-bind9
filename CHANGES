@@ -1,3 +1,195 @@
+	--- 9.16.33 released ---
+
+5962.	[security]	Fix memory leak in EdDSA verify processing.
+			(CVE-2022-38178) [GL #3487]
+
+5961.	[security]	Fix memory leak in ECDSA verify processing.
+			(CVE-2022-38177) [GL #3487]
+
+5960.	[security]	Fix serve-stale crash that could happen when
+			stale-answer-client-timeout was set to 0 and there was
+			a stale CNAME in the cache for an incoming query.
+			(CVE-2022-3080) [GL #3517]
+
+5957.	[security]	Prevent excessive resource use while processing large
+			delegations. (CVE-2022-2795) [GL #3394]
+
+5956.	[func]		Make RRL code treat all QNAMEs that are subject to
+			wildcard processing within a given zone as the same
+			name. [GL #3459]
+
+5955.	[port]		The libxml2 library has deprecated the usage of
+			xmlInitThreads() and xmlCleanupThreads() functions. Use
+			xmlInitParser() and xmlCleanupParser() instead.
+			[GL #3518]
+
+5954.	[func]		Fallback to IDNA2003 processing in dig when IDNA2008
+			conversion fails. [GL #3485]
+
+5953.	[bug]		Fix a crash on shutdown in delete_trace_entry(). Add
+			mctx attach/detach pair to make sure that the memory
+			context used by a memory pool is not destroyed before
+			the memory pool itself. [GL #3515]
+
+5952.	[bug]		Use quotes around address strings in YAML output.
+			[GL #3511]
+
+5951.	[bug]		In some cases, the dnstap query_message field was
+			erroneously set when logging response messages.
+			[GL #3501]
+
+5948.	[bug]		Fix nsec3.c:dns_nsec3_activex() function, add a missing
+			dns_db_detachnode() call. [GL #3500]
+
+5945.	[bug]		If parsing /etc/bind.key failed, delv could assert
+			when trying to parse the built in trust anchors as
+			the parser hadn't been reset. [GL !6468]
+
+5942.	[bug]		Fix tkey.c:buildquery() function's error handling by
+			adding the missing cleanup code. [GL #3492]
+
+5941.	[func]		Zones with dnssec-policy now require dynamic DNS or
+			inline-siging to be configured explicitly. [GL #3381]
+
+5936.	[bug]		Don't enable serve-stale for lookups that error because
+			it is a duplicate query or a query that would be
+			dropped. [GL #2982]
+
+	--- 9.16.32 released ---
+
+5934.	[func]		Improve fetches-per-zone fetch limit logging to log
+			the final allowed and spilled values of the fetch
+			counters before the counter object gets destroyed.
+			[GL #3461]
+
+5933.	[port]		Automatically disable RSASHA1 and NSEC3RSASHA1 in
+			named on Fedorda 33, Oracle Linux 9 and RHEL9 when
+			they are disabled by the security policy. [GL #3469]
+
+5932.	[bug]		Fix rndc dumpdb -expired and always include expired
+			RRsets, not just for RBTDB_VIRTUAL time window.
+			[GL #3462]
+
+5929.	[bug]		The "max-zone-ttl" option in "dnssec-policy" was
+			not fully effective; it was used for timing key
+			rollovers but did not actually place an upper limit
+			on TTLs when loading a zone. This has been
+			corrected, and the documentation has been clarified
+			to indicate that the old "max-zone-ttl" zone option
+			is now ignored when "dnssec-policy" is in use.
+			[GL #2918]
+
+5924.	[func]		When it's necessary to use AXFR to respond to an
+			IXFR request, a message explaining the reason
+			is now logged at level info. [GL #2683]
+
+5923.	[bug]		Fix inheritance for dnssec-policy when checking for
+			inline-signing. [GL #3438]
+
+5922.	[bug]		Forwarding of UPDATE message could fail with the
+			introduction of netmgr. This has been fixed. [GL #3389]
+
+	--- 9.16.31 released ---
+
+5917.	[bug]		Update ifconfig.sh script as is miscomputed interface
+			identifiers when destroying interfaces. [GL #3061]
+
+5915.	[bug]		Detect missing closing brace (}) and computational
+			overflows in $GENERATE directives. [GL #3429]
+
+5913.	[bug]		Fix a race between resolver query timeout and
+			validation in resolver.c:validated(). Remove
+			resolver.c:maybe_destroy() as it is no loger needed.
+			[GL #3398]
+
+5909.	[bug]		The server-side destination port was missing from dnstap
+			captures of client traffic. [GL #3309]
+
+5905.	[bug]		When the TCP connection would be closed/reset between
+			the connect/accept and the read, the uv_read_start()
+			return value would be unexpected and cause an assertion
+			failure. [GL #3400]
+
+5903.	[bug]		When named checks that the OPCODE in a response matches
+			that of the request, if there is a mismatch named logs
+			an error.  Some of those error messages incorrectly
+			used RCODE instead of OPCODE to lookup the nemonic.
+			This has been corrected. [GL !6420]
+
+	--- 9.16.30 released ---
+
+5899.	[func]		Don't try to process DNSSEC-related and ZONEMD records
+			in catz. [GL #3380]
+
+5890.	[bug]		When the fetches-per-server quota was adjusted
+			because of an authoritative server timing out more
+			or less frequently, it was incorrectly set to 1
+			rather than the intended value.  This has been
+			fixed. [GL #3327]
+
+5888.	[bug]		Only write key files if the dnssec-policy keymgr has
+			changed the metadata. [GL #3302]
+
+5823.	[func]		Replace hazard pointers based lock-free list with
+			locked-list based queue that's simpler and has no or
+			little performance impact. [GL #3180]
+
+	--- 9.16.29 released ---
+
+5885.	[bug]		RPZ NSIP and NSDNAME rule processing didn't handle stub
+			and static-stub zones at or above the query name.  This
+			has now been addressed. [GL #3232]
+
+5881.	[bug]		dig +nssearch could hang in rare cases when recv_done()
+			callback was being called earlier than send_done().
+			[GL #3278]
+
+5880.	[func]		Add new named command-line option -C to print built-in
+			defaults. [GL #1326]
+
+5879.	[contrib]	dlz: Add FALLTHROUGH and UNREACHABLE macros. [GL #3306]
+
+5874.	[bug]		keymgr didn't work with python 3.11. [GL !6157]
+
+5866.	[bug]		Work around a jemalloc quirk which could trigger an
+			out-of-memory condition in named over time. [GL #3287]
+
+5863.	[bug]		If there was a pending negative cache DS entry,
+			validations depending upon it could fail. [GL #3279]
+
+5858.	[bug]		Don't remove CDS/CDNSKEY DELETE records on zone sign
+			when using 'auto-dnssec maintain;'. [GL #2931]
+
+	--- 9.16.28 released ---
+
+5856.	[bug]		The "starting maxtime timer" message related to outgoing
+			zone transfers was incorrectly logged at the ERROR level
+			instead of DEBUG(1). [GL #3208]
+
+5852.	[func]		Add new "reuseport" option to enable/disable load
+			balancing of sockets. [GL #3249]
+
+5843.	[bug]		When an UPDATE targets a zone that is not configured,
+			the requested zone name is now logged in the "not
+			authoritative" error message, so that it is easier to
+			track down problematic update clients. [GL #3209]
+
+5836.	[bug]		Quote the dns64 prefix in error messages that complain
+			about problems with it, to avoid confusion with the
+			following dns64 ACLs. [GL #3210]
+
+5834.	[cleanup]	C99 variable-length arrays are difficult to use safely,
+			so avoid them except in test code. [GL #3201]
+
+5828.	[bug]		Replace single TCP write timer with per-TCP write
+			timers. [GL #3200]
+
+5824.	[bug]		Invalid dnssec-policy definitions were being accepted
+			where the defined keys did not cover both KSK and ZSK
+			roles for a given algorithm.  This is now checked for
+			and the dnssec-policy is rejected if both roles are
+			not present for all algorithms in use. [GL #3142]
+
 	--- 9.16.27 released ---
 
 5818.	[security]	A synchronous call to closehandle_cb() caused

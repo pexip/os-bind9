@@ -191,8 +191,7 @@ pkcs11ecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		dgstlen = ISC_SHA384_DIGESTLENGTH;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	PK11_RET(pkcs_C_DigestFinal, (pk11_ctx->session, digest, &dgstlen),
@@ -211,6 +210,7 @@ pkcs11ecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 
 	for (attr = pk11_attribute_first(ec); attr != NULL;
 	     attr = pk11_attribute_next(ec, attr))
+	{
 		switch (attr->type) {
 		case CKA_EC_PARAMS:
 			INSIST(keyTemplate[5].type == attr->type);
@@ -229,6 +229,7 @@ pkcs11ecdsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 			keyTemplate[6].ulValueLen = attr->ulValueLen;
 			break;
 		}
+	}
 	pk11_ctx->object = CK_INVALID_HANDLE;
 	pk11_ctx->ontoken = false;
 	PK11_RET(pkcs_C_CreateObject,
@@ -309,8 +310,7 @@ pkcs11ecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		dgstlen = ISC_SHA384_DIGESTLENGTH;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	PK11_RET(pkcs_C_DigestFinal, (pk11_ctx->session, digest, &dgstlen),
@@ -318,6 +318,7 @@ pkcs11ecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 
 	for (attr = pk11_attribute_first(ec); attr != NULL;
 	     attr = pk11_attribute_next(ec, attr))
+	{
 		switch (attr->type) {
 		case CKA_EC_PARAMS:
 			INSIST(keyTemplate[5].type == attr->type);
@@ -336,6 +337,7 @@ pkcs11ecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
 			keyTemplate[6].ulValueLen = attr->ulValueLen;
 			break;
 		}
+	}
 	pk11_ctx->object = CK_INVALID_HANDLE;
 	pk11_ctx->ontoken = false;
 	PK11_RET(pkcs_C_CreateObject,
@@ -449,8 +451,7 @@ pkcs11ecdsa_compare(const dst_key_t *key1, const dst_key_t *key2) {
 		attr->ulValueLen = sizeof(PK11_ECC_SECP384R1);           \
 		break;                                                   \
 	default:                                                         \
-		INSIST(0);                                               \
-		ISC_UNREACHABLE();                                       \
+		UNREACHABLE();                                           \
 	}
 
 #define FREECURVE()                                                     \
@@ -559,8 +560,7 @@ pkcs11ecdsa_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 		key->key_size = DNS_KEY_ECDSA384SIZE * 4;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	return (ISC_R_SUCCESS);
@@ -605,6 +605,7 @@ pkcs11ecdsa_destroy(dst_key_t *key) {
 
 	for (attr = pk11_attribute_first(ec); attr != NULL;
 	     attr = pk11_attribute_next(ec, attr))
+	{
 		switch (attr->type) {
 		case CKA_LABEL:
 		case CKA_ID:
@@ -614,6 +615,7 @@ pkcs11ecdsa_destroy(dst_key_t *key) {
 			FREECURVE();
 			break;
 		}
+	}
 	if (ec->repr != NULL) {
 		memset(ec->repr, 0, ec->attrcnt * sizeof(*attr));
 		isc_mem_put(key->mctx, ec->repr, ec->attrcnt * sizeof(*attr));
@@ -640,8 +642,7 @@ pkcs11ecdsa_todns(const dst_key_t *key, isc_buffer_t *data) {
 		len = DNS_KEY_ECDSA384SIZE;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	ec = key->keydata.pkey;
@@ -682,8 +683,7 @@ pkcs11ecdsa_fromdns(dst_key_t *key, isc_buffer_t *data) {
 		len = DNS_KEY_ECDSA384SIZE;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	isc_buffer_remainingregion(data, &r);
@@ -978,8 +978,7 @@ pkcs11ecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		key->key_size = DNS_KEY_ECDSA384SIZE * 4;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	return (ISC_R_SUCCESS);
@@ -1100,8 +1099,7 @@ pkcs11ecdsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
 		key->key_size = DNS_KEY_ECDSA384SIZE * 4;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	pk11_return_session(pk11_ctx);

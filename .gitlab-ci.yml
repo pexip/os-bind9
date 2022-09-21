@@ -16,16 +16,17 @@ variables:
   TEST_PARALLEL_JOBS: 6
 
   CONFIGURE: ./configure
-  CLANG: clang-13
-  SCAN_BUILD: scan-build-13
-  ASAN_SYMBOLIZER_PATH: /usr/lib/llvm-13/bin/llvm-symbolizer
-  CLANG_FORMAT: clang-format-13
+  CLANG_VERSION: 14
+  CLANG: "clang-${CLANG_VERSION}"
+  SCAN_BUILD: "scan-build-${CLANG_VERSION}"
+  ASAN_SYMBOLIZER_PATH: "/usr/lib/llvm-${CLANG_VERSION}/bin/llvm-symbolizer"
+  CLANG_FORMAT: "clang-format-${CLANG_VERSION}"
 
-  CFLAGS_COMMON: -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g -Wall -Wextra 
+  CFLAGS_COMMON: -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -g -Wall -Wextra
 
   # Pass run-time flags to AddressSanitizer to get core dumps on error.
   ASAN_OPTIONS: abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1
-  TSAN_OPTIONS_COMMON: "disable_coredump=0 second_deadlock_stack=1 history_size=7 log_exe_name=true log_path=tsan external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
+  TSAN_OPTIONS_COMMON: "disable_coredump=0 second_deadlock_stack=1 history_size=7 log_exe_name=true log_path=tsan"
 
   TARBALL_COMPRESSOR: xz
   TARBALL_EXTENSION: xz
@@ -54,7 +55,6 @@ stages:
   - system
   - performance
   - docs
-  - push
   - postcheck
   - release
 
@@ -100,8 +100,8 @@ stages:
 
 # Alpine Linux
 
-.alpine-3.15-amd64: &alpine_3_15_amd64_image
-  image: "$CI_REGISTRY_IMAGE:alpine-3.15-amd64"
+.alpine-3.16-amd64: &alpine_3_16_amd64_image
+  image: "$CI_REGISTRY_IMAGE:alpine-3.16-amd64"
   <<: *linux_amd64
 
 # Oracle Linux
@@ -115,10 +115,6 @@ stages:
   <<: *linux_amd64
 
 # Debian
-
-.debian-stretch-amd64: &debian_stretch_amd64_image
-  image: "$CI_REGISTRY_IMAGE:debian-stretch-amd64"
-  <<: *linux_amd64
 
 .debian-buster-amd64: &debian_buster_amd64_image
   image: "$CI_REGISTRY_IMAGE:debian-buster-amd64"
@@ -162,6 +158,10 @@ stages:
   image: "$CI_REGISTRY_IMAGE:ubuntu-focal-amd64"
   <<: *linux_amd64
 
+.ubuntu-jammy-amd64: &ubuntu_jammy_amd64_image
+  image: "$CI_REGISTRY_IMAGE:ubuntu-jammy-amd64"
+  <<: *linux_amd64
+
 # Windows
 
 .windows-server-2016-amd64: &windows_server_2016_amd64_image
@@ -181,38 +181,34 @@ stages:
   <<: *libvirt_amd64
 
 .freebsd-13-amd64: &freebsd_13_amd64_image
-  image: "freebsd-13.0-x86_64"
+  image: "freebsd-13.1-x86_64"
   <<: *libvirt_amd64
 
 .openbsd-amd64: &openbsd_amd64_image
-  image: "openbsd-7.0-x86_64"
+  image: "openbsd-7.1-x86_64"
   <<: *libvirt_amd64
 
 ### Job Templates
+
+.api-schedules-tags-triggers-web-triggering-rules: &api_schedules_tags_triggers_web_triggering_rules
+  only:
+    - api
+    - schedules
+    - tags
+    - triggers
+    - web
+
+.api-schedules-triggers-web-triggering-rules: &api_schedules_triggers_web_triggering_rules
+  only:
+    - api
+    - schedules
+    - triggers
+    - web
 
 .default-triggering-rules: &default_triggering_rules
   only:
     - api
     - merge_requests
-    - tags
-    - triggers
-    - web
-    - schedules
-
-.release-branch-triggering-rules: &release_branch_triggering_rules
-  only:
-    - api
-    - merge_requests
-    - tags
-    - triggers
-    - web
-    - schedules
-    - main@isc-projects/bind9
-    - /^v9_[1-9][0-9]$/@isc-projects/bind9
-
-.schedules-tags-web-triggering-rules: &schedules_tags_web_triggering_rules
-  only:
-    - api
     - schedules
     - tags
     - triggers
@@ -224,7 +220,7 @@ stages:
   stage: precheck
 
 .autoconf: &autoconf_job
-  <<: *release_branch_triggering_rules
+  <<: *default_triggering_rules
   <<: *base_image
   stage: precheck
   script:
@@ -351,7 +347,7 @@ stages:
          --output kyua_html > /dev/null
 
 .windows_system_test: &windows_system_test_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   stage: system
   script:
     - 'Push-Location bin/tests/system'
@@ -408,6 +404,25 @@ stages:
       - kyua_html/
     when: on_failure
 
+.respdiff: &respdiff_job
+  <<: *base_image
+  stage: system
+  before_script:
+    - *configure
+    - make -j${BUILD_PARALLEL_JOBS:-1} V=1
+    - *setup_interfaces
+    - git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.isc.org/isc-private/bind-qa.git
+    - cd bind-qa/bind9/respdiff
+  needs: []
+  artifacts:
+    paths:
+      - bind-qa/bind9/respdiff
+    exclude:
+      - bind-qa/bind9/respdiff/rspworkdir/data.mdb # Exclude a 10 GB file.
+    untracked: true
+    expire_in: "1 day"
+    when: always
+
 ### Job Definitions
 
 # Jobs in the precheck stage
@@ -438,6 +453,19 @@ misc:
     paths:
       - checklibs.out
     expire_in: "1 day"
+    when: on_failure
+
+black:
+  <<: *precheck_job
+  needs: []
+  script:
+    - black $(git ls-files '*.py' '*.py.in')
+    - git diff > black.patch
+    - if test "$(git status --porcelain | grep -Ev '\?\?' | wc -l)" -gt "0"; then git status --short; exit 1; fi
+  artifacts:
+    paths:
+      - black.patch
+    expire_in: "1 week"
     when: on_failure
 
 clang-format:
@@ -480,19 +508,6 @@ danger:
     variables:
       - $DANGER_GITLAB_API_TOKEN
 
-flake8:
-  <<: *default_triggering_rules
-  <<: *base_image
-  stage: postcheck
-  needs:
-    - job: autoreconf
-      artifacts: true
-  script:
-    - *configure
-    - flake8 --max-line-length=80 $(git ls-files '*.py' | grep -vE '(ans\.py|dangerfile\.py|^bin/tests/system/)')
-      # Ignore Flake8 E402 error (module level import not at top of file) in system test to enable use of pytest.importorskip
-    - flake8 --max-line-length=80 --extend-ignore=E402 $(git ls-files 'bin/tests/system/*.py' | grep -vE 'ans\.py')
-
 pylint:
   <<: *default_triggering_rules
   <<: *base_image
@@ -526,7 +541,7 @@ tarball-create:
 # Jobs for doc builds on Debian 11 "bullseye" (amd64)
 
 docs:
-  <<: *release_branch_triggering_rules
+  <<: *default_triggering_rules
   <<: *base_image
   stage: docs
   before_script:
@@ -551,41 +566,28 @@ docs:
       - doc/arm/
       - doc/man/
       - doc/misc/
-    expire_in: "1 month"
 
-push:docs:
-  <<: *base_image
-  stage: push
-  needs:
-    - job: docs
-      artifacts: false
-  script:
-    - curl -X POST -F token=$GITLAB_PAGES_DOCS_TRIGGER_TOKEN -F ref=main $GITLAB_PAGES_DOCS_TRIGGER_URL
-  only:
-    - main@isc-projects/bind9
-    - /^v9_[1-9][0-9]$/@isc-projects/bind9
+# Jobs for regular GCC builds on Alpine Linux 3.16 (amd64)
 
-# Jobs for regular GCC builds on Alpine Linux 3.15 (amd64)
-
-gcc:alpine3.15:amd64:
+gcc:alpine3.16:amd64:
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON}"
-  <<: *alpine_3_15_amd64_image
+  <<: *alpine_3_16_amd64_image
   <<: *build_job
 
-system:gcc:alpine3.15:amd64:
-  <<: *alpine_3_15_amd64_image
+system:gcc:alpine3.16:amd64:
+  <<: *alpine_3_16_amd64_image
   <<: *system_test_job
   needs:
-    - job: gcc:alpine3.15:amd64
+    - job: gcc:alpine3.16:amd64
       artifacts: true
 
-unit:gcc:alpine3.15:amd64:
-  <<: *alpine_3_15_amd64_image
+unit:gcc:alpine3.16:amd64:
+  <<: *alpine_3_16_amd64_image
   <<: *unit_test_job
   needs:
-    - job: gcc:alpine3.15:amd64
+    - job: gcc:alpine3.16:amd64
       artifacts: true
 
 # Jobs for regular GCC builds on Oracle Linux 7 (amd64)
@@ -636,33 +638,6 @@ unit:gcc:oraclelinux8:amd64:
     - job: gcc:oraclelinux8:amd64
       artifacts: true
 
-# Jobs for regular GCC builds on Debian 9 "stretch" (amd64)
-
-gcc:stretch:amd64:
-  variables:
-    CC: gcc
-    CFLAGS: "${CFLAGS_COMMON} -O2"
-    EXTRA_CONFIGURE: "--without-gssapi"
-  <<: *debian_stretch_amd64_image
-  <<: *build_job
-  <<: *schedules_tags_web_triggering_rules
-
-system:gcc:stretch:amd64:
-  <<: *debian_stretch_amd64_image
-  <<: *system_test_job
-  <<: *schedules_tags_web_triggering_rules
-  needs:
-    - job: gcc:stretch:amd64
-      artifacts: true
-
-unit:gcc:stretch:amd64:
-  <<: *debian_stretch_amd64_image
-  <<: *unit_test_job
-  <<: *schedules_tags_web_triggering_rules
-  needs:
-    - job: gcc:stretch:amd64
-      artifacts: true
-
 # Jobs for regular GCC builds on Debian 10 "buster" (amd64)
 
 gcc:buster:amd64:
@@ -672,12 +647,12 @@ gcc:buster:amd64:
     EXTRA_CONFIGURE: "--with-libidn2"
   <<: *debian_buster_amd64_image
   <<: *build_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
 
 system:gcc:buster:amd64:
   <<: *debian_buster_amd64_image
   <<: *system_test_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   needs:
     - job: gcc:buster:amd64
       artifacts: true
@@ -685,7 +660,7 @@ system:gcc:buster:amd64:
 unit:gcc:buster:amd64:
   <<: *debian_buster_amd64_image
   <<: *unit_test_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   needs:
     - job: gcc:buster:amd64
       artifacts: true
@@ -709,6 +684,16 @@ system:gcc:bullseye:amd64:
     - job: unit:gcc:bullseye:amd64
       artifacts: true
 
+system:gcc:bullseye:unstable:amd64:
+  <<: *debian_bullseye_amd64_image
+  <<: *system_test_job
+  <<: *api_schedules_triggers_web_triggering_rules
+  variables:
+    CI_ENABLE_ALL_TESTS: 1
+  needs:
+    - job: gcc:bullseye:amd64
+      artifacts: true
+
 unit:gcc:bullseye:amd64:
   <<: *debian_bullseye_amd64_image
   <<: *unit_test_gcov_job
@@ -719,16 +704,12 @@ unit:gcc:bullseye:amd64:
 unit:gcc:bullseye:unstable:amd64:
   <<: *debian_bullseye_amd64_image
   <<: *unit_test_job
+  <<: *api_schedules_triggers_web_triggering_rules
   variables:
     CI_ENABLE_ALL_TESTS: 1
   needs:
     - job: gcc:bullseye:amd64
       artifacts: true
-  only:
-    - api
-    - schedules
-    - triggers
-    - web
 
 # Jobs for cross-compiled GCC builds on Debian 11 "bullseye" (amd64) with
 # 32-bit libraries
@@ -848,7 +829,7 @@ gcc:tarball:
 system:gcc:tarball:
   <<: *base_image
   <<: *system_test_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   before_script:
     - cd bind-*
     - *setup_interfaces
@@ -859,7 +840,7 @@ system:gcc:tarball:
 unit:gcc:tarball:
   <<: *base_image
   <<: *unit_test_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   before_script:
     - cd bind-*
   needs:
@@ -896,13 +877,15 @@ gcc:bionic:amd64:
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON} -O2"
-    EXTRA_CONFIGURE: "--disable-dnstap --disable-geoip --with-gssapi"
+    EXTRA_CONFIGURE: "--disable-dnstap --with-gssapi"
   <<: *ubuntu_bionic_amd64_image
   <<: *build_job
+  <<: *api_schedules_tags_triggers_web_triggering_rules
 
 system:gcc:bionic:amd64:
   <<: *ubuntu_bionic_amd64_image
   <<: *system_test_job
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   needs:
     - job: gcc:bionic:amd64
       artifacts: true
@@ -910,6 +893,7 @@ system:gcc:bionic:amd64:
 unit:gcc:bionic:amd64:
   <<: *ubuntu_bionic_amd64_image
   <<: *unit_test_job
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   needs:
     - job: gcc:bionic:amd64
       artifacts: true
@@ -920,7 +904,7 @@ gcc:focal:amd64:
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON} -Og"
-    EXTRA_CONFIGURE: "--with-libidn2 --with-gssapi=/usr"
+    EXTRA_CONFIGURE: "--with-libidn2 --with-gssapi=/usr --disable-geoip"
   <<: *ubuntu_focal_amd64_image
   <<: *build_job
 
@@ -936,6 +920,30 @@ unit:gcc:focal:amd64:
   <<: *unit_test_job
   needs:
     - job: gcc:focal:amd64
+      artifacts: true
+
+# Jobs for regular GCC builds on Ubuntu 22.04 Jammy Jellyfish (amd64)
+
+gcc:jammy:amd64:
+  variables:
+    CC: gcc
+    CFLAGS: "${CFLAGS_COMMON}"
+    EXTRA_CONFIGURE: "--with-libidn2"
+  <<: *ubuntu_jammy_amd64_image
+  <<: *build_job
+
+system:gcc:jammy:amd64:
+  <<: *ubuntu_jammy_amd64_image
+  <<: *system_test_job
+  needs:
+    - job: gcc:jammy:amd64
+      artifacts: true
+
+unit:gcc:jammy:amd64:
+  <<: *ubuntu_jammy_amd64_image
+  <<: *unit_test_job
+  needs:
+    - job: gcc:jammy:amd64
       artifacts: true
 
 # Jobs for ASAN builds on Fedora 35 (amd64)
@@ -999,7 +1007,7 @@ gcc:tsan:
 
 system:gcc:tsan:
   variables:
-    TSAN_OPTIONS: ${TSAN_OPTIONS_COMMON}
+    TSAN_OPTIONS: "${TSAN_OPTIONS_COMMON} external_symbolizer_path=/usr/bin/llvm-symbolizer"
   <<: *fedora_35_amd64_image
   <<: *system_test_tsan_job
   needs:
@@ -1008,7 +1016,7 @@ system:gcc:tsan:
 
 unit:gcc:tsan:
   variables:
-    TSAN_OPTIONS: ${TSAN_OPTIONS_COMMON}
+    TSAN_OPTIONS: "${TSAN_OPTIONS_COMMON} external_symbolizer_path=/usr/bin/llvm-symbolizer"
   <<: *fedora_35_amd64_image
   <<: *unit_test_tsan_job
   needs:
@@ -1026,7 +1034,7 @@ clang:tsan:
 
 system:clang:tsan:
   variables:
-    TSAN_OPTIONS: ${TSAN_OPTIONS_COMMON}
+    TSAN_OPTIONS: "${TSAN_OPTIONS_COMMON} external_symbolizer_path=/usr/lib/llvm-${CLANG_VERSION}/bin/llvm-symbolizer"
   <<: *base_image
   <<: *system_test_tsan_job
   needs:
@@ -1035,35 +1043,11 @@ system:clang:tsan:
 
 unit:clang:tsan:
   variables:
-    TSAN_OPTIONS: ${TSAN_OPTIONS_COMMON} suppressions=$CI_PROJECT_DIR/tsan-suppressions.txt
+    TSAN_OPTIONS: "${TSAN_OPTIONS_COMMON} external_symbolizer_path=/usr/lib/llvm-${CLANG_VERSION}/bin/llvm-symbolizer suppressions=$CI_PROJECT_DIR/tsan-suppressions.txt"
   <<: *base_image
   <<: *unit_test_tsan_job
   needs:
     - job: clang:tsan
-      artifacts: true
-
-# Jobs for builds with mutex-based atomics on Debian 11 "bullseye" (amd64)
-
-gcc:mutexatomics:
-  variables:
-    CC: gcc
-    CFLAGS: "${CFLAGS_COMMON} -DISC_MEM_USE_INTERNAL_MALLOC=0"
-    EXTRA_CONFIGURE: "--with-libidn2 --enable-mutex-atomics"
-  <<: *base_image
-  <<: *build_job
-
-system:gcc:mutexatomics:
-  <<: *base_image
-  <<: *system_test_job
-  needs:
-    - job: gcc:mutexatomics
-      artifacts: true
-
-unit:gcc:mutexatomics:
-  <<: *base_image
-  <<: *unit_test_job
-  needs:
-    - job: gcc:mutexatomics
       artifacts: true
 
 # Jobs for Clang builds on Debian 11 "bullseye" (amd64)
@@ -1090,25 +1074,25 @@ unit:clang:bullseye:amd64:
     - job: clang:bullseye:amd64
       artifacts: true
 
-# Jobs for PKCS#11-enabled GCC builds on Fedora 35 (amd64)
+# Jobs for PKCS#11-enabled GCC builds on Debian 11 "bullseye" (amd64)
 
 gcc:softhsm2.6:
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON} -O1"
-    EXTRA_CONFIGURE: "--with-libidn2 --enable-native-pkcs11 --with-pkcs11=/usr/lib64/pkcs11/libsofthsm2.so"
-  <<: *fedora_35_amd64_image
+    EXTRA_CONFIGURE: "--with-libidn2 --enable-native-pkcs11 --with-pkcs11=/usr/lib/softhsm/libsofthsm2.so"
+  <<: *debian_bullseye_amd64_image
   <<: *build_job
 
 system:gcc:softhsm2.6:
-  <<: *fedora_35_amd64_image
+  <<: *debian_bullseye_amd64_image
   <<: *system_test_job
   needs:
     - job: gcc:softhsm2.6
       artifacts: true
 
 unit:gcc:softhsm2.6:
-  <<: *fedora_35_amd64_image
+  <<: *debian_bullseye_amd64_image
   <<: *unit_test_job
   needs:
     - job: gcc:softhsm2.6
@@ -1181,16 +1165,12 @@ clang:openbsd:amd64:
 system:clang:openbsd:amd64:
   <<: *openbsd_amd64_image
   <<: *system_test_job
+  <<: *api_schedules_triggers_web_triggering_rules
   variables:
     USER: gitlab-runner
   needs:
     - job: clang:openbsd:amd64
       artifacts: true
-  only:
-    - api
-    - schedules
-    - triggers
-    - web
 
 # Jobs with libtool disabled
 
@@ -1237,7 +1217,7 @@ system:msvc:windows:amd64:
 msvc-debug:windows:amd64:
   <<: *windows_server_2016_amd64_image
   <<: *windows_build_job
-  <<: *schedules_tags_web_triggering_rules
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   variables:
     VSCONF: Debug
 
@@ -1300,27 +1280,25 @@ release:
 
 # Coverity Scan analysis upload
 
-.coverity_cache_prep: &coverity_cache_prep
-  - test -f cov-analysis-linux64.md5 && test -f cov-analysis-linux64.tgz || (
-    curl --output cov-analysis-linux64.md5 https://scan.coverity.com/download/linux64
+.coverity_prep: &coverity_prep
+  - curl --output /tmp/cov-analysis-linux64.md5 https://scan.coverity.com/download/linux64
          --form project=$COVERITY_SCAN_PROJECT_NAME
          --form token=$COVERITY_SCAN_TOKEN
-         --form md5=1;
-    curl --output cov-analysis-linux64.tgz https://scan.coverity.com/download/linux64
+         --form md5=1
+  - curl --output /tmp/cov-analysis-linux64.tgz https://scan.coverity.com/download/linux64
          --form project=$COVERITY_SCAN_PROJECT_NAME
-         --form token=$COVERITY_SCAN_TOKEN;
-    )
-  - test "$(md5sum cov-analysis-linux64.tgz | awk '{ print $1 }')" = "$(cat cov-analysis-linux64.md5)"
-  - tar --extract --gzip --file=cov-analysis-linux64.tgz
-  - test -d cov-analysis-linux64-2021.12.1
+         --form token=$COVERITY_SCAN_TOKEN
+  - test "$(md5sum /tmp/cov-analysis-linux64.tgz | awk '{ print $1 }')" = "$(cat /tmp/cov-analysis-linux64.md5)"
+  - tar --extract --gzip --file=/tmp/cov-analysis-linux64.tgz --directory=/tmp
+  - test -d /tmp/cov-analysis-linux64-2022.6.0
 
 .coverity_build: &coverity_build
-  - cov-analysis-linux64-2021.12.1/bin/cov-build --dir cov-int sh -c 'make -j${BUILD_PARALLEL_JOBS:-1} -k all V=1'
-  - tar --create --gzip --file=cov-int.tar.gz cov-int/
+  - /tmp/cov-analysis-linux64-2022.6.0/bin/cov-build --dir /tmp/cov-int --fs-capture-search . sh -c 'make -j${BUILD_PARALLEL_JOBS:-1} -k all V=1'
+  - tar --create --gzip --file=/tmp/cov-int.tar.gz --directory /tmp cov-int
   - curl -v https://scan.coverity.com/builds?project=$COVERITY_SCAN_PROJECT_NAME
         --form token=$COVERITY_SCAN_TOKEN
         --form email=bind-changes@isc.org
-        --form file=@cov-int.tar.gz
+        --form file=@/tmp/cov-int.tar.gz
         --form version="$(git rev-parse --short HEAD)"
         --form description="$(git rev-parse --short HEAD) / $CI_COMMIT_TITLE / $CI_COMMIT_REF_NAME:$CI_PIPELINE_ID" 2>&1
         | tee curl-response.txt
@@ -1334,9 +1312,11 @@ coverity:
     CFLAGS: "${CFLAGS_COMMON} -Og"
     EXTRA_CONFIGURE: "--with-libidn2"
   script:
-    - *coverity_cache_prep
+    - *coverity_prep
     - *configure
     - *coverity_build
+  after_script:
+    - mv -v /tmp/cov-int.tar.gz ${CI_PROJECT_DIR}/
   needs:
     - job: autoreconf
       artifacts: true
@@ -1350,69 +1330,38 @@ coverity:
     variables:
       - $COVERITY_SCAN_PROJECT_NAME
       - $COVERITY_SCAN_TOKEN
-  cache:
-    key: cov-analysis-linux64-2021.12.1
-    paths:
-      - cov-analysis-linux64.md5
-      - cov-analysis-linux64.tgz
 
 # Respdiff tests
 
-respdiff:
-  <<: *base_image
-  <<: *schedules_tags_web_triggering_rules
-  stage: system
+respdiff-short:
+  <<: *respdiff_job
+  <<: *default_triggering_rules
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON} -Og"
-    BIND_BASELINE_VERSION: v9_11_24
     MAX_DISAGREEMENTS_PERCENTAGE: "0.1"
   script:
-    - *configure
-    - make -j${BUILD_PARALLEL_JOBS:-1} V=1
-    - *setup_interfaces
-    - git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.isc.org/isc-private/bind-qa.git
-    - git clone --branch "${BIND_BASELINE_VERSION}" --depth 1 https://gitlab.isc.org/isc-projects/bind9.git refserver
-    - cd refserver/
-    - ./configure --without-make-clean --with-randomdev=/dev/urandom
-    - make -j${BUILD_PARALLEL_JOBS:-1} V=1
-    - cd ../bind-qa/bind9/respdiff
-    - bash respdiff.sh -s named -q "${PWD}/100k_mixed.txt" -c 3 -w "${PWD}/rspworkdir" "${CI_PROJECT_DIR}" "${CI_PROJECT_DIR}/refserver"
-  needs: []
-  artifacts:
-    paths:
-      - refserver
-      - bind-qa/bind9/respdiff
-    exclude:
-      - bind-qa/bind9/respdiff/rspworkdir/data.mdb # Exclude a 10 GB file.
-    untracked: true
-    expire_in: "1 day"
-    when: always
+    - bash respdiff.sh -s named -q "${PWD}/10k_a.txt" -c 3 -w "${PWD}/rspworkdir" "${CI_PROJECT_DIR}" "/usr/local/respdiff-reference-bind/sbin/named"
 
-respdiff-third-party:
-  <<: *base_image
-  <<: *schedules_tags_web_triggering_rules
-  stage: system
+respdiff-long:
+  <<: *respdiff_job
+  <<: *api_schedules_tags_triggers_web_triggering_rules
   variables:
     CC: gcc
     CFLAGS: "${CFLAGS_COMMON} -Og"
     MAX_DISAGREEMENTS_PERCENTAGE: "0.1"
   script:
-    - *configure
-    - make -j${BUILD_PARALLEL_JOBS:-1} V=1
-    - *setup_interfaces
-    - git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.isc.org/isc-private/bind-qa.git
-    - cd bind-qa/bind9/respdiff
+    - bash respdiff.sh -s named -q "${PWD}/100k_mixed.txt" -c 3 -w "${PWD}/rspworkdir" "${CI_PROJECT_DIR}" "/usr/local/respdiff-reference-bind/sbin/named"
+
+respdiff-long-third-party:
+  <<: *respdiff_job
+  <<: *api_schedules_tags_triggers_web_triggering_rules
+  variables:
+    CC: gcc
+    CFLAGS: "${CFLAGS_COMMON} -Og"
+    MAX_DISAGREEMENTS_PERCENTAGE: "0.1"
+  script:
     - bash respdiff.sh -s third_party -q "${PWD}/100k_mixed.txt" -c 1 -w "${PWD}/rspworkdir" "${CI_PROJECT_DIR}"
-  needs: []
-  artifacts:
-    paths:
-      - bind-qa/bind9/respdiff
-    exclude:
-      - bind-qa/bind9/respdiff/rspworkdir/data.mdb # Exclude a 10 GB file.
-    untracked: true
-    expire_in: "1 day"
-    when: always
 
 # "Stress" tests
 
@@ -1464,6 +1413,20 @@ stress:recursive:fedora:35:amd64:
     variables:
       - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /linux/i && $BIND_STRESS_TEST_MODE =~ /recursive/i && $BIND_STRESS_TEST_ARCH =~ /amd64/i)
 
+stress:rpz:fedora:35:amd64:
+  <<: *fedora_35_amd64_image
+  <<: *linux_stress_amd64
+  <<: *stress_job
+  variables:
+    CC: gcc
+    FLAME: /usr/bin/flame
+    MODE: rpz
+    RATE: 1500
+    RUN_TIME: 1
+  only:
+    variables:
+      - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /linux/i && $BIND_STRESS_TEST_MODE =~ /rpz/i && $BIND_STRESS_TEST_ARCH =~ /amd64/i)
+
 stress:authoritative:fedora:35:arm64:
   <<: *fedora_35_arm64_image
   <<: *linux_stress_arm64
@@ -1492,6 +1455,20 @@ stress:recursive:fedora:35:arm64:
     variables:
       - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /linux/i && $BIND_STRESS_TEST_MODE =~ /recursive/i && $BIND_STRESS_TEST_ARCH =~ /arm64/i)
 
+stress:rpz:fedora:35:arm64:
+  <<: *fedora_35_arm64_image
+  <<: *linux_stress_arm64
+  <<: *stress_job
+  variables:
+    CC: gcc
+    FLAME: /usr/bin/flame
+    MODE: rpz
+    RATE: 1500
+    RUN_TIME: 1
+  only:
+    variables:
+      - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /linux/i && $BIND_STRESS_TEST_MODE =~ /rpz/i && $BIND_STRESS_TEST_ARCH =~ /arm64/i)
+
 stress:authoritative:freebsd12:amd64:
   <<: *freebsd_12_amd64_image
   <<: *freebsd_stress_amd64
@@ -1519,6 +1496,20 @@ stress:recursive:freebsd12:amd64:
   only:
     variables:
       - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /freebsd/i && $BIND_STRESS_TEST_MODE =~ /recursive/i && $BIND_STRESS_TEST_ARCH =~ /amd64/i)
+
+stress:rpz:freebsd12:amd64:
+  <<: *freebsd_12_amd64_image
+  <<: *freebsd_stress_amd64
+  <<: *stress_job
+  variables:
+    CC: clang
+    FLAME: /usr/local/bin/flame
+    MODE: rpz
+    RATE: 1500
+    RUN_TIME: 1
+  only:
+    variables:
+      - $CI_COMMIT_TAG || ($BIND_STRESS_TEST_OS =~ /freebsd/i && $BIND_STRESS_TEST_MODE =~ /rpz/i && $BIND_STRESS_TEST_ARCH =~ /amd64/i)
 
 gcov:
   <<: *base_image
@@ -1551,7 +1542,9 @@ gcov:
       - coverage.txt
       - coverage.xml
     reports:
-      cobertura: coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
 
 # Pairwise testing of ./configure options
 

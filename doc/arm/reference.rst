@@ -1516,11 +1516,15 @@ default is used.
    cannot be longer than a week.
 
 ``max-zone-ttl``
-   This specifies a maximum permissible TTL value in seconds. For
-   convenience, TTL-style time-unit suffixes may be used to specify the
-   maximum value. When loading a zone file using a ``masterfile-format``
-   of ``text`` or ``raw``, any record encountered with a TTL higher than
-   ``max-zone-ttl`` causes the zone to be rejected.
+
+   This should now be configured as part of ``dnssec-policy``.
+   Use of this option in ``options``, ``view`` and ``zone`` blocks has no
+   effect on any zone for which a ``dnssec-policy`` has also been configured.
+
+   ``max-zone-ttl`` specifies a maximum permissible TTL value in seconds.
+   For convenience, TTL-style time-unit suffixes may be used to specify the
+   maximum value. When a zone file is loaded, any record encountered with a
+   TTL higher than ``max-zone-ttl`` causes the zone to be rejected.
 
    This is useful in DNSSEC-signed zones because when rolling to a new
    DNSKEY, the old key needs to remain available until RRSIG records
@@ -1530,8 +1534,8 @@ default is used.
    (Note: because ``map``-format files load directly into memory, this
    option cannot be used with them.)
 
-   The default value is ``unlimited``. A ``max-zone-ttl`` of zero is
-   treated as ``unlimited``.
+   The default value is ``unlimited``. Setting ``max-zone-ttl`` to zero is
+   equivalent to ``unlimited``.
 
 ``stale-answer-ttl``
    This specifies the TTL to be returned on stale answers. The default is 30
@@ -1690,6 +1694,28 @@ Boolean Options
 ``root-key-sentinel``
    If ``yes``, respond to root key sentinel probes as described in
    draft-ietf-dnsop-kskroll-sentinel-08. The default is ``yes``.
+
+``reuseport``
+   This option enables kernel load-balancing of sockets on systems which support
+   it, including Linux (SO_REUSEPORT) and FreeBSD (SO_REUSEPORT_LB). This
+   instructs the kernel to distribute incoming socket connections among the
+   networking threads based on a hashing scheme. For more information, see the
+   receive network flow classification options (``rx-flow-hash``) section in the
+   ``ethtool`` manual page. The default is ``yes``.
+
+   Enabling ``reuseport`` significantly increases general throughput when
+   incoming traffic is distributed uniformly onto the threads by the
+   operating system. However, in cases where a worker thread is busy with a
+   long-lasting operation, such as processing a Response Policy Zone (RPZ) or
+   Catalog Zone update or an unusually large zone transfer, incoming traffic
+   that hashes onto that thread may be delayed. On servers where these events
+   occur frequently, it may be preferable to disable socket load-balancing so
+   that other threads can pick up the traffic that would have been sent to the
+   busy thread.
+
+   Note: this option can only be set when ``named`` first starts.
+   Changes will not take effect during reconfiguration; the server
+   must be restarted.
 
 ``message-compression``
    If ``yes``, DNS name compression is used in responses to regular
@@ -2040,6 +2066,9 @@ Boolean Options
    This option may only be activated at the zone level; if configured
    at the view or options level, it must be set to ``off``.
 
+   The DNSSEC records are written to the zone's filename set in ``file``,
+   unless ``inline-signing`` is enabled.
+
 ``dnssec-enable``
    This option is obsolete and has no effect.
 
@@ -2049,7 +2078,9 @@ Boolean Options
    This option enables DNSSEC validation in ``named``.
 
    If set to ``auto``, DNSSEC validation is enabled and a default trust
-   anchor for the DNS root zone is used.
+   anchor for the DNS root zone is used. This trust anchor is provided
+   as part of BIND and is kept up-to-date using :ref:`rfc5011.support` key
+   management.
 
    If set to ``yes``, DNSSEC validation is enabled, but a trust anchor must be
    manually configured using a ``trust-anchors`` statement (or the
@@ -2385,6 +2416,8 @@ for details on how to specify IP address lists.
    and inherited by zones, this could lead to some zones unintentionally
    allowing updates.
 
+   Updates are written to the zone's filename that is set in ``file``.
+
 ``allow-update-forwarding``
    When set in the ``zone`` statement for a secondary zone, this specifies which
    hosts are allowed to submit Dynamic DNS updates and have them be
@@ -2602,9 +2635,6 @@ options are:
    UDP and TCP queries, but the port applies only to UDP queries. TCP
    queries always use a random unprivileged port.
 
-.. note:: Solaris 2.5.1 and earlier does not support setting the source address
-   for TCP sockets.
-
 .. warning:: Specifying a single port is discouraged, as it removes a layer of
    protection against spoofing errors.
 
@@ -2745,9 +2775,6 @@ options apply to zone transfers.
    ``transfer-source`` statement within the ``view`` or ``zone`` block
    in the configuration file.
 
-   .. note:: Solaris 2.5.1 and earlier does not support setting the source
-      address for TCP sockets.
-
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
 
@@ -2782,9 +2809,6 @@ options apply to zone transfers.
    ``notify-source`` for all zones, but can be overridden on a per-zone
    or per-view basis by including a ``notify-source`` statement within
    the ``zone`` or ``view`` block in the configuration file.
-
-   .. note:: Solaris 2.5.1 and earlier does not support setting the source
-      address for TCP sockets.
 
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
@@ -4328,18 +4352,20 @@ with ``ipv4-prefix-length`` (default 24) and ``ipv6-prefix-length``
 
 All non-empty responses for a valid domain name (qname) and record type
 (qtype) are identical and have a limit specified with
-``responses-per-second`` (default 0 or no limit). All empty (NODATA)
-responses for a valid domain, regardless of query type, are identical.
-Responses in the NODATA class are limited by ``nodata-per-second``
-(default ``responses-per-second``). Requests for any and all undefined
-subdomains of a given valid domain result in NXDOMAIN errors, and are
-identical regardless of query type. They are limited by
-``nxdomains-per-second`` (default ``responses-per-second``). This
-controls some attacks using random names, but can be relaxed or turned
-off (set to 0) on servers that expect many legitimate NXDOMAIN
-responses, such as from anti-spam rejection lists. Referrals or delegations
-to the server of a given domain are identical and are limited by
-``referrals-per-second`` (default ``responses-per-second``).
+``responses-per-second`` (default 0 or no limit). All valid wildcard
+domain names are interpreted as the zone's origin name concatenated to
+the "*" name. All empty (NODATA) responses for a valid domain,
+regardless of query type, are identical.  Responses in the NODATA class
+are limited by ``nodata-per-second`` (default ``responses-per-second``).
+Requests for any and all undefined subdomains of a given valid domain
+result in NXDOMAIN errors, and are identical regardless of query type.
+They are limited by ``nxdomains-per-second`` (default
+``responses-per-second``). This controls some attacks using random
+names, but can be relaxed or turned off (set to 0) on servers that
+expect many legitimate NXDOMAIN responses, such as from anti-spam
+rejection lists. Referrals or delegations to the server of a given
+domain are identical and are limited by ``referrals-per-second``
+(default ``responses-per-second``).
 
 Responses generated from local wildcards are counted and limited as if
 they were for the parent domain name. This controls flooding using
@@ -4878,6 +4904,13 @@ Multiple key and signing policies can be configured.  To attach a policy
 to a zone, add a ``dnssec-policy`` option to the ``zone`` statement,
 specifying the name of the policy that should be used.
 
+By default, ``dnssec-policy`` assumes ``inline-signing``. This means that
+a signed version of the zone is maintained separately and is written out to
+a different file on disk (the zone's filename plus a ``.signed`` extension).
+
+If the zone is dynamic because it is configured with an ``update-policy`` or
+``allow-update``, the DNSSEC records are written to the filename set in the original zone's ``file``, unless ``inline-signing`` is explicitly set.
+
 Key rollover timing is computed for each key according to the key
 lifetime defined in the KASP.  The lifetime may be modified by zone TTLs
 and propagation delays, to prevent validation failures.  When a key
@@ -5013,20 +5046,22 @@ The following options can be specified in a ``dnssec-policy`` statement:
     The default is ``P2W`` (2 weeks).
 
   ``max-zone-ttl``
-    Like the ``max-zone-ttl`` zone option, this specifies the maximum
-    permissible TTL value, in seconds, for the zone.
 
-    This is needed in DNSSEC-maintained zones because when rolling to a
-    new DNSKEY, the old key needs to remain available until RRSIG
-    records have expired from caches.  The ``max-zone-ttl`` option
-    guarantees that the largest TTL in the zone is no higher than the
-    set value.
+   This specifies the maximum permissible TTL value for the zone.  When
+   a zone file is loaded, any record encountered with a TTL higher than
+   ``max-zone-ttl`` causes the zone to be rejected.
+
+   This ensures that when rolling to a new DNSKEY, the old key will remain
+   available until RRSIG records have expired from caches. The
+   ``max-zone-ttl`` option guarantees that the largest TTL in the
+   zone is no higher than a known and predictable value.
 
     .. note:: Because ``map``-format files load directly into memory,
        this option cannot be used with them.
 
-    The default value is ``PT24H`` (24 hours).  A ``max-zone-ttl`` of
-    zero is treated as if the default value were in use.
+   The default value ``PT24H`` (24 hours).  A value of zero is treated
+   as if the default value were in use.
+
 
   ``nsec3param``
     Use NSEC3 instead of NSEC, and optionally set the NSEC3 parameters.
@@ -5037,11 +5072,17 @@ The following options can be specified in a ``dnssec-policy`` statement:
 
         nsec3param iterations 5 optout no salt-length 8;
 
-    The default is to use NSEC.  The ``iterations``, ``optout`` and
+    The default is to use NSEC. The ``iterations``, ``optout``, and
     ``salt-length`` parts are optional, but if not set, the values in
-    the example above are the default NSEC3 parameters. Note that you don't
-    specify a specific salt string, ``named`` will create a salt for you
-    of the provided salt length.
+    the example above are the default NSEC3 parameters. Note that the
+    specific salt string is not specified by the user; :iscman:`named` creates a salt
+    of the indicated length.
+
+    .. warning::
+       Do not use extra :term:`iterations`, :term:`salt`, and
+       :term:`opt-out` unless their implications are fully understood.
+       A higher number of iterations causes interoperability problems and opens
+       servers to CPU-exhausting DoS attacks.
 
   ``zone-propagation-delay``
     This is the expected propagation delay from the time when a zone is
@@ -5074,16 +5115,11 @@ old DNSSEC key.
 The following options apply to DS queries sent to ``parental-agents``:
 
 ``parental-source``
-   ``parental-source`` determines which local source address, and
-   optionally UDP port, is used to send parental DS queries. This
-   address must appear in the secondary server's ``parental-agents`` zone
-   clause. This statement sets the ``parental-source`` for all zones, but can
-   be overridden on a per-zone or per-view basis by including a
-   ``parental-source`` statement within the ``zone`` or ``view`` block in the
-   configuration file.
-
-   .. note:: Solaris 2.5.1 and earlier does not support setting the source
-      address for TCP sockets.
+   ``parental-source`` determines which local source address, and optionally
+   UDP port, is used to send parental DS queries. This statement sets the
+   ``parental-source`` for all zones, but can be overridden on a per-zone or
+   per-view basis by including a ``parental-source`` statement within the
+   ``zone`` or ``view`` block in the configuration file.
 
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
@@ -5755,10 +5791,12 @@ Zone Options
    See the description of ``serial-update-method`` in :ref:`options`.
 
 ``inline-signing``
-   If ``yes``, this enables "bump in the wire" signing of a zone, where
-   an unsigned zone is transferred in or loaded from disk and a signed
+   If ``yes``, BIND 9 maintains a separate signed version of the zone.
+   An unsigned zone is transferred in or loaded from disk and the signed
    version of the zone is served with, possibly, a different serial
-   number. This behavior is disabled by default.
+   number. The signed version of the zone is stored in a file that is
+   the zone's filename (set in ``file``) with a ``.signed`` extension.
+   This behavior is disabled by default.
 
 ``multi-master``
    See the description of ``multi-master`` in :ref:`boolean_options`.
@@ -5778,8 +5816,21 @@ Dynamic Update Policies
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 BIND 9 supports two methods of granting clients the right to
-perform dynamic updates to a zone, configured by the ``allow-update``
-or ``update-policy`` options.
+perform dynamic updates to a zone:
+
+- ``allow-update`` - a simple access control list
+- ``update-policy`` - fine-grained access control
+
+In both cases, BIND 9 writes the updates to the zone's filename
+set in ``file``.
+
+In the case of a DNSSEC zone, DNSSEC records are also written to
+the zone's filename, unless ``inline-signing`` is enabled.
+
+   .. note:: The zone file can no longer be manually updated while ``named``
+      is running; it is now necessary to perform :option:`rndc freeze`, edit,
+      and then perform :option:`rndc thaw`. Comments and formatting
+      in the zone file are lost when dynamic updates occur.
 
 The ``allow-update`` clause is a simple access control list. Any client
 that matches the ACL is granted permission to update any record in the
@@ -6339,12 +6390,76 @@ TTLs. Valid TTLs are of the range 0-2147483647 seconds.
 BIND Primary File Extension: the ``$GENERATE`` Directive
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Syntax: ``$GENERATE`` range lhs [ttl] [class] type rhs [comment]
+Syntax: ``$GENERATE`` range owner [ttl] [class] type rdata [comment]
 
 ``$GENERATE`` is used to create a series of resource records that only
-differ from each other by an iterator. ``$GENERATE`` can be used to
-easily generate the sets of records required to support sub-/24 reverse
-delegations described in :rfc:`2317`.
+differ from each other by an iterator.
+
+``range``
+    This can be one of two forms: start-stop or start-stop/step.
+    If the first form is used, then step is set to 1. "start",
+    "stop", and "step" must be positive integers between 0 and
+    (2^31)-1. "start" must not be larger than "stop".
+
+``owner``
+    This describes the owner name of the resource records to be created.
+
+    The ``owner`` string may include one or more ``$`` (dollar sign)
+    symbols, which will be replaced with the iterator value when
+    generating records; see below for details.
+
+``ttl``
+    This specifies the time-to-live of the generated records. If
+    not specified, this is inherited using the normal TTL inheritance
+    rules.
+
+    ``class`` and ``ttl`` can be entered in either order.
+
+``class``
+    This specifies the class of the generated records. This must
+    match the zone class if it is specified.
+
+    ``class`` and ``ttl`` can be entered in either order.
+
+``type``
+    This can be any valid type.
+
+``rdata``
+    This is a string containing the RDATA of the resource record
+    to be created. As with ``owner``, the ``rdata`` string may
+    include one or more ``$`` symbols, which are replaced with the
+    iterator value. ``rdata`` may be quoted if there are spaces in
+    the string; the quotation marks do not appear in the generated
+    record.
+
+    Any single ``$`` (dollar sign) symbols within the ``owner`` or
+    ``rdata`` strings are replaced by the iterator value. To get a ``$``
+    in the output, escape the ``$`` using a backslash ``\\``, e.g.,
+    ``\$``. (For compatibility with earlier versions, ``$$`` is also
+    recognized as indicating a literal ``$`` in the output.)
+
+    The ``$`` may optionally be followed by modifiers which change
+    the offset from the iterator, field width, and base.  Modifiers
+    are introduced by a ``{`` (left brace) immediately following
+    the ``$``, as in  ``${offset[,width[,base]]}``. For example,
+    ``${-20,3,d}`` subtracts 20 from the current value and prints
+    the result as a decimal in a zero-padded field of width 3.
+    Available output forms are decimal (``d``), octal (``o``),
+    hexadecimal (``x`` or ``X`` for uppercase), and nibble (``n``
+    or ``N`` for uppercase). The modfiier cannot contain whitespace
+    or newlines.
+
+    The default modifier is ``${0,0,d}``. If the ``owner`` is not
+    absolute, the current ``$ORIGIN`` is appended to the name.
+
+    In nibble mode, the value is treated as if it were a reversed
+    hexadecimal string, with each hexadecimal digit as a separate
+    label. The width field includes the label separator.
+
+Examples:
+
+``$GENERATE`` can be used to easily generate the sets of records required
+to support sub-/24 reverse delegations described in :rfc:`2317`:
 
 ::
 
@@ -6363,9 +6478,8 @@ is equivalent to
    ...
    127.0.0.192.IN-ADDR.ARPA. CNAME 127.0.0.0.192.IN-ADDR.ARPA.
 
-Both generate a set of A and MX records. Note the MX's right-hand side is a
-quoted string. The quotes are stripped when the right-hand side is
-processed.
+This example creates a set of A and MX records. Note the MX's ``rdata``
+is a quoted string; the quotes are stripped when ``$GENERATE`` is processed:
 
 ::
 
@@ -6387,35 +6501,25 @@ is equivalent to
    HOST-127.EXAMPLE. A  1.2.3.127
    HOST-127.EXAMPLE. MX 0 .
 
-``range``
-    This can be one of two forms: start-stop or start-stop/step. If the first form is used, then step is set to 1. "start", "stop", and "step" must be positive integers between 0 and (2^31)-1. "start" must not be larger than "stop".
 
-``owner``
-    This describes the owner name of the resource records to be created. Any single ``$`` (dollar sign) symbols within the ``owner`` string are replaced by the iterator value. To get a ``$`` in the output, escape the ``$`` using a backslash ``\``, e.g., ``\$``. The ``$`` may optionally be followed by modifiers which change the offset from the iterator, field width, and base.
+This example generates A and AAAA records using modifiers; the AAAA
+``owner`` names are generated using nibble mode:
 
-    Modifiers are introduced by a ``{`` (left brace) immediately following the ``$``, as in  ``${offset[,width[,base]]}``. For example, ``${-20,3,d}`` subtracts 20 from the current value and prints the result as a decimal in a zero-padded field of width 3. Available output forms are decimal (``d``), octal (``o``), hexadecimal (``x`` or ``X`` for uppercase), and nibble (``n`` or ``N`` for uppercase).
+::
 
-    The default modifier is ``${0,0,d}``. If the ``owner`` is not absolute, the current ``$ORIGIN`` is appended to the name.
+   $ORIGIN EXAMPLE.
+   $GENERATE 0-2 HOST-${0,4,d} A 1.2.3.${1,0,d}
+   $GENERATE 1024-1026 ${0,3,n} AAAA 2001:db8::${0,4,x}
 
-    In nibble mode, the value is treated as if it were a reversed hexadecimal string, with each hexadecimal digit as a separate label. The width field includes the label separator.
+is equivalent to:
 
-    For compatibility with earlier versions, ``$$`` is still recognized as indicating a literal $ in the output.
-
-``ttl``
-    This specifies the time-to-live of the generated records. If not specified, this is inherited using the normal TTL inheritance rules.
-
-    ``class`` and ``ttl`` can be entered in either order.
-
-``class``
-    This specifies the class of the generated records. This must match the zone class if it is specified.
-
-    ``class`` and ``ttl`` can be entered in either order.
-
-``type``
-    This can be any valid type.
-
-``rdata``
-    This is a string containing the RDATA of the resource record to be created. It may be quoted if there are spaces in the string; the quotation marks do not appear in the generated record.
+::
+   HOST-0000.EXAMPLE.   A      1.2.3.1
+   HOST-0001.EXAMPLE.   A      1.2.3.2
+   HOST-0002.EXAMPLE.   A      1.2.3.3
+   0.0.4.EXAMPLE.       AAAA   2001:db8::400
+   1.0.4.EXAMPLE.       AAAA   2001:db8::401
+   2.0.4.EXAMPLE.       AAAA   2001:db8::402
 
 The ``$GENERATE`` directive is a BIND extension and not part of the
 standard zone file format.

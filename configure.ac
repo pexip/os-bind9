@@ -145,28 +145,6 @@ AS_IF([test "$enable_fuzzing" = "afl"],
 			 [AC_MSG_ERROR([set CC=afl-<gcc|clang> when --enable-fuzzing=afl is used])])
       ])
 
-# [pairwise: --enable-mutex-atomics, --disable-mutex-atomics]
-AC_ARG_ENABLE(mutex_atomics,
-	      AS_HELP_STRING([--enable-mutex-atomics],
-		             [emulate atomics by mutex-locked variables, useful for debugging
-				[default=no]]),
-	      [],
-	      [enable_mutex_atomics=no])
-
-AC_MSG_CHECKING([whether to emulate atomics with mutexes])
-case "$enable_mutex_atomics" in
-yes)
-        AC_MSG_RESULT(yes)
-        AC_DEFINE(ISC_MUTEX_ATOMICS, 1, [Define to emulate atomic variables with mutexes.])
-        ;;
-no)
-        AC_MSG_RESULT(no)
-        ;;
-*)
-        AC_MSG_ERROR("--enable-mutex-atomics requires yes or no")
-        ;;
-esac
-
 #
 # Make very sure that these are the first files processed by
 # config.status, since we use the processed output as the input for
@@ -228,10 +206,13 @@ except: exit(1)'
 testply='try: import ply
 except: exit(1)'
 
-testsetup='try: from distutils.core import setup
+testsetuptools='try: from setuptools import setup
 except: exit(1)'
 
-default_with_python="python python3 python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3.2 python2 python2.7"
+testdistutils='try: from distutils.core import setup
+except: exit(1)'
+
+default_with_python="python python3 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3.2 python2 python2.7"
 
 AC_ARG_VAR([PYTHON], [path to python executable])
 
@@ -290,12 +271,16 @@ AS_IF([test "$with_python" = "no"],
 		unset PYTHON
 		continue])
 
-	 AC_MSG_CHECKING([Python module 'distutils.core setup'])
-	 AS_IF(["$PYTHON" -c "$testsetup" 2>/dev/null],
+	 AC_MSG_CHECKING([Python module 'setuptools'])
+	 AS_IF(["$PYTHON" -c "$testsetuptools" 2>/dev/null],
 	       [AC_MSG_RESULT([yes])],
 	       [AC_MSG_RESULT([no])
-		unset PYTHON
-		continue])
+		AC_MSG_CHECKING([Python module 'distutils'])
+		AS_IF(["$PYTHON" -c "$testdistutils" 2>/dev/null],
+		      [AC_MSG_RESULT([yes])],
+		      [AC_MSG_RESULT([no])
+		       unset PYTHON
+		       continue])])
 
 	 # Stop looking any further once we find a Python interpreter
 	 # satisfying all requirements.
@@ -655,7 +640,7 @@ AS_IF([test "$enable_geoip" = "yes"],
 				   GEOIP2LINKOBJS='${GEOIP2LINKOBJS}'
 				   MAXMINDDB_LIBS="$MAXMINDDB_LIBS $ac_cv_search_MMDB_open"
 				   AC_MSG_NOTICE([GeoIP2 default database path set to $with_maxminddb/share/GeoIP])
-				   AS_VAR_COPY([MAXMINDDB_PREFIX], [$with_maxminddb])
+				   AS_VAR_COPY([MAXMINDDB_PREFIX], [with_maxminddb])
 				  ],
 				  [AC_MSG_ERROR([GeoIP2 requested, but libmaxminddb not found])])
 		   AX_RESTORE_FLAGS([maxminddb])
@@ -726,6 +711,10 @@ AC_MSG_CHECKING(for libuv)
 PKG_CHECK_MODULES([LIBUV], [libuv >= 1.0.0], [],
 		  [AC_MSG_ERROR([libuv not found])])
 
+AX_SAVE_FLAGS([libuv])
+CFLAGS="$CFLAGS $LIBUV_CFLAGS"
+LIBS="$LIBS $LIBUV_LIBS"
+
 # libuv recvmmsg support
 AC_CHECK_DECLS([UV_UDP_MMSG_FREE, UV_UDP_MMSG_CHUNK], [], [], [[#include <uv.h>]])
 AC_MSG_CHECKING([whether struct msghdr uses padding for alignment])
@@ -736,6 +725,8 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <sys/socket.h>],
 			     [0], [Disable recvmmsg support on systems with MUSL glibc])],
 		  [AC_MSG_RESULT([no])
 		   AC_CHECK_DECLS([UV_UDP_RECVMMSG], [], [], [[#include <uv.h>]])])
+
+AX_RESTORE_FLAGS([libuv])
 
 #
 # flockfile is usually provided by pthreads

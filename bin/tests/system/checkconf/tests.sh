@@ -503,7 +503,7 @@ n=`expr $n + 1`
 echo_i "checking named-checkconf kasp errors ($n)"
 ret=0
 $CHECKCONF kasp-and-other-dnssec-options.conf > checkconf.out$n 2>&1 && ret=1
-grep "'inline-signing;' cannot be set to 'no' if dnssec-policy is also set on a non-dynamic DNS zone" < checkconf.out$n > /dev/null || ret=1
+grep "'dnssec-policy;' requires dynamic DNS or inline-signing to be configured for the zone" < checkconf.out$n > /dev/null || ret=1
 grep "'auto-dnssec maintain;' cannot be configured if dnssec-policy is also set" < checkconf.out$n > /dev/null || ret=1
 grep "dnskey-sig-validity: cannot be configured if dnssec-policy is also set" < checkconf.out$n > /dev/null || ret=1
 grep "dnssec-dnskey-kskonly: cannot be configured if dnssec-policy is also set" < checkconf.out$n > /dev/null || ret=1
@@ -582,6 +582,14 @@ $CHECKCONF warn-notify-source.conf > checkconf.out$n 2>/dev/null || ret=1
 grep "not recommended" < checkconf.out$n > /dev/null || ret=1
 $CHECKCONF warn-parental-source.conf > checkconf.out$n 2>/dev/null || ret=1
 grep "not recommended" < checkconf.out$n > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; ret=1; fi
+status=`expr $status + $ret`
+
+n=`expr $n + 1`
+echo_i "check that using both max-zone-ttl and dnssec-policy generates a warning ($n)"
+ret=0
+$CHECKCONF warn-kasp-max-zone-ttl.conf > checkconf.out$n 2>/dev/null || ret=1
+grep "option 'max-zone-ttl' is ignored when used together with 'dnssec-policy'" < checkconf.out$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; ret=1; fi
 status=`expr $status + $ret`
 

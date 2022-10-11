@@ -58,7 +58,7 @@
 
 dig_lookup_t *default_lookup = NULL;
 
-static atomic_uintptr_t batchname = ATOMIC_VAR_INIT(0);
+static atomic_uintptr_t batchname = 0;
 static FILE *batchfp = NULL;
 static char *argv0;
 static int addresscount = 0;
@@ -712,7 +712,7 @@ printmessage(dig_query_t *query, const isc_buffer_t *msgbuf, dns_message_t *msg,
 				strlcat(sockstr, "0", sizeof(sockstr));
 			}
 
-			printf("    response_address: %s\n", sockstr);
+			printf("    response_address: \"%s\"\n", sockstr);
 			printf("    response_port: %u\n", sport);
 		}
 
@@ -730,7 +730,7 @@ printmessage(dig_query_t *query, const isc_buffer_t *msgbuf, dns_message_t *msg,
 				strlcat(sockstr, "0", sizeof(sockstr));
 			}
 
-			printf("    query_address: %s\n", sockstr);
+			printf("    query_address: \"%s\"\n", sockstr);
 			printf("    query_port: %u\n", sport);
 		}
 
@@ -1874,7 +1874,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 				have_ipv6 = false;
 			} else {
 				fatal("can't find IPv4 networking");
-				/* NOTREACHED */
+				UNREACHABLE();
 				return (false);
 			}
 			break;
@@ -1884,7 +1884,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 				have_ipv4 = false;
 			} else {
 				fatal("can't find IPv6 networking");
-				/* NOTREACHED */
+				UNREACHABLE();
 				return (false);
 			}
 			break;
@@ -2135,7 +2135,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 		fprintf(stderr, "Invalid option: -%s\n", option);
 		usage();
 	}
-	/* NOTREACHED */
+	UNREACHABLE();
 	return (false);
 }
 

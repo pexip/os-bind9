@@ -940,7 +940,7 @@ if [ -x ${DELV} ] ; then
    ret=0
    echo_i "checking that validation fails when key record is missing using dns_client ($n)"
    delv_with_opts +cd @10.53.0.4 a a.b.keyless.example > delv.out$n 2>&1 || ret=1
-   grep "resolution failed: broken trust chain" delv.out$n > /dev/null || ret=1
+   grep "resolution failed: insecurity proof failed" delv.out$n > /dev/null || ret=1
    n=$((n+1))
    test "$ret" -eq 0 || echo_i "failed"
    status=$((status+ret))
@@ -1794,8 +1794,12 @@ $SIGNER -O raw -f signer.out.5 -Sxt -o example example.db > /dev/null
 $SIGNER -O raw=0 -f signer.out.6 -Sxt -o example example.db > /dev/null
 $SIGNER -O raw -f - -Sxt -o example example.db > signer.out.7 2> /dev/null
 ) || ret=1
-awk '/IN *SOA/ {if (NF != 11) exit(1)}' signer/signer.out.3 || ret=1
-awk '/IN *SOA/ {if (NF != 7) exit(1)}' signer/signer.out.4 || ret=1
+awk 'BEGIN { found = 0; }
+     $1 == "example." && $3 == "IN" && $4 == "SOA" { found = 1; if (NF != 11) exit(1); }
+     END { if (!found) exit(1); }' signer/signer.out.3 || ret=1
+awk 'BEGIN { found = 0; }
+     $1 == "example." && $3 == "IN" && $4 == "SOA" { found = 1; if (NF != 7) exit(1); }
+     END { if (!found) exit(1); }' signer/signer.out.4 || ret=1
 israw1 signer/signer.out.5 || ret=1
 israw0 signer/signer.out.6 || ret=1
 israw1 signer/signer.out.7 || ret=1
@@ -4410,6 +4414,24 @@ grep "status: NOERROR" dig.out.ns4.test$n >/dev/null || ret=1
 grep "ANSWER: 0, AUTHORITY: 8" dig.out.ns4.test$n > /dev/null || ret=1
 n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
+status=$((status+ret))
+
+# Check that a query against a validating resolver succeeds when there is
+# a negative cache entry with trust level "pending" for the DS.  Prime
+# with a +cd DS query to produce the negative cache entry, then send a
+# query that uses that entry as part of the validation process. [GL #3279]
+echo_i "check that pending negative DS cache entry validates ($n)"
+ret=0
+dig_with_opts @10.53.0.4 +cd insecure2.example. ds > dig.out.prime.ns4.test$n || ret=1
+grep "flags: qr rd ra cd;" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "status: NOERROR" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "ANSWER: 0, AUTHORITY: 4, " dig.out.prime.ns4.test$n > /dev/null || ret=1
+dig_with_opts @10.53.0.4 a.insecure2.example. a > dig.out.ns4.test$n || ret=1
+grep "ANSWER: 1, AUTHORITY: 1, " dig.out.ns4.test$n > /dev/null || ret=1
+grep "flags: qr rd ra;" dig.out.ns4.test$n >/dev/null || ret=1
+grep "status: NOERROR" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n+1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 echo_i "exit status: $status"

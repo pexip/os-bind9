@@ -133,8 +133,7 @@ configure_zone_acl(const cfg_obj_t *zconfig, const cfg_obj_t *vconfig,
 		aclname = "allow-update-forwarding";
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	/* First check to see if ACL is defined within the zone */
@@ -249,8 +248,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 		} else if (strcasecmp(str, "deny") == 0) {
 			grant = false;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
 		str = cfg_obj_asstring(matchtype);
@@ -674,7 +672,7 @@ cleanup:
 /*%
  * Convert a config file zone type into a server zone type.
  */
-static inline dns_zonetype_t
+static dns_zonetype_t
 zonetype_fromconfig(const cfg_obj_t *map) {
 	const cfg_obj_t *obj = NULL;
 	isc_result_t result;
@@ -749,8 +747,7 @@ checknames(dns_zonetype_t ztype, const cfg_obj_t **maps,
 		result = named_checknames_get(maps, primary_synonyms, objp);
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	INSIST(result == ISC_R_SUCCESS && objp != NULL && *objp != NULL);
@@ -900,6 +897,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 	dns_stats_t *dnssecsignstats;
 	dns_zonestat_level_t statlevel = dns_zonestat_none;
 	int seconds;
+	dns_ttl_t maxttl = 0; /* unlimited */
 	dns_zone_t *mayberaw = (raw != NULL) ? raw : zone;
 	isc_dscp_t dscp;
 
@@ -1036,8 +1034,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 				    "masterfile-format: format 'map' is "
 				    "deprecated");
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 
@@ -1060,29 +1057,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(masterstylestr, "relative") == 0) {
 			masterstyle = &dns_master_style_default;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
-		}
-	}
-
-	obj = NULL;
-	result = named_config_get(maps, "max-zone-ttl", &obj);
-	if (result == ISC_R_SUCCESS && masterformat == dns_masterformat_map) {
-		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-			      NAMED_LOGMODULE_SERVER, ISC_LOG_ERROR,
-			      "zone '%s': 'max-zone-ttl' is not compatible "
-			      "with 'masterfile-format map'",
-			      zname);
-		return (ISC_R_FAILURE);
-	} else if (result == ISC_R_SUCCESS) {
-		dns_ttl_t maxttl = 0; /* unlimited */
-
-		if (cfg_obj_isduration(obj)) {
-			maxttl = cfg_obj_asduration(obj);
-		}
-		dns_zone_setmaxttl(zone, maxttl);
-		if (raw != NULL) {
-			dns_zone_setmaxttl(raw, maxttl);
+			UNREACHABLE();
 		}
 	}
 
@@ -1161,8 +1136,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(dialupstr, "passive") == 0) {
 			dialup = dns_dialuptype_passive;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 	if (raw != NULL) {
@@ -1188,8 +1162,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(levelstr, "none") == 0) {
 			statlevel = dns_zonestat_none;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 	dns_zone_setstatlevel(zone, statlevel);
@@ -1268,8 +1241,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			{
 				notifytype = dns_notifytype_masteronly;
 			} else {
-				INSIST(0);
-				ISC_UNREACHABLE();
+				UNREACHABLE();
 			}
 		}
 		notifytype = process_notifytype(notifytype, ztype, zname,
@@ -1463,8 +1435,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(cfg_obj_asstring(obj), "ignore") == 0) {
 			fail = check = false;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		if (raw != NULL) {
 			dns_zone_setoption(raw, DNS_ZONEOPT_CHECKNAMES, check);
@@ -1498,8 +1469,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(cfg_obj_asstring(obj), "ignore") == 0) {
 			check = false;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		dns_zone_setoption(zone, DNS_ZONEOPT_CHECKSPF, check);
 
@@ -1544,6 +1514,22 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		dns_zone_setjournalsize(zone, journal_size);
 	}
 
+	if (use_kasp) {
+		maxttl = dns_kasp_zonemaxttl(dns_zone_getkasp(zone));
+	} else {
+		obj = NULL;
+		result = named_config_get(maps, "max-zone-ttl", &obj);
+		if (result == ISC_R_SUCCESS) {
+			if (cfg_obj_isduration(obj)) {
+				maxttl = cfg_obj_asduration(obj);
+			}
+		}
+	}
+	dns_zone_setmaxttl(zone, maxttl);
+	if (raw != NULL) {
+		dns_zone_setmaxttl(raw, maxttl);
+	}
+
 	/*
 	 * Configure update-related options.  These apply to
 	 * primary servers only.
@@ -1567,6 +1553,10 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		RETERR(configure_zone_ssutable(zoptions, mayberaw, zname));
 	}
 
+	/*
+	 * Configure DNSSEC signing. These apply to primary zones or zones that
+	 * use inline-signing (raw != NULL).
+	 */
 	if (ztype == dns_zone_primary || raw != NULL) {
 		const cfg_obj_t *validity, *resign;
 		bool allow = false, maint = false;
@@ -1699,8 +1689,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			} else if (strcasecmp(arg, "off") == 0) {
 				/* Default */
 			} else {
-				INSIST(0);
-				ISC_UNREACHABLE();
+				UNREACHABLE();
 			}
 			dns_zone_setkeyopt(zone, DNS_ZONEKEY_ALLOW, allow);
 			dns_zone_setkeyopt(zone, DNS_ZONEKEY_CREATE, false);
@@ -1776,8 +1765,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(dupcheck, "ignore") == 0) {
 			fail = check = false;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKDUPRR, check);
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKDUPRRFAIL, fail);
@@ -1793,8 +1781,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(cfg_obj_asstring(obj), "ignore") == 0) {
 			fail = check = false;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKMX, check);
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKMXFAIL, fail);
@@ -1833,8 +1820,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(cfg_obj_asstring(obj), "ignore") == 0) {
 			warn = ignore = true;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_WARNMXCNAME, warn);
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_IGNOREMXCNAME, ignore);
@@ -1850,8 +1836,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		} else if (strcasecmp(cfg_obj_asstring(obj), "ignore") == 0) {
 			warn = ignore = true;
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_WARNSRVCNAME, warn);
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_IGNORESRVCNAME,
@@ -1874,8 +1859,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			} else if (strcasecmp(arg, "maintain") == 0) {
 				/* Default */
 			} else {
-				INSIST(0);
-				ISC_UNREACHABLE();
+				UNREACHABLE();
 			}
 		}
 
@@ -1911,7 +1895,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			dns_zone_setxfracl(zone, none);
 			dns_acl_detach(&none);
 		}
-	/* FALLTHROUGH */
+		FALLTHROUGH;
 	case dns_zone_secondary:
 	case dns_zone_stub:
 	case dns_zone_redirect:
@@ -2097,9 +2081,7 @@ named_zone_configure_writeable_dlz(dns_dlzdb_t *dlzdatabase, dns_zone_t *zone,
 }
 
 bool
-named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig,
-		    const cfg_obj_t *vconfig, const cfg_obj_t *config,
-		    cfg_aclconfctx_t *actx) {
+named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig) {
 	const cfg_obj_t *zoptions = NULL;
 	const cfg_obj_t *obj = NULL;
 	const char *cfilename;
@@ -2133,8 +2115,7 @@ named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig,
 		has_raw = false;
 	}
 
-	inline_signing = named_zone_inlinesigning(zone, zconfig, vconfig,
-						  config, actx);
+	inline_signing = named_zone_inlinesigning(zconfig);
 	if (!inline_signing && has_raw) {
 		dns_zone_log(zone, ISC_LOG_DEBUG(1),
 			     "not reusable: old zone was inline-signing");
@@ -2171,80 +2152,15 @@ named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig,
 }
 
 bool
-named_zone_inlinesigning(dns_zone_t *zone, const cfg_obj_t *zconfig,
-			 const cfg_obj_t *vconfig, const cfg_obj_t *config,
-			 cfg_aclconfctx_t *actx) {
-	isc_result_t res;
+named_zone_inlinesigning(const cfg_obj_t *zconfig) {
 	const cfg_obj_t *zoptions = NULL;
-	const cfg_obj_t *voptions = NULL;
-	const cfg_obj_t *options = NULL;
 	const cfg_obj_t *signing = NULL;
-	const cfg_obj_t *allowupdate = NULL;
-	const cfg_obj_t *updatepolicy = NULL;
-	bool zone_is_dynamic = false;
 	bool inline_signing = false;
 
-	(void)cfg_map_get(config, "options", &options);
-
 	zoptions = cfg_tuple_get(zconfig, "options");
-	if (vconfig != NULL) {
-		voptions = cfg_tuple_get(vconfig, "options");
-	}
-
 	inline_signing = (cfg_map_get(zoptions, "inline-signing", &signing) ==
 				  ISC_R_SUCCESS &&
 			  cfg_obj_asboolean(signing));
-	if (inline_signing) {
-		return (true);
-	}
-
-	if (cfg_map_get(zoptions, "update-policy", &updatepolicy) ==
-	    ISC_R_SUCCESS) {
-		zone_is_dynamic = true;
-	} else {
-		res = cfg_map_get(zoptions, "allow-update", &allowupdate);
-		if (res != ISC_R_SUCCESS && voptions != NULL) {
-			res = cfg_map_get(voptions, "allow-update",
-					  &allowupdate);
-		}
-		if (res != ISC_R_SUCCESS && options != NULL) {
-			res = cfg_map_get(options, "allow-update",
-					  &allowupdate);
-		}
-		if (res == ISC_R_SUCCESS) {
-			dns_acl_t *acl = NULL;
-			res = cfg_acl_fromconfig(
-				allowupdate, config, named_g_lctx, actx,
-				dns_zone_getmctx(zone), 0, &acl);
-			if (res == ISC_R_SUCCESS && acl != NULL &&
-			    !dns_acl_isnone(acl)) {
-				zone_is_dynamic = true;
-			}
-			if (acl != NULL) {
-				dns_acl_detach(&acl);
-			}
-		}
-	}
-
-	/*
-	 * If inline-signing is not set, perhaps implictly through a
-	 * dnssec-policy.  Since automated DNSSEC maintenance requires
-	 * a dynamic zone, or inline-siging to be enabled, check if
-	 * the zone with dnssec-policy allows updates.  If not, enable
-	 * inline-signing.
-	 */
-	signing = NULL;
-	if (!inline_signing && !zone_is_dynamic &&
-	    cfg_map_get(zoptions, "dnssec-policy", &signing) == ISC_R_SUCCESS &&
-	    signing != NULL)
-	{
-		if (strcmp(cfg_obj_asstring(signing), "none") != 0) {
-			inline_signing = true;
-			dns_zone_log(zone, ISC_LOG_DEBUG(1),
-				     "inline-signing: "
-				     "implicitly through dnssec-policy");
-		}
-	}
 
 	return (inline_signing);
 }

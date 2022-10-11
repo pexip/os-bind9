@@ -1,3 +1,20 @@
+bind9 (1:9.16.33-1~deb11u1) bullseye-security; urgency=high
+
+  * New upstream version 9.16.33
+   - CVE-2022-2795: Processing large delegations may severely degrade
+     resolver performance
+   - CVE-2022-2881: Buffer overread in statistics channel code
+   - CVE-2022-2906: Memory leaks in code handling Diffie-Hellman key
+     exchange via TKEY RRs (OpenSSL 3.0.0+ only)
+   - CVE-2022-3080: BIND 9 resolvers configured to answer from stale
+     cache with zero stale-answer-client-timeout may terminate unexpectedly
+   - CVE-2022-38177: Memory leak in ECDSA DNSSEC verification code
+   - CVE-2022-38178: Memory leaks in EdDSA DNSSEC verification code
+  * Drop libldap2-dev from Build-Depends (Closes: #1008021)
+  * Add runtime dependency on libuv1 >= 1.40.0 (Closes: #1009889)
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Sep 2022 12:40:02 +0200
+
 bind9 (1:9.16.27-1~deb11u1pexip5) pexip-bullseye; urgency=medium
 
   * Bullseye rebuild for ARM64 inclusion

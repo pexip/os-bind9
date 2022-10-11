@@ -345,12 +345,11 @@ delete_trace_entry(isc__mem_t *mctx, const void *ptr, size_t size,
 	 * If we get here, we didn't find the item on the list.  We're
 	 * screwed.
 	 */
-	INSIST(0);
-	ISC_UNREACHABLE();
+	UNREACHABLE();
 }
 #endif /* ISC_MEM_TRACKLINES */
 
-static inline size_t
+static size_t
 rmsize(size_t size) {
 	/*
 	 * round down to ALIGNMENT_SIZE
@@ -358,7 +357,7 @@ rmsize(size_t size) {
 	return (size & (~(ALIGNMENT_SIZE - 1)));
 }
 
-static inline size_t
+static size_t
 quantize(size_t size) {
 	/*!
 	 * Round up the result in order to get a size big
@@ -372,7 +371,7 @@ quantize(size_t size) {
 	return ((size + ALIGNMENT_SIZE - 1) & (~(ALIGNMENT_SIZE - 1)));
 }
 
-static inline void
+static void
 more_basic_blocks(isc__mem_t *ctx) {
 	void *tmp;
 	unsigned char *curr, *next;
@@ -434,7 +433,7 @@ more_basic_blocks(isc__mem_t *ctx) {
 	ctx->basic_blocks = tmp;
 }
 
-static inline void
+static void
 more_frags(isc__mem_t *ctx, size_t new_size) {
 	int frags;
 	size_t total_size;
@@ -486,7 +485,7 @@ more_frags(isc__mem_t *ctx, size_t new_size) {
 	ctx->freelists[new_size] = tmp;
 }
 
-static inline void *
+static void *
 mem_getunlocked(isc__mem_t *ctx, size_t size) {
 	size_t new_size = quantize(size);
 	void *ret;
@@ -551,7 +550,7 @@ done:
 }
 
 #if ISC_MEM_CHECKOVERRUN
-static inline void
+static void
 check_overrun(void *mem, size_t size, size_t new_size) {
 	unsigned char *cp;
 
@@ -566,7 +565,7 @@ check_overrun(void *mem, size_t size, size_t new_size) {
 #endif /* if ISC_MEM_CHECKOVERRUN */
 
 /* coverity[+free : arg-1] */
-static inline void
+static void
 mem_putunlocked(isc__mem_t *ctx, void *mem, size_t size) {
 	size_t new_size = quantize(size);
 
@@ -615,7 +614,7 @@ mem_putunlocked(isc__mem_t *ctx, void *mem, size_t size) {
 /*!
  * Perform a malloc, doing memory filling and overrun detection as necessary.
  */
-static inline void *
+static void *
 mem_get(isc__mem_t *ctx, size_t size) {
 	char *ret;
 
@@ -645,7 +644,7 @@ mem_get(isc__mem_t *ctx, size_t size) {
  * Perform a free, doing memory filling and overrun detection as necessary.
  */
 /* coverity[+free : arg-1] */
-static inline void
+static void
 mem_put(isc__mem_t *ctx, void *mem, size_t size) {
 #if ISC_MEM_CHECKOVERRUN
 	INSIST(((unsigned char *)mem)[size] == 0xbe);
@@ -660,7 +659,7 @@ mem_put(isc__mem_t *ctx, void *mem, size_t size) {
 /*!
  * Update internal counters after a memory get.
  */
-static inline void
+static void
 mem_getstats(isc__mem_t *ctx, size_t size) {
 	ctx->total += size;
 	ctx->inuse += size;
@@ -685,7 +684,7 @@ mem_getstats(isc__mem_t *ctx, size_t size) {
 /*!
  * Update internal counters after a memory put.
  */
-static inline void
+static void
 mem_putstats(isc__mem_t *ctx, void *ptr, size_t size) {
 	UNUSED(ptr);
 
@@ -1653,7 +1652,8 @@ isc_mempool_create(isc_mem_t *mctx0, size_t size, isc_mempool_t **mpctxp) {
 
 	mpctx->common.impmagic = MEMPOOL_MAGIC;
 	mpctx->common.magic = ISCAPI_MPOOL_MAGIC;
-	mpctx->mctx = mctx;
+	mpctx->mctx = NULL;
+	isc_mem_attach((isc_mem_t *)mctx, (isc_mem_t **)&mpctx->mctx);
 	/*
 	 * Mempools are stored as a linked list of element.
 	 */
@@ -1726,13 +1726,8 @@ isc_mempool_destroy(isc_mempool_t **mpctxp) {
 		mpctx->freecount--;
 		item = mpctx->items;
 		mpctx->items = item->next;
-
-		if ((mctx->flags & ISC_MEMFLAG_INTERNAL) != 0) {
-			mem_putunlocked(mctx, item, mpctx->size);
-		} else {
-			mem_putstats(mctx, item, mpctx->size);
-			mem_put(mctx, item, mpctx->size);
-		}
+		mem_putstats(mctx, item, mpctx->size);
+		mem_put(mctx, item, mpctx->size);
 	}
 	MCTXUNLOCK(mctx);
 
@@ -1747,7 +1742,8 @@ isc_mempool_destroy(isc_mempool_t **mpctxp) {
 	mpctx->common.impmagic = 0;
 	mpctx->common.magic = 0;
 
-	isc_mem_put((isc_mem_t *)mpctx->mctx, mpctx, sizeof(isc__mempool_t));
+	isc_mem_putanddetach((isc_mem_t **)&mpctx->mctx, mpctx,
+			     sizeof(isc__mempool_t));
 
 	*mpctxp = NULL;
 }
@@ -1993,7 +1989,7 @@ print_contexts(FILE *file) {
 	fflush(file);
 }
 
-static atomic_uintptr_t checkdestroyed = ATOMIC_VAR_INIT(0);
+static atomic_uintptr_t checkdestroyed = 0;
 
 void
 isc_mem_checkdestroyed(FILE *file) {
@@ -2015,8 +2011,7 @@ isc__mem_checkdestroyed(void) {
 			print_contexts(file);
 		}
 #endif /* if ISC_MEM_TRACKLINES */
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 	UNLOCK(&contextslock);
 }

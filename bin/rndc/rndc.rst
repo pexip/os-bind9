@@ -161,14 +161,16 @@ Currently supported commands are:
    ``rndc dnssec -rollover`` allows you to schedule key rollover for a
    specific key (overriding the original key lifetime).
 
-   ``rndc dnssec -checkds`` will let ``named`` know that the DS for the given
-   key has been seen published into or withdrawn from the parent.  This is
-   required in order to complete a KSK rollover.  If the ``-key id`` argument
-   is specified, look for the key with the given identifier, otherwise if there
-   is only one key acting as a KSK in the zone, assume the DS of that key (if
-   there are multiple keys with the same tag, use ``-alg algorithm`` to
-   select the correct algorithm).  The time that the DS has been published or
-   withdrawn is set to now, unless otherwise specified with the argument ``-when time``.
+   ``rndc dnssec -checkds`` informs :iscman:`named` that the DS for
+   a specified zone's key-signing key has been confirmed to be published
+   in, or withdrawn from, the parent zone. This is required in order to
+   complete a KSK rollover.  The ``-key id`` and ``-alg algorithm`` arguments
+   can be used to specify a particular KSK, if necessary; if there is only
+   one key acting as a KSK for the zone, these arguments can be omitted.
+   The time of publication or withdrawal for the DS is set to the current
+   time by default, but can be overridden to a specific time with the
+   argument ``-when time``, where ``time`` is expressed in YYYYMMDDHHMMSS
+   notation.
 
 ``dnstap`` ( **-reopen** | **-roll** [*number*] )
    This command closes and re-opens DNSTAP output files. ``rndc dnstap -reopen`` allows
@@ -479,15 +481,17 @@ Currently supported commands are:
    depending on whether the opt-out bit in the NSEC3
    chain should be set. ``iterations`` defines the number of additional times to apply
    the algorithm when generating an NSEC3 hash. The ``salt`` is a string
-   of data expressed in hexadecimal, a hyphen (`-') if no salt is to be
+   of data expressed in hexadecimal, a hyphen (``-``) if no salt is to be
    used, or the keyword ``auto``, which causes ``named`` to generate a
    random 64-bit salt.
 
-   So, for example, to create an NSEC3 chain using the SHA-1 hash
-   algorithm, no opt-out flag, 10 iterations, and a salt value of
-   "FFFF", use: ``rndc signing -nsec3param 1 0 10 FFFF zone``. To set
-   the opt-out flag, 15 iterations, and no salt, use:
-   ``rndc signing -nsec3param 1 1 15 - zone``.
+   The only recommended configuration is ``rndc signing -nsec3param 1 0 0 - zone``,
+   i.e. no salt, no additional iterations, no opt-out.
+
+   .. warning::
+      Do not use extra iterations, salt, or opt-out unless all their implications
+      are fully understood. A higher number of iterations causes interoperability
+      problems and opens servers to CPU-exhausting DoS attacks.
 
    ``rndc signing -nsec3param none`` removes an existing NSEC3 chain and
    replaces it with NSEC.

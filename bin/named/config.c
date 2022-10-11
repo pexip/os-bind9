@@ -20,6 +20,7 @@
 #include <isc/buffer.h>
 #include <isc/log.h>
 #include <isc/mem.h>
+#include <isc/netmgr.h>
 #include <isc/parseint.h>
 #include <isc/region.h>
 #include <isc/result.h>
@@ -87,7 +88,15 @@ options {\n\
 	nta-lifetime 3600;\n\
 	nta-recheck 300;\n\
 #	pid-file \"" NAMED_LOCALSTATEDIR "/run/named/named.pid\"; \n\
-	port 53;\n\
+	port 53;\n"
+#if HAVE_SO_REUSEPORT_LB
+			    "\
+	reuseport yes;\n"
+#else
+			    "\
+	reuseport no;\n"
+#endif
+			    "\
 	prefetch 2 9;\n\
 	recursing-file \"named.recursing\";\n\
 	recursive-clients 1000;\n\
@@ -320,6 +329,11 @@ named_config_parsedefaults(cfg_parser_t *parser, cfg_obj_t **conf) {
 				 CFG_PCTX_NODEPRECATED, conf));
 }
 
+const char *
+named_config_getdefault(void) {
+	return (defaultconf);
+}
+
 isc_result_t
 named_config_get(cfg_obj_t const *const *maps, const char *name,
 		 const cfg_obj_t **obj) {
@@ -449,8 +463,7 @@ named_config_getzonetype(const cfg_obj_t *zonetypeobj) {
 	} else if (strcasecmp(str, "redirect") == 0) {
 		ztype = dns_zone_redirect;
 	} else {
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 	return (ztype);
 }
@@ -1059,8 +1072,7 @@ named_config_getkeyalgorithm2(const char *str, const dns_name_t **name,
 			*name = dns_tsig_hmacsha512_name;
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 	if (typep != NULL) {

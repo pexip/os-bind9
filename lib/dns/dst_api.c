@@ -482,12 +482,41 @@ dst_key_tofile(const dst_key_t *key, int type, const char *directory) {
 
 void
 dst_key_setexternal(dst_key_t *key, bool value) {
+	REQUIRE(VALID_KEY(key));
+
 	key->external = value;
 }
 
 bool
 dst_key_isexternal(dst_key_t *key) {
+	REQUIRE(VALID_KEY(key));
+
 	return (key->external);
+}
+
+void
+dst_key_setmodified(dst_key_t *key, bool value) {
+	REQUIRE(VALID_KEY(key));
+
+	isc_mutex_lock(&key->mdlock);
+	key->modified = value;
+	isc_mutex_unlock(&key->mdlock);
+}
+
+bool
+dst_key_ismodified(const dst_key_t *key) {
+	bool modified;
+	dst_key_t *k;
+
+	REQUIRE(VALID_KEY(key));
+
+	DE_CONST(key, k);
+
+	isc_mutex_lock(&k->mdlock);
+	modified = key->modified;
+	isc_mutex_unlock(&k->mdlock);
+
+	return (modified);
 }
 
 isc_result_t
@@ -637,6 +666,7 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	    (pubkey->key_flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY)
 	{
 		RETERR(computeid(pubkey));
+		pubkey->modified = false;
 		*keyp = pubkey;
 		pubkey = NULL;
 		goto out;
@@ -690,6 +720,7 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 		RETERR(DST_R_INVALIDPRIVATEKEY);
 	}
 
+	key->modified = false;
 	*keyp = key;
 	key = NULL;
 
@@ -1047,6 +1078,8 @@ dst_key_setbool(dst_key_t *key, int type, bool value) {
 	REQUIRE(type <= DST_MAX_BOOLEAN);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || !key->boolset[type] ||
+			key->bools[type] != value;
 	key->bools[type] = value;
 	key->boolset[type] = true;
 	isc_mutex_unlock(&key->mdlock);
@@ -1058,6 +1091,7 @@ dst_key_unsetbool(dst_key_t *key, int type) {
 	REQUIRE(type <= DST_MAX_BOOLEAN);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || key->boolset[type];
 	key->boolset[type] = false;
 	isc_mutex_unlock(&key->mdlock);
 }
@@ -1089,6 +1123,8 @@ dst_key_setnum(dst_key_t *key, int type, uint32_t value) {
 	REQUIRE(type <= DST_MAX_NUMERIC);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || !key->numset[type] ||
+			key->nums[type] != value;
 	key->nums[type] = value;
 	key->numset[type] = true;
 	isc_mutex_unlock(&key->mdlock);
@@ -1100,6 +1136,7 @@ dst_key_unsetnum(dst_key_t *key, int type) {
 	REQUIRE(type <= DST_MAX_NUMERIC);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || key->numset[type];
 	key->numset[type] = false;
 	isc_mutex_unlock(&key->mdlock);
 }
@@ -1130,6 +1167,8 @@ dst_key_settime(dst_key_t *key, int type, isc_stdtime_t when) {
 	REQUIRE(type <= DST_MAX_TIMES);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || !key->timeset[type] ||
+			key->times[type] != when;
 	key->times[type] = when;
 	key->timeset[type] = true;
 	isc_mutex_unlock(&key->mdlock);
@@ -1141,6 +1180,7 @@ dst_key_unsettime(dst_key_t *key, int type) {
 	REQUIRE(type <= DST_MAX_TIMES);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || key->timeset[type];
 	key->timeset[type] = false;
 	isc_mutex_unlock(&key->mdlock);
 }
@@ -1172,6 +1212,8 @@ dst_key_setstate(dst_key_t *key, int type, dst_key_state_t state) {
 	REQUIRE(type <= DST_MAX_KEYSTATES);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || !key->keystateset[type] ||
+			key->keystates[type] != state;
 	key->keystates[type] = state;
 	key->keystateset[type] = true;
 	isc_mutex_unlock(&key->mdlock);
@@ -1183,6 +1225,7 @@ dst_key_unsetstate(dst_key_t *key, int type) {
 	REQUIRE(type <= DST_MAX_KEYSTATES);
 
 	isc_mutex_lock(&key->mdlock);
+	key->modified = key->modified || key->keystateset[type];
 	key->keystateset[type] = false;
 	isc_mutex_unlock(&key->mdlock);
 }
@@ -2747,4 +2790,6 @@ dst_key_copy_metadata(dst_key_t *to, dst_key_t *from) {
 			dst_key_unsetstate(to, i);
 		}
 	}
+
+	dst_key_setmodified(to, dst_key_ismodified(from));
 }

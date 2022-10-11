@@ -256,17 +256,17 @@ static isc_result_t
 unknown_totext(dns_rdata_t *rdata, dns_rdata_textctx_t *tctx,
 	       isc_buffer_t *target);
 
-static inline isc_result_t generic_fromtext_key(ARGS_FROMTEXT);
+static isc_result_t generic_fromtext_key(ARGS_FROMTEXT);
 
-static inline isc_result_t generic_totext_key(ARGS_TOTEXT);
+static isc_result_t generic_totext_key(ARGS_TOTEXT);
 
-static inline isc_result_t generic_fromwire_key(ARGS_FROMWIRE);
+static isc_result_t generic_fromwire_key(ARGS_FROMWIRE);
 
-static inline isc_result_t generic_fromstruct_key(ARGS_FROMSTRUCT);
+static isc_result_t generic_fromstruct_key(ARGS_FROMSTRUCT);
 
-static inline isc_result_t generic_tostruct_key(ARGS_TOSTRUCT);
+static isc_result_t generic_tostruct_key(ARGS_TOSTRUCT);
 
-static inline void generic_freestruct_key(ARGS_FREESTRUCT);
+static void generic_freestruct_key(ARGS_FREESTRUCT);
 
 static isc_result_t generic_fromtext_txt(ARGS_FROMTEXT);
 
@@ -348,7 +348,7 @@ static dns_name_t const gc_msdcs = DNS_NAME_INITNONABSOLUTE(gc_msdcs_data,
  * \note
  *	(1) does not touch `dst' unless it's returning 1.
  */
-static inline int
+static int
 locator_pton(const char *src, unsigned char *dst) {
 	static const char xdigits_l[] = "0123456789abcdef",
 			  xdigits_u[] = "0123456789ABCDEF";
@@ -406,7 +406,7 @@ locator_pton(const char *src, unsigned char *dst) {
 	return (1);
 }
 
-static inline isc_result_t
+static isc_result_t
 name_duporclone(const dns_name_t *source, isc_mem_t *mctx, dns_name_t *target) {
 	if (mctx != NULL) {
 		dns_name_dup(source, mctx, target);
@@ -416,7 +416,7 @@ name_duporclone(const dns_name_t *source, isc_mem_t *mctx, dns_name_t *target) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline void *
+static void *
 mem_maybedup(isc_mem_t *mctx, void *source, size_t length) {
 	void *copy;
 
@@ -429,7 +429,7 @@ mem_maybedup(isc_mem_t *mctx, void *source, size_t length) {
 	return (copy);
 }
 
-static inline isc_result_t
+static isc_result_t
 typemap_fromtext(isc_lex_t *lexer, isc_buffer_t *target, bool allow_empty) {
 	isc_token_t token;
 	unsigned char bm[8 * 1024]; /* 64k bits */
@@ -497,7 +497,7 @@ typemap_fromtext(isc_lex_t *lexer, isc_buffer_t *target, bool allow_empty) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 typemap_totext(isc_region_t *sr, dns_rdata_textctx_t *tctx,
 	       isc_buffer_t *target) {
 	unsigned int i, j, k;
@@ -1890,9 +1890,9 @@ inet_totext(int af, uint32_t flags, isc_region_t *src, isc_buffer_t *target) {
 	 * parsing, so append 0 in that case.
 	 */
 	if (af == AF_INET6 && (flags & DNS_STYLEFLAG_YAML) != 0) {
-		isc_textregion_t tr;
-		isc_buffer_usedregion(target, (isc_region_t *)&tr);
-		if (tr.base[tr.length - 1] == ':') {
+		isc_region_t r;
+		isc_buffer_usedregion(target, &r);
+		if (r.length > 0 && r.base[r.length - 1] == ':') {
 			if (isc_buffer_availablelength(target) == 0) {
 				return (ISC_R_NOSPACE);
 			}

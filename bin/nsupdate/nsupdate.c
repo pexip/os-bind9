@@ -324,7 +324,7 @@ ddebug(const char *format, ...) {
 	}
 }
 
-static inline void
+static void
 check_result(isc_result_t result, const char *msg) {
 	if (result != ISC_R_SUCCESS) {
 		fatal("%s: %s", msg, isc_result_totext(result));
@@ -763,8 +763,9 @@ doshutdown(void) {
 static void
 maybeshutdown(void) {
 	/* when called from getinput, doshutdown might be already finished */
-	if (requestmgr == NULL)
+	if (requestmgr == NULL) {
 		return;
+	}
 
 	ddebug("Shutting down request manager");
 	dns_requestmgr_shutdown(requestmgr);

@@ -852,6 +852,7 @@ setup_dnsseckeys(dns_client_t *client) {
 
 		isc_buffer_init(&b, anchortext, sizeof(anchortext) - 1);
 		isc_buffer_add(&b, sizeof(anchortext) - 1);
+		cfg_parser_reset(parser);
 		result = cfg_parse_buffer(parser, &b, NULL, 0,
 					  &cfg_type_bindkeys, 0, &bindkeys);
 		if (result != ISC_R_SUCCESS) {
@@ -1332,7 +1333,6 @@ dash_option(char *option, char *next, bool *open_type_class) {
 		case 'h':
 			usage();
 			exit(0);
-		/* NOTREACHED */
 		case 'i':
 			no_sigs = true;
 			root_validation = false;
@@ -1343,10 +1343,8 @@ dash_option(char *option, char *next, bool *open_type_class) {
 		case 'v':
 			fputs("delv " VERSION "\n", stderr);
 			exit(0);
-		/* NOTREACHED */
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		if (strlen(option) > 1U) {
 			option = &option[1];
@@ -1484,7 +1482,7 @@ dash_option(char *option, char *next, bool *open_type_class) {
 		fprintf(stderr, "Invalid option: -%s\n", option);
 		usage();
 	}
-	/* NOTREACHED */
+	UNREACHABLE();
 	return (false);
 }
 

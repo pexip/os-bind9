@@ -41,9 +41,9 @@
 #include <dlz/sdlz_helper.h>
 #include <named/globals.h>
 
-#if !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000
+#if !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000
 typedef bool my_bool;
-#endif /* !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000 */
+#endif /* !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000 */
 
 static dns_sdlzimplementation_t *dlz_mysql = NULL;
 
@@ -289,7 +289,9 @@ mysql_get_resultset(const char *zone, const char *record, const char *client,
 			break;
 		}
 		for (j = 0; mysql_ping((MYSQL *)dbi->dbconn) != 0 && j < 4; j++)
+		{
 			;
+		}
 	}
 
 	if (qres == 0) {

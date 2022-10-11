@@ -791,7 +791,7 @@ retry:
 				need_retry = true;
 				break;
 			}
-			/* FALLTHROUGH */
+			FALLTHROUGH;
 
 		default:
 			isc_result = isc__errno2result(Error);
@@ -1028,9 +1028,10 @@ dump_msg(struct msghdr *msg, isc_socket_t *sock) {
 	printf("MSGHDR %p, Socket #: %Iu\n", msg, sock->fd);
 	printf("\tname %p, namelen %d\n", msg->msg_name, msg->msg_namelen);
 	printf("\tiov %p, iovlen %d\n", msg->msg_iov, msg->msg_iovlen);
-	for (i = 0; i < (unsigned int)msg->msg_iovlen; i++)
+	for (i = 0; i < (unsigned int)msg->msg_iovlen; i++) {
 		printf("\t\t%u\tbase %p, len %u\n", i, msg->msg_iov[i].buf,
 		       msg->msg_iov[i].len);
+	}
 }
 #endif /* if defined(ISC_SOCKET_DEBUG) */
 

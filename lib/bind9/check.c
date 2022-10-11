@@ -505,7 +505,14 @@ check_viewacls(cfg_aclconfctx_t *actx, const cfg_obj_t *voptions,
 	return (result);
 }
 
-static const unsigned char zeros[16];
+static void
+dns64_error(const cfg_obj_t *obj, isc_log_t *logctx, isc_netaddr_t *netaddr,
+	    unsigned int prefixlen, const char *message) {
+	char buf[ISC_NETADDR_FORMATSIZE + 1];
+	isc_netaddr_format(netaddr, buf, sizeof(buf));
+	cfg_obj_log(obj, logctx, ISC_LOG_ERROR, "dns64 prefix %s/%u %s", buf,
+		    prefixlen, message);
+}
 
 static isc_result_t
 check_dns64(cfg_aclconfctx_t *actx, const cfg_obj_t *voptions,
@@ -544,16 +551,15 @@ check_dns64(cfg_aclconfctx_t *actx, const cfg_obj_t *voptions,
 
 		cfg_obj_asnetprefix(obj, &na, &prefixlen);
 		if (na.family != AF_INET6) {
-			cfg_obj_log(map, logctx, ISC_LOG_ERROR,
-				    "dns64 requires a IPv6 prefix");
+			dns64_error(map, logctx, &na, prefixlen,
+				    "must be IPv6");
 			result = ISC_R_FAILURE;
 			continue;
 		}
 
 		if (na.type.in6.s6_addr[8] != 0) {
-			cfg_obj_log(map, logctx, ISC_LOG_ERROR,
-				    "invalid prefix, bits [64..71] must be "
-				    "zero");
+			dns64_error(map, logctx, &na, prefixlen,
+				    "bits [64..71] must be zero");
 			result = ISC_R_FAILURE;
 			continue;
 		}
@@ -561,9 +567,8 @@ check_dns64(cfg_aclconfctx_t *actx, const cfg_obj_t *voptions,
 		if (prefixlen != 32 && prefixlen != 40 && prefixlen != 48 &&
 		    prefixlen != 56 && prefixlen != 64 && prefixlen != 96)
 		{
-			cfg_obj_log(map, logctx, ISC_LOG_ERROR,
-				    "bad prefix length %u [32/40/48/56/64/96]",
-				    prefixlen);
+			dns64_error(map, logctx, &na, prefixlen,
+				    "length is not 32/40/48/56/64/96");
 			result = ISC_R_FAILURE;
 			continue;
 		}
@@ -590,6 +595,7 @@ check_dns64(cfg_aclconfctx_t *actx, const cfg_obj_t *voptions,
 		obj = NULL;
 		(void)cfg_map_get(map, "suffix", &obj);
 		if (obj != NULL) {
+			static const unsigned char zeros[16];
 			isc_netaddr_fromsockaddr(&sa, cfg_obj_assockaddr(obj));
 			if (sa.family != AF_INET6) {
 				cfg_obj_log(map, logctx, ISC_LOG_ERROR,
@@ -2164,8 +2170,7 @@ check_update_policy(const cfg_obj_t *policy, isc_log_t *logctx) {
 			}
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
 		for (element2 = cfg_list_first(typelist); element2 != NULL;
@@ -2336,7 +2341,7 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 	const char *target = NULL;
 	unsigned int ztype;
 	const cfg_obj_t *zoptions, *goptions = NULL;
-	const cfg_obj_t *obj = NULL;
+	const cfg_obj_t *obj = NULL, *kasp = NULL;
 	const cfg_obj_t *inviewobj = NULL;
 	isc_result_t result = ISC_R_SUCCESS;
 	isc_result_t tresult;
@@ -2495,8 +2500,8 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 		} else if (dns_name_isula(zname)) {
 			ula = true;
 		}
-		tmp += strlen(tmp);
 		len -= strlen(tmp);
+		tmp += strlen(tmp);
 		(void)snprintf(tmp, len, "%u/%s", zclass,
 			       (ztype == CFG_ZONE_INVIEW) ? target
 			       : (viewname != NULL)	  ? viewname
@@ -2545,8 +2550,7 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 			break;
 
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 
@@ -2626,6 +2630,30 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 					result = ISC_R_FAILURE;
 				}
 			}
+		}
+		if (has_dnssecpolicy) {
+			kasp = obj;
+		}
+	}
+
+	/*
+	 * Warn about zones with both dnssec-policy and max-zone-ttl
+	 */
+	if (has_dnssecpolicy) {
+		obj = NULL;
+		(void)cfg_map_get(zoptions, "max-zone-ttl", &obj);
+		if (obj == NULL && voptions != NULL) {
+			(void)cfg_map_get(voptions, "max-zone-ttl", &obj);
+		}
+		if (obj == NULL && goptions != NULL) {
+			(void)cfg_map_get(goptions, "max-zone-ttl", &obj);
+		}
+		if (obj != NULL) {
+			cfg_obj_log(obj, logctx, ISC_LOG_WARNING,
+				    "zone '%s': option 'max-zone-ttl' "
+				    "is ignored when used together with "
+				    "'dnssec-policy'",
+				    znamestr);
 		}
 	}
 
@@ -2903,12 +2931,17 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 		res1 = cfg_map_get(zoptions, "inline-signing", &obj);
 		if (res1 == ISC_R_SUCCESS) {
 			signing = cfg_obj_asboolean(obj);
-			if (has_dnssecpolicy && !ddns && !signing) {
-				cfg_obj_log(obj, logctx, ISC_LOG_ERROR,
-					    "'inline-signing;' cannot be set "
-					    "to 'no' "
-					    "if dnssec-policy is also set on a "
-					    "non-dynamic DNS zone");
+		}
+
+		if (has_dnssecpolicy) {
+			if (!ddns && !signing) {
+				cfg_obj_log(kasp, logctx, ISC_LOG_ERROR,
+					    "'dnssec-policy;' requires%s "
+					    "inline-signing to be configured "
+					    "for the zone",
+					    (ztype == CFG_ZONE_PRIMARY)
+						    ? " dynamic DNS or"
+						    : "");
 				result = ISC_R_FAILURE;
 			}
 		}
@@ -2920,7 +2953,7 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 			arg = cfg_obj_asstring(obj);
 		}
 		if (strcasecmp(arg, "off") != 0) {
-			if (!ddns && !signing && strcasecmp(arg, "off") != 0) {
+			if (!ddns && !signing && !has_dnssecpolicy) {
 				cfg_obj_log(obj, logctx, ISC_LOG_ERROR,
 					    "'auto-dnssec %s;' requires%s "
 					    "inline-signing to be configured "
@@ -2932,7 +2965,7 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 				result = ISC_R_FAILURE;
 			}
 
-			if (strcasecmp(arg, "off") != 0 && has_dnssecpolicy) {
+			if (has_dnssecpolicy) {
 				cfg_obj_log(obj, logctx, ISC_LOG_ERROR,
 					    "'auto-dnssec %s;' cannot be "
 					    "configured if dnssec-policy is "
@@ -3177,8 +3210,7 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 				    "masterfile-format: format 'map' is "
 				    "deprecated");
 		} else {
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 
@@ -3244,8 +3276,8 @@ check_zoneconf(const cfg_obj_t *zconfig, const cfg_obj_t *voptions,
 		char *tmp = keydirbuf;
 		size_t len = sizeof(keydirbuf);
 		dns_name_format(zname, keydirbuf, sizeof(keydirbuf));
-		tmp += strlen(tmp);
 		len -= strlen(tmp);
+		tmp += strlen(tmp);
 		(void)snprintf(tmp, len, "/%s", (dir == NULL) ? "(null)" : dir);
 		tresult = keydirexist(zconfig, (const char *)keydirbuf,
 				      kaspname, keydirs, logctx, mctx);

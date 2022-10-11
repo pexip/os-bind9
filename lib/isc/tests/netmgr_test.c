@@ -23,7 +23,6 @@
 #define UNIT_TESTING
 #include <cmocka.h>
 
-#include <isc/hp.h>
 #include <isc/nonce.h>
 #include <isc/os.h>
 #include <isc/quota.h>
@@ -62,26 +61,26 @@ static isc_sockaddr_t tcp_connect_addr;
 static uint64_t send_magic = 0;
 static uint64_t stop_magic = 0;
 
-static uv_buf_t send_msg = { .base = (char *)&send_magic,
-			     .len = sizeof(send_magic) };
+static isc_region_t send_msg = { .base = (unsigned char *)&send_magic,
+				 .length = sizeof(send_magic) };
 
-static uv_buf_t stop_msg = { .base = (char *)&stop_magic,
-			     .len = sizeof(stop_magic) };
+static isc_region_t stop_msg = { .base = (unsigned char *)&stop_magic,
+				 .length = sizeof(stop_magic) };
 
-static atomic_bool do_send = ATOMIC_VAR_INIT(false);
+static atomic_bool do_send = false;
 static unsigned int workers = 0;
 
 static atomic_int_fast64_t nsends;
 static int_fast64_t esends; /* expected sends */
 
-static atomic_int_fast64_t ssends = ATOMIC_VAR_INIT(0);
-static atomic_int_fast64_t sreads = ATOMIC_VAR_INIT(0);
-static atomic_int_fast64_t saccepts = ATOMIC_VAR_INIT(0);
+static atomic_int_fast64_t ssends = 0;
+static atomic_int_fast64_t sreads = 0;
+static atomic_int_fast64_t saccepts = 0;
 
-static atomic_int_fast64_t cconnects = ATOMIC_VAR_INIT(0);
-static atomic_int_fast64_t csends = ATOMIC_VAR_INIT(0);
-static atomic_int_fast64_t creads = ATOMIC_VAR_INIT(0);
-static atomic_int_fast64_t ctimeouts = ATOMIC_VAR_INIT(0);
+static atomic_int_fast64_t cconnects = 0;
+static atomic_int_fast64_t csends = 0;
+static atomic_int_fast64_t creads = 0;
+static atomic_int_fast64_t ctimeouts = 0;
 
 static isc_refcount_t active_cconnects;
 static isc_refcount_t active_csends;
@@ -205,8 +204,6 @@ _setup(void **state __attribute__((unused))) {
 	if (isc_test_begin(NULL, false, workers) != ISC_R_SUCCESS) {
 		return (-1);
 	}
-
-	isc_hp_init(4 * workers);
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -420,11 +417,9 @@ connect_send(isc_nmhandle_t *handle) {
 	isc_nmhandle_attach(handle, &sendhandle);
 	isc_nmhandle_setwritetimeout(handle, T_IDLE);
 	if (atomic_fetch_sub(&nsends, 1) > 1) {
-		isc_nm_send(sendhandle, (isc_region_t *)&send_msg,
-			    connect_send_cb, NULL);
+		isc_nm_send(sendhandle, &send_msg, connect_send_cb, NULL);
 	} else {
-		isc_nm_send(sendhandle, (isc_region_t *)&stop_msg,
-			    connect_send_cb, NULL);
+		isc_nm_send(sendhandle, &stop_msg, connect_send_cb, NULL);
 	}
 }
 
@@ -531,8 +526,8 @@ listen_read_cb(isc_nmhandle_t *handle, isc_result_t eresult,
 			isc_nmhandle_attach(handle, &sendhandle);
 			isc_refcount_increment0(&active_ssends);
 			isc_nmhandle_setwritetimeout(sendhandle, T_IDLE);
-			isc_nm_send(sendhandle, (isc_region_t *)&send_msg,
-				    listen_send_cb, cbarg);
+			isc_nm_send(sendhandle, &send_msg, listen_send_cb,
+				    cbarg);
 		}
 		return;
 	}

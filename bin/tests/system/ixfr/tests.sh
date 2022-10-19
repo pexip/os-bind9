@@ -16,8 +16,7 @@
 #          in the log file - need a better approach <sdm> - until then,
 #          if you add any tests above that point, you will break the test.
 
-SYSTEMTESTTOP=..
-. $SYSTEMTESTTOP/conf.sh
+. ../conf.sh
 
 wait_for_serial() (
     $DIG $DIGOPTS "@$1" "$2" SOA > "$4"
@@ -29,14 +28,18 @@ status=0
 n=0
 
 DIGOPTS="+tcp +noadd +nosea +nostat +noquest +nocomm +nocmd -p ${PORT}"
-SENDCMD="$PERL ../send.pl 10.53.0.2 ${EXTRAPORT1}"
 RNDCCMD="$RNDC -p ${CONTROLPORT} -c ../common/rndc.conf -s"
+
+sendcmd() {
+    send 10.53.0.2 "${EXTRAPORT1}"
+}
+
 
 n=$((n+1))
 echo_i "testing initial AXFR ($n)"
 ret=0
 
-$SENDCMD <<EOF
+sendcmd <<EOF
 /SOA/
 nil.      	300	SOA	ns.nil. root.nil. 1 300 300 604800 300
 /AXFR/
@@ -79,7 +82,7 @@ ret=0
 # We change the IP address of a.nil., and the TXT record at the apex.
 # Then we do a SOA-only update.
 
-$SENDCMD <<EOF
+sendcmd <<EOF
 /SOA/
 nil.      	300	SOA	ns.nil. root.nil. 3 300 300 604800 300
 /IXFR/
@@ -111,7 +114,7 @@ ret=0
 
 # Provide a broken IXFR response and a working fallback AXFR response
 
-$SENDCMD <<EOF
+sendcmd <<EOF
 /SOA/
 nil.      	300	SOA	ns.nil. root.nil. 4 300 300 604800 300
 /IXFR/
@@ -148,7 +151,7 @@ ret=0
 nextpart ns1/named.run >/dev/null
 
 # Provide a broken IXFR response and a working fallback AXFR response.
-$SENDCMD <<EOF
+sendcmd <<EOF
 /SOA/
 nil.      	300	SOA	ns.nil. root.nil. 4 300 300 604800 300
 /IXFR/
@@ -214,6 +217,7 @@ retry_quiet 10 wait_for_serial 10.53.0.4 test. 1 dig.out.test$n || ret=1
 nextpart ns4/named.run > /dev/null
 
 # modify the primary
+sleep 1
 cp ns3/mytest1.db ns3/mytest.db
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
 
@@ -241,6 +245,7 @@ ret=0
 # we want to make sure that a change to sub.test results in AXFR, while
 # changes to test. result in IXFR
 
+sleep 1
 cp ns3/subtest1.db ns3/subtest.db # change to sub.test zone, should be AXFR
 nextpart ns4/named.run > /dev/null
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
@@ -264,6 +269,7 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "testing 'request-ixfr yes' option inheritance from view ($n)"
 ret=0
+sleep 1
 cp ns3/mytest2.db ns3/mytest.db # change to test zone, should be IXFR
 nextpart ns4/named.run > /dev/null
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
@@ -348,6 +354,32 @@ $DIG $DIGOPTS ixfr=1 test @10.53.0.5 > dig.out1.test$n || ret=1
 $DIG $DIGOPTS ixfr=1 +notcp test @10.53.0.5 > dig.out2.test$n || ret=1
 awk '$4 == "SOA" { soacnt++} END {if (soacnt == 2) exit(0); else exit(1);}' dig.out1.test$n || ret=1
 awk '$4 == "SOA" { soacnt++} END {if (soacnt == 1) exit(0); else exit(1);}' dig.out2.test$n || ret=1
+msg="IXFR delta response disabled due to 'provide-ixfr no;' being set"
+nextpart ns5/named.run | grep "$msg" > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "test 'provide-ixfr no;' (serial = current) ($n)"
+ret=0
+# Should be "AXFR style" response
+$DIG $DIGOPTS ixfr=3 test @10.53.0.5 > dig.out1.test$n || ret=1
+# Should be "switch to TCP" response
+$DIG $DIGOPTS ixfr=3 +notcp test @10.53.0.5 > dig.out2.test$n || ret=1
+awk '$4 == "SOA" { soacnt++} END {if (soacnt == 1) exit(0); else exit(1);}' dig.out1.test$n || ret=1
+awk '$4 == "SOA" { soacnt++} END {if (soacnt == 1) exit(0); else exit(1);}' dig.out2.test$n || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "test 'provide-ixfr no;' (serial > current) ($n)"
+ret=0
+# Should be "AXFR style" response
+$DIG $DIGOPTS ixfr=4 test @10.53.0.5 > dig.out1.test$n || ret=1
+# Should be "switch to TCP" response
+$DIG $DIGOPTS ixfr=4 +notcp test @10.53.0.5 > dig.out2.test$n || ret=1
+awk '$4 == "SOA" { soacnt++} END {if (soacnt == 1) exit(0); else exit(1);}' dig.out1.test$n || ret=1
+awk '$4 == "SOA" { soacnt++} END {if (soacnt == 1) exit(0); else exit(1);}' dig.out2.test$n || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -388,6 +420,7 @@ ret=0
 echo_i "testing fallback to AXFR when max-ixfr-ratio is exceeded ($n)"
 nextpart ns4/named.run > /dev/null
 
+sleep 1
 cp ns3/mytest3.db ns3/mytest.db # change to test zone, too big for IXFR
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
 

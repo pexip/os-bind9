@@ -1,3 +1,1 @@
-0001-Add_--install-layout=deb_to_setup.py_call.patch
-0002-python-fix-for-dist-packages.patch
-0003-Disable-sphinx-build-strict-mode.patch
+0001-Disable-treat-warnings-as-errors-in-sphinx-build.patch

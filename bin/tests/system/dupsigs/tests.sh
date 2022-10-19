@@ -9,8 +9,7 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=..
-. $SYSTEMTESTTOP/conf.sh
+. ../conf.sh
 
 status=0
 start=`date +%s`

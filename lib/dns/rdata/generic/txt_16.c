@@ -233,6 +233,7 @@ additionaldata_txt(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_txt);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 

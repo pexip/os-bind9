@@ -11,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISCCFG_CFG_H
-#define ISCCFG_CFG_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -622,5 +621,3 @@ cfg_pluginlist_foreach(const cfg_obj_t *config, const cfg_obj_t *list,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCFG_CFG_H */

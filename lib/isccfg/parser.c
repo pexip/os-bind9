@@ -12,9 +12,6 @@
  */
 
 /*
- * duration_fromtext initially taken from OpenDNSSEC code base.
- * Modified to fit the BIND 9 code.
- *
  * Copyright (c) 2009-2018 NLNet Labs.
  * All rights reserved.
  *
@@ -43,18 +40,23 @@
 /*! \file */
 
 #include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <isc/buffer.h>
 #include <isc/dir.h>
+#include <isc/errno.h>
 #include <isc/formatcheck.h>
+#include <isc/glob.h>
 #include <isc/lex.h>
 #include <isc/log.h>
 #include <isc/mem.h>
 #include <isc/net.h>
 #include <isc/netaddr.h>
+#include <isc/netmgr.h>
 #include <isc/netscope.h>
 #include <isc/print.h>
 #include <isc/sockaddr.h>
@@ -154,22 +156,19 @@ doc_geoip(cfg_printer_t *pctx, const cfg_type_t *type);
  * not need a union member).
  */
 
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_uint32 = { "uint32", free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_uint64 = { "uint64", free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_string = { "string", free_string };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_boolean = { "boolean", free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_map = { "map", free_map };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_list = { "list", free_list };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_tuple = { "tuple", free_tuple };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_sockaddr = { "sockaddr", free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_netprefix = { "netprefix",
-							free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_void = { "void", free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_fixedpoint = { "fixedpoint",
-							 free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_percentage = { "percentage",
-							 free_noop };
-LIBISCCFG_EXTERNAL_DATA cfg_rep_t cfg_rep_duration = { "duration", free_noop };
+cfg_rep_t cfg_rep_uint32 = { "uint32", free_noop };
+cfg_rep_t cfg_rep_uint64 = { "uint64", free_noop };
+cfg_rep_t cfg_rep_string = { "string", free_string };
+cfg_rep_t cfg_rep_boolean = { "boolean", free_noop };
+cfg_rep_t cfg_rep_map = { "map", free_map };
+cfg_rep_t cfg_rep_list = { "list", free_list };
+cfg_rep_t cfg_rep_tuple = { "tuple", free_tuple };
+cfg_rep_t cfg_rep_sockaddr = { "sockaddr", free_noop };
+cfg_rep_t cfg_rep_netprefix = { "netprefix", free_noop };
+cfg_rep_t cfg_rep_void = { "void", free_noop };
+cfg_rep_t cfg_rep_fixedpoint = { "fixedpoint", free_noop };
+cfg_rep_t cfg_rep_percentage = { "percentage", free_noop };
+cfg_rep_t cfg_rep_duration = { "duration", free_noop };
 
 /*
  * Configuration type definitions.
@@ -769,10 +768,8 @@ cfg_obj_isvoid(const cfg_obj_t *obj) {
 	return (obj->type->rep == &cfg_rep_void);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_void = {
-	"void",	      cfg_parse_void, cfg_print_void,
-	cfg_doc_void, &cfg_rep_void,  NULL
-};
+cfg_type_t cfg_type_void = { "void",	   cfg_parse_void, cfg_print_void,
+			     cfg_doc_void, &cfg_rep_void,  NULL };
 
 /*
  * percentage
@@ -829,10 +826,9 @@ cfg_obj_aspercentage(const cfg_obj_t *obj) {
 	return (obj->value.uint32);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_percentage = {
-	"percentage",	  cfg_parse_percentage, cfg_print_percentage,
-	cfg_doc_terminal, &cfg_rep_percentage,	NULL
-};
+cfg_type_t cfg_type_percentage = { "percentage",	 cfg_parse_percentage,
+				   cfg_print_percentage, cfg_doc_terminal,
+				   &cfg_rep_percentage,	 NULL };
 
 bool
 cfg_obj_ispercentage(const cfg_obj_t *obj) {
@@ -913,10 +909,9 @@ cfg_obj_asfixedpoint(const cfg_obj_t *obj) {
 	return (obj->value.uint32);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_fixedpoint = {
-	"fixedpoint",	  cfg_parse_fixedpoint, cfg_print_fixedpoint,
-	cfg_doc_terminal, &cfg_rep_fixedpoint,	NULL
-};
+cfg_type_t cfg_type_fixedpoint = { "fixedpoint",	 cfg_parse_fixedpoint,
+				   cfg_print_fixedpoint, cfg_doc_terminal,
+				   &cfg_rep_fixedpoint,	 NULL };
 
 bool
 cfg_obj_isfixedpoint(const cfg_obj_t *obj) {
@@ -981,10 +976,9 @@ cfg_obj_asuint32(const cfg_obj_t *obj) {
 	return (obj->value.uint32);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_uint32 = {
-	"integer",	  cfg_parse_uint32, cfg_print_uint32,
-	cfg_doc_terminal, &cfg_rep_uint32,  NULL
-};
+cfg_type_t cfg_type_uint32 = { "integer",	 cfg_parse_uint32,
+			       cfg_print_uint32, cfg_doc_terminal,
+			       &cfg_rep_uint32,	 NULL };
 
 /*
  * uint64
@@ -1009,10 +1003,9 @@ cfg_print_uint64(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	cfg_print_cstr(pctx, buf);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_uint64 = {
-	"64_bit_integer", NULL, cfg_print_uint64, cfg_doc_terminal,
-	&cfg_rep_uint64,  NULL
-};
+cfg_type_t cfg_type_uint64 = { "64_bit_integer", NULL,
+			       cfg_print_uint64, cfg_doc_terminal,
+			       &cfg_rep_uint64,	 NULL };
 
 /*
  * Get the number of digits in a number.
@@ -1037,12 +1030,12 @@ numlen(uint32_t num) {
  */
 void
 cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
-	char buf[CFG_DURATION_MAXLEN];
+	char buf[DURATION_MAXLEN];
 	char *str;
 	const char *indicators = "YMWDHMS";
 	int count, i;
 	int durationlen[7];
-	cfg_duration_t duration;
+	isccfg_duration_t duration;
 	/*
 	 * D ? The duration has a date part.
 	 * T ? The duration has a time part.
@@ -1094,7 +1087,7 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	if (T) {
 		count++;
 	}
-	INSIST(count < CFG_DURATION_MAXLEN);
+	INSIST(count < DURATION_MAXLEN);
 
 	/* Now print the duration. */
 	for (i = 0; i < 6; i++) {
@@ -1123,7 +1116,7 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 
 void
 cfg_print_duration_or_unlimited(cfg_printer_t *pctx, const cfg_obj_t *obj) {
-	cfg_duration_t duration;
+	isccfg_duration_t duration;
 
 	REQUIRE(pctx != NULL);
 	REQUIRE(obj != NULL);
@@ -1146,163 +1139,17 @@ cfg_obj_isduration(const cfg_obj_t *obj) {
 uint32_t
 cfg_obj_asduration(const cfg_obj_t *obj) {
 	REQUIRE(obj != NULL && obj->type->rep == &cfg_rep_duration);
-	uint32_t duration = 0;
-	duration += obj->value.duration.parts[6];	      /* Seconds */
-	duration += obj->value.duration.parts[5] * 60;	      /* Minutes */
-	duration += obj->value.duration.parts[4] * 3600;      /* Hours */
-	duration += obj->value.duration.parts[3] * 86400;     /* Days */
-	duration += obj->value.duration.parts[2] * 86400 * 7; /* Weaks */
-	/*
-	 * The below additions are not entirely correct
-	 * because days may very per month and per year.
-	 */
-	duration += obj->value.duration.parts[1] * 86400 * 31;	/* Months */
-	duration += obj->value.duration.parts[0] * 86400 * 365; /* Years */
-	return (duration);
-}
-
-static isc_result_t
-duration_fromtext(isc_textregion_t *source, cfg_duration_t *duration) {
-	char buf[CFG_DURATION_MAXLEN];
-	char *P, *X, *T, *W, *str;
-	bool not_weeks = false;
-	int i;
-
-	/*
-	 * Copy the buffer as it may not be NULL terminated.
-	 * Anyone having a duration longer than 63 characters is crazy.
-	 */
-	if (source->length > sizeof(buf) - 1) {
-		return (ISC_R_BADNUMBER);
-	}
-	/* Copy source->length bytes and NULL terminate. */
-	snprintf(buf, sizeof(buf), "%.*s", (int)source->length, source->base);
-	str = buf;
-
-	/* Clear out duration. */
-	for (i = 0; i < 7; i++) {
-		duration->parts[i] = 0;
-	}
-
-	/* Every duration starts with 'P' */
-	P = strpbrk(str, "Pp");
-	if (P == NULL) {
-		return (ISC_R_BADNUMBER);
-	}
-
-	/* Record the time indicator. */
-	T = strpbrk(str, "Tt");
-
-	/* Record years. */
-	X = strpbrk(str, "Yy");
-	if (X != NULL) {
-		duration->parts[0] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Record months. */
-	X = strpbrk(str, "Mm");
-
-	/*
-	 * M could be months or minutes. This is months if there is no time
-	 * part, or this M indicator is before the time indicator.
-	 */
-	if (X != NULL && (T == NULL || (size_t)(X - P) < (size_t)(T - P))) {
-		duration->parts[1] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Record days. */
-	X = strpbrk(str, "Dd");
-	if (X != NULL) {
-		duration->parts[3] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Time part? */
-	if (T != NULL) {
-		str = T;
-		not_weeks = true;
-	}
-
-	/* Record hours. */
-	X = strpbrk(str, "Hh");
-	if (X != NULL && T != NULL) {
-		duration->parts[4] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Record minutes. */
-	X = strpbrk(str, "Mm");
-
-	/*
-	 * M could be months or minutes. This is minutes if there is a time
-	 * part and the M indicator is behind the time indicator.
-	 */
-	if (X != NULL && T != NULL && (size_t)(X - P) > (size_t)(T - P)) {
-		duration->parts[5] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Record seconds. */
-	X = strpbrk(str, "Ss");
-	if (X != NULL && T != NULL) {
-		duration->parts[6] = atoi(str + 1);
-		str = X;
-		not_weeks = true;
-	}
-
-	/* Or is the duration configured in weeks? */
-	W = strpbrk(buf, "Ww");
-	if (W != NULL) {
-		if (not_weeks) {
-			/* Mix of weeks and other indicators is not allowed */
-			return (ISC_R_BADNUMBER);
-		} else {
-			duration->parts[2] = atoi(str + 1);
-			str = W;
-		}
-	}
-
-	/* Deal with trailing garbage. */
-	if (str[1] != '\0') {
-		return (ISC_R_BADNUMBER);
-	}
-
-	return (ISC_R_SUCCESS);
+	return isccfg_duration_toseconds(&(obj->value.duration));
 }
 
 static isc_result_t
 parse_duration(cfg_parser_t *pctx, cfg_obj_t **ret) {
 	isc_result_t result;
 	cfg_obj_t *obj = NULL;
-	cfg_duration_t duration;
+	isccfg_duration_t duration;
 
-	duration.unlimited = false;
-
-	if (toupper((unsigned char)TOKEN_STRING(pctx)[0]) == 'P') {
-		result = duration_fromtext(&pctx->token.value.as_textregion,
-					   &duration);
-		duration.iso8601 = true;
-	} else {
-		uint32_t ttl;
-		result = dns_ttl_fromtext(&pctx->token.value.as_textregion,
-					  &ttl);
-		/*
-		 * With dns_ttl_fromtext() the information on optional units.
-		 * is lost, and is treated as seconds from now on.
-		 */
-		for (int i = 0; i < 6; i++) {
-			duration.parts[i] = 0;
-		}
-		duration.parts[6] = ttl;
-		duration.iso8601 = false;
-	}
+	result = isccfg_parse_duration(&pctx->token.value.as_textregion,
+				       &duration);
 
 	if (result == ISC_R_RANGE) {
 		cfg_parser_error(pctx, CFG_LOG_NEAR,
@@ -1350,7 +1197,7 @@ cfg_parse_duration_or_unlimited(cfg_parser_t *pctx, const cfg_type_t *type,
 				cfg_obj_t **ret) {
 	isc_result_t result;
 	cfg_obj_t *obj = NULL;
-	cfg_duration_t duration;
+	isccfg_duration_t duration;
 
 	UNUSED(type);
 
@@ -1396,18 +1243,15 @@ cleanup:
  *
  * A duration can also be a TTL value (number + optional unit).
  */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_duration = {
-	"duration",	  cfg_parse_duration, cfg_print_duration,
-	cfg_doc_terminal, &cfg_rep_duration,  NULL
-};
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_duration_or_unlimited = {
-	"duration_or_unlimited",
-	cfg_parse_duration_or_unlimited,
-	cfg_print_duration_or_unlimited,
-	cfg_doc_terminal,
-	&cfg_rep_duration,
-	NULL
-};
+cfg_type_t cfg_type_duration = { "duration",	     cfg_parse_duration,
+				 cfg_print_duration, cfg_doc_terminal,
+				 &cfg_rep_duration,  NULL };
+cfg_type_t cfg_type_duration_or_unlimited = { "duration_or_unlimited",
+					      cfg_parse_duration_or_unlimited,
+					      cfg_print_duration_or_unlimited,
+					      cfg_doc_terminal,
+					      &cfg_rep_duration,
+					      NULL };
 
 /*
  * qstring (quoted string), ustring (unquoted string), astring
@@ -1711,41 +1555,36 @@ cfg_obj_asstring(const cfg_obj_t *obj) {
 }
 
 /* Quoted string only */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_qstring = {
-	"quoted_string",  cfg_parse_qstring, print_qstring,
-	cfg_doc_terminal, &cfg_rep_string,   NULL
-};
+cfg_type_t cfg_type_qstring = { "quoted_string", cfg_parse_qstring,
+				print_qstring,	 cfg_doc_terminal,
+				&cfg_rep_string, NULL };
 
 /* Unquoted string only */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_ustring = {
-	"string",	  parse_ustring,   cfg_print_ustring,
-	cfg_doc_terminal, &cfg_rep_string, NULL
-};
+cfg_type_t cfg_type_ustring = { "string",	   parse_ustring,
+				cfg_print_ustring, cfg_doc_terminal,
+				&cfg_rep_string,   NULL };
 
 /* Any string (quoted or unquoted); printed with quotes */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_astring = {
-	"string",	  cfg_parse_astring, print_qstring,
-	cfg_doc_terminal, &cfg_rep_string,   NULL
-};
+cfg_type_t cfg_type_astring = { "string",	 cfg_parse_astring,
+				print_qstring,	 cfg_doc_terminal,
+				&cfg_rep_string, NULL };
 
 /*
  * Any string (quoted or unquoted); printed with quotes.
  * If CFG_PRINTER_XKEY is set when printing the string will be '?' out.
  */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_sstring = {
-	"string",	  cfg_parse_sstring, print_sstring,
-	cfg_doc_terminal, &cfg_rep_string,   NULL
-};
+cfg_type_t cfg_type_sstring = { "string",	 cfg_parse_sstring,
+				print_sstring,	 cfg_doc_terminal,
+				&cfg_rep_string, NULL };
 
 /*
  * Text enclosed in brackets. Used to pass a block of configuration
  * text to dynamic library or external application. Checked for
  * bracket balance, but not otherwise parsed.
  */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_bracketed_text = {
-	"bracketed_text", parse_btext,	   print_btext,
-	doc_btext,	  &cfg_rep_string, NULL
-};
+cfg_type_t cfg_type_bracketed_text = { "bracketed_text", parse_btext,
+				       print_btext,	 doc_btext,
+				       &cfg_rep_string,	 NULL };
 
 #if defined(HAVE_GEOIP2)
 /*
@@ -1923,14 +1762,12 @@ static cfg_type_t cfg_type_addrmatchelt = { "address_match_element",
 /*%
  * A bracketed address match list
  */
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_bracketed_aml = {
-	"bracketed_aml",
-	cfg_parse_bracketed_list,
-	cfg_print_bracketed_list,
-	cfg_doc_bracketed_list,
-	&cfg_rep_list,
-	&cfg_type_addrmatchelt
-};
+cfg_type_t cfg_type_bracketed_aml = { "bracketed_aml",
+				      cfg_parse_bracketed_list,
+				      cfg_print_bracketed_list,
+				      cfg_doc_bracketed_list,
+				      &cfg_rep_list,
+				      &cfg_type_addrmatchelt };
 
 /*
  * Optional bracketed text
@@ -1971,14 +1808,12 @@ doc_optional_btext(cfg_printer_t *pctx, const cfg_type_t *type) {
 	cfg_print_cstr(pctx, "[ { <unspecified-text> } ]");
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_optional_bracketed_text = {
-	"optional_btext",
-	parse_optional_btext,
-	print_optional_btext,
-	doc_optional_btext,
-	NULL,
-	NULL
-};
+cfg_type_t cfg_type_optional_bracketed_text = { "optional_btext",
+						parse_optional_btext,
+						print_optional_btext,
+						doc_optional_btext,
+						NULL,
+						NULL };
 
 /*
  * Booleans
@@ -2055,10 +1890,9 @@ cfg_print_boolean(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	}
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_boolean = {
-	"boolean",	  cfg_parse_boolean, cfg_print_boolean,
-	cfg_doc_terminal, &cfg_rep_boolean,  NULL
-};
+cfg_type_t cfg_type_boolean = { "boolean",	   cfg_parse_boolean,
+				cfg_print_boolean, cfg_doc_terminal,
+				&cfg_rep_boolean,  NULL };
 
 /*
  * Lists.
@@ -2396,9 +2230,21 @@ cfg_parse_mapbody(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
 			CHECK(cfg_parse_obj(pctx, &cfg_type_qstring,
 					    &includename));
 			CHECK(parse_semicolon(pctx));
-			CHECK(parser_openfile(pctx,
-					      includename->value.string.base));
+
+			/* Allow include to specify a pattern that follows
+			 * the same rules as the shell e.g "/path/zone*.conf" */
+			glob_t glob_obj;
+			CHECK(isc_glob(includename->value.string.base,
+				       &glob_obj));
 			cfg_obj_destroy(pctx, &includename);
+
+			for (size_t i = 0; i < glob_obj.gl_pathc; ++i) {
+				CHECK(parser_openfile(pctx,
+						      glob_obj.gl_pathv[i]));
+			}
+
+			isc_globfree(&glob_obj);
+
 			goto redo;
 		}
 
@@ -2436,6 +2282,13 @@ cfg_parse_mapbody(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
 					 clause->name);
 			CHECK(ISC_R_FAILURE);
 		}
+		if ((clause->flags & CFG_CLAUSEFLAG_NOTCONFIGURED) != 0) {
+			cfg_parser_error(pctx, 0,
+					 "option '%s' was not "
+					 "enabled at compile time",
+					 clause->name);
+			CHECK(ISC_R_FAILURE);
+		}
 
 		/* Issue warnings if appropriate */
 		if ((pctx->flags & CFG_PCTX_NODEPRECATED) == 0 &&
@@ -2450,37 +2303,12 @@ cfg_parse_mapbody(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
 					   "should be removed ",
 					   clause->name);
 		}
-		if ((clause->flags & CFG_CLAUSEFLAG_NOTIMP) != 0) {
+		if ((clause->flags & CFG_CLAUSEFLAG_EXPERIMENTAL) != 0) {
 			cfg_parser_warning(pctx, 0,
-					   "option '%s' is not implemented",
+					   "option '%s' is experimental and "
+					   "subject to change in the future",
 					   clause->name);
 		}
-		if ((clause->flags & CFG_CLAUSEFLAG_NYI) != 0) {
-			cfg_parser_warning(pctx, 0,
-					   "option '%s' is not implemented",
-					   clause->name);
-		}
-		if ((clause->flags & CFG_CLAUSEFLAG_NOOP) != 0) {
-			cfg_parser_warning(pctx, 0,
-					   "option '%s' was not "
-					   "enabled at compile time "
-					   "(ignored)",
-					   clause->name);
-		}
-
-		if ((clause->flags & CFG_CLAUSEFLAG_NOTCONFIGURED) != 0) {
-			cfg_parser_error(pctx, 0,
-					 "option '%s' was not "
-					 "enabled at compile time",
-					 clause->name);
-			CHECK(ISC_R_FAILURE);
-		}
-
-		/*
-		 * Don't log options with CFG_CLAUSEFLAG_NEWDEFAULT
-		 * set here - we need to log the *lack* of such an option,
-		 * not its presence.
-		 */
 
 		/* See if the clause already has a value; if not create one. */
 		result = isc_symtab_lookup(obj->value.map.symtab, clause->name,
@@ -2710,15 +2538,11 @@ cfg_print_mapbody(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 static struct flagtext {
 	unsigned int flag;
 	const char *text;
-} flagtexts[] = { { CFG_CLAUSEFLAG_NOTIMP, "not implemented" },
-		  { CFG_CLAUSEFLAG_NYI, "not yet implemented" },
-		  { CFG_CLAUSEFLAG_OBSOLETE, "obsolete" },
-		  { CFG_CLAUSEFLAG_NEWDEFAULT, "default changed" },
+} flagtexts[] = { { CFG_CLAUSEFLAG_OBSOLETE, "obsolete" },
 		  { CFG_CLAUSEFLAG_TESTONLY, "test only" },
 		  { CFG_CLAUSEFLAG_NOTCONFIGURED, "not configured" },
 		  { CFG_CLAUSEFLAG_MULTI, "may occur multiple times" },
 		  { CFG_CLAUSEFLAG_EXPERIMENTAL, "experimental" },
-		  { CFG_CLAUSEFLAG_NOOP, "non-operational" },
 		  { CFG_CLAUSEFLAG_DEPRECATED, "deprecated" },
 		  { CFG_CLAUSEFLAG_ANCIENT, "ancient" },
 		  { 0, NULL } };
@@ -2752,9 +2576,12 @@ cfg_doc_mapbody(cfg_printer_t *pctx, const cfg_type_t *type) {
 		for (clause = *clauseset; clause->name != NULL; clause++) {
 			if (((pctx->flags & CFG_PRINTER_ACTIVEONLY) != 0) &&
 			    (((clause->flags & CFG_CLAUSEFLAG_OBSOLETE) != 0) ||
-			     ((clause->flags & CFG_CLAUSEFLAG_ANCIENT) != 0) ||
-			     ((clause->flags & CFG_CLAUSEFLAG_NYI) != 0) ||
 			     ((clause->flags & CFG_CLAUSEFLAG_TESTONLY) != 0)))
+			{
+				continue;
+			}
+			if ((clause->flags & CFG_CLAUSEFLAG_ANCIENT) != 0 ||
+			    (clause->flags & CFG_CLAUSEFLAG_NODOC) != 0)
 			{
 				continue;
 			}
@@ -2807,9 +2634,12 @@ cfg_doc_map(cfg_printer_t *pctx, const cfg_type_t *type) {
 		for (clause = *clauseset; clause->name != NULL; clause++) {
 			if (((pctx->flags & CFG_PRINTER_ACTIVEONLY) != 0) &&
 			    (((clause->flags & CFG_CLAUSEFLAG_OBSOLETE) != 0) ||
-			     ((clause->flags & CFG_CLAUSEFLAG_ANCIENT) != 0) ||
-			     ((clause->flags & CFG_CLAUSEFLAG_NYI) != 0) ||
 			     ((clause->flags & CFG_CLAUSEFLAG_TESTONLY) != 0)))
+			{
+				continue;
+			}
+			if ((clause->flags & CFG_CLAUSEFLAG_ANCIENT) != 0 ||
+			    (clause->flags & CFG_CLAUSEFLAG_NODOC) != 0)
 			{
 				continue;
 			}
@@ -2951,10 +2781,9 @@ cleanup:
 	return (result);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_token = {
-	"token",	  parse_token,	   cfg_print_ustring,
-	cfg_doc_terminal, &cfg_rep_string, NULL
-};
+cfg_type_t cfg_type_token = { "token",		 parse_token,
+			      cfg_print_ustring, cfg_doc_terminal,
+			      &cfg_rep_string,	 NULL };
 
 /*
  * An unsupported option.  This is just a list of tokens with balanced braces
@@ -3003,10 +2832,9 @@ cleanup:
 	return (result);
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_unsupported = {
-	"unsupported",	  parse_unsupported, cfg_print_spacelist,
-	cfg_doc_terminal, &cfg_rep_list,     NULL
-};
+cfg_type_t cfg_type_unsupported = { "unsupported",	 parse_unsupported,
+				    cfg_print_spacelist, cfg_doc_terminal,
+				    &cfg_rep_list,	 NULL };
 
 /*
  * Try interpreting the current token as a network address.
@@ -3264,30 +3092,25 @@ cfg_doc_netaddr(cfg_printer_t *pctx, const cfg_type_t *type) {
 	}
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netaddr = {
-	"netaddr",	 parse_netaddr,	    cfg_print_sockaddr,
-	cfg_doc_netaddr, &cfg_rep_sockaddr, &netaddr_flags
-};
+cfg_type_t cfg_type_netaddr = { "netaddr",	    parse_netaddr,
+				cfg_print_sockaddr, cfg_doc_netaddr,
+				&cfg_rep_sockaddr,  &netaddr_flags };
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netaddr4 = {
-	"netaddr4",	 parse_netaddr,	    cfg_print_sockaddr,
-	cfg_doc_netaddr, &cfg_rep_sockaddr, &netaddr4_flags
-};
+cfg_type_t cfg_type_netaddr4 = { "netaddr4",	     parse_netaddr,
+				 cfg_print_sockaddr, cfg_doc_netaddr,
+				 &cfg_rep_sockaddr,  &netaddr4_flags };
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netaddr4wild = {
-	"netaddr4wild",	 parse_netaddr,	    cfg_print_sockaddr,
-	cfg_doc_netaddr, &cfg_rep_sockaddr, &netaddr4wild_flags
-};
+cfg_type_t cfg_type_netaddr4wild = { "netaddr4wild",	 parse_netaddr,
+				     cfg_print_sockaddr, cfg_doc_netaddr,
+				     &cfg_rep_sockaddr,	 &netaddr4wild_flags };
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netaddr6 = {
-	"netaddr6",	 parse_netaddr,	    cfg_print_sockaddr,
-	cfg_doc_netaddr, &cfg_rep_sockaddr, &netaddr6_flags
-};
+cfg_type_t cfg_type_netaddr6 = { "netaddr6",	     parse_netaddr,
+				 cfg_print_sockaddr, cfg_doc_netaddr,
+				 &cfg_rep_sockaddr,  &netaddr6_flags };
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netaddr6wild = {
-	"netaddr6wild",	 parse_netaddr,	    cfg_print_sockaddr,
-	cfg_doc_netaddr, &cfg_rep_sockaddr, &netaddr6wild_flags
-};
+cfg_type_t cfg_type_netaddr6wild = { "netaddr6wild",	 parse_netaddr,
+				     cfg_print_sockaddr, cfg_doc_netaddr,
+				     &cfg_rep_sockaddr,	 &netaddr6wild_flags };
 
 /* netprefix */
 
@@ -3393,10 +3216,9 @@ cfg_obj_asnetprefix(const cfg_obj_t *obj, isc_netaddr_t *netaddr,
 	*prefixlen = obj->value.netprefix.prefixlen;
 }
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_netprefix = {
-	"netprefix",	  cfg_parse_netprefix, print_netprefix,
-	cfg_doc_terminal, &cfg_rep_netprefix,  NULL
-};
+cfg_type_t cfg_type_netprefix = { "netprefix",	      cfg_parse_netprefix,
+				  print_netprefix,    cfg_doc_terminal,
+				  &cfg_rep_netprefix, NULL };
 
 static isc_result_t
 parse_sockaddrsub(cfg_parser_t *pctx, const cfg_type_t *type, int flags,
@@ -3452,17 +3274,15 @@ cleanup:
 }
 
 static unsigned int sockaddr_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK;
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_sockaddr = {
-	"sockaddr",	  cfg_parse_sockaddr, cfg_print_sockaddr,
-	cfg_doc_sockaddr, &cfg_rep_sockaddr,  &sockaddr_flags
-};
+cfg_type_t cfg_type_sockaddr = { "sockaddr",	     cfg_parse_sockaddr,
+				 cfg_print_sockaddr, cfg_doc_sockaddr,
+				 &cfg_rep_sockaddr,  &sockaddr_flags };
 
 static unsigned int sockaddrdscp_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK |
 					 CFG_ADDR_DSCPOK;
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_sockaddrdscp = {
-	"sockaddr",	  cfg_parse_sockaddr, cfg_print_sockaddr,
-	cfg_doc_sockaddr, &cfg_rep_sockaddr,  &sockaddrdscp_flags
-};
+cfg_type_t cfg_type_sockaddrdscp = { "sockaddr",	 cfg_parse_sockaddr,
+				     cfg_print_sockaddr, cfg_doc_sockaddr,
+				     &cfg_rep_sockaddr,	 &sockaddrdscp_flags };
 
 isc_result_t
 cfg_parse_sockaddr(cfg_parser_t *pctx, const cfg_type_t *type,

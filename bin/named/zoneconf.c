@@ -18,6 +18,7 @@
 #include <isc/file.h>
 #include <isc/mem.h>
 #include <isc/print.h>
+#include <isc/result.h>
 #include <isc/stats.h>
 #include <isc/string.h> /* Required for HP/UX (and others?) */
 #include <isc/util.h>
@@ -36,7 +37,6 @@
 #include <dns/rdatalist.h>
 #include <dns/rdataset.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/sdlz.h>
 #include <dns/ssu.h>
 #include <dns/stats.h>
@@ -203,7 +203,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 	dns_ssutable_t *table = NULL;
 	isc_mem_t *mctx = dns_zone_getmctx(zone);
 	bool autoddns = false;
-	isc_result_t result;
+	isc_result_t result = ISC_R_SUCCESS;
 
 	(void)cfg_map_get(zconfig, "update-policy", &updatepolicy);
 
@@ -219,10 +219,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 		updatepolicy = NULL;
 	}
 
-	result = dns_ssutable_create(mctx, &table);
-	if (result != ISC_R_SUCCESS) {
-		return (result);
-	}
+	dns_ssutable_create(mctx, &table);
 
 	for (element = cfg_list_first(updatepolicy); element != NULL;
 	     element = cfg_list_next(element))
@@ -239,7 +236,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 		dns_ssumatchtype_t mtype = dns_ssumatchtype_name;
 		dns_fixedname_t fname, fident;
 		isc_buffer_t b;
-		dns_rdatatype_t *types;
+		dns_ssuruletype_t *types;
 		unsigned int i, n;
 
 		str = cfg_obj_asstring(mode);
@@ -272,8 +269,8 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 
 		dns_fixedname_init(&fname);
 		if (usezone) {
-			dns_name_copynf(dns_zone_getorigin(zone),
-					dns_fixedname_name(&fname));
+			dns_name_copy(dns_zone_getorigin(zone),
+				      dns_fixedname_name(&fname));
 		} else {
 			str = cfg_obj_asstring(dname);
 			isc_buffer_constinit(&b, str, strlen(str));
@@ -292,7 +289,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 		if (n == 0) {
 			types = NULL;
 		} else {
-			types = isc_mem_get(mctx, n * sizeof(dns_rdatatype_t));
+			types = isc_mem_get(mctx, n * sizeof(*types));
 		}
 
 		i = 0;
@@ -300,35 +297,53 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 		     element2 = cfg_list_next(element2))
 		{
 			const cfg_obj_t *typeobj;
+			const char *bracket;
 			isc_textregion_t r;
+			unsigned long max = 0;
 
 			INSIST(i < n);
 
 			typeobj = cfg_listelt_value(element2);
 			str = cfg_obj_asstring(typeobj);
 			DE_CONST(str, r.base);
-			r.length = strlen(str);
 
-			result = dns_rdatatype_fromtext(&types[i++], &r);
+			bracket = strchr(str, '(' /*)*/);
+			if (bracket != NULL) {
+				char *end = NULL;
+				r.length = bracket - str;
+				max = strtoul(bracket + 1, &end, 10);
+				if (max > 0xffff || end[0] != /*(*/ ')' ||
+				    end[1] != 0) {
+					cfg_obj_log(identity, named_g_lctx,
+						    ISC_LOG_ERROR,
+						    "'%s' is not a valid count",
+						    bracket);
+					isc_mem_put(mctx, types,
+						    n * sizeof(*types));
+					goto cleanup;
+				}
+			} else {
+				r.length = strlen(str);
+			}
+			types[i].max = max;
+
+			result = dns_rdatatype_fromtext(&types[i++].type, &r);
 			if (result != ISC_R_SUCCESS) {
 				cfg_obj_log(identity, named_g_lctx,
 					    ISC_LOG_ERROR,
-					    "'%s' is not a valid type", str);
-				isc_mem_put(mctx, types,
-					    n * sizeof(dns_rdatatype_t));
+					    "'%.*s' is not a valid type",
+					    (int)r.length, str);
+				isc_mem_put(mctx, types, n * sizeof(*types));
 				goto cleanup;
 			}
 		}
 		INSIST(i == n);
 
-		result = dns_ssutable_addrule(
-			table, grant, dns_fixedname_name(&fident), mtype,
-			dns_fixedname_name(&fname), n, types);
+		dns_ssutable_addrule(table, grant, dns_fixedname_name(&fident),
+				     mtype, dns_fixedname_name(&fname), n,
+				     types);
 		if (types != NULL) {
-			isc_mem_put(mctx, types, n * sizeof(dns_rdatatype_t));
-		}
-		if (result != ISC_R_SUCCESS) {
-			goto cleanup;
+			isc_mem_put(mctx, types, n * sizeof(*types));
 		}
 	}
 
@@ -338,7 +353,7 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 	 * update-policy { grant <session-keyname> zonesub any; };
 	 */
 	if (autoddns) {
-		dns_rdatatype_t any = dns_rdatatype_any;
+		dns_ssuruletype_t any = { dns_rdatatype_any, 0 };
 
 		if (named_g_server->session_keyname == NULL) {
 			isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
@@ -350,17 +365,12 @@ configure_zone_ssutable(const cfg_obj_t *zconfig, dns_zone_t *zone,
 			goto cleanup;
 		}
 
-		result = dns_ssutable_addrule(
-			table, true, named_g_server->session_keyname,
-			dns_ssumatchtype_local, dns_zone_getorigin(zone), 1,
-			&any);
-
-		if (result != ISC_R_SUCCESS) {
-			goto cleanup;
-		}
+		dns_ssutable_addrule(table, true,
+				     named_g_server->session_keyname,
+				     dns_ssumatchtype_local,
+				     dns_zone_getorigin(zone), 1, &any);
 	}
 
-	result = ISC_R_SUCCESS;
 	dns_zone_setssutable(zone, table);
 
 cleanup:
@@ -1003,7 +1013,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 	}
 
 	/*
-	 * Unless we're using some alternative database, a master zone
+	 * Unless we're using some alternative database, a primary zone
 	 * will be needing a master file.
 	 */
 	if (ztype == dns_zone_primary && cpval == default_dbtype &&
@@ -1028,11 +1038,6 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			masterformat = dns_masterformat_text;
 		} else if (strcasecmp(masterformatstr, "raw") == 0) {
 			masterformat = dns_masterformat_raw;
-		} else if (strcasecmp(masterformatstr, "map") == 0) {
-			masterformat = dns_masterformat_map;
-			cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,
-				    "masterfile-format: format 'map' is "
-				    "deprecated");
 		} else {
 			UNREACHABLE();
 		}
@@ -1193,7 +1198,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 	}
 
 	/*
-	 * Configure master functionality.  This applies
+	 * Configure authoritative zone functionality.  This applies
 	 * to primary servers (type "primary") and secondaries
 	 * acting as primaries (type "secondary"), but not to stubs.
 	 */
@@ -1264,13 +1269,12 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 
 			RETERR(named_config_getipandkeylist(config, "primaries",
 							    obj, mctx, &ipkl));
-			result = dns_zone_setalsonotifydscpkeys(
-				zone, ipkl.addrs, ipkl.dscps, ipkl.keys,
-				ipkl.count);
+			dns_zone_setalsonotify(zone, ipkl.addrs, ipkl.dscps,
+					       ipkl.keys, ipkl.tlss,
+					       ipkl.count);
 			dns_ipkeylist_clear(mctx, &ipkl);
-			RETERR(result);
 		} else {
-			RETERR(dns_zone_setalsonotify(zone, NULL, 0));
+			dns_zone_setalsonotify(zone, NULL, NULL, NULL, NULL, 0);
 		}
 
 		obj = NULL;
@@ -1715,17 +1719,16 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 			dns_ipkeylist_init(&ipkl);
 			RETERR(named_config_getipandkeylist(
 				config, "parental-agents", obj, mctx, &ipkl));
-			result = dns_zone_setparentals(zone, ipkl.addrs,
-						       ipkl.keys, ipkl.count);
+			dns_zone_setparentals(zone, ipkl.addrs, ipkl.keys,
+					      ipkl.tlss, ipkl.count);
 			dns_ipkeylist_clear(mctx, &ipkl);
-			RETERR(result);
 		} else {
-			RETERR(dns_zone_setparentals(zone, NULL, NULL, 0));
+			dns_zone_setparentals(zone, NULL, NULL, NULL, 0);
 		}
 	}
 
 	/*%
-	 * Primary master functionality.
+	 * Configure primary zone functionality.
 	 */
 	if (ztype == dns_zone_primary) {
 		obj = NULL;
@@ -1737,26 +1740,10 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		}
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKWILDCARD, check);
 
-		/*
-		 * With map files, the default is ignore duplicate
-		 * records.  With other master formats, the default is
-		 * taken from the global configuration.
-		 */
 		obj = NULL;
-		if (masterformat != dns_masterformat_map) {
-			result = named_config_get(maps, "check-dup-records",
-						  &obj);
-			INSIST(result == ISC_R_SUCCESS && obj != NULL);
-			dupcheck = cfg_obj_asstring(obj);
-		} else {
-			result = named_config_get(nodefault,
-						  "check-dup-records", &obj);
-			if (result == ISC_R_SUCCESS) {
-				dupcheck = cfg_obj_asstring(obj);
-			} else {
-				dupcheck = "ignore";
-			}
-		}
+		result = named_config_get(maps, "check-dup-records", &obj);
+		INSIST(result == ISC_R_SUCCESS && obj != NULL);
+		dupcheck = cfg_obj_asstring(obj);
 		if (strcasecmp(dupcheck, "warn") == 0) {
 			fail = false;
 			check = true;
@@ -1786,28 +1773,11 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKMX, check);
 		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKMXFAIL, fail);
 
-		/*
-		 * With map files, the default is *not* to check
-		 * integrity.  With other master formats, the default is
-		 * taken from the global configuration.
-		 */
 		obj = NULL;
-		if (masterformat != dns_masterformat_map) {
-			result = named_config_get(maps, "check-integrity",
-						  &obj);
-			INSIST(result == ISC_R_SUCCESS && obj != NULL);
-			dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKINTEGRITY,
-					   cfg_obj_asboolean(obj));
-		} else {
-			check = false;
-			result = named_config_get(nodefault, "check-integrity",
-						  &obj);
-			if (result == ISC_R_SUCCESS) {
-				check = cfg_obj_asboolean(obj);
-			}
-			dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKINTEGRITY,
-					   check);
-		}
+		result = named_config_get(maps, "check-integrity", &obj);
+		INSIST(result == ISC_R_SUCCESS && obj != NULL);
+		dns_zone_setoption(mayberaw, DNS_ZONEOPT_CHECKINTEGRITY,
+				   cfg_obj_asboolean(obj));
 
 		obj = NULL;
 		result = named_config_get(maps, "check-mx-cname", &obj);
@@ -1879,7 +1849,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 	}
 
 	/*
-	 * Configure slave functionality.
+	 * Configure secondary zone functionality.
 	 */
 	switch (ztype) {
 	case dns_zone_mirror:
@@ -1924,15 +1894,13 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 
 			RETERR(named_config_getipandkeylist(config, "primaries",
 							    obj, mctx, &ipkl));
-			result = dns_zone_setprimarieswithkeys(
-				mayberaw, ipkl.addrs, ipkl.keys, ipkl.count);
+			dns_zone_setprimaries(mayberaw, ipkl.addrs, ipkl.keys,
+					      ipkl.tlss, ipkl.count);
 			count = ipkl.count;
 			dns_ipkeylist_clear(mctx, &ipkl);
-			RETERR(result);
 		} else {
-			result = dns_zone_setprimaries(mayberaw, NULL, 0);
+			dns_zone_setprimaries(mayberaw, NULL, NULL, NULL, 0);
 		}
-		RETERR(result);
 
 		multi = false;
 		if (count > 1) {

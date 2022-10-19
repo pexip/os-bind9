@@ -1,6 +1,12 @@
-bind9 (1:9.16.33-1~deb11u1) bullseye-security; urgency=high
+bind9 (1:9.18.8-1) unstable; urgency=medium
 
-  * New upstream version 9.16.33
+  * New upstream version 9.18.8
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Oct 2022 14:58:38 +0200
+
+bind9 (1:9.18.7-1) unstable; urgency=medium
+
+  * New upstream version 9.18.7
    - CVE-2022-2795: Processing large delegations may severely degrade
      resolver performance
    - CVE-2022-2881: Buffer overread in statistics channel code
@@ -10,33 +16,414 @@ bind9 (1:9.16.33-1~deb11u1) bullseye-security; urgency=high
      cache with zero stale-answer-client-timeout may terminate unexpectedly
    - CVE-2022-38177: Memory leak in ECDSA DNSSEC verification code
    - CVE-2022-38178: Memory leaks in EdDSA DNSSEC verification code
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Sep 2022 12:48:36 +0200
+
+bind9 (1:9.18.6-2) unstable; urgency=medium
+
+  * No-change source-only upload
+
+ -- Bernhard Schmidt <berni@debian.org>  Mon, 05 Sep 2022 21:30:08 +0200
+
+bind9 (1:9.18.6-1) unstable; urgency=medium
+
+  * Disable treat-warnings-as-errors in sphinx-build
+  * New upstream version 9.18.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Aug 2022 09:39:20 +0200
+
+bind9 (1:9.18.5-1) unstable; urgency=medium
+
+  * New upstream version 9.18.5
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Jul 2022 16:40:31 +0200
+
+bind9 (1:9.18.4-2) unstable; urgency=medium
+
+  [ Simon Deziel ]
+  * debian/extras/etc/db.0: correct descriptive comment
+
+  [ Bernhard Schmidt ]
+  * Add sleep workaround in tests/simpletests (Closes: #1012059)
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 05 Jul 2022 12:58:06 +0200
+
+bind9 (1:9.18.4-1) unstable; urgency=medium
+
+  * Disable treat-warnings-as-errors in sphinx-build
+  * New upstream version 9.18.4
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Jun 2022 14:36:44 +0200
+
+bind9 (1:9.18.3-1) unstable; urgency=medium
+
+  * New upstream version 9.18.3
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 18 May 2022 16:53:01 +0200
+
+bind9 (1:9.18.2-1) unstable; urgency=medium
+
   * Drop libldap2-dev from Build-Depends (Closes: #1008021)
+  * New upstream version 9.18.2
   * Add runtime dependency on libuv1 >= 1.40.0 (Closes: #1009889)
 
- -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Sep 2022 12:40:02 +0200
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 26 Apr 2022 11:03:35 +0200
 
-bind9 (1:9.16.27-1~deb11u1) bullseye-security; urgency=high
+bind9 (1:9.18.1-1) unstable; urgency=high
 
-  * New upstream version 9.16.27
-  * CVE-2022-0396: A synchronous call to closehandle_cb() caused
-    isc__nm_process_sock_buffer() to be called recursively, which in turn
-    left TCP connections hanging in the CLOSE_WAIT state blocking
-    indefinitely when out-of-order processing was disabled.
+  * New upstream version 9.18.1
   * CVE-2021-25220: The rules for acceptance of records into the cache
     have been tightened to prevent the possibility of poisoning if
-    forwarders send records outside the configured bailiwick
-  * Remove patch to fix sphinx-build failure (fixed upstream)
+    forwarders send records outside the configured bailiwick.
+  * CVE-2022-0396: TCP connections with 'keep-response-order' enabled
+    could leave the TCP sockets in the 'CLOSE_WAIT' state when the client
+    did not properly shut down the connection.
+  * CVE-2022-0635: Lookups involving a DNAME could trigger an assertion
+    failure when 'synth-from-dnssec' was enabled (which is the default)
+  * CVE-2022-0667: When chasing DS records, a timed out or artificially
+    delayed fetch could cause 'named' to crash while resuming a DS lookup.
 
- -- Ondřej Surý <ondrej@debian.org>  Mon, 14 Mar 2022 15:25:15 +0100
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 14 Mar 2022 15:29:31 +0100
 
-bind9 (1:9.16.22-1~deb11u1) bullseye-security; urgency=high
+bind9 (1:9.18.0-2) unstable; urgency=medium
+
+  * Add patch to use detected L1 cache-line size instead of hard-coded
+    value, this should fix architectures with 128-byte L1 cache.
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 27 Jan 2022 13:16:04 +0100
+
+bind9 (1:9.18.0-1) unstable; urgency=medium
+
+  * Bump the upstream version in debian/ to 9.18
+  * New upstream version 9.18.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 26 Jan 2022 12:31:55 +0100
+
+bind9 (1:9.18.0~0+git28350c-1) unstable; urgency=medium
+
+  * New upstream version 9.18.0~0+git28350c
+   + Pull the 9.18.0 pre-release git to have the L1 cache line
+     fix (Closes: #1004271)
+  * Fix the typo when backing up and restoring configure{,.ac}
+    (Closes: #903586)
+  * Remove some prehistoring conffile no longer in use
+    (Closes: #942377)
+  * Pick UTC date for release_date variable (Closes: #1000893)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 24 Jan 2022 16:00:49 +0100
+
+bind9 (1:9.17.22-1) unstable; urgency=medium
+
+  * New upstream version 9.17.22
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Jan 2022 18:38:13 +0100
+
+bind9 (1:9.17.21-1) unstable; urgency=medium
+
+  * New upstream version 9.17.21
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Dec 2021 15:22:46 +0100
+
+bind9 (1:9.17.20-3) unstable; urgency=medium
+
+  * Retain bind9-resolvconf.service alias (Closes: #1000565)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 25 Nov 2021 10:10:50 +0100
+
+bind9 (1:9.17.20-2) unstable; urgency=medium
+
+  * Tighten the dependencies on bind9-libs for the utils too
+    (Closes: #1000354)
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 22 Nov 2021 08:58:22 +0100
+
+bind9 (1:9.17.20-1) unstable; urgency=medium
+
+  * New upstream version 9.17.20
+  * Remove the sphinx-patch, the role has been fixed upstream
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Nov 2021 07:49:14 +0100
+
+bind9 (1:9.17.19-3) unstable; urgency=medium
+
+  * Remove the .so libraries from excluded files
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 12 Nov 2021 14:24:13 +0100
+
+bind9 (1:9.17.19-2) unstable; urgency=medium
+
+  * Add libjemalloc-dev to Build-Depends
+  * Sync the packaging between BIND 9.16 and BIND 9.17 branches
+  * Don't install static libraries to bind9-dev, they are not built
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 09 Nov 2021 10:42:43 +0100
+
+bind9 (1:9.17.19-1) unstable; urgency=medium
+
+  * New upstream version 9.17.19
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 14:29:06 +0200
+
+bind9 (1:9.17.18-1) experimental; urgency=medium
+
+  * New upstream version 9.17.18
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Sep 2021 10:03:31 +0200
+
+bind9 (1:9.17.17-2) experimental; urgency=medium
+
+  * Bump MAPAPI to 3.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Aug 2021 14:34:56 +0200
+
+bind9 (1:9.17.17-1) experimental; urgency=medium
+
+  * New upstream version 9.17.17
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 18 Aug 2021 18:31:14 +0200
+
+bind9 (1:9.17.16-1) experimental; urgency=medium
+
+  * New upstream version 9.17.16
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Jul 2021 20:31:56 +0200
+
+bind9 (1:9.17.15-1) experimental; urgency=medium
+
+  * New upstream version 9.17.15
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 15:13:26 +0200
+
+bind9 (1:9.17.14-3) experimental; urgency=medium
+
+  * Add upstream patch to address 'Checking of key-directory and
+    dnssec-policy was broken'
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 09:08:52 +0200
+
+bind9 (1:9.17.14-2) experimental; urgency=medium
+
+  * Add upstream patch to fix: 'W' in wildcard expansions was being mapped
+    to '\000'.
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 06:49:25 +0200
+
+bind9 (1:9.17.14-1) experimental; urgency=medium
+
+  * New upstream version 9.17.14
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Jun 2021 00:26:38 +0200
+
+bind9 (1:9.17.13-2) experimental; urgency=medium
+
+  * Revert upstream 'Add a Sphinx role for linking GitLab issues/MRs'
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 May 2021 11:30:01 +0200
+
+bind9 (1:9.17.13-1) experimental; urgency=medium
+
+  * New upstream version 9.17.13
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 May 2021 11:05:32 +0200
+
+bind9 (1:9.17.12-2) experimental; urgency=medium
+
+  * Add filter-a.so plugin into main package
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 01 May 2021 13:15:40 +0200
+
+bind9 (1:9.17.12-1) experimental; urgency=medium
+
+  * New upstream version 9.17.12
+  * Add patches to implement I-D draft-hardaker-dnsop-nsec3-guidance
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 29 Apr 2021 10:49:07 +0200
+
+bind9 (1:9.17.11-1) experimental; urgency=medium
+
+  * New upstream version 9.17.11
+  * Add upstream patches to fix TCP timeouts firing too early
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Mar 2021 14:43:40 +0100
+
+bind9 (1:9.17.10-1) experimental; urgency=high
+
+  * New upstream version 9.17.10
+   + [CVE-2020-8625]: Fix off-by-one bug in ISC SPNEGO implementation.
+  * Adjust the bind9-libs package for new upstream library names
+  * Add libnghttp2-dev to Build-Depends
+  * Update the way how we ignore development libraries, so the real ones
+    gets installed
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Feb 2021 09:27:46 +0100
+
+bind9 (1:9.17.9-1) experimental; urgency=medium
+
+  * Exclude test-async.so from dh_install
+  * Update the ISC code-signing key
+  * New upstream version 9.17.9
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Jan 2021 11:29:33 +0100
+
+bind9 (1:9.17.8-1) experimental; urgency=medium
+
+  * New upstream version 9.17.8
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Dec 2020 22:35:50 +0100
+
+bind9 (1:9.17.7-1) experimental; urgency=medium
+
+  * New upstream version 9.17.7
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 26 Nov 2020 15:58:54 +0100
+
+bind9 (1:9.17.6-1) experimental; urgency=medium
+
+  * New upstream version 9.17.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 23 Oct 2020 15:11:42 +0200
+
+bind9 (1:9.17.5-2) experimental; urgency=medium
+
+  [ Bernhard Schmidt ]
+  * Move Build-Depends for documentation to Build-Depends-Indep
+  * Set Restart=on-failure in systemd unit
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Sep 2020 13:53:04 +0200
+
+bind9 (1:9.17.5-1) experimental; urgency=medium
+
+  * New upstream version 9.17.5
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Sep 2020 10:40:29 +0200
+
+bind9 (1:9.17.4-1) experimental; urgency=medium
+
+  * Add libtool-bin to Build-Depends
+  * Disable static linking
+  * New upstream version 9.17.4
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 Aug 2020 21:35:16 +0200
+
+bind9 (1:9.17.3-1) experimental; urgency=medium
+
+  * New upstream version 9.17.2
+  * Adjust d/*.install files after upstream moved binaries from sbin to bin
+  * Remove rfc-compliance from docs, it's gone
+  * New upstream version 9.17.3
+  * Add fonts-freefont-otf, latexmk, texlive-fonts-extra,
+    texlive-latex-recommended, texlive-xetex, and xindy to Build-Depends
+  * Install man pages for tsig-gen and named-compilezone
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Jul 2020 00:38:43 +0200
+
+bind9 (1:9.17.1+git20200519-1) experimental; urgency=medium
+
+  * New upstream version 9.17.1+git20200519
+  * Update Debian packaging for autoconf/automake and sphinx-doc
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 19 May 2020 22:02:19 +0200
+
+bind9 (1:9.17.1-1) experimental; urgency=medium
+
+  * Update d/copyright (Closes: #947978)
+  * New upstream version 9.17.1
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Apr 2020 10:34:10 +0200
+
+bind9 (1:9.17.0-1) experimental; urgency=medium
+
+  [ Andreas Hasenack ]
+  * Bring back the DEP8 test from sid
+  * Use iproute2 instead of net-tools
+  * d/control: drop hardcoded python3 dependency
+
+  [ Bernhard Schmidt ]
+  * Fix apparmor profile name.
+    Thanks to Andreas Hasenack
+  * Enable readline support
+
+  [ Andreas Hasenack ]
+  * Update apparmor profile with what is in sid
+  * Create the missing transitional packages for dnsutils, bind9utils
+  * There is a licensing conflict with adding libreadline and we should
+    use libedit-dev instead.
+
+  [ Ondřej Surý ]
+  * Switch to BIND 9.17 for the -dev packages
+  * New upstream version 9.17.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Mar 2020 14:23:38 +0100
+
+bind9 (1:9.16.22-1) unstable; urgency=medium
 
   * New upstream version 9.16.22
-   + CVE-2021-25219: The "lame-ttl" option is now forcibly set to 0. This
-     effectively disables the lame server cache, as it could previously be
-     abused by an attacker to significantly degrade resolver performance.
 
- -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 13:29:14 +0200
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 25 Oct 2021 14:27:31 +0200
+
+bind9 (1:9.16.21-1) unstable; urgency=medium
+
+  * New upstream version 9.16.21
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 16 Sep 2021 09:54:17 +0200
+
+bind9 (1:9.16.20-2) unstable; urgency=medium
+
+  * Bump MAPAPI to 3.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Aug 2021 14:40:11 +0200
+
+bind9 (1:9.16.20-1) unstable; urgency=medium
+
+  * New upstream version 9.16.20
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 18 Aug 2021 18:27:37 +0200
+
+bind9 (1:9.16.19-1) unstable; urgency=medium
+
+  * New upstream version 9.16.19
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Jul 2021 20:27:13 +0200
+
+bind9 (1:9.16.18-1) unstable; urgency=medium
+
+  * New upstream version 9.16.18
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 15:06:55 +0200
+
+bind9 (1:9.16.17-3) unstable; urgency=medium
+
+  * Add upstream patch to address 'Checking of key-directory and
+    dnssec-policy was broken'
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 09:07:09 +0200
+
+bind9 (1:9.16.17-2) unstable; urgency=high
+
+  * Add upstream patch to fix: 'W' in wildcard expansions was being mapped
+    to '\000'.
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Jun 2021 06:45:25 +0200
+
+bind9 (1:9.16.17-1) unstable; urgency=medium
+
+  * New upstream version 9.16.17
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Jun 2021 00:10:22 +0200
+
+bind9 (1:9.16.16-2) unstable; urgency=medium
+
+  * Revert upstream 'Add a Sphinx role for linking GitLab issues/MRs'
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 May 2021 11:28:18 +0200
+
+bind9 (1:9.16.16-1) unstable; urgency=medium
+
+  * New upstream version 9.16.16
+  * Patches to implement I-D draft-hardaker-dnsop-nsec3-guidance were
+    merged upstream; remove them from the package.
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 May 2021 10:00:00 +0200
 
 bind9 (1:9.16.15-1) unstable; urgency=high
 

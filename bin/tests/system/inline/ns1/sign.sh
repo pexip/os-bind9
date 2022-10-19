@@ -11,14 +11,13 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=../..
-. $SYSTEMTESTTOP/conf.sh
+. ../../conf.sh
 
 zone=.
 rm -f K.+*+*.key
 rm -f K.+*+*.private
-keyname=`$KEYGEN -q -a RSASHA1 -b 1024 -n zone $zone`
-keyname=`$KEYGEN -q -a RSASHA1 -b 1024 -n zone -f KSK $zone`
+keyname=$($KEYGEN -q -a ${DEFAULT_ALGORITHM} -n zone $zone)
+keyname=$($KEYGEN -q -a ${DEFAULT_ALGORITHM} -n zone -f KSK $zone)
 $SIGNER -S -x -T 1200 -o ${zone} root.db > signer.out
 [ $? = 0 ] || cat signer.out
 

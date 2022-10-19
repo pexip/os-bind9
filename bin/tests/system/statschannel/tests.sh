@@ -11,12 +11,11 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=..
 # shellcheck source=conf.sh
-. "$SYSTEMTESTTOP/conf.sh"
+. ../conf.sh
 
 DIGCMD="$DIG @10.53.0.2 -p ${PORT}"
-RNDCCMD="$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p ${CONTROLPORT} -s"
+RNDCCMD="$RNDC -c ../common/rndc.conf -p ${CONTROLPORT} -s"
 
 if [ ! "$HAVEJSONSTATS" ]
 then
@@ -111,8 +110,8 @@ if [ $PERL_JSON ]; then
     [ "$noerror_count" -eq "$json_noerror_count" ] || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 ret=0
 echo_i "checking malloced memory statistics xml/json ($n)"
@@ -132,8 +131,8 @@ if [ $PERL_JSON ]; then
     grep '"Malloced":[0-9][0-9]*,' json.mem > /dev/null || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 echo_i "checking consistency between regular and compressed output ($n)"
 for i in 1 2 3 4 5; do
@@ -159,8 +158,8 @@ for i in 1 2 3 4 5; do
 	fi
 done
 
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 ret=0
 echo_i "checking if compressed output is really compressed ($n)"
@@ -170,15 +169,15 @@ then
 	grep -i Content-Length | sed -e "s/.*: \([0-9]*\).*/\1/"`
     COMPSIZE=`cat compressed.headers | \
 	grep -i Content-Length | sed -e "s/.*: \([0-9]*\).*/\1/"`
-    if [ ! `expr $REGSIZE / $COMPSIZE` -gt 2 ]; then
+    if [ ! $((REGSIZE / COMPSIZE)) -gt 2 ]; then
 	ret=1
     fi
 else
     echo_i "skipped"
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test dnssec sign statistics.
 zone="dnssec"
@@ -209,8 +208,8 @@ if [ $PERL_JSON ]; then
     cmp zones.out.j$n zones.expect.$n || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test sign operations after dynamic update.
 ret=0
@@ -239,8 +238,8 @@ if [ $PERL_JSON ]; then
     cmp zones.out.j$n zones.expect.$n || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test sign operations of KSK.
 ret=0
@@ -266,8 +265,8 @@ if [ $PERL_JSON ]; then
     cmp zones.out.j$n zones.expect.$n || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test sign operations for scheduled resigning (many keys).
 ret=0
@@ -278,6 +277,7 @@ ksk13_id=`cat ns2/$zone.ksk13.id`
 zsk13_id=`cat ns2/$zone.zsk13.id`
 ksk14_id=`cat ns2/$zone.ksk14.id`
 zsk14_id=`cat ns2/$zone.zsk14.id`
+num_ids=$( (echo $ksk8_id; echo $zsk8_id; echo $ksk13_id; echo $zsk13_id; echo $ksk14_id; echo $zsk14_id;) | sort -u | wc -l)
 # The dnssec zone has 10 RRsets to sign (including NSEC) with the ZSKs and one
 # RRset (DNSKEY) with the KSKs. So starting named with signatures that expire
 # almost right away, this should trigger 10 zsk and 1 ksk sign operations per
@@ -298,17 +298,22 @@ cat zones.expect | sort > zones.expect.$n
 rm -f zones.expect
 # Fetch and check the dnssec sign statistics.
 echo_i "fetching zone '$zone' stats data after zone maintenance at startup ($n)"
-if [ $PERL_XML ]; then
-    getzones xml $zone x$n || ret=1
-    cmp zones.out.x$n zones.expect.$n || ret=1
+if test $num_ids -eq 6
+then
+    if [ $PERL_XML ]; then
+        getzones xml $zone x$n || ret=1
+        cmp zones.out.x$n zones.expect.$n || ret=1
+    fi
+    if [ $PERL_JSON ]; then
+        getzones json 2 j$n || ret=1
+        cmp zones.out.j$n zones.expect.$n || ret=1
+    fi
+    if [ $ret != 0 ]; then echo_i "failed"; fi
+else
+    echo_i "skipped: duplicate key id detected (fixed in BIND 9.19)"
 fi
-if [ $PERL_JSON ]; then
-    getzones json 2 j$n || ret=1
-    cmp zones.out.j$n zones.expect.$n || ret=1
-fi
-if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test sign operations after dynamic update (many keys).
 ret=0
@@ -336,17 +341,22 @@ cat zones.expect | sort > zones.expect.$n
 rm -f zones.expect
 # Fetch and check the dnssec sign statistics.
 echo_i "fetching zone '$zone' stats data after dynamic update ($n)"
-if [ $PERL_XML ]; then
-    getzones xml $zone x$n || ret=1
-    cmp zones.out.x$n zones.expect.$n || ret=1
+if test $num_ids -eq 6
+then
+    if [ $PERL_XML ]; then
+        getzones xml $zone x$n || ret=1
+        cmp zones.out.x$n zones.expect.$n || ret=1
+    fi
+    if [ $PERL_JSON ]; then
+        getzones json 2 j$n || ret=1
+        cmp zones.out.j$n zones.expect.$n || ret=1
+    fi
+    if [ $ret != 0 ]; then echo_i "failed"; fi
+else
+    echo_i "skipped: duplicate key id detected (fixed in BIND 9.19)"
 fi
-if [ $PERL_JSON ]; then
-    getzones json 2 j$n || ret=1
-    cmp zones.out.j$n zones.expect.$n || ret=1
-fi
-if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
 
 # Test sign operations after dnssec-policy change (removing keys).
 ret=0
@@ -374,8 +384,83 @@ if [ $PERL_JSON ]; then
     cmp zones.out.j$n zones.expect.$n || ret=1
 fi
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
-n=`expr $n + 1`
+status=$((status + ret))
+n=$((n + 1))
+
+if [ -x "${NC}" ] ; then
+    echo_i "Check HTTP/1.1 pipelined requests are handled (GET) ($n)"
+    ret=0
+    ${NC} 10.53.0.3 ${EXTRAPORT1} << EOF > nc.out$n || ret=1
+GET /xml/v3/status HTTP/1.1
+Host: 10.53.0.3:${EXTRAPORT1}
+
+GET /xml/v3/status HTTP/1.1
+Host: 10.53.0.3:${EXTRAPORT1}
+Connection: close
+
+EOF
+    lines=$(grep "^HTTP/1.1" nc.out$n | wc -l)
+    test $lines = 2 || ret=1
+    if [ $ret != 0 ]; then echo_i "failed"; fi
+    status=$((status + ret))
+    n=$((n + 1))
+else
+    echo_i "skipping test as nc not found"
+fi
+
+if [ -x "${NC}" ] ; then
+    echo_i "Check HTTP/1.1 pipelined requests are handled (POST) ($n)"
+    ret=0
+    ${NC} 10.53.0.3 ${EXTRAPORT1} << EOF > nc.out$n || ret=1
+POST /xml/v3/status HTTP/1.1
+Host: 10.53.0.3:${EXTRAPORT1}
+Content-Type: application/json
+Content-Length: 3
+
+{}
+POST /xml/v3/status HTTP/1.1
+Host: 10.53.0.3:${EXTRAPORT1}
+Content-Type: application/json
+Content-Length: 3
+Connection: close
+
+{}
+EOF
+    lines=$(grep "^HTTP/1.1" nc.out$n | wc -l)
+    test $lines = 2 || ret=1
+    if [ $ret != 0 ]; then echo_i "failed"; fi
+    status=$((status + ret))
+    n=$((n + 1))
+else
+    echo_i "skipping test as nc not found"
+fi
+
+echo_i "Check HTTP/1.1 pipelined with truncated stream ($n)"
+ret=0
+i=0
+# build input stream.
+cp /dev/null send.in$n
+while test $i -lt 500
+do
+cat >> send.in$n << EOF
+GET /xml/v3/status HTTP/1.1
+Host: 10.53.0.3
+
+EOF
+i=$((i+1))
+done
+
+# send the requests then wait for named to close the socket.
+time1=$($PERL -e 'print time(), "\n";')
+${PERL} send64k.pl 10.53.0.3 ${EXTRAPORT1} < send.in$n  > send.out$n
+time2=$($PERL -e 'print time(), "\n";')
+test $((time2 - time1)) -lt 5 || ret=1
+# we expect 91 of the 500 requests to be processed.
+lines=$(grep "^HTTP/1.1" send.out$n | wc -l)
+test $lines = 91 || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+n=$((n + 1))
 
 echo_i "exit status: $status"
 [ $status -eq 0 ] || exit 1

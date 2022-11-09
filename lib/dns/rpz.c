@@ -22,6 +22,7 @@
 #include <isc/net.h>
 #include <isc/netaddr.h>
 #include <isc/print.h>
+#include <isc/result.h>
 #include <isc/rwlock.h>
 #include <isc/string.h>
 #include <isc/task.h>
@@ -38,7 +39,6 @@
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
-#include <dns/result.h>
 #include <dns/rpz.h>
 #include <dns/view.h>
 
@@ -1088,7 +1088,7 @@ diff_keys(const dns_rpz_cidr_key_t *key1, dns_rpz_prefix_t prefix1,
 	 */
 	for (i = 0; bit < maxbit; i++, bit += DNS_RPZ_CIDR_WORD_BITS) {
 		delta = key1->w[i] ^ key2->w[i];
-		if (ISC_UNLIKELY(delta != 0)) {
+		if (delta != 0) {
 #ifdef HAVE_BUILTIN_CLZ
 			bit += __builtin_clz(delta);
 #else  /* ifdef HAVE_BUILTIN_CLZ */
@@ -1700,7 +1700,7 @@ setup_update(dns_rpz_zone_t *rpz) {
 	isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL, DNS_LOGMODULE_MASTER,
 		      ISC_LOG_INFO, "rpz: %s: reload start", domain);
 
-	nodecount = dns_db_nodecount(rpz->updb);
+	nodecount = dns_db_nodecount(rpz->updb, dns_dbtree_main);
 	hashsize = 1;
 	while (nodecount != 0 &&
 	       hashsize <= (DNS_RPZ_HTSIZE_MAX + DNS_RPZ_HTSIZE_DIV)) {
@@ -2608,6 +2608,7 @@ dns_rpz_find_ip(dns_rpz_zones_t *rpzs, dns_rpz_type_t rpz_type,
 			break;
 		default:
 			UNREACHABLE();
+			break;
 		}
 	} else if (netaddr->family == AF_INET6) {
 		dns_rpz_cidr_key_t src_ip6;
@@ -2633,6 +2634,7 @@ dns_rpz_find_ip(dns_rpz_zones_t *rpzs, dns_rpz_type_t rpz_type,
 			break;
 		default:
 			UNREACHABLE();
+			break;
 		}
 	} else {
 		return (DNS_RPZ_INVALID_NUM);

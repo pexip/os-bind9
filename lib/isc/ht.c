@@ -31,7 +31,7 @@ struct isc_ht_node {
 	void *value;
 	isc_ht_node_t *next;
 	size_t keysize;
-	unsigned char key[FLEXIBLE_ARRAY_MEMBER];
+	unsigned char key[];
 };
 
 struct isc_ht {

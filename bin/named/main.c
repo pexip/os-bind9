@@ -15,20 +15,18 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <locale.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
-
-#if HAVE_LOCALE_H
-#include <locale.h>
-#endif /* HAVE_LOCALE_H */
 
 #ifdef HAVE_DNSTAP
 #include <protobuf-c/protobuf-c.h>
 #endif
 
 #include <isc/app.h>
+#include <isc/attributes.h>
 #include <isc/backtrace.h>
 #include <isc/commandline.h>
 #include <isc/dir.h>
@@ -38,9 +36,9 @@
 #include <isc/managers.h>
 #include <isc/netmgr.h>
 #include <isc/os.h>
-#include <isc/platform.h>
 #include <isc/print.h>
 #include <isc/resource.h>
+#include <isc/result.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
 #include <isc/task.h>
@@ -51,15 +49,7 @@
 #include <dns/dyndb.h>
 #include <dns/name.h>
 #include <dns/resolver.h>
-#include <dns/result.h>
 #include <dns/view.h>
-
-#include <dst/result.h>
-
-#include <isccc/result.h>
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
 
 #include <dlz/dlz_dlopen_driver.h>
 
@@ -105,17 +95,13 @@
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif /* ifdef HAVE_ZLIB */
+#ifdef HAVE_LIBNGHTTP2
+#include <nghttp2/nghttp2.h>
+#endif
 /*
  * Include header files for database drivers here.
  */
 /* #include "xxdb.h" */
-
-#ifdef CONTRIB_DLZ
-/*
- * Include contributed DLZ drivers if appropriate.
- */
-#include <dlz/dlz_drivers.h>
-#endif /* ifdef CONTRIB_DLZ */
 
 /*
  * The maximum number of stack frames to dump on assertion failure.
@@ -124,10 +110,10 @@
 #define BACKTRACE_MAXFRAME 128
 #endif /* ifndef BACKTRACE_MAXFRAME */
 
-LIBISC_EXTERNAL_DATA extern int isc_dscp_check_value;
-LIBDNS_EXTERNAL_DATA extern unsigned int dns_zone_mkey_hour;
-LIBDNS_EXTERNAL_DATA extern unsigned int dns_zone_mkey_day;
-LIBDNS_EXTERNAL_DATA extern unsigned int dns_zone_mkey_month;
+extern int isc_dscp_check_value;
+extern unsigned int dns_zone_mkey_hour;
+extern unsigned int dns_zone_mkey_day;
+extern unsigned int dns_zone_mkey_month;
 
 static bool want_stats = false;
 static char program_name[NAME_MAX] = "named";
@@ -135,7 +121,6 @@ static char absolute_conffile[PATH_MAX];
 static char saved_command_line[4096] = { 0 };
 static char ellipsis[5] = { 0 };
 static char version[512];
-static unsigned int maxsocks = 0;
 static int maxudp = 0;
 
 /*
@@ -200,18 +185,15 @@ named_main_earlyfatal(const char *format, ...) {
 	exit(1);
 }
 
-ISC_PLATFORM_NORETURN_PRE static void
+noreturn static void
 assertion_failed(const char *file, int line, isc_assertiontype_t type,
-		 const char *cond) ISC_PLATFORM_NORETURN_POST;
+		 const char *cond);
 
 static void
 assertion_failed(const char *file, int line, isc_assertiontype_t type,
 		 const char *cond) {
 	void *tracebuf[BACKTRACE_MAXFRAME];
-	int i, nframes;
-	isc_result_t result;
-	const char *logsuffix = "";
-	const char *fname;
+	int nframes;
 
 	/*
 	 * Handle assertion failures.
@@ -224,37 +206,21 @@ assertion_failed(const char *file, int line, isc_assertiontype_t type,
 		 */
 		isc_assertion_setcallback(NULL);
 
-		result = isc_backtrace_gettrace(tracebuf, BACKTRACE_MAXFRAME,
-						&nframes);
-		if (result == ISC_R_SUCCESS && nframes > 0) {
-			logsuffix = ", back trace";
-		}
+		nframes = isc_backtrace(tracebuf, BACKTRACE_MAXFRAME);
 		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			      NAMED_LOGMODULE_MAIN, ISC_LOG_CRITICAL,
 			      "%s:%d: %s(%s) failed%s", file, line,
-			      isc_assertion_typetotext(type), cond, logsuffix);
-		if (result == ISC_R_SUCCESS) {
-			for (i = 0; i < nframes; i++) {
-				unsigned long offset;
-
-				fname = NULL;
-				result = isc_backtrace_getsymbol(
-					tracebuf[i], &fname, &offset);
-				if (result == ISC_R_SUCCESS) {
+			      isc_assertion_typetotext(type), cond,
+			      (nframes > 0) ? ", back trace" : "");
+		if (nframes > 0) {
+			char **strs = isc_backtrace_symbols(tracebuf, nframes);
+			if (strs != NULL) {
+				for (int i = 0; i < nframes; i++) {
 					isc_log_write(named_g_lctx,
 						      NAMED_LOGCATEGORY_GENERAL,
 						      NAMED_LOGMODULE_MAIN,
-						      ISC_LOG_CRITICAL,
-						      "#%d %p in %s()+0x%lx", i,
-						      tracebuf[i], fname,
-						      offset);
-				} else {
-					isc_log_write(named_g_lctx,
-						      NAMED_LOGCATEGORY_GENERAL,
-						      NAMED_LOGMODULE_MAIN,
-						      ISC_LOG_CRITICAL,
-						      "#%d %p in ??", i,
-						      tracebuf[i]);
+						      ISC_LOG_CRITICAL, "%s",
+						      strs[i]);
 				}
 			}
 		}
@@ -273,10 +239,9 @@ assertion_failed(const char *file, int line, isc_assertiontype_t type,
 	exit(1);
 }
 
-ISC_PLATFORM_NORETURN_PRE static void
+noreturn static void
 library_fatal_error(const char *file, int line, const char *format,
-		    va_list args)
-	ISC_FORMAT_PRINTF(3, 0) ISC_PLATFORM_NORETURN_POST;
+		    va_list args) ISC_FORMAT_PRINTF(3, 0);
 
 static void
 library_fatal_error(const char *file, int line, const char *format,
@@ -350,7 +315,7 @@ usage(void) {
 			"username] [-U listeners]\n"
 			"             [-X lockfile] [-m "
 			"{usage|trace|record|size|mctx}]\n"
-			"             [-M external|internal|fill|nofill]\n"
+			"             [-M fill|nofill]\n"
 			"usage: named [-v|-V|-C]\n");
 }
 
@@ -453,12 +418,8 @@ static struct flag_def {
 			{ "trace", ISC_MEM_DEBUGTRACE, false },
 			{ "record", ISC_MEM_DEBUGRECORD, false },
 			{ "usage", ISC_MEM_DEBUGUSAGE, false },
-			{ "size", ISC_MEM_DEBUGSIZE, false },
-			{ "mctx", ISC_MEM_DEBUGCTX, false },
 			{ NULL, 0, false } },
-  mem_context_flags[] = { { "external", ISC_MEMFLAG_INTERNAL, true },
-			  { "internal", ISC_MEMFLAG_INTERNAL, false },
-			  { "fill", ISC_MEMFLAG_FILL, false },
+  mem_context_flags[] = { { "fill", ISC_MEMFLAG_FILL, false },
 			  { "nofill", ISC_MEMFLAG_FILL, true },
 			  { NULL, 0, false } };
 
@@ -502,25 +463,117 @@ set_flags(const char *arg, struct flag_def *defs, unsigned int *ret) {
 }
 
 static void
+list_dnssec_algorithms(isc_buffer_t *b) {
+	for (dst_algorithm_t i = DST_ALG_UNKNOWN; i < DST_MAX_ALGS; i++) {
+		if (i == DST_ALG_DH || i == DST_ALG_GSSAPI ||
+		    (i >= DST_ALG_HMAC_FIRST && i <= DST_ALG_HMAC_LAST))
+		{
+			continue;
+		}
+		if (dst_algorithm_supported(i)) {
+			isc_buffer_putstr(b, " ");
+			(void)dns_secalg_totext(i, b);
+		}
+	}
+}
+
+static void
+list_ds_algorithms(isc_buffer_t *b) {
+	for (size_t i = 0; i < 256; i++) {
+		if (dst_ds_digest_supported(i)) {
+			isc_buffer_putstr(b, " ");
+			(void)dns_dsdigest_totext(i, b);
+		}
+	}
+}
+
+static void
+list_hmac_algorithms(isc_buffer_t *b) {
+	isc_buffer_t sb = *b;
+	for (dst_algorithm_t i = DST_ALG_HMAC_FIRST; i <= DST_ALG_HMAC_LAST;
+	     i++) {
+		if (dst_algorithm_supported(i)) {
+			isc_buffer_putstr(b, " ");
+			isc_buffer_putstr(b, dst_hmac_algorithm_totext(i));
+		}
+	}
+	for (unsigned char *s = isc_buffer_used(&sb); s != isc_buffer_used(b);
+	     s++) {
+		*s = toupper(*s);
+	}
+}
+
+static void
+logit(isc_buffer_t *b) {
+	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+		      NAMED_LOGMODULE_MAIN, ISC_LOG_WARNING, "%.*s",
+		      (int)isc_buffer_usedlength(b),
+		      (char *)isc_buffer_base(b));
+}
+
+static void
+printit(isc_buffer_t *b) {
+	printf("%.*s\n", (int)isc_buffer_usedlength(b),
+	       (char *)isc_buffer_base(b));
+}
+
+static void
+format_supported_algorithms(void (*emit)(isc_buffer_t *b)) {
+	isc_buffer_t b;
+	char buf[512];
+
+	isc_buffer_init(&b, buf, sizeof(buf));
+	isc_buffer_putstr(&b, "DNSSEC algorithms:");
+	list_dnssec_algorithms(&b);
+	(*emit)(&b);
+
+	isc_buffer_init(&b, buf, sizeof(buf));
+	isc_buffer_putstr(&b, "DS algorithms:");
+	list_ds_algorithms(&b);
+	(*emit)(&b);
+
+	isc_buffer_init(&b, buf, sizeof(buf));
+	isc_buffer_putstr(&b, "HMAC algorithms:");
+	list_hmac_algorithms(&b);
+	(*emit)(&b);
+
+	isc_buffer_init(&b, buf, sizeof(buf));
+	isc_buffer_printf(&b, "TKEY mode 2 support (Diffie-Hellman): %s",
+			  (dst_algorithm_supported(DST_ALG_DH) &&
+			   dst_algorithm_supported(DST_ALG_HMACMD5))
+				  ? "yes"
+				  : "non");
+	(*emit)(&b);
+
+	isc_buffer_init(&b, buf, sizeof(buf));
+	isc_buffer_printf(&b, "TKEY mode 3 support (GSS-API): %s",
+			  dst_algorithm_supported(DST_ALG_GSSAPI) ? "yes"
+								  : "no");
+	(*emit)(&b);
+}
+
+static void
 printversion(bool verbose) {
 	char rndcconf[PATH_MAX], *dot = NULL;
-#if defined(HAVE_GEOIP2)
 	isc_mem_t *mctx = NULL;
+	isc_result_t result;
+	isc_buffer_t b;
+	char buf[512];
+#if defined(HAVE_GEOIP2)
 	cfg_parser_t *parser = NULL;
 	cfg_obj_t *config = NULL;
 	const cfg_obj_t *defaults = NULL, *obj = NULL;
 #endif /* if defined(HAVE_GEOIP2) */
 
-	printf("%s %s%s%s <id:%s>\n", named_g_product, named_g_version,
-	       (*named_g_description != '\0') ? " " : "", named_g_description,
-	       named_g_srcid);
+	printf("%s%s <id:%s>\n", PACKAGE_STRING, PACKAGE_DESCRIPTION,
+	       PACKAGE_SRCID);
 
 	if (!verbose) {
 		return;
 	}
 
 	printf("running on %s\n", named_os_uname());
-	printf("built by %s with %s\n", named_g_builder, named_g_configargs);
+	printf("built by %s with %s\n", PACKAGE_BUILDER, PACKAGE_CONFIGARGS);
 #ifdef __clang__
 	printf("compiled by CLANG %s\n", __VERSION__);
 #else /* ifdef __clang__ */
@@ -552,6 +605,12 @@ printversion(bool verbose) {
 	printf("compiled with libuv version: %d.%d.%d\n", UV_VERSION_MAJOR,
 	       UV_VERSION_MINOR, UV_VERSION_PATCH);
 	printf("linked to libuv version: %s\n", uv_version_string());
+#if HAVE_LIBNGHTTP2
+	nghttp2_info *nginfo = NULL;
+	printf("compiled with libnghttp2 version: %s\n", NGHTTP2_VERSION);
+	nginfo = nghttp2_version(1);
+	printf("linked to libnghttp2 version: %s\n", nginfo->version_str);
+#endif
 #ifdef HAVE_LIBXML2
 	printf("compiled with libxml2 version: %s\n", LIBXML_DOTTED_VERSION);
 	printf("linked to libxml2 version: %s\n", xmlParserVersion);
@@ -572,14 +631,23 @@ printversion(bool verbose) {
 	printf("compiled with protobuf-c version: %s\n", PROTOBUF_C_VERSION);
 	printf("linked to protobuf-c version: %s\n", protobuf_c_version());
 #endif /* if defined(HAVE_DNSTAP) */
-	printf("threads support is enabled\n\n");
+	printf("threads support is enabled\n");
+
+	isc_mem_create(&mctx);
+	result = dst_lib_init(mctx, named_g_engine);
+	if (result == ISC_R_SUCCESS) {
+		isc_buffer_init(&b, buf, sizeof(buf));
+		format_supported_algorithms(printit);
+		printf("\n");
+	} else {
+		printf("DST initialization failure: %s\n",
+		       isc_result_totext(result));
+	}
 
 	/*
 	 * The default rndc.conf and rndc.key paths are in the same
 	 * directory, but named only has rndc.key defined internally.
-	 * We construct the rndc.conf path from it. (We could use
-	 * NAMED_SYSCONFDIR here but the result would look wrong on
-	 * Windows.)
+	 * We construct the rndc.conf path from it.
 	 */
 	strlcpy(rndcconf, named_g_keyfile, sizeof(rndcconf));
 	dot = strrchr(rndcconf, '.');
@@ -600,7 +668,6 @@ printversion(bool verbose) {
 	printf("  named lock file:      %s\n", named_g_defaultlockfile);
 #if defined(HAVE_GEOIP2)
 #define RTC(x) RUNTIME_CHECK((x) == ISC_R_SUCCESS)
-	isc_mem_create(&mctx);
 	RTC(cfg_parser_create(mctx, named_g_lctx, &parser));
 	RTC(named_config_parsedefaults(parser, &config));
 	RTC(cfg_map_get(config, "options", &defaults));
@@ -727,9 +794,50 @@ parse_T_opt(char *option) {
 }
 
 static void
+parse_port(char *arg) {
+	enum { DNSPORT, TLSPORT, HTTPSPORT, HTTPPORT } ptype = DNSPORT;
+	char *value = arg;
+	int port;
+
+	if (strncmp(arg, "dns=", 4) == 0) {
+		value = arg + 4;
+	} else if (strncmp(arg, "tls=", 4) == 0) {
+		value = arg + 4;
+		ptype = TLSPORT;
+	} else if (strncmp(arg, "https=", 6) == 0) {
+		value = arg + 6;
+		ptype = HTTPSPORT;
+	} else if (strncmp(arg, "http=", 5) == 0) {
+		value = arg + 6;
+		ptype = HTTPPORT;
+	}
+
+	port = parse_int(value, "port");
+	if (port < 1 || port > 65535) {
+		named_main_earlyfatal("port '%s' out of range", value);
+	}
+
+	switch (ptype) {
+	case DNSPORT:
+		named_g_port = port;
+		break;
+	case TLSPORT:
+		named_g_tlsport = port;
+		break;
+	case HTTPSPORT:
+		named_g_httpsport = port;
+		break;
+	case HTTPPORT:
+		named_g_httpport = port;
+		break;
+	default:
+		UNREACHABLE();
+	}
+}
+
+static void
 parse_command_line(int argc, char *argv[]) {
 	int ch;
-	int port;
 	const char *p;
 
 	save_command_line(argc, argv);
@@ -816,20 +924,14 @@ parse_command_line(int argc, char *argv[]) {
 			}
 			break;
 		case 'p':
-			port = parse_int(isc_commandline_argument, "port");
-			if (port < 1 || port > 65535) {
-				named_main_earlyfatal("port '%s' out of range",
-						      isc_commandline_argument);
-			}
-			named_g_port = port;
+			parse_port(isc_commandline_argument);
 			break;
 		case 's':
 			/* XXXRTH temporary syntax */
 			want_stats = true;
 			break;
 		case 'S':
-			maxsocks = parse_int(isc_commandline_argument,
-					     "max number of sockets");
+			/* Formerly maxsocks */
 			break;
 		case 't':
 			/* XXXJAB should we make a copy? */
@@ -901,7 +1003,6 @@ parse_command_line(int argc, char *argv[]) {
 static isc_result_t
 create_managers(void) {
 	isc_result_t result;
-	unsigned int socks;
 
 	INSIST(named_g_cpus_detected > 0);
 
@@ -913,93 +1014,33 @@ create_managers(void) {
 		ISC_LOG_INFO, "found %u CPU%s, using %u worker thread%s",
 		named_g_cpus_detected, named_g_cpus_detected == 1 ? "" : "s",
 		named_g_cpus, named_g_cpus == 1 ? "" : "s");
-#ifdef WIN32
-	named_g_udpdisp = 1;
-#else  /* ifdef WIN32 */
 	if (named_g_udpdisp == 0) {
 		named_g_udpdisp = named_g_cpus_detected;
 	}
 	if (named_g_udpdisp > named_g_cpus) {
 		named_g_udpdisp = named_g_cpus;
 	}
-#endif /* ifdef WIN32 */
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_SERVER, ISC_LOG_INFO,
 		      "using %u UDP listener%s per interface", named_g_udpdisp,
 		      named_g_udpdisp == 1 ? "" : "s");
 
-	result = isc_managers_create(named_g_mctx, named_g_cpus, 0, &named_g_nm,
-				     &named_g_taskmgr);
+	result = isc_managers_create(named_g_mctx, named_g_cpus,
+				     0 /* quantum */, &named_g_netmgr,
+				     &named_g_taskmgr, &named_g_timermgr);
 	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_managers_create() failed: %s",
-				 isc_result_totext(result));
-		return (ISC_R_UNEXPECTED);
+		return (result);
 	}
 
-	result = isc_timermgr_create(named_g_mctx, &named_g_timermgr);
-	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_timermgr_create() failed: %s",
-				 isc_result_totext(result));
-		return (ISC_R_UNEXPECTED);
-	}
-
-	result = isc_socketmgr_create2(named_g_mctx, &named_g_socketmgr,
-				       maxsocks, named_g_cpus);
-	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_socketmgr_create() failed: %s",
-				 isc_result_totext(result));
-		return (ISC_R_UNEXPECTED);
-	}
-	isc_socketmgr_maxudp(named_g_socketmgr, maxudp);
-	isc_nm_maxudp(named_g_nm, maxudp);
-	result = isc_socketmgr_getmaxsockets(named_g_socketmgr, &socks);
-	if (result == ISC_R_SUCCESS) {
-		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-			      NAMED_LOGMODULE_SERVER, ISC_LOG_INFO,
-			      "using up to %u sockets", socks);
-	}
+	isc_nm_maxudp(named_g_netmgr, maxudp);
 
 	return (ISC_R_SUCCESS);
 }
 
 static void
 destroy_managers(void) {
-	isc_managers_destroy(&named_g_nm, &named_g_taskmgr);
-	isc_timermgr_destroy(&named_g_timermgr);
-	isc_socketmgr_destroy(&named_g_socketmgr);
-}
-
-static void
-dump_symboltable(void) {
-	int i;
-	isc_result_t result;
-	const char *fname;
-	const void *addr;
-
-	if (isc__backtrace_nsymbols == 0) {
-		return;
-	}
-
-	if (!isc_log_wouldlog(named_g_lctx, ISC_LOG_DEBUG(99))) {
-		return;
-	}
-
-	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-		      NAMED_LOGMODULE_MAIN, ISC_LOG_DEBUG(99), "Symbol table:");
-
-	for (i = 0, result = ISC_R_SUCCESS; result == ISC_R_SUCCESS; i++) {
-		addr = NULL;
-		fname = NULL;
-		result = isc_backtrace_getsymbolfromindex(i, &addr, &fname);
-		if (result == ISC_R_SUCCESS) {
-			isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-				      NAMED_LOGMODULE_MAIN, ISC_LOG_DEBUG(99),
-				      "[%d] %p %s", i, addr, fname);
-		}
-	}
+	isc_managers_destroy(&named_g_netmgr, &named_g_taskmgr,
+			     &named_g_timermgr);
 }
 
 static void
@@ -1085,9 +1126,8 @@ setup(void) {
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
-		      "starting %s %s%s%s <id:%s>", named_g_product,
-		      named_g_version, *named_g_description ? " " : "",
-		      named_g_description, named_g_srcid);
+		      "starting %s%s <id:%s>", PACKAGE_STRING,
+		      PACKAGE_DESCRIPTION, PACKAGE_SRCID);
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE, "running on %s",
@@ -1095,7 +1135,7 @@ setup(void) {
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE, "built with %s",
-		      named_g_configargs);
+		      PACKAGE_CONFIGARGS);
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
@@ -1189,12 +1229,9 @@ setup(void) {
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
 		      "----------------------------------------------------");
 
-	dump_symboltable();
-
 	/*
 	 * Get the initial resource limits.
 	 */
-#ifndef WIN32
 	RUNTIME_CHECK(isc_resource_getlimit(isc_resource_stacksize,
 					    &named_g_initstacksize) ==
 		      ISC_R_SUCCESS);
@@ -1204,7 +1241,6 @@ setup(void) {
 	RUNTIME_CHECK(isc_resource_getlimit(isc_resource_coresize,
 					    &named_g_initcoresize) ==
 		      ISC_R_SUCCESS);
-#endif /* ifndef WIN32 */
 	RUNTIME_CHECK(isc_resource_getlimit(isc_resource_openfiles,
 					    &named_g_initopenfiles) ==
 		      ISC_R_SUCCESS);
@@ -1266,7 +1302,6 @@ setup(void) {
 	 */
 	/* xxdb_init(); */
 
-#ifdef ISC_DLZ_DLOPEN
 	/*
 	 * Register the DLZ "dlopen" driver.
 	 */
@@ -1275,22 +1310,16 @@ setup(void) {
 		named_main_earlyfatal("dlz_dlopen_init() failed: %s",
 				      isc_result_totext(result));
 	}
-#endif /* ifdef ISC_DLZ_DLOPEN */
-
-#if CONTRIB_DLZ
-	/*
-	 * Register any other contributed DLZ drivers.
-	 */
-	result = dlz_drivers_init();
-	if (result != ISC_R_SUCCESS) {
-		named_main_earlyfatal("dlz_drivers_init() failed: %s",
-				      isc_result_totext(result));
-	}
-#endif /* if CONTRIB_DLZ */
 
 	named_server_create(named_g_mctx, &named_g_server);
 	ENSURE(named_g_server != NULL);
 	sctx = named_g_server->sctx;
+
+	/*
+	 * Report supported algorithms now that dst_lib_init() has
+	 * been called via named_server_create().
+	 */
+	format_supported_algorithms(logit);
 
 	/*
 	 * Modify server context according to command line options
@@ -1353,18 +1382,10 @@ cleanup(void) {
 	 */
 	/* xxdb_clear(); */
 
-#ifdef CONTRIB_DLZ
-	/*
-	 * Unregister contributed DLZ drivers.
-	 */
-	dlz_drivers_clear();
-#endif /* ifdef CONTRIB_DLZ */
-#ifdef ISC_DLZ_DLOPEN
 	/*
 	 * Unregister "dlopen" DLZ driver.
 	 */
 	dlz_dlopen_clear();
-#endif /* ifdef ISC_DLZ_DLOPEN */
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE, "exiting");
@@ -1471,17 +1492,6 @@ main(int argc, char *argv[]) {
 	(void)ProfilerStart(NULL);
 #endif /* ifdef HAVE_GPERFTOOLS_PROFILER */
 
-#ifdef WIN32
-	/*
-	 * Prevent unbuffered I/O from crippling named performance on Windows
-	 * when it is logging to stderr (e.g. in system tests).  Use full
-	 * buffering (_IOFBF) as line buffering (_IOLBF) is unavailable on
-	 * Windows and fflush() is called anyway after each log message gets
-	 * written to the default stderr logging channels created by libisc.
-	 */
-	setvbuf(stderr, NULL, _IOFBF, BUFSIZ);
-#endif /* ifdef WIN32 */
-
 #ifdef HAVE_LIBXML2
 	xmlInitParser();
 #endif /* HAVE_LIBXML2 */
@@ -1496,9 +1506,7 @@ main(int argc, char *argv[]) {
 	 * setlocale(LC_ALL, ""); before the call and setlocale(LC_ALL, "C");
 	 * after the call, and no BIND 9 library calls must be made in between.
 	 */
-#if HAVE_SETLOCALE
 	setlocale(LC_ALL, "C");
-#endif /* HAVE_SETLOCALE */
 
 	/*
 	 * Record version in core image.
@@ -1506,10 +1514,11 @@ main(int argc, char *argv[]) {
 	 */
 	strlcat(version,
 #if defined(NO_VERSION_DATE) || !defined(__DATE__)
-		"named version: BIND " VERSION " <" SRCID ">",
-#else  /* if defined(NO_VERSION_DATE) || !defined(__DATE__) */
-		"named version: BIND " VERSION " <" SRCID "> (" __DATE__ ")",
-#endif /* if defined(NO_VERSION_DATE) || !defined(__DATE__) */
+		"named version: BIND " PACKAGE_VERSION " <" PACKAGE_SRCID ">",
+#else
+		"named version: BIND " PACKAGE_VERSION " <" PACKAGE_SRCID
+		"> (" __DATE__ ")",
+#endif
 		sizeof(version));
 	result = isc_file_progname(*argv, program_name, sizeof(program_name));
 	if (result != ISC_R_SUCCESS) {
@@ -1521,13 +1530,6 @@ main(int argc, char *argv[]) {
 	isc_error_setunexpected(library_unexpected_error);
 
 	named_os_init(program_name);
-
-	dns_result_register();
-	dst_result_register();
-	isccc_result_register();
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
 
 	parse_command_line(argc, argv);
 
@@ -1559,9 +1561,10 @@ main(int argc, char *argv[]) {
 	}
 
 	isc_mem_create(&named_g_mctx);
-	isc_mem_setname(named_g_mctx, "main", NULL);
+	isc_mem_setname(named_g_mctx, "main");
 
 	setup();
+	INSIST(named_g_server != NULL);
 
 	/*
 	 * Start things running and then wait for a shutdown request
@@ -1605,7 +1608,6 @@ main(int argc, char *argv[]) {
 
 	if (want_stats) {
 		isc_mem_stats(named_g_mctx, stdout);
-		isc_mutex_stats(stdout);
 	}
 
 	if (named_g_memstatistics && memstats != NULL) {
@@ -1613,7 +1615,6 @@ main(int argc, char *argv[]) {
 		result = isc_stdio_open(memstats, "w", &fp);
 		if (result == ISC_R_SUCCESS) {
 			isc_mem_stats(named_g_mctx, fp);
-			isc_mutex_stats(fp);
 			(void)isc_stdio_close(fp);
 		}
 	}

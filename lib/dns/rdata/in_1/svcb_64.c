@@ -16,11 +16,12 @@
 #ifndef RDATA_IN_1_SVCB_64_C
 #define RDATA_IN_1_SVCB_64_C
 
-#define RRTYPE_SVCB_ATTRIBUTES 0
+#define RRTYPE_SVCB_ATTRIBUTES (DNS_RDATATYPEATTR_FOLLOWADDITIONAL)
 
 #define SVCB_MAN_KEY		 0
 #define SVCB_ALPN_KEY		 1
 #define SVCB_NO_DEFAULT_ALPN_KEY 2
+#define MAX_CNAMES		 16 /* See ns/query.c MAX_RESTARTS */
 
 /*
  * Service Binding Parameter Registry
@@ -33,13 +34,14 @@ enum encoding {
 	sbpr_base64,
 	sbpr_empty,
 	sbpr_alpn,
-	sbpr_keylist
+	sbpr_keylist,
+	sbpr_dohpath
 };
 static const struct {
 	const char *name; /* Restricted to lowercase LDH by registry. */
 	unsigned int value;
 	enum encoding encoding;
-	bool initial;
+	bool initial; /* Part of the first defined set of encodings. */
 } sbpr[] = {
 	{ "mandatory", 0, sbpr_keylist, true },
 	{ "alpn", 1, sbpr_alpn, true },
@@ -48,6 +50,7 @@ static const struct {
 	{ "ipv4hint", 4, sbpr_ipv4s, true },
 	{ "ech", 5, sbpr_base64, true },
 	{ "ipv6hint", 6, sbpr_ipv6s, true },
+	{ "dohpath", 7, sbpr_dohpath, false },
 };
 
 static isc_result_t
@@ -91,12 +94,7 @@ static isc_result_t
 svcb_validate(uint16_t key, isc_region_t *region) {
 	size_t i;
 
-#ifndef ARRAYSIZE
-/* defined in winnt.h */
-#define ARRAYSIZE(x) (sizeof(x) / sizeof(*x))
-#endif
-
-	for (i = 0; i < ARRAYSIZE(sbpr); i++) {
+	for (i = 0; i < ARRAY_SIZE(sbpr); i++) {
 		if (sbpr[i].value == key) {
 			switch (sbpr[i].encoding) {
 			case sbpr_port:
@@ -151,6 +149,30 @@ svcb_validate(uint16_t key, isc_region_t *region) {
 			case sbpr_text:
 			case sbpr_base64:
 				break;
+			case sbpr_dohpath:
+				/*
+				 * Minimum valid dohpath is "/{?dns}" as
+				 * it MUST be relative (leading "/") and
+				 * MUST contain "{?dns}".
+				 */
+				if (region->length < 7) {
+					return (DNS_R_FORMERR);
+				}
+				/* MUST be relative */
+				if (region->base[0] != '/') {
+					return (DNS_R_FORMERR);
+				}
+				/* MUST be UTF8 */
+				if (!isc_utf8_valid(region->base,
+						    region->length)) {
+					return (DNS_R_FORMERR);
+				}
+				/* MUST contain "{?dns}" */
+				if (strnstr((char *)region->base, "{?dns}",
+					    region->length) == NULL) {
+					return (DNS_R_FORMERR);
+				}
+				break;
 			case sbpr_empty:
 				if (region->length != 0) {
 					return (DNS_R_FORMERR);
@@ -173,7 +195,7 @@ svc_keyfromregion(isc_textregion_t *region, char sep, uint16_t *value,
 	unsigned long ul;
 
 	/* Look for known key names.  */
-	for (i = 0; i < ARRAYSIZE(sbpr); i++) {
+	for (i = 0; i < ARRAY_SIZE(sbpr); i++) {
 		size_t len = strlen(sbpr[i].name);
 		if (strncasecmp(region->base, sbpr[i].name, len) != 0 ||
 		    (region->base[len] != 0 && region->base[len] != sep))
@@ -236,7 +258,7 @@ svc_fromtext(isc_textregion_t *region, isc_buffer_t *target) {
 	unsigned int used;
 	unsigned long ul;
 
-	for (i = 0; i < ARRAYSIZE(sbpr); i++) {
+	for (i = 0; i < ARRAY_SIZE(sbpr); i++) {
 		len = strlen(sbpr[i].name);
 		if (strncmp(region->base, sbpr[i].name, len) != 0 ||
 		    (region->base[len] != 0 && region->base[len] != '='))
@@ -256,6 +278,7 @@ svc_fromtext(isc_textregion_t *region, isc_buffer_t *target) {
 
 		switch (sbpr[i].encoding) {
 		case sbpr_text:
+		case sbpr_dohpath:
 			RETERR(multitxt_fromtext(region, target));
 			break;
 		case sbpr_alpn:
@@ -332,6 +355,19 @@ svc_fromtext(isc_textregion_t *region, isc_buffer_t *target) {
 		len = isc_buffer_usedlength(target) -
 		      isc_buffer_usedlength(&sb) - 2;
 		RETERR(uint16_tobuffer(len, &sb)); /* length */
+		switch (sbpr[i].encoding) {
+		case sbpr_dohpath:
+			/*
+			 * Apply constraints not applied by multitxt_fromtext.
+			 */
+			keyregion.base = isc_buffer_used(&sb);
+			keyregion.length = isc_buffer_usedlength(target) -
+					   isc_buffer_usedlength(&sb);
+			RETERR(svcb_validate(sbpr[i].value, &keyregion));
+			break;
+		default:
+			break;
+		}
 		return (ISC_R_SUCCESS);
 	}
 
@@ -360,7 +396,7 @@ svcparamkey(unsigned short value, enum encoding *encoding, char *buf,
 	size_t i;
 	int n;
 
-	for (i = 0; i < ARRAYSIZE(sbpr); i++) {
+	for (i = 0; i < ARRAY_SIZE(sbpr); i++) {
 		if (sbpr[i].value == value && sbpr[i].initial) {
 			*encoding = sbpr[i].encoding;
 			return (sbpr[i].name);
@@ -1012,7 +1048,7 @@ generic_tostruct_in_svcb(ARGS_TOSTRUCT) {
 	dns_name_fromregion(&name, &region);
 	isc_region_consume(&region, name_length(&name));
 
-	RETERR(name_duporclone(&name, mctx, &svcb->svcdomain));
+	name_duporclone(&name, mctx, &svcb->svcdomain);
 	svcb->svclen = region.length;
 	svcb->svc = mem_maybedup(mctx, region.base, region.length);
 
@@ -1069,11 +1105,85 @@ freestruct_in_svcb(ARGS_FREESTRUCT) {
 
 static isc_result_t
 generic_additionaldata_in_svcb(ARGS_ADDLDATA) {
-	UNUSED(rdata);
-	UNUSED(add);
-	UNUSED(arg);
+	bool alias, done = false;
+	dns_fixedname_t fixed;
+	dns_name_t name, *fname = NULL;
+	dns_offsets_t offsets;
+	dns_rdataset_t rdataset;
+	isc_region_t region;
+	unsigned int cnames = 0;
 
-	return (ISC_R_SUCCESS);
+	dns_name_init(&name, offsets);
+	dns_rdata_toregion(rdata, &region);
+	alias = uint16_fromregion(&region) == 0;
+	isc_region_consume(&region, 2);
+
+	dns_name_fromregion(&name, &region);
+
+	if (dns_name_equal(&name, dns_rootname)) {
+		/*
+		 * "." only means owner name in service form.
+		 */
+		if (alias || dns_name_equal(owner, dns_rootname) ||
+		    !dns_name_ishostname(owner, false))
+		{
+			return (ISC_R_SUCCESS);
+		}
+		/* Only lookup address records */
+		return ((add)(arg, owner, dns_rdatatype_a, NULL));
+	}
+
+	/*
+	 * Follow CNAME chains when processing HTTPS and SVCB records.
+	 */
+	dns_rdataset_init(&rdataset);
+	fname = dns_fixedname_initname(&fixed);
+	do {
+		RETERR((add)(arg, &name, dns_rdatatype_cname, &rdataset));
+		if (dns_rdataset_isassociated(&rdataset)) {
+			isc_result_t result;
+			result = dns_rdataset_first(&rdataset);
+			if (result == ISC_R_SUCCESS) {
+				dns_rdata_t current = DNS_RDATA_INIT;
+				dns_rdata_cname_t cname;
+
+				dns_rdataset_current(&rdataset, &current);
+
+				result = dns_rdata_tostruct(&current, &cname,
+							    NULL);
+				RUNTIME_CHECK(result == ISC_R_SUCCESS);
+				dns_name_copy(&cname.cname, fname);
+				dns_name_clone(fname, &name);
+			} else {
+				done = true;
+			}
+			dns_rdataset_disassociate(&rdataset);
+		} else {
+			done = true;
+		}
+		/*
+		 * Stop following a potentially infinite CNAME chain.
+		 */
+		if (!done && cnames++ > MAX_CNAMES) {
+			return (ISC_R_SUCCESS);
+		}
+	} while (!done);
+
+	/*
+	 * Look up HTTPS/SVCB records when processing the alias form.
+	 */
+	if (alias) {
+		RETERR((add)(arg, &name, rdata->type, &rdataset));
+		/*
+		 * Don't return A or AAAA if this is not the last element
+		 * in the HTTP / SVCB chain.
+		 */
+		if (dns_rdataset_isassociated(&rdataset)) {
+			dns_rdataset_disassociate(&rdataset);
+			return (ISC_R_SUCCESS);
+		}
+	}
+	return ((add)(arg, &name, dns_rdatatype_a, NULL));
 }
 
 static isc_result_t

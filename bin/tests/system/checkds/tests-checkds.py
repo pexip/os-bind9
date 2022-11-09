@@ -349,6 +349,8 @@ def test_checkds_dspublished(named_port):
 
     # TBD: Check with TSIG
 
+    # TBD: Check with TLS
+
 
 def test_checkds_dswithdrawn(named_port):
     # We create resolver instances that will be used to send queries.

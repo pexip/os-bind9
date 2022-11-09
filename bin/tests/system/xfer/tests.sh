@@ -11,11 +11,10 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=..
-. $SYSTEMTESTTOP/conf.sh
+. ../conf.sh
 
 DIGOPTS="+tcp +noadd +nosea +nostat +noquest +nocomm +nocmd -p ${PORT}"
-RNDCCMD="$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p ${CONTROLPORT} -s"
+RNDCCMD="$RNDC -c ../common/rndc.conf -p ${CONTROLPORT} -s"
 
 status=0
 n=0
@@ -176,7 +175,7 @@ grep "^;" dig.out.ns6.test$n | cat_i
 
 $DIG $DIGOPTS primary. \
 	@10.53.0.3 axfr > dig.out.ns3.test$n || tmp=1
-grep "^;" dig.out.ns3.test$n > /dev/null && cat_i dig.out.ns3.test$n
+grep "^;" dig.out.ns3.test$n > /dev/null && cat_i < dig.out.ns3.test$n
 
 digcomp dig.out.ns6.test$n dig.out.ns3.test$n || tmp=1
 
@@ -251,13 +250,16 @@ fi
 
 # now we test transfers with assorted TSIG glitches
 DIGCMD="$DIG $DIGOPTS @10.53.0.4"
-SENDCMD="$PERL ../send.pl 10.53.0.5 $EXTRAPORT1"
+
+sendcmd() {
+    send 10.53.0.5 "$EXTRAPORT1"
+}
 
 echo_i "testing that incorrectly signed transfers will fail..."
 n=$((n+1))
 echo_i "initial correctly-signed transfer should succeed ($n)"
 
-$SENDCMD < ans5/goodaxfr
+sendcmd < ans5/goodaxfr
 
 # Initially, ns4 is not authoritative for anything.
 # Now that ans is up and running with the right data, we make ns4
@@ -294,7 +296,8 @@ $DIGCMD nil. TXT | grep 'initial AXFR' >/dev/null || {
 n=$((n+1))
 echo_i "unsigned transfer ($n)"
 
-$SENDCMD < ans5/unsigned
+sendcmd < ans5/unsigned
+sleep 1
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -313,7 +316,7 @@ $DIGCMD nil. TXT | grep 'unsigned AXFR' >/dev/null && {
 n=$((n+1))
 echo_i "bad keydata ($n)"
 
-$SENDCMD < ans5/badkeydata
+sendcmd < ans5/badkeydata
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -332,7 +335,7 @@ $DIGCMD nil. TXT | grep 'bad keydata AXFR' >/dev/null && {
 n=$((n+1))
 echo_i "partially-signed transfer ($n)"
 
-$SENDCMD < ans5/partial
+sendcmd < ans5/partial
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -351,7 +354,7 @@ $DIGCMD nil. TXT | grep 'partially signed AXFR' >/dev/null && {
 n=$((n+1))
 echo_i "unknown key ($n)"
 
-$SENDCMD < ans5/unknownkey
+sendcmd < ans5/unknownkey
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -370,7 +373,7 @@ $DIGCMD nil. TXT | grep 'unknown key AXFR' >/dev/null && {
 n=$((n+1))
 echo_i "incorrect key ($n)"
 
-$SENDCMD < ans5/wrongkey
+sendcmd < ans5/wrongkey
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -387,9 +390,28 @@ $DIGCMD nil. TXT | grep 'incorrect key AXFR' >/dev/null && {
 }
 
 n=$((n+1))
+echo_i "bad question section ($n)"
+
+sendcmd < ans5/wrongname
+
+$RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
+
+sleep 2
+
+nextpart ns4/named.run | grep "question name mismatch" > /dev/null || {
+    echo_i "failed: expected status was not logged"
+    status=$((status+1))
+}
+
+$DIGCMD nil. TXT | grep 'wrong question AXFR' >/dev/null && {
+    echo_i "failed"
+    status=$((status+1))
+}
+
+n=$((n+1))
 echo_i "bad message id ($n)"
 
-$SENDCMD < ans5/badmessageid
+sendcmd < ans5/badmessageid
 
 # Uncomment to see AXFR stream with mismatching IDs.
 # $DIG $DIGOPTS @10.53.0.5 -y tsig_key:LSAnCU+Z nil. AXFR +all
@@ -398,13 +420,12 @@ $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
 sleep 2
 
-msg="detected message ID mismatch on incoming AXFR stream, transfer will fail in BIND 9.17.2 and later if AXFR source is not fixed"
-nextpart ns4/named.run | grep "$msg" > /dev/null || {
+nextpart ns4/named.run | grep "unexpected message id" > /dev/null || {
     echo_i "failed: expected status was not logged"
     status=$((status+1))
 }
 
-$DIGCMD nil. TXT | grep 'bad message id' >/dev/null || {
+$DIGCMD nil. TXT | grep 'bad message id' >/dev/null && {
     echo_i "failed"
     status=$((status+1))
 }
@@ -412,7 +433,7 @@ $DIGCMD nil. TXT | grep 'bad message id' >/dev/null || {
 n=$((n+1))
 echo_i "mismatched SOA ($n)"
 
-${SENDCMD} < ans5/soamismatch
+sendcmd < ans5/soamismatch
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
@@ -446,8 +467,6 @@ echo_i "test smaller transfer TCP message size ($n)"
 $DIG $DIGOPTS example. @10.53.0.8 axfr \
 	-y key1.:1234abcd8765 > dig.out.msgsize.test$n || status=1
 
-$DOS2UNIX dig.out.msgsize.test$n >/dev/null 2>&1
-
 bytes=`wc -c < dig.out.msgsize.test$n`
 if [ $bytes -ne 459357 ]; then
 	echo_i "failed axfr size check"
@@ -465,8 +484,8 @@ echo_i "test mapped zone with out of zone data ($n)"
 tmp=0
 $DIG -p ${PORT} txt mapped @10.53.0.3 > dig.out.1.test$n
 grep "status: NOERROR," dig.out.1.test$n > /dev/null || tmp=1
-$PERL $SYSTEMTESTTOP/stop.pl xfer ns3
-$PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} xfer ns3
+$PERL ../stop.pl xfer ns3
+start_server --noclean --restart --port ${PORT} xfer ns3
 check_mapped () {
 	$DIG -p ${PORT} txt mapped @10.53.0.3 > dig.out.2.test$n
 	grep "status: NOERROR," dig.out.2.test$n > /dev/null || return 1

@@ -11,8 +11,7 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=../..
-. $SYSTEMTESTTOP/conf.sh
+. ../../conf.sh
 
 ( cd ../ns2 && $SHELL -e sign.sh )
 
@@ -22,8 +21,8 @@ zone=.
 infile=root.db.in
 zonefile=root.db
 
-keyname1=`$KEYGEN -a RSASHA256 -f KSK $zone 2> /dev/null`
-keyname2=`$KEYGEN -a RSASHA256 $zone 2> /dev/null`
+keyname1=$($KEYGEN -a ${DEFAULT_ALGORITHM} -f KSK $zone 2> /dev/null)
+keyname2=$($KEYGEN -a ${DEFAULT_ALGORITHM} $zone 2> /dev/null)
 
 cat $infile $keyname1.key $keyname2.key > $zonefile
 

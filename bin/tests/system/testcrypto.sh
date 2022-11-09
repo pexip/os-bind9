@@ -11,8 +11,7 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=${SYSTEMTESTTOP:=..}
-. $SYSTEMTESTTOP/conf.sh
+. ../conf.sh
 
 prog=$0
 
@@ -27,7 +26,7 @@ while test "$#" -gt 0; do
                 args="$args -q"
                 quiet=1
                 ;;
-        rsa|RSA)
+        rsa|RSA|rsasha1|RSASHA1)
                 alg="-a RSASHA1"
                 msg="RSA cryptography"
                 ;;
@@ -69,8 +68,6 @@ then
 else
     if test $quiet -eq 0; then
         echo_i "This test requires support for $msg" >&2
-        echo_i "configure with --with-openssl, or --enable-native-pkcs11" \
-            "--with-pkcs11" >&2
     fi
     exit 255
 fi

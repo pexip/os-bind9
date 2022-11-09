@@ -24,6 +24,7 @@
 #include <isc/once.h>
 #include <isc/print.h>
 #include <isc/random.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/thread.h>
 #include <isc/util.h>
@@ -31,7 +32,6 @@
 #include <dns/compress.h>
 #include <dns/fixedname.h>
 #include <dns/name.h>
-#include <dns/result.h>
 
 #define VALID_NAME(n) ISC_MAGIC_VALID(n, DNS_NAME_MAGIC)
 
@@ -137,7 +137,7 @@ static unsigned char root_ndata[] = { "" };
 static unsigned char root_offsets[] = { 0 };
 
 static dns_name_t root = DNS_NAME_INITABSOLUTE(root_ndata, root_offsets);
-LIBDNS_EXTERNAL_DATA const dns_name_t *dns_rootname = &root;
+const dns_name_t *dns_rootname = &root;
 
 static unsigned char wild_ndata[] = { "\001*" };
 static unsigned char wild_offsets[] = { 0 };
@@ -145,12 +145,12 @@ static unsigned char wild_offsets[] = { 0 };
 static dns_name_t const wild = DNS_NAME_INITNONABSOLUTE(wild_ndata,
 							wild_offsets);
 
-LIBDNS_EXTERNAL_DATA const dns_name_t *dns_wildcardname = &wild;
+const dns_name_t *dns_wildcardname = &wild;
 
 /*
  * dns_name_t to text post-conversion procedure.
  */
-ISC_THREAD_LOCAL dns_name_totextfilter_t *totext_filter_proc = NULL;
+static thread_local dns_name_totextfilter_t *totext_filter_proc = NULL;
 
 static void
 set_offsets(const dns_name_t *name, unsigned char *offsets,
@@ -319,7 +319,7 @@ dns_name_ismailbox(const dns_name_t *name) {
 	}
 
 	/*
-	 * RFC292/RFC1123 hostname.
+	 * RFC952/RFC1123 hostname.
 	 */
 	while (ndata < (name->ndata + name->length)) {
 		n = *ndata++;
@@ -368,7 +368,7 @@ dns_name_ishostname(const dns_name_t *name, bool wildcard) {
 	}
 
 	/*
-	 * RFC292/RFC1123 hostname.
+	 * RFC952/RFC1123 hostname.
 	 */
 	while (ndata < (name->ndata + name->length)) {
 		n = *ndata++;
@@ -516,7 +516,7 @@ dns_name_fullcompare(const dns_name_t *name1, const dns_name_t *name2,
 	REQUIRE((name1->attributes & DNS_NAMEATTR_ABSOLUTE) ==
 		(name2->attributes & DNS_NAMEATTR_ABSOLUTE));
 
-	if (ISC_UNLIKELY(name1 == name2)) {
+	if (name1 == name2) {
 		*orderp = 0;
 		*nlabelsp = name1->labels;
 		return (dns_namereln_equal);
@@ -539,7 +539,7 @@ dns_name_fullcompare(const dns_name_t *name1, const dns_name_t *name2,
 	offsets1 += l1;
 	offsets2 += l2;
 
-	while (ISC_LIKELY(l > 0)) {
+	while (l > 0) {
 		l--;
 		offsets1--;
 		offsets2--;
@@ -562,7 +562,7 @@ dns_name_fullcompare(const dns_name_t *name1, const dns_name_t *name2,
 		}
 
 		/* Loop unrolled for performance */
-		while (ISC_LIKELY(count > 3)) {
+		while (count > 3) {
 			chdiff = (int)maptolower[label1[0]] -
 				 (int)maptolower[label2[0]];
 			if (chdiff != 0) {
@@ -591,7 +591,7 @@ dns_name_fullcompare(const dns_name_t *name1, const dns_name_t *name2,
 			label1 += 4;
 			label2 += 4;
 		}
-		while (ISC_LIKELY(count-- > 0)) {
+		while (count-- > 0) {
 			chdiff = (int)maptolower[*label1++] -
 				 (int)maptolower[*label2++];
 			if (chdiff != 0) {
@@ -669,7 +669,7 @@ dns_name_equal(const dns_name_t *name1, const dns_name_t *name2) {
 	REQUIRE((name1->attributes & DNS_NAMEATTR_ABSOLUTE) ==
 		(name2->attributes & DNS_NAMEATTR_ABSOLUTE));
 
-	if (ISC_UNLIKELY(name1 == name2)) {
+	if (name1 == name2) {
 		return (true);
 	}
 
@@ -685,7 +685,7 @@ dns_name_equal(const dns_name_t *name1, const dns_name_t *name2) {
 
 	label1 = name1->ndata;
 	label2 = name2->ndata;
-	while (ISC_LIKELY(l-- > 0)) {
+	while (l-- > 0) {
 		count = *label1++;
 		if (count != *label2++) {
 			return (false);
@@ -694,7 +694,7 @@ dns_name_equal(const dns_name_t *name1, const dns_name_t *name2) {
 		INSIST(count <= 63); /* no bitstring support */
 
 		/* Loop unrolled for performance */
-		while (ISC_LIKELY(count > 3)) {
+		while (count > 3) {
 			c = maptolower[label1[0]];
 			if (c != maptolower[label2[0]]) {
 				return (false);
@@ -715,7 +715,7 @@ dns_name_equal(const dns_name_t *name1, const dns_name_t *name2) {
 			label1 += 4;
 			label2 += 4;
 		}
-		while (ISC_LIKELY(count-- > 0)) {
+		while (count-- > 0) {
 			c = maptolower[*label1++];
 			if (c != maptolower[*label2++]) {
 				return (false);
@@ -919,7 +919,7 @@ dns_name_getlabelsequence(const dns_name_t *source, unsigned int first,
 	REQUIRE(BINDABLE(target));
 
 	p = source->ndata;
-	if (ISC_UNLIKELY(first == source->labels)) {
+	if (first == source->labels) {
 		firstoffset = source->length;
 	} else {
 		for (i = 0; i < first; i++) {
@@ -929,7 +929,7 @@ dns_name_getlabelsequence(const dns_name_t *source, unsigned int first,
 		firstoffset = (unsigned int)(p - source->ndata);
 	}
 
-	if (ISC_LIKELY(first + n == source->labels)) {
+	if (first + n == source->labels) {
 		endoffset = source->length;
 	} else {
 		for (i = 0; i < n; i++) {
@@ -1710,7 +1710,7 @@ set_offsets(const dns_name_t *name, unsigned char *offsets,
 	offset = 0;
 	nlabels = 0;
 	absolute = false;
-	while (ISC_LIKELY(offset != length)) {
+	while (offset != length) {
 		INSIST(nlabels < 128);
 		offsets[nlabels++] = offset;
 		count = *ndata;
@@ -1718,7 +1718,7 @@ set_offsets(const dns_name_t *name, unsigned char *offsets,
 		offset += count + 1;
 		ndata += count + 1;
 		INSIST(offset <= length);
-		if (ISC_UNLIKELY(count == 0)) {
+		if (count == 0) {
 			absolute = true;
 			break;
 		}
@@ -1957,7 +1957,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
 	    (name->attributes & DNS_NAMEATTR_NOCOMPRESS) == 0 &&
 	    (methods & DNS_COMPRESS_GLOBAL14) != 0)
 	{
-		if (ISC_UNLIKELY(target->length - target->used < 2)) {
+		if (target->length - target->used < 2) {
 			return (ISC_R_NOSPACE);
 		}
 		offset = *comp_offsetp;
@@ -1991,7 +1991,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
 	 * If the offset is too high for 14 bit global compression, we're
 	 * out of luck.
 	 */
-	if (gf && ISC_UNLIKELY(go >= 0x4000)) {
+	if (gf && go >= 0x4000) {
 		gf = false;
 	}
 
@@ -2003,7 +2003,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
 	}
 
 	if (gf) {
-		if (ISC_UNLIKELY(target->length - target->used < gp.length)) {
+		if (target->length - target->used < gp.length) {
 			return (ISC_R_NOSPACE);
 		}
 		if (gp.length != 0) {
@@ -2012,7 +2012,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
 				      (size_t)gp.length);
 		}
 		isc_buffer_add(target, gp.length);
-		if (ISC_UNLIKELY(target->length - target->used < 2)) {
+		if (target->length - target->used < 2) {
 			return (ISC_R_NOSPACE);
 		}
 		isc_buffer_putuint16(target, go | 0xc000);
@@ -2025,8 +2025,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
 			*comp_offsetp = go;
 		}
 	} else {
-		if (ISC_UNLIKELY(target->length - target->used < name->length))
-		{
+		if (target->length - target->used < name->length) {
 			return (ISC_R_NOSPACE);
 		}
 		if (name->length != 0) {
@@ -2446,24 +2445,23 @@ dns_name_fromstring2(dns_name_t *target, const char *src,
 	return (result);
 }
 
-static isc_result_t
-name_copy(const dns_name_t *source, dns_name_t *dest, isc_buffer_t *target) {
+void
+dns_name_copy(const dns_name_t *source, dns_name_t *dest) {
+	isc_buffer_t *target = NULL;
 	unsigned char *ndata = NULL;
 
-	/*
-	 * Make dest a copy of source.
-	 */
-
+	REQUIRE(VALID_NAME(source));
+	REQUIRE(VALID_NAME(dest));
 	REQUIRE(BINDABLE(dest));
 
-	/*
-	 * Set up.
-	 */
-	if (target->length - target->used < source->length) {
-		return (ISC_R_NOSPACE);
-	}
+	target = dest->buffer;
 
-	ndata = (unsigned char *)target->base + target->used;
+	REQUIRE(target != NULL);
+	REQUIRE(target->length >= source->length);
+
+	isc_buffer_clear(target);
+
+	ndata = (unsigned char *)target->base;
 	dest->ndata = target->base;
 
 	if (source->length != 0) {
@@ -2488,28 +2486,6 @@ name_copy(const dns_name_t *source, dns_name_t *dest, isc_buffer_t *target) {
 	}
 
 	isc_buffer_add(target, dest->length);
-
-	return (ISC_R_SUCCESS);
-}
-
-isc_result_t
-dns_name_copy(const dns_name_t *source, dns_name_t *dest,
-	      isc_buffer_t *target) {
-	REQUIRE(VALID_NAME(source));
-	REQUIRE(VALID_NAME(dest));
-	REQUIRE(target != NULL);
-
-	return (name_copy(source, dest, target));
-}
-
-void
-dns_name_copynf(const dns_name_t *source, dns_name_t *dest) {
-	REQUIRE(VALID_NAME(source));
-	REQUIRE(VALID_NAME(dest));
-	REQUIRE(dest->buffer != NULL);
-
-	isc_buffer_clear(dest->buffer);
-	RUNTIME_CHECK(name_copy(source, dest, dest->buffer) == ISC_R_SUCCESS);
 }
 
 /*

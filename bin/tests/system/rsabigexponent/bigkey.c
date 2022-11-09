@@ -16,7 +16,6 @@
 
 #include <isc/buffer.h>
 #include <isc/mem.h>
-#include <isc/platform.h>
 #include <isc/print.h>
 #include <isc/region.h>
 #include <isc/stdio.h>
@@ -31,22 +30,22 @@
 #include <openssl/objects.h>
 #include <openssl/rsa.h>
 
+#include <isc/result.h>
+
 #include <dns/dnssec.h>
 #include <dns/fixedname.h>
 #include <dns/keyvalues.h>
 #include <dns/log.h>
 #include <dns/name.h>
 #include <dns/rdataclass.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 
 #include <dst/dst.h>
-#include <dst/result.h>
 
 dst_key_t *key;
 dns_fixedname_t fname;
 dns_name_t *name;
-unsigned int bits = 1024U;
+unsigned int bits = 2048U;
 isc_mem_t *mctx;
 isc_log_t *log_;
 isc_logconfig_t *logconfig;
@@ -77,8 +76,6 @@ main(int argc, char **argv) {
 	UNUSED(argc);
 	UNUSED(argv);
 
-#if !USE_PKCS11
-
 	rsa = RSA_new();
 	e = BN_new();
 	pkey = EVP_PKEY_new();
@@ -104,8 +101,6 @@ main(int argc, char **argv) {
 			__FILE__, __LINE__);
 		exit(1);
 	}
-
-	dns_result_register();
 
 	isc_mem_create(&mctx);
 	CHECK(dst_lib_init(mctx, NULL), "dst_lib_init()");
@@ -134,7 +129,7 @@ main(int argc, char **argv) {
 								    "\"example."
 								    "\")");
 
-	CHECK(dst_key_buildinternal(name, DNS_KEYALG_RSASHA1, bits,
+	CHECK(dst_key_buildinternal(name, DNS_KEYALG_RSASHA256, bits,
 				    DNS_KEYOWNER_ZONE, DNS_KEYPROTO_DNSSEC,
 				    dns_rdataclass_in, pkey, mctx, &key),
 	      "dst_key_buildinternal(...)");
@@ -154,9 +149,6 @@ main(int argc, char **argv) {
 	dst_lib_destroy();
 	isc_mem_destroy(&mctx);
 	return (0);
-#else  /* !USE_PKCS11 */
-	return (1);
-#endif /* !USE_PKC11 */
 }
 
 /*! \file */

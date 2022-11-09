@@ -11,8 +11,7 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-SYSTEMTESTTOP=../..
-. $SYSTEMTESTTOP/conf.sh
+. ../../conf.sh
 
 # NOTE: The number of signing keys generated below is not coincidental.  More
 # details can be found in the comment inside ns7/named.conf.
@@ -20,6 +19,6 @@ SYSTEMTESTTOP=../..
 zone=nsec3-loop
 rm -f K${zone}.+*+*.key
 rm -f K${zone}.+*+*.private
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone $zone`
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone $zone`
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone -f KSK $zone`
+keyname=$($KEYGEN -q -a ${DEFAULT_ALGORITHM} -n zone $zone)
+keyname=$($KEYGEN -q -a ${DEFAULT_ALGORITHM} -n zone $zone)
+keyname=$($KEYGEN -q -a ${DEFAULT_ALGORITHM} -n zone -f KSK $zone)

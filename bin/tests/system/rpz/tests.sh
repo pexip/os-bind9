@@ -16,8 +16,7 @@
 # touch dnsrps-off to not test with DNSRPS
 # touch dnsrps-only to not test with classic RPZ
 
-SYSTEMTESTTOP=..
-. $SYSTEMTESTTOP/conf.sh
+. ../conf.sh
 
 ns=10.53.0
 ns1=$ns.1		# root, defining the others
@@ -65,7 +64,7 @@ comment () {
 }
 
 DNSRPSCMD=./dnsrps
-RNDCCMD="$RNDC -c $SYSTEMTESTTOP/common/rndc.conf -p ${CONTROLPORT} -s"
+RNDCCMD="$RNDC -c ../common/rndc.conf -p ${CONTROLPORT} -s"
 
 if test -x $DNSRPSCMD; then
     # speed up the many delays for dnsrpzd by waiting only 0.1 seconds
@@ -208,7 +207,7 @@ restart () {
 	    PID=`cat ns$1/named.pid 2>/dev/null`
 	    if test -n "$PID"; then
 		echo_i "killing ns$1 server $PID"
-		$KILL -9 $PID
+		kill -9 $PID
 	    fi
 	fi
     fi
@@ -220,7 +219,7 @@ restart () {
             done
         fi
     fi
-    $PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} rpz ns$1
+    start_server --noclean --restart --port ${PORT} rpz ns$1
     load_db
     dnsrps_loaded
     sleep 1
@@ -329,7 +328,7 @@ ckresult () {
 	setret "'dig $digarg' AD set;"
     fi
 
-    if $PERL $SYSTEMTESTTOP/digcomp.pl $DIGNM $2 >/dev/null; then
+    if $PERL ../digcomp.pl $DIGNM $2 >/dev/null; then
 	grep -q 'Truncated, retrying in TCP' $DIGNM && trunc=1 || trunc=0
 	if [ "$tcp" -ne "$trunc" ]; then
 	    setret "'dig $digarg' wrong; no or unexpected truncation in $DIGNM"
@@ -384,7 +383,7 @@ addr () {
     digcmd $2 >$DIGNM
     #ckalive "$2" "server crashed by 'dig $2'" || return 1
     ADDR_ESC=`echo "$ADDR" | sed -e 's/\./\\\\./g'`
-    ADDR_TTL=`tr -d '\r' < $DIGNM | sed -n -e "s/^[-.a-z0-9]\{1,\}[	 ]*\([0-9]*\)	IN	AA*	${ADDR_ESC}\$/\1/p"`
+    ADDR_TTL=`sed -n -e "s/^[-.a-z0-9]\{1,\}[	 ]*\([0-9]*\)	IN	AA*	${ADDR_ESC}\$/\1/p" $DIGNM`
     if test -z "$ADDR_TTL"; then
 	setret "'dig $2' wrong; no address $ADDR record in $DIGNM"
 	return 1
@@ -424,7 +423,7 @@ here () {
 }
 
 # check dropped response
-DROPPED='^;; connection timed out; no servers could be reached'
+DROPPED='^;; no servers could be reached'
 drop () {
     make_dignm
     digcmd $* >$DIGNM
@@ -465,6 +464,9 @@ make_proto_nodata() {
   return 0
 }
 
+# ensure that the fast-expire zone is populated before we begin testing
+$RNDCCMD $ns3 retransfer fast-expire
+
 for mode in native dnsrps; do
   status=0
   case ${mode} in
@@ -482,7 +484,7 @@ for mode in native dnsrps; do
       continue
     fi
     echo_i "attempting to configure servers with DNSRPS..."
-    $PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} rpz
+    $PERL ../stop.pl --use-rndc --port ${CONTROLPORT} rpz
     $SHELL ./setup.sh -N -D $DEBUG
     for server in ns*; do
       resetstats $server
@@ -497,7 +499,7 @@ for mode in native dnsrps; do
       continue
     else
       echo_i "running DNSRPS sub-test"
-      $PERL $SYSTEMTESTTOP/start.pl --noclean --restart --port ${PORT} rpz
+      start_server --noclean --restart --port ${PORT} rpz
       sleep 3
     fi
     ;;
@@ -790,7 +792,7 @@ EOF
   if [ "$mode" = dnsrps ]; then
     echo_i "checking that dnsrpzd is automatically restarted"
     OLD_PID=`cat dnsrpzd.pid`
-    $KILL "$OLD_PID"
+    kill "$OLD_PID"
     n=0
     while true; do
 	NEW_PID=`cat dnsrpzd.pid 2>/dev/null`
@@ -819,7 +821,7 @@ EOF
 
   # restart the main test RPZ server to see if that creates a core file
   if test -z "$HAVE_CORE"; then
-    $PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
+    $PERL ../stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
     restart 3 "rebuild-bl-rpz"
     HAVE_CORE=`find ns* -name '*core*' -print`
     test -z "$HAVE_CORE" || setret "found $HAVE_CORE; memory leak?"
@@ -839,11 +841,11 @@ EOF
     # restart the main test RPZ server with a bad zone.
     t=`expr $t + 1`
     echo_i "checking that ns3 with broken rpz does not crash (${t})"
-    $PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
+    $PERL ../stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
     cp ns3/broken.db.in ns3/bl.db
     restart 3 # do not rebuild rpz zones
     nocrash a3-1.tld2 -tA
-    $PERL $SYSTEMTESTTOP/stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
+    $PERL ../stop.pl --use-rndc --port ${CONTROLPORT} rpz ns3
     restart 3 "rebuild-bl-rpz"
 
     # reload a RPZ zone that is now deliberately broken.

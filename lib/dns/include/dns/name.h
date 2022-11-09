@@ -11,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_NAME_H
-#define DNS_NAME_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -144,8 +143,8 @@ struct dns_name {
 #define DNS_NAME_CHECKMX	0x0010 /*%< Used by rdata. */
 #define DNS_NAME_CHECKMXFAIL	0x0020 /*%< Used by rdata. */
 
-LIBDNS_EXTERNAL_DATA extern const dns_name_t *dns_rootname;
-LIBDNS_EXTERNAL_DATA extern const dns_name_t *dns_wildcardname;
+extern const dns_name_t *dns_rootname;
+extern const dns_name_t *dns_wildcardname;
 
 /*%<
  * DNS_NAME_INITNONABSOLUTE and DNS_NAME_INITABSOLUTE are macros for
@@ -1242,33 +1241,12 @@ dns_name_settotextfilter(dns_name_totextfilter_t *proc);
  * Includes space for the terminating NULL.
  */
 
-isc_result_t
-dns_name_copy(const dns_name_t *source, dns_name_t *dest, isc_buffer_t *target);
-/*%<
- * Copies the name in 'source' into 'dest'.  The name data is copied to
- * the 'target' buffer, which is then set as the buffer for 'dest'.
- *
- * Requires:
- * \li	'source' is a valid name.
- *
- * \li	'dest' is an initialized name.
- *
- * \li	'target' is an initialized buffer.
- *
- * Ensures:
- *
- *\li	On success, the used space in target is updated.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
- *\li	#ISC_R_NOSPACE
- */
-
 void
-dns_name_copynf(const dns_name_t *source, dns_name_t *dest);
+dns_name_copy(const dns_name_t *source, dns_name_t *dest);
 /*%<
  * Copies the name in 'source' into 'dest'.  The name data is copied to
- * the dedicated buffer for 'dest'.
+ * the dedicated buffer for 'dest'. (If copying to a name that doesn't
+ * have a dedicated buffer, use dns_name_setbuffer() first.)
  *
  * Requires:
  * \li	'source' is a valid name.
@@ -1406,5 +1384,3 @@ ISC_LANG_ENDDECLS
 #define dns_name_split(n, l, p, s) DNS_NAME_SPLIT(n, l, p, s)
 
 #endif /* DNS_NAME_USEINLINE */
-
-#endif /* DNS_NAME_H */

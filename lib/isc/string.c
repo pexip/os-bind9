@@ -12,8 +12,14 @@
  */
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * Copyright (c) 2001 Mike Barcroft <mike@FreeBSD.org>
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -109,11 +115,29 @@ strlcat(char *dst, const char *src, size_t size) {
 }
 #endif /* !defined(HAVE_STRLCAT) */
 
+#if !defined(HAVE_STRNSTR)
+char *
+strnstr(const char *s, const char *find, size_t slen) {
+	char c, sc;
+	size_t len;
+
+	if ((c = *find++) != '\0') {
+		len = strlen(find);
+		do {
+			do {
+				if (slen-- < 1 || (sc = *s++) == '\0')
+					return (NULL);
+			} while (sc != c);
+			if (len > slen)
+				return (NULL);
+		} while (strncmp(s, find, len) != 0);
+		s--;
+	}
+	return ((char *)s);
+}
+#endif
+
 int
 isc_string_strerror_r(int errnum, char *buf, size_t buflen) {
-#if defined(_WIN32) || defined(_WIN64)
-	return (strerror_s(buf, buflen, errnum));
-#else  /* if defined(_WIN32) || defined(_WIN64) */
 	return (strerror_r(errnum, buf, buflen));
-#endif /* if defined(_WIN32) || defined(_WIN64) */
 }

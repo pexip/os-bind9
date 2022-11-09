@@ -11,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RPZ_H
-#define DNS_RPZ_H 1
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -206,6 +205,7 @@ struct dns_rpz_popt {
 	bool		break_dnssec;
 	bool		qname_wait_recurse;
 	bool		nsip_wait_recurse;
+	bool		nsdname_wait_recurse;
 	unsigned int	min_ns_labels;
 	dns_rpz_num_t	num_zones;
 };
@@ -431,5 +431,3 @@ dns_rpz_find_name(dns_rpz_zones_t *rpzs, dns_rpz_type_t rpz_type,
 		  dns_rpz_zbits_t zbits, dns_name_t *trig_name);
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_RPZ_H */

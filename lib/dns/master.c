@@ -23,6 +23,7 @@
 #include <isc/mem.h>
 #include <isc/print.h>
 #include <isc/refcount.h>
+#include <isc/result.h>
 #include <isc/serial.h>
 #include <isc/stdio.h>
 #include <isc/stdtime.h>
@@ -41,7 +42,6 @@
 #include <dns/rdataset.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/soa.h>
 #include <dns/time.h>
 #include <dns/ttl.h>
@@ -188,12 +188,6 @@ static isc_result_t
 load_raw(dns_loadctx_t *lctx);
 
 static isc_result_t
-openfile_map(dns_loadctx_t *lctx, const char *master_file);
-
-static isc_result_t
-load_map(dns_loadctx_t *lctx);
-
-static isc_result_t
 pushfile(const char *master_file, dns_name_t *origin, dns_loadctx_t *lctx);
 
 static isc_result_t
@@ -313,18 +307,18 @@ loadctx_destroy(dns_loadctx_t *lctx);
 	    result == ISC_R_NOPERM)                                            \
 		(*callbacks->error)(callbacks, "%s: %s:%lu: %s: %s",           \
 				    "dns_master_load", source, line, filename, \
-				    dns_result_totext(result));                \
+				    isc_result_totext(result));                \
 	else                                                                   \
 		LOGIT(result)
 
 #define LOGIT(result)                                                 \
 	if (result == ISC_R_NOMEMORY)                                 \
 		(*callbacks->error)(callbacks, "dns_master_load: %s", \
-				    dns_result_totext(result));       \
+				    isc_result_totext(result));       \
 	else                                                          \
 		(*callbacks->error)(callbacks, "%s: %s:%lu: %s",      \
 				    "dns_master_load", source, line,  \
-				    dns_result_totext(result))
+				    isc_result_totext(result))
 
 static unsigned char in_addr_arpa_data[] = "\007IN-ADDR\004ARPA";
 static unsigned char in_addr_arpa_offsets[] = { 0, 8, 13 };
@@ -344,7 +338,7 @@ static dns_name_t const ip6_arpa = DNS_NAME_INITABSOLUTE(ip6_arpa_data,
 static bool
 dns_master_isprimary(dns_loadctx_t *lctx) {
 	return ((lctx->options & DNS_MASTER_ZONE) != 0 &&
-		(lctx->options & DNS_MASTER_SLAVE) == 0 &&
+		(lctx->options & DNS_MASTER_SECONDARY) == 0 &&
 		(lctx->options & DNS_MASTER_KEY) == 0);
 }
 
@@ -544,10 +538,6 @@ loadctx_create(dns_masterformat_t format, isc_mem_t *mctx, unsigned int options,
 	case dns_masterformat_raw:
 		lctx->openfile = openfile_raw;
 		lctx->load = load_raw;
-		break;
-	case dns_masterformat_map:
-		lctx->openfile = openfile_map;
-		lctx->load = load_map;
 		break;
 	default:
 		UNREACHABLE();
@@ -944,10 +934,10 @@ generate(dns_loadctx_t *lctx, char *range, char *lhs, char *gtype, char *rhs,
 error_cleanup:
 	if (result == ISC_R_NOMEMORY) {
 		(*callbacks->error)(callbacks, "$GENERATE: %s",
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 	} else {
 		(*callbacks->error)(callbacks, "$GENERATE: %s:%lu: %s", source,
-				    line, dns_result_totext(result));
+				    line, isc_result_totext(result));
 	}
 
 insist_cleanup:
@@ -1768,7 +1758,7 @@ load_text(dns_loadctx_t *lctx) {
 			dns_rdatatype_format(type, typebuf, sizeof(typebuf));
 			(*callbacks->error)(callbacks, "%s:%lu: %s '%s': %s",
 					    source, line, "type", typebuf,
-					    dns_result_totext(result));
+					    isc_result_totext(result));
 			if (MANYERRS(lctx, result)) {
 				SETRESULT(lctx, result);
 			} else {
@@ -1788,7 +1778,7 @@ load_text(dns_loadctx_t *lctx) {
 			dns_rdatatype_format(type, typebuf, sizeof(typebuf));
 			(*callbacks->error)(callbacks, "%s:%lu: %s '%s': %s",
 					    source, line, "type", typebuf,
-					    dns_result_totext(result));
+					    isc_result_totext(result));
 			if (MANYERRS(lctx, result)) {
 				SETRESULT(lctx, result);
 			} else {
@@ -1847,7 +1837,7 @@ load_text(dns_loadctx_t *lctx) {
 				const char *desc;
 				dns_name_format(name, namebuf, sizeof(namebuf));
 				result = DNS_R_BADOWNERNAME;
-				desc = dns_result_totext(result);
+				desc = isc_result_totext(result);
 				if (CHECKNAMESFAIL(lctx->options) ||
 				    type == dns_rdatatype_nsec3) {
 					(*callbacks->error)(
@@ -2271,9 +2261,7 @@ load_header(dns_loadctx_t *lctx) {
 
 	REQUIRE(DNS_LCTX_VALID(lctx));
 
-	if (lctx->format != dns_masterformat_raw &&
-	    lctx->format != dns_masterformat_map)
-	{
+	if (lctx->format != dns_masterformat_raw) {
 		return (ISC_R_NOTIMPLEMENTED);
 	}
 
@@ -2296,10 +2284,7 @@ load_header(dns_loadctx_t *lctx) {
 	if (header.format != lctx->format) {
 		(*callbacks->error)(callbacks,
 				    "dns_master_load: "
-				    "file format mismatch (not %s)",
-				    lctx->format == dns_masterformat_map ? "map"
-									 : "ra"
-									   "w");
+				    "file format mismatch (not raw)");
 		return (ISC_R_NOTIMPLEMENTED);
 	}
 
@@ -2339,46 +2324,6 @@ load_header(dns_loadctx_t *lctx) {
 	lctx->header = header;
 
 	return (ISC_R_SUCCESS);
-}
-
-static isc_result_t
-openfile_map(dns_loadctx_t *lctx, const char *master_file) {
-	isc_result_t result;
-
-	result = isc_stdio_open(master_file, "rb", &lctx->f);
-	if (result != ISC_R_SUCCESS && result != ISC_R_FILENOTFOUND) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_stdio_open() failed: %s",
-				 isc_result_totext(result));
-	}
-
-	return (result);
-}
-
-/*
- * Load a map format file, using mmap() to access RBT trees directly
- */
-static isc_result_t
-load_map(dns_loadctx_t *lctx) {
-	isc_result_t result = ISC_R_SUCCESS;
-	dns_rdatacallbacks_t *callbacks;
-
-	REQUIRE(DNS_LCTX_VALID(lctx));
-
-	callbacks = lctx->callbacks;
-
-	if (lctx->first) {
-		result = load_header(lctx);
-		if (result != ISC_R_SUCCESS) {
-			return (result);
-		}
-
-		result = (*callbacks->deserialize)(
-			callbacks->deserialize_private, lctx->f,
-			sizeof(dns_masterrawheader_t));
-	}
-
-	return (result);
 }
 
 static isc_result_t
@@ -2689,7 +2634,7 @@ cleanup:
 	}
 	if (result != ISC_R_SUCCESS && result != DNS_R_CONTINUE) {
 		(*callbacks->error)(callbacks, "dns_master_load: %s",
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 	}
 
 	return (result);
@@ -3139,17 +3084,17 @@ commit(dns_rdatacallbacks_t *callbacks, dns_loadctx_t *lctx,
 					    &dataset));
 		if (result == ISC_R_NOMEMORY) {
 			(*error)(callbacks, "dns_master_load: %s",
-				 dns_result_totext(result));
+				 isc_result_totext(result));
 		} else if (result != ISC_R_SUCCESS) {
 			dns_name_format(owner, namebuf, sizeof(namebuf));
 			if (source != NULL) {
 				(*error)(callbacks, "%s: %s:%lu: %s: %s",
 					 "dns_master_load", source, line,
-					 namebuf, dns_result_totext(result));
+					 namebuf, isc_result_totext(result));
 			} else {
 				(*error)(callbacks, "%s: %s: %s",
 					 "dns_master_load", namebuf,
-					 dns_result_totext(result));
+					 isc_result_totext(result));
 			}
 		}
 		if (MANYERRS(lctx, result)) {

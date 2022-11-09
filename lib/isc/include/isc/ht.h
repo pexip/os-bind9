@@ -13,8 +13,7 @@
 
 /* ! \file */
 
-#ifndef ISC_HT_H
-#define ISC_HT_H 1
+#pragma once
 
 #include <inttypes.h>
 #include <string.h>
@@ -180,4 +179,3 @@ isc_ht_iter_currentkey(isc_ht_iter_t *it, unsigned char **key, size_t *keysize);
  */
 unsigned int
 isc_ht_count(isc_ht_t *ht);
-#endif /* ifndef ISC_HT_H */

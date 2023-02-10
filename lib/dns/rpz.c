@@ -213,7 +213,7 @@ dns_rpz_type2str(dns_rpz_type_t type) {
 	case DNS_RPZ_TYPE_BAD:
 		break;
 	}
-	FATAL_ERROR(__FILE__, __LINE__, "impossible rpz type %d", type);
+	FATAL_ERROR("impossible rpz type %d", type);
 	return ("impossible");
 }
 
@@ -907,9 +907,11 @@ name2ipkey(int log_level, const dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num,
 		 */
 		*tgt_prefix = (dns_rpz_prefix_t)prefix_num;
 		for (i = 0; ip_labels > 0 && i < DNS_RPZ_CIDR_WORDS * 2;
-		     ip_labels--) {
+		     ip_labels--)
+		{
 			if (cp[0] == 'z' && cp[1] == 'z' &&
-			    (cp[2] == '.' || cp[2] == '\0') && i <= 6) {
+			    (cp[2] == '.' || cp[2] == '\0') && i <= 6)
+			{
 				do {
 					if ((i & 1) == 0) {
 						tgt_ip->w[3 - i / 2] = 0;
@@ -920,7 +922,8 @@ name2ipkey(int log_level, const dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num,
 			} else {
 				l = strtoul(cp, &cp2, 16);
 				if (l > 0xffffu ||
-				    (*cp2 != '.' && *cp2 != '\0')) {
+				    (*cp2 != '.' && *cp2 != '\0'))
+				{
 					if (*cp2 == '.') {
 						*cp2 = '\0';
 					}
@@ -965,7 +968,8 @@ name2ipkey(int log_level, const dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num,
 	 * Complain about bad names but be generous and accept them.
 	 */
 	if (log_level < DNS_RPZ_DEBUG_QUIET &&
-	    isc_log_wouldlog(dns_lctx, log_level)) {
+	    isc_log_wouldlog(dns_lctx, log_level))
+	{
 		/*
 		 * Convert the address back to a canonical domain name
 		 * to ensure that the original name is in canonical form.
@@ -974,7 +978,8 @@ name2ipkey(int log_level, const dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num,
 		result = ip2name(tgt_ip, (dns_rpz_prefix_t)prefix_num, NULL,
 				 ip_name2);
 		if (result != ISC_R_SUCCESS ||
-		    !dns_name_equal(&ip_name, ip_name2)) {
+		    !dns_name_equal(&ip_name, ip_name2))
+		{
 			dns_name_format(ip_name2, ip2_str, sizeof(ip2_str));
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_RPZ,
 				      DNS_LOGMODULE_RBTDB, log_level,
@@ -1539,7 +1544,7 @@ dns_rpz_new_zone(dns_rpz_zones_t *rpzs, dns_rpz_zone_t **rpzp) {
 	 * simplifies update_from_db
 	 */
 
-	isc_ht_init(&zone->nodes, rpzs->mctx, 1);
+	isc_ht_init(&zone->nodes, rpzs->mctx, 1, ISC_HT_CASE_SENSITIVE);
 
 	dns_name_init(&zone->origin, NULL);
 	dns_name_init(&zone->client_ip, NULL);
@@ -1703,7 +1708,8 @@ setup_update(dns_rpz_zone_t *rpz) {
 	nodecount = dns_db_nodecount(rpz->updb, dns_dbtree_main);
 	hashsize = 1;
 	while (nodecount != 0 &&
-	       hashsize <= (DNS_RPZ_HTSIZE_MAX + DNS_RPZ_HTSIZE_DIV)) {
+	       hashsize <= (DNS_RPZ_HTSIZE_MAX + DNS_RPZ_HTSIZE_DIV))
+	{
 		hashsize++;
 		nodecount >>= 1;
 	}
@@ -1716,7 +1722,8 @@ setup_update(dns_rpz_zone_t *rpz) {
 		      ISC_LOG_DEBUG(1), "rpz: %s: using hashtable size %d",
 		      domain, hashsize);
 
-	isc_ht_init(&rpz->newnodes, rpz->rpzs->mctx, hashsize);
+	isc_ht_init(&rpz->newnodes, rpz->rpzs->mctx, hashsize,
+		    ISC_HT_CASE_SENSITIVE);
 
 	result = dns_db_createiterator(rpz->updb, DNS_DB_NONSEC3, &rpz->updbit);
 	if (result != ISC_R_SUCCESS) {
@@ -1951,7 +1958,7 @@ update_quantum(isc_task_t *task, isc_event_t *event) {
 		}
 
 		result = dns_db_allrdatasets(rpz->updb, node, rpz->updbversion,
-					     0, &rdsiter);
+					     0, 0, &rdsiter);
 		if (result != ISC_R_SUCCESS) {
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_GENERAL,
 				      DNS_LOGMODULE_MASTER, ISC_LOG_ERROR,
@@ -2224,7 +2231,7 @@ rpz_detach(dns_rpz_zone_t **rpzp) {
 
 		isc_timer_reset(rpz->updatetimer, isc_timertype_inactive, NULL,
 				NULL, true);
-		isc_timer_detach(&rpz->updatetimer);
+		isc_timer_destroy(&rpz->updatetimer);
 
 		isc_ht_destroy(&rpz->nodes);
 
@@ -2256,7 +2263,8 @@ dns_rpz_detach_rpzs(dns_rpz_zones_t **rpzsp) {
 		 * the last reference.
 		 */
 		for (dns_rpz_num_t rpz_num = 0; rpz_num < DNS_RPZ_MAX_ZONES;
-		     ++rpz_num) {
+		     ++rpz_num)
+		{
 			dns_rpz_zone_t *rpz = rpzs->zones[rpz_num];
 			rpzs->zones[rpz_num] = NULL;
 			if (rpz != NULL) {
@@ -2422,7 +2430,8 @@ del_cidr(dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num, dns_rpz_type_t rpz_type,
 			child = tgt->child[1];
 		}
 		if (tgt->set.client_ip != 0 || tgt->set.ip != 0 ||
-		    tgt->set.nsip != 0) {
+		    tgt->set.nsip != 0)
+		{
 			break;
 		}
 

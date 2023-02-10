@@ -210,7 +210,6 @@ struct ns_client {
 	dns_ecs_t ecs; /*%< EDNS client subnet sent by client */
 
 	struct in6_pktinfo pktinfo;
-	isc_dscp_t	   dscp;
 	/*%
 	 * Information about recent FORMERR response(s), for
 	 * FORMERR loop avoidance.  This is separate for each
@@ -348,10 +347,16 @@ ns_clientmgr_create(ns_server_t *sctx, isc_taskmgr_t *taskmgr,
  */
 
 void
-ns_clientmgr_destroy(ns_clientmgr_t **managerp);
+ns_clientmgr_shutdown(ns_clientmgr_t *manager);
 /*%<
- * Destroy a client manager and all ns_client_t objects
- * managed by it.
+ * Shutdown a client manager and all ns_client_t objects
+ * managed by it
+ */
+
+void
+ns_clientmgr_detach(ns_clientmgr_t **managerp);
+/*%<
+ * Detach from a client manager.
  */
 
 isc_sockaddr_t *

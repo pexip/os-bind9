@@ -120,7 +120,6 @@ struct dns_xfrin_ctx {
 	 * may differ due to IXFR->AXFR fallback.
 	 */
 	dns_rdatatype_t reqtype;
-	isc_dscp_t dscp;
 
 	isc_sockaddr_t primaryaddr;
 	isc_sockaddr_t sourceaddr;
@@ -200,9 +199,9 @@ static void
 xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 	     dns_name_t *zonename, dns_rdataclass_t rdclass,
 	     dns_rdatatype_t reqtype, const isc_sockaddr_t *primaryaddr,
-	     const isc_sockaddr_t *sourceaddr, isc_dscp_t dscp,
-	     dns_tsigkey_t *tsigkey, dns_transport_t *transport,
-	     isc_tlsctx_cache_t *tlsctx_cache, dns_xfrin_ctx_t **xfrp);
+	     const isc_sockaddr_t *sourceaddr, dns_tsigkey_t *tsigkey,
+	     dns_transport_t *transport, isc_tlsctx_cache_t *tlsctx_cache,
+	     dns_xfrin_ctx_t **xfrp);
 
 static isc_result_t
 axfr_init(dns_xfrin_ctx_t *xfr);
@@ -500,7 +499,8 @@ xfr_rr(dns_xfrin_ctx_t *xfr, dns_name_t *name, uint32_t ttl,
 	xfr->nrecs++;
 
 	if (rdata->type == dns_rdatatype_none ||
-	    dns_rdatatype_ismeta(rdata->type)) {
+	    dns_rdatatype_ismeta(rdata->type))
+	{
 		FAIL(DNS_R_FORMERR);
 	}
 
@@ -510,7 +510,8 @@ xfr_rr(dns_xfrin_ctx_t *xfr, dns_name_t *name, uint32_t ttl,
 	 * apex.
 	 */
 	if (rdata->type == dns_rdatatype_soa &&
-	    !dns_name_equal(&xfr->name, name)) {
+	    !dns_name_equal(&xfr->name, name))
+	{
 		char namebuf[DNS_NAME_FORMATSIZE];
 		dns_name_format(name, namebuf, sizeof(namebuf));
 		xfrin_log(xfr, ISC_LOG_DEBUG(3), "SOA name mismatch: '%s'",
@@ -644,7 +645,8 @@ redo:
 			}
 		}
 		if (rdata->type == dns_rdatatype_ns &&
-		    dns_name_iswildcard(name)) {
+		    dns_name_iswildcard(name))
+		{
 			FAIL(DNS_R_INVALIDNS);
 		}
 		CHECK(ixfr_putdata(xfr, DNS_DIFFOP_ADD, name, ttl, rdata));
@@ -692,10 +694,9 @@ failure:
 isc_result_t
 dns_xfrin_create(dns_zone_t *zone, dns_rdatatype_t xfrtype,
 		 const isc_sockaddr_t *primaryaddr,
-		 const isc_sockaddr_t *sourceaddr, isc_dscp_t dscp,
-		 dns_tsigkey_t *tsigkey, dns_transport_t *transport,
-		 isc_tlsctx_cache_t *tlsctx_cache, isc_mem_t *mctx,
-		 isc_nm_t *netmgr, dns_xfrindone_t done,
+		 const isc_sockaddr_t *sourceaddr, dns_tsigkey_t *tsigkey,
+		 dns_transport_t *transport, isc_tlsctx_cache_t *tlsctx_cache,
+		 isc_mem_t *mctx, isc_nm_t *netmgr, dns_xfrindone_t done,
 		 dns_xfrin_ctx_t **xfrp) {
 	dns_name_t *zonename = dns_zone_getorigin(zone);
 	dns_xfrin_ctx_t *xfr = NULL;
@@ -713,7 +714,7 @@ dns_xfrin_create(dns_zone_t *zone, dns_rdatatype_t xfrtype,
 	}
 
 	xfrin_create(mctx, zone, db, netmgr, zonename, dns_zone_getclass(zone),
-		     xfrtype, primaryaddr, sourceaddr, dscp, tsigkey, transport,
+		     xfrtype, primaryaddr, sourceaddr, tsigkey, transport,
 		     tlsctx_cache, &xfr);
 
 	if (db != NULL) {
@@ -830,7 +831,8 @@ static void
 xfrin_fail(dns_xfrin_ctx_t *xfr, isc_result_t result, const char *msg) {
 	/* Make sure only the first xfrin_fail() trumps */
 	if (atomic_compare_exchange_strong(&xfr->shuttingdown, &(bool){ false },
-					   true)) {
+					   true))
+	{
 		if (result != DNS_R_UPTODATE && result != DNS_R_TOOMANYRECORDS)
 		{
 			xfrin_log(xfr, ISC_LOG_ERROR, "%s: %s", msg,
@@ -860,9 +862,9 @@ static void
 xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 	     dns_name_t *zonename, dns_rdataclass_t rdclass,
 	     dns_rdatatype_t reqtype, const isc_sockaddr_t *primaryaddr,
-	     const isc_sockaddr_t *sourceaddr, isc_dscp_t dscp,
-	     dns_tsigkey_t *tsigkey, dns_transport_t *transport,
-	     isc_tlsctx_cache_t *tlsctx_cache, dns_xfrin_ctx_t **xfrp) {
+	     const isc_sockaddr_t *sourceaddr, dns_tsigkey_t *tsigkey,
+	     dns_transport_t *transport, isc_tlsctx_cache_t *tlsctx_cache,
+	     dns_xfrin_ctx_t **xfrp) {
 	dns_xfrin_ctx_t *xfr = NULL;
 
 	xfr = isc_mem_get(mctx, sizeof(*xfr));
@@ -870,7 +872,6 @@ xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 				  .shutdown_result = ISC_R_UNSET,
 				  .rdclass = rdclass,
 				  .reqtype = reqtype,
-				  .dscp = dscp,
 				  .id = (dns_messageid_t)isc_random16(),
 				  .maxrecords = dns_zone_getmaxrecords(zone),
 				  .primaryaddr = *primaryaddr,
@@ -1068,9 +1069,10 @@ get_create_tlsctx(const dns_xfrin_ctx_t *xfr, isc_tlsctx_t **pctx,
 
 		isc_tlsctx_enable_dot_client_alpn(tlsctx);
 
-		sess_cache = isc_tlsctx_client_session_cache_new(
+		isc_tlsctx_client_session_cache_create(
 			xfr->mctx, tlsctx,
-			ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE);
+			ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE,
+			&sess_cache);
 
 		found_store = NULL;
 		result = isc_tlsctx_cache_add(xfr->tlsctx_cache, tlsname,
@@ -1231,9 +1233,7 @@ xfrin_connect_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 
 	CHECK(result);
 
-	if (!isc_nm_xfr_allowed(handle)) {
-		goto failure;
-	}
+	CHECK(isc_nm_xfr_checkperm(handle));
 
 	zmgr = dns_zone_getmgr(xfr->zone);
 	if (zmgr != NULL) {
@@ -1251,7 +1251,6 @@ xfrin_connect_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	xfr->handle = handle;
 	sockaddr = isc_nmhandle_peeraddr(handle);
 	isc_sockaddr_format(&sockaddr, sourcetext, sizeof(sourcetext));
-	/* TODO	set DSCP */
 
 	if (xfr->tsigkey != NULL && xfr->tsigkey->key != NULL) {
 		dns_name_format(dst_key_name(xfr->tsigkey->key), signerbuf,
@@ -1518,17 +1517,20 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 		{
 			result = dns_result_fromrcode(msg->rcode);
 		} else if (result == ISC_R_SUCCESS &&
-			   msg->opcode != dns_opcode_query) {
+			   msg->opcode != dns_opcode_query)
+		{
 			result = DNS_R_UNEXPECTEDOPCODE;
 		} else if (result == ISC_R_SUCCESS &&
-			   msg->rdclass != xfr->rdclass) {
+			   msg->rdclass != xfr->rdclass)
+		{
 			result = DNS_R_BADCLASS;
 		} else if (result == ISC_R_SUCCESS || result == DNS_R_NOERROR) {
 			result = DNS_R_UNEXPECTEDID;
 		}
 
 		if (xfr->reqtype == dns_rdatatype_axfr ||
-		    xfr->reqtype == dns_rdatatype_soa) {
+		    xfr->reqtype == dns_rdatatype_soa)
+		{
 			goto failure;
 		}
 
@@ -1619,7 +1621,8 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 	}
 
 	if (xfr->reqtype == dns_rdatatype_soa &&
-	    (msg->flags & DNS_MESSAGEFLAG_AA) == 0) {
+	    (msg->flags & DNS_MESSAGEFLAG_AA) == 0)
+	{
 		FAIL(DNS_R_NOTAUTHORITATIVE);
 	}
 

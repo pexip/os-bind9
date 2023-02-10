@@ -1030,11 +1030,11 @@ numlen(uint32_t num) {
  */
 void
 cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
-	char buf[DURATION_MAXLEN];
+	char buf[CFG_DURATION_MAXLEN];
 	char *str;
 	const char *indicators = "YMWDHMS";
 	int count, i;
-	int durationlen[7];
+	int durationlen[7] = { 0 };
 	isccfg_duration_t duration;
 	/*
 	 * D ? The duration has a date part.
@@ -1066,10 +1066,8 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 			} else {
 				T = true;
 			}
-		} else {
-			durationlen[i] = 0;
+			count += durationlen[i];
 		}
-		count += durationlen[i];
 	}
 	/*
 	 * Special case for seconds which is not taken into account in the
@@ -1078,7 +1076,8 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	 * case this function will print "PT0S".
 	 */
 	if (duration.parts[6] > 0 ||
-	    (!D && !duration.parts[4] && !duration.parts[5])) {
+	    (!D && !duration.parts[4] && !duration.parts[5]))
+	{
 		durationlen[6] = 1 + numlen(duration.parts[6]);
 		T = true;
 		count += durationlen[6];
@@ -1087,7 +1086,7 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	if (T) {
 		count++;
 	}
-	INSIST(count < DURATION_MAXLEN);
+	INSIST(count < CFG_DURATION_MAXLEN);
 
 	/* Now print the duration. */
 	for (i = 0; i < 6; i++) {
@@ -1098,7 +1097,7 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 		if (duration.parts[i] > 0) {
 			snprintf(str, durationlen[i] + 2, "%u%c",
 				 (uint32_t)duration.parts[i], indicators[i]);
-			str += durationlen[i] + 1;
+			str += durationlen[i];
 		}
 		if (i == 3 && T) {
 			snprintf(str, 2, "T");
@@ -1107,7 +1106,8 @@ cfg_print_duration(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	}
 	/* Special case for seconds. */
 	if (duration.parts[6] > 0 ||
-	    (!D && !duration.parts[4] && !duration.parts[3])) {
+	    (!D && !duration.parts[4] && !duration.parts[5]))
+	{
 		snprintf(str, durationlen[6] + 2, "%u%c",
 			 (uint32_t)duration.parts[6], indicators[6]);
 	}
@@ -1627,7 +1627,8 @@ parse_geoip(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
 	if (pctx->token.type == isc_tokentype_string) {
 		CHECK(cfg_gettoken(pctx, 0));
 		if (strcasecmp(TOKEN_STRING(pctx), "db") == 0 &&
-		    obj->value.tuple[1] == NULL) {
+		    obj->value.tuple[1] == NULL)
+		{
 			CHECK(cfg_parse_obj(pctx, fields[1].type,
 					    &obj->value.tuple[1]));
 		} else {
@@ -2010,7 +2011,8 @@ print_list(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	const cfg_listelt_t *elt;
 
 	for (elt = ISC_LIST_HEAD(*list); elt != NULL;
-	     elt = ISC_LIST_NEXT(elt, link)) {
+	     elt = ISC_LIST_NEXT(elt, link))
+	{
 		if ((pctx->flags & CFG_PRINTER_ONELINE) != 0) {
 			cfg_print_obj(pctx, elt->obj);
 			cfg_print_cstr(pctx, "; ");
@@ -2109,7 +2111,8 @@ cfg_print_spacelist(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	list = &obj->value.list;
 
 	for (elt = ISC_LIST_HEAD(*list); elt != NULL;
-	     elt = ISC_LIST_NEXT(elt, link)) {
+	     elt = ISC_LIST_NEXT(elt, link))
+	{
 		cfg_print_obj(pctx, elt->obj);
 		if (ISC_LIST_NEXT(elt, link) != NULL) {
 			cfg_print_cstr(pctx, " ");
@@ -2251,9 +2254,11 @@ cfg_parse_mapbody(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
 		clause = NULL;
 		for (clauseset = clausesets; *clauseset != NULL; clauseset++) {
 			for (clause = *clauseset; clause->name != NULL;
-			     clause++) {
+			     clause++)
+			{
 				if (strcasecmp(TOKEN_STRING(pctx),
-					       clause->name) == 0) {
+					       clause->name) == 0)
+				{
 					goto done;
 				}
 			}
@@ -2501,7 +2506,8 @@ cfg_print_mapbody(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 	REQUIRE(obj != NULL);
 
 	for (clauseset = obj->value.map.clausesets; *clauseset != NULL;
-	     clauseset++) {
+	     clauseset++)
+	{
 		isc_symvalue_t symval;
 		const cfg_clausedef_t *clause;
 
@@ -2517,7 +2523,8 @@ cfg_print_mapbody(cfg_printer_t *pctx, const cfg_obj_t *obj) {
 					cfg_listelt_t *elt;
 					for (elt = ISC_LIST_HEAD(*list);
 					     elt != NULL;
-					     elt = ISC_LIST_NEXT(elt, link)) {
+					     elt = ISC_LIST_NEXT(elt, link))
+					{
 						print_symval(pctx, clause->name,
 							     elt->obj);
 					}
@@ -3012,29 +3019,6 @@ cfg_print_rawaddr(cfg_printer_t *pctx, const isc_netaddr_t *na) {
 			isc_buffer_usedlength(&buf));
 }
 
-isc_result_t
-cfg_parse_dscp(cfg_parser_t *pctx, isc_dscp_t *dscp) {
-	isc_result_t result;
-
-	REQUIRE(pctx != NULL);
-	REQUIRE(dscp != NULL);
-
-	CHECK(cfg_gettoken(pctx, ISC_LEXOPT_NUMBER | ISC_LEXOPT_CNUMBER));
-
-	if (pctx->token.type != isc_tokentype_number) {
-		cfg_parser_error(pctx, CFG_LOG_NEAR, "expected number");
-		return (ISC_R_UNEXPECTEDTOKEN);
-	}
-	if (pctx->token.value.as_ulong > 63U) {
-		cfg_parser_error(pctx, CFG_LOG_NEAR, "dscp out of range");
-		return (ISC_R_RANGE);
-	}
-	*dscp = (isc_dscp_t)(pctx->token.value.as_ulong);
-	return (ISC_R_SUCCESS);
-cleanup:
-	return (result);
-}
-
 /* netaddr */
 
 static unsigned int netaddr_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK;
@@ -3226,24 +3210,39 @@ parse_sockaddrsub(cfg_parser_t *pctx, const cfg_type_t *type, int flags,
 	isc_result_t result;
 	isc_netaddr_t netaddr;
 	in_port_t port = 0;
-	isc_dscp_t dscp = -1;
 	cfg_obj_t *obj = NULL;
 	int have_port = 0, have_dscp = 0;
+	cfg_obj_t *dscp = NULL;
 
 	CHECK(cfg_create_obj(pctx, type, &obj));
 	CHECK(cfg_parse_rawaddr(pctx, flags, &netaddr));
+	obj->value.sockaddrdscp.dscp = -1;
 	for (;;) {
 		CHECK(cfg_peektoken(pctx, 0));
 		if (pctx->token.type == isc_tokentype_string) {
 			if (strcasecmp(TOKEN_STRING(pctx), "port") == 0) {
+				if ((pctx->flags & CFG_PCTX_NODEPRECATED) ==
+					    0 &&
+				    (flags & CFG_ADDR_PORTOK) == 0)
+				{
+					cfg_parser_warning(
+						pctx, 0,
+						"token 'port' is deprecated");
+				}
 				CHECK(cfg_gettoken(pctx, 0)); /* read "port" */
 				CHECK(cfg_parse_rawport(pctx, flags, &port));
 				++have_port;
 			} else if ((flags & CFG_ADDR_DSCPOK) != 0 &&
 				   strcasecmp(TOKEN_STRING(pctx), "dscp") == 0)
 			{
+				cfg_parser_warning(pctx, 0,
+						   "'dscp' is obsolete and "
+						   "should be removed");
 				CHECK(cfg_gettoken(pctx, 0)); /* read "dscp" */
-				CHECK(cfg_parse_dscp(pctx, &dscp));
+				CHECK(cfg_parse_uint32(pctx, NULL, &dscp));
+				obj->value.sockaddrdscp.dscp =
+					cfg_obj_asuint32(dscp);
+				cfg_obj_destroy(pctx, &dscp);
 				++have_dscp;
 			} else {
 				break;
@@ -3264,7 +3263,6 @@ parse_sockaddrsub(cfg_parser_t *pctx, const cfg_type_t *type, int flags,
 		goto cleanup;
 	}
 	isc_sockaddr_fromnetaddr(&obj->value.sockaddr, &netaddr, port);
-	obj->value.sockaddrdscp.dscp = dscp;
 	*ret = obj;
 	return (ISC_R_SUCCESS);
 
@@ -3273,13 +3271,14 @@ cleanup:
 	return (result);
 }
 
-static unsigned int sockaddr_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK;
+static unsigned int sockaddr_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK |
+				     CFG_ADDR_PORTOK;
 cfg_type_t cfg_type_sockaddr = { "sockaddr",	     cfg_parse_sockaddr,
 				 cfg_print_sockaddr, cfg_doc_sockaddr,
 				 &cfg_rep_sockaddr,  &sockaddr_flags };
 
 static unsigned int sockaddrdscp_flags = CFG_ADDR_V4OK | CFG_ADDR_V6OK |
-					 CFG_ADDR_DSCPOK;
+					 CFG_ADDR_DSCPOK | CFG_ADDR_PORTOK;
 cfg_type_t cfg_type_sockaddrdscp = { "sockaddr",	 cfg_parse_sockaddr,
 				     cfg_print_sockaddr, cfg_doc_sockaddr,
 				     &cfg_rep_sockaddr,	 &sockaddrdscp_flags };
@@ -3352,13 +3351,12 @@ cfg_doc_sockaddr(cfg_printer_t *pctx, const cfg_type_t *type) {
 		POST(n);
 	}
 	cfg_print_cstr(pctx, " ) ");
-	if ((*flagp & CFG_ADDR_WILDOK) != 0) {
-		cfg_print_cstr(pctx, "[ port ( <integer> | * ) ]");
-	} else {
-		cfg_print_cstr(pctx, "[ port <integer> ]");
-	}
-	if ((*flagp & CFG_ADDR_DSCPOK) != 0) {
-		cfg_print_cstr(pctx, " [ dscp <integer> ]");
+	if ((*flagp & CFG_ADDR_PORTOK) != 0) {
+		if ((*flagp & CFG_ADDR_WILDOK) != 0) {
+			cfg_print_cstr(pctx, "[ port ( <integer> | * ) ]");
+		} else {
+			cfg_print_cstr(pctx, "[ port <integer> ]");
+		}
 	}
 }
 
@@ -3372,12 +3370,6 @@ const isc_sockaddr_t *
 cfg_obj_assockaddr(const cfg_obj_t *obj) {
 	REQUIRE(obj != NULL && obj->type->rep == &cfg_rep_sockaddr);
 	return (&obj->value.sockaddr);
-}
-
-isc_dscp_t
-cfg_obj_getdscp(const cfg_obj_t *obj) {
-	REQUIRE(obj != NULL && obj->type->rep == &cfg_rep_sockaddr);
-	return (obj->value.sockaddrdscp.dscp);
 }
 
 isc_result_t

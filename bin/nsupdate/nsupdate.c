@@ -860,7 +860,8 @@ setup_system(void) {
 		 */
 		ns_total = 0;
 		for (sa = ISC_LIST_HEAD(*nslist); sa != NULL;
-		     sa = ISC_LIST_NEXT(sa, link)) {
+		     sa = ISC_LIST_NEXT(sa, link))
+		{
 			switch (sa->type.sa.sa_family) {
 			case AF_INET:
 				if (have_ipv4) {
@@ -882,7 +883,8 @@ setup_system(void) {
 
 		i = 0;
 		for (sa = ISC_LIST_HEAD(*nslist); sa != NULL;
-		     sa = ISC_LIST_NEXT(sa, link)) {
+		     sa = ISC_LIST_NEXT(sa, link))
+		{
 			switch (sa->type.sa.sa_family) {
 			case AF_INET:
 				if (have_ipv4) {
@@ -1916,7 +1918,8 @@ parseclass:
 		dns_name_t *bad;
 
 		if (!dns_rdata_checkowner(name, rdata->rdclass, rdata->type,
-					  true)) {
+					  true))
+		{
 			char namebuf[DNS_NAME_FORMATSIZE];
 
 			dns_name_format(name, namebuf, sizeof(namebuf));
@@ -2182,7 +2185,8 @@ do_next_command(char *cmdline) {
 		return (evaluate_realm(cmdline));
 	}
 	if (strcasecmp(word, "check-names") == 0 ||
-	    strcasecmp(word, "checknames") == 0) {
+	    strcasecmp(word, "checknames") == 0)
+	{
 		return (evaluate_checknames(cmdline));
 	}
 	if (strcasecmp(word, "gsstsig") == 0) {
@@ -2500,7 +2504,7 @@ send_update(dns_name_t *zone, isc_sockaddr_t *primary) {
 		updatemsg->tsigname->attributes |= DNS_NAMEATTR_NOCOMPRESS;
 	}
 
-	result = dns_request_create(requestmgr, updatemsg, srcaddr, primary, -1,
+	result = dns_request_create(requestmgr, updatemsg, srcaddr, primary,
 				    options, tsigkey, timeout, udp_timeout,
 				    udp_retries, global_task, update_completed,
 				    NULL, &request);
@@ -2610,7 +2614,7 @@ recvsoa(isc_task_t *task, isc_event_t *event) {
 		}
 
 		result = dns_request_create(requestmgr, soaquery, srcaddr, addr,
-					    -1, 0, NULL, FIND_TIMEOUT * 20,
+					    0, NULL, FIND_TIMEOUT * 20,
 					    FIND_TIMEOUT, 3, global_task,
 					    recvsoa, reqinfo, &request);
 		check_result(result, "dns_request_create");
@@ -2640,7 +2644,8 @@ recvsoa(isc_task_t *task, isc_event_t *event) {
 	}
 
 	if (rcvmsg->rcode != dns_rcode_noerror &&
-	    rcvmsg->rcode != dns_rcode_nxdomain) {
+	    rcvmsg->rcode != dns_rcode_nxdomain)
+	{
 		fatal("response to SOA query was unsuccessful");
 	}
 
@@ -2652,8 +2657,8 @@ recvsoa(isc_task_t *task, isc_event_t *event) {
 		dns_request_destroy(&request);
 		dns_message_detach(&soaquery);
 		ddebug("Out of recvsoa");
-		done_update();
 		seenerror = true;
+		done_update();
 		return;
 	}
 
@@ -2760,7 +2765,14 @@ lookforsoa:
 		primary_total = get_addresses(serverstr, dnsport,
 					      primary_servers, primary_alloc);
 		if (primary_total == 0) {
-			exit(1);
+			seenerror = true;
+			dns_rdata_freestruct(&soa);
+			dns_message_detach(&soaquery);
+			dns_request_destroy(&request);
+			dns_message_detach(&rcvmsg);
+			ddebug("Out of recvsoa");
+			done_update();
+			return;
 		}
 		primary_inuse = 0;
 	} else {
@@ -2828,7 +2840,7 @@ sendrequest(isc_sockaddr_t *destaddr, dns_message_t *msg,
 		srcaddr = localaddr4;
 	}
 
-	result = dns_request_create(requestmgr, msg, srcaddr, destaddr, -1, 0,
+	result = dns_request_create(requestmgr, msg, srcaddr, destaddr, 0,
 				    default_servers ? NULL : tsigkey,
 				    FIND_TIMEOUT * 20, FIND_TIMEOUT, 3,
 				    global_task, recvsoa, reqinfo, request);
@@ -3030,10 +3042,9 @@ send_gssrequest(isc_sockaddr_t *destaddr, dns_message_t *msg,
 		srcaddr = localaddr4;
 	}
 
-	result = dns_request_create(requestmgr, msg, srcaddr, destaddr, -1,
-				    options, tsigkey, FIND_TIMEOUT * 20,
-				    FIND_TIMEOUT, 3, global_task, recvgss,
-				    reqinfo, request);
+	result = dns_request_create(requestmgr, msg, srcaddr, destaddr, options,
+				    tsigkey, FIND_TIMEOUT * 20, FIND_TIMEOUT, 3,
+				    global_task, recvgss, reqinfo, request);
 	check_result(result, "dns_request_create");
 	if (debugging) {
 		show_message(stdout, msg, "Outgoing update query:");
@@ -3131,7 +3142,8 @@ recvgss(isc_task_t *task, isc_event_t *event) {
 	}
 
 	if (rcvmsg->rcode != dns_rcode_noerror &&
-	    rcvmsg->rcode != dns_rcode_nxdomain) {
+	    rcvmsg->rcode != dns_rcode_nxdomain)
+	{
 		fatal("response to GSS-TSIG query was unsuccessful");
 	}
 

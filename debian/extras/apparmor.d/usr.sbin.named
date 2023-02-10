@@ -30,7 +30,8 @@ profile named /usr/sbin/named flags=(attach_disconnected) {
   /etc/bind/krb5.keytab kr,
 
   # ssl
-  /etc/ssl/openssl.cnf r,
+  /etc/ssl/*.cnf r,
+  /etc/ssl/*.conf r,
 
   # root hints from dns-data-root
   /usr/share/dns/root.* r,
@@ -43,6 +44,9 @@ profile named /usr/sbin/named flags=(attach_disconnected) {
 
   # Allow changing worker thread names
   owner @{PROC}/@{pid}/task/@{tid}/comm rw,
+
+  # named need to check if hugepages is available
+  /sys/kernel/mm/transparent_hugepage/enabled r,
 
   @{PROC}/net/if_inet6 r,
   @{PROC}/*/net/if_inet6 r,
@@ -88,6 +92,9 @@ profile named /usr/sbin/named flags=(attach_disconnected) {
   /etc/samba/smb.conf r,
   /dev/urandom rwmk,
   owner /var/tmp/krb5_* rwk,
+
+  # systemd sd_notify
+  /run/systemd/notify w,
 
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.sbin.named>

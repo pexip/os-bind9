@@ -36,6 +36,7 @@
 #include <isc/sockaddr.h>
 #include <isc/string.h>
 #include <isc/task.h>
+#include <isc/time.h>
 #include <isc/util.h>
 
 #include <dns/byaddr.h>
@@ -84,10 +85,6 @@
 #define UDPTIMEOUT 5
 #define MAXTRIES   0xffffffff
 
-#define NS_PER_US  1000	   /*%< Nanoseconds per microsecond. */
-#define US_PER_SEC 1000000 /*%< Microseconds per second. */
-#define US_PER_MS  1000	   /*%< Microseconds per millisecond. */
-
 static isc_mem_t *mctx = NULL;
 static dns_requestmgr_t *requestmgr = NULL;
 static const char *batchname = NULL;
@@ -119,7 +116,6 @@ static isc_sockaddr_t srcaddr;
 static char *server = NULL;
 static isc_sockaddr_t dstaddr;
 static in_port_t port = 53;
-static isc_dscp_t dscp = -1;
 static unsigned char cookie_secret[33];
 static int onfly = 0;
 static char hexcookie[81];
@@ -477,7 +473,8 @@ repopulate_buffer:
 						dns_rdataset_next(rdataset);
 					dns_rdata_reset(&rdata);
 					if (strlen("\n") >=
-					    isc_buffer_availablelength(buf)) {
+					    isc_buffer_availablelength(buf))
+					{
 						goto buftoosmall;
 					}
 					isc_buffer_putstr(buf, "\n");
@@ -757,7 +754,7 @@ sendquery(struct query *query, isc_task_t *task) {
 
 	request = NULL;
 	result = dns_request_create(
-		requestmgr, message, have_src ? &srcaddr : NULL, &dstaddr, dscp,
+		requestmgr, message, have_src ? &srcaddr : NULL, &dstaddr,
 		options, NULL, query->timeout, query->udptimeout,
 		query->udpretries, task, recvresponse, message, &request);
 	CHECK("dns_request_create", result);
@@ -816,9 +813,6 @@ help(void) {
 	       "                 -p port             (specify port number)\n"
 	       "                 -m                  (enable memory usage "
 	       "debugging)\n"
-	       "                 +[no]dscp[=###]     (Set the DSCP value to "
-	       "### "
-	       "[0..63])\n"
 	       "                 +[no]vc             (TCP mode)\n"
 	       "                 +[no]tcp            (TCP mode, alternate "
 	       "syntax)\n"
@@ -1323,18 +1317,10 @@ plus_option(char *option, struct query *query, bool global) {
 			query->dnssec = state;
 			break;
 		case 's': /* dscp */
+			/* obsolete */
 			FULLCHECK("dscp");
-			GLOBAL();
-			if (!state) {
-				dscp = -1;
-				break;
-			}
-			if (value == NULL) {
-				goto need_value;
-			}
-			result = parse_uint(&num, value, 0x3f, "DSCP");
-			CHECK("parse_uint(DSCP)", result);
-			dscp = num;
+			fprintf(stderr, ";; +dscp option is obsolete "
+					"and has no effect");
 			break;
 		default:
 			goto invalid_option;
@@ -1890,7 +1876,8 @@ preparse_args(int argc, char **argv) {
 		}
 		/* Look for dash value option. */
 		if (strpbrk(option, dash_opts) != &option[0] ||
-		    strlen(option) > 1U) {
+		    strlen(option) > 1U)
+		{
 			/* Error or value in option. */
 			continue;
 		}
@@ -1977,13 +1964,15 @@ parse_args(bool is_batchfile, int argc, char **argv) {
 
 			if (rc <= 1) {
 				if (dash_option(&rv[0][1], NULL, query, global,
-						&setname)) {
+						&setname))
+				{
 					rc--;
 					rv++;
 				}
 			} else {
 				if (dash_option(&rv[0][1], rv[1], query, global,
-						&setname)) {
+						&setname))
+				{
 					rc--;
 					rv++;
 				}

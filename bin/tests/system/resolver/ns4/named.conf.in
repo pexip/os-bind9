@@ -14,9 +14,9 @@
 // NS4
 
 options {
-	query-source address 10.53.0.4 dscp 4;
-	notify-source 10.53.0.4 dscp 5;
-	transfer-source 10.53.0.4 dscp 6;
+	query-source address 10.53.0.4;
+	notify-source 10.53.0.4;
+	transfer-source 10.53.0.4;
 	port @PORT@;
 	pid-file "named.pid";
 	listen-on { 10.53.0.4; };
@@ -55,6 +55,11 @@ zone "broken" {
 zone "sourcens" {
     type primary;
     file "sourcens.db";
+};
+
+zone "v4only.net" {
+	type primary;
+	file "v4only.net.db";
 };
 
 key rndc_key {

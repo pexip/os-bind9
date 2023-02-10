@@ -17,7 +17,7 @@ Release Notes
 Introduction
 ------------
 
-BIND 9.18 is a stable branch, suitable for production use. This
+BIND 9.18 (Extended Support Version) is a stable branch of BIND. This
 document summarizes significant changes since the last production
 release on that branch.
 
@@ -33,6 +33,12 @@ The latest versions of BIND 9 software can always be found at
 https://www.isc.org/download/. There you will find additional
 information about each release, and source code.
 
+.. include:: ../notes/notes-known-issues.rst
+
+.. include:: ../notes/notes-9.18.12.rst
+.. include:: ../notes/notes-9.18.11.rst
+.. include:: ../notes/notes-9.18.10.rst
+.. include:: ../notes/notes-9.18.9.rst
 .. include:: ../notes/notes-9.18.8.rst
 .. include:: ../notes/notes-9.18.7.rst
 .. include:: ../notes/notes-9.18.6.rst
@@ -57,11 +63,9 @@ https://www.isc.org/contact/.
 End of Life
 -----------
 
-BIND 9.18 is a stable branch, suitable for production use. After it has been
-in production use for a while it will be designated as an Extended Support
-Version (ESV). Until then, the current ESV is BIND 9.16, which will be
-supported until at least December 2023.  See https://kb.isc.org/docs/aa-00896
-for details of ISC's software support policy.
+BIND 9.18 (Extended Support Version) will be supported until at least
+December, 2025. See https://kb.isc.org/docs/aa-00896 for details of
+ISC's software support policy.
 
 Thank You
 ---------

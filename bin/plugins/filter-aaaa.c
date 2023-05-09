@@ -350,7 +350,7 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 				       cfg_line, mctx, lctx, actx));
 	}
 
-	isc_ht_init(&inst->ht, mctx, 16);
+	isc_ht_init(&inst->ht, mctx, 16, ISC_HT_CASE_SENSITIVE);
 	isc_mutex_init(&inst->hlock);
 
 	/*
@@ -622,7 +622,8 @@ process_section(const section_filter_t *filter) {
 		}
 
 		if (section == DNS_SECTION_ANSWER ||
-		    section == DNS_SECTION_AUTHORITY) {
+		    section == DNS_SECTION_AUTHORITY)
+		{
 			message->flags &= ~DNS_MESSAGEFLAG_AD;
 		}
 	}

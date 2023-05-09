@@ -744,7 +744,8 @@ isc__nm_tlsdns_stoplistening(isc_nmsocket_t *sock) {
 	REQUIRE(sock->type == isc_nm_tlsdnslistener);
 
 	if (!atomic_compare_exchange_strong(&sock->closing, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		UNREACHABLE();
 	}
 
@@ -863,6 +864,12 @@ isc__nm_tlsdns_failed_read_cb(isc_nmsocket_t *sock, isc_result_t result,
 		sock->tls.pending_req = NULL;
 
 		if (peer_verification_has_failed(sock)) {
+			/*
+			 * Save error message as 'sock->tls' will get detached.
+			 */
+			sock->tls.tls_verify_errmsg =
+				isc_tls_verify_peer_result_string(
+					sock->tls.tls);
 			failure_result = ISC_R_TLSBADPEERCERT;
 		}
 		isc__nm_failed_connect_cb(sock, req, failure_result, async);
@@ -1135,7 +1142,8 @@ tls_cycle_input(isc_nmsocket_t *sock) {
 	switch (err) {
 	case SSL_ERROR_WANT_READ:
 		if (sock->tls.state == TLS_STATE_NONE &&
-		    !SSL_is_init_finished(sock->tls.tls)) {
+		    !SSL_is_init_finished(sock->tls.tls))
+		{
 			sock->tls.state = TLS_STATE_HANDSHAKE;
 			result = isc__nm_process_sock_buffer(sock);
 			if (result != ISC_R_SUCCESS) {
@@ -1296,7 +1304,8 @@ tls_cycle_output(isc_nmsocket_t *sock) {
 		int r;
 
 		if (sock->tls.senddata.base != NULL ||
-		    sock->tls.senddata.length > 0) {
+		    sock->tls.senddata.length > 0)
+		{
 			break;
 		}
 
@@ -1384,6 +1393,27 @@ tls_pop_error(isc_nmsocket_t *sock) {
 static isc_result_t
 tls_cycle(isc_nmsocket_t *sock) {
 	isc_result_t result;
+
+	/*
+	 * Clear the TLS error queue so that SSL_get_error() and SSL I/O
+	 * routine calls will not get affected by prior error statuses.
+	 *
+	 * See here:
+	 * https://www.openssl.org/docs/man3.0/man3/SSL_get_error.html
+	 *
+	 * In particular, it mentions the following:
+	 *
+	 * The current thread's error queue must be empty before the
+	 * TLS/SSL I/O operation is attempted, or SSL_get_error() will not
+	 * work reliably.
+	 *
+	 * As we use the result of SSL_get_error() to decide on I/O
+	 * operations, we need to ensure that it works reliably by
+	 * cleaning the error queue.
+	 *
+	 * The sum of details: https://stackoverflow.com/a/37980911
+	 */
+	ERR_clear_error();
 
 	if (isc__nmsocket_closing(sock)) {
 		return (ISC_R_CANCELED);
@@ -1855,7 +1885,8 @@ tlsdns_stop_cb(uv_handle_t *handle) {
 	uv_handle_set_data(handle, NULL);
 
 	if (!atomic_compare_exchange_strong(&sock->closed, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		UNREACHABLE();
 	}
 
@@ -1880,7 +1911,8 @@ tlsdns_close_sock(isc_nmsocket_t *sock) {
 	REQUIRE(atomic_load(&sock->closing));
 
 	if (!atomic_compare_exchange_strong(&sock->closed, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		UNREACHABLE();
 	}
 
@@ -1942,7 +1974,8 @@ stop_tlsdns_child(isc_nmsocket_t *sock) {
 	REQUIRE(sock->tid == isc_nm_tid());
 
 	if (!atomic_compare_exchange_strong(&sock->closing, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		return;
 	}
 
@@ -2017,7 +2050,8 @@ isc__nm_tlsdns_close(isc_nmsocket_t *sock) {
 	REQUIRE(!isc__nmsocket_active(sock));
 
 	if (!atomic_compare_exchange_strong(&sock->closing, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		return;
 	}
 
@@ -2100,6 +2134,13 @@ isc__nm_tlsdns_shutdown(isc_nmsocket_t *sock) {
 			sock->tls.pending_req = NULL;
 
 			if (peer_verification_has_failed(sock)) {
+				/*
+				 * Save error message as 'sock->tls' will get
+				 * detached.
+				 */
+				sock->tls.tls_verify_errmsg =
+					isc_tls_verify_peer_result_string(
+						sock->tls.tls);
 				result = ISC_R_TLSBADPEERCERT;
 			}
 			isc__nm_failed_connect_cb(sock, req, result, false);
@@ -2175,12 +2216,16 @@ isc__nm_async_tlsdnscancel(isc__networker_t *worker, isc__netievent_t *ev0) {
  * The ones requiring strict compatibility with the specification
  * could disable TLSv1.2 in the configuration file.
  */
-bool
-isc__nm_tlsdns_xfr_allowed(isc_nmsocket_t *sock) {
+isc_result_t
+isc__nm_tlsdns_xfr_checkperm(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 	REQUIRE(sock->type == isc_nm_tlsdnssocket);
 
-	return (sock->tls.alpn_negotiated);
+	if (!sock->tls.alpn_negotiated) {
+		return (ISC_R_DOTALPNERROR);
+	}
+
+	return (ISC_R_SUCCESS);
 }
 
 const char *
@@ -2193,7 +2238,7 @@ isc__nm_tlsdns_verify_tls_peer_result_string(const isc_nmhandle_t *handle) {
 
 	sock = handle->sock;
 	if (sock->tls.tls == NULL) {
-		return (NULL);
+		return (sock->tls.tls_verify_errmsg);
 	}
 
 	return (isc_tls_verify_peer_result_string(sock->tls.tls));
@@ -2211,7 +2256,8 @@ isc__nm_async_tlsdns_set_tlsctx(isc_nmsocket_t *listener, isc_tlsctx_t *tlsctx,
 void
 isc__nm_tlsdns_cleanup_data(isc_nmsocket_t *sock) {
 	if (sock->type == isc_nm_tlsdnslistener ||
-	    sock->type == isc_nm_tlsdnssocket) {
+	    sock->type == isc_nm_tlsdnssocket)
+	{
 		if (sock->tls.client_sess_cache != NULL) {
 			INSIST(atomic_load(&sock->client));
 			INSIST(sock->type == isc_nm_tlsdnssocket);

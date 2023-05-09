@@ -124,7 +124,8 @@ need_rescan(ns_interfacemgr_t *mgr, struct MSGHDR *rtm, size_t len) {
 			 * state changes.
 			 */
 			if (rth->rta_type == IFA_ADDRESS &&
-			    ifa->ifa_family == AF_INET6) {
+			    ifa->ifa_family == AF_INET6)
+			{
 				bool existed = false;
 				bool was_listening = false;
 				isc_netaddr_t addr = { 0 };
@@ -180,7 +181,8 @@ need_rescan(ns_interfacemgr_t *mgr, struct MSGHDR *rtm, size_t len) {
 					return (true);
 				}
 			} else if (rth->rta_type == IFA_ADDRESS &&
-				   ifa->ifa_family == AF_INET) {
+				   ifa->ifa_family == AF_INET)
+			{
 				/*
 				 * It seems that the IPv4 P2P link state
 				 * has changed.
@@ -384,7 +386,7 @@ ns_interfacemgr_destroy(ns_interfacemgr_t *mgr) {
 	clearlistenon(mgr);
 	isc_mutex_destroy(&mgr->lock);
 	for (size_t i = 0; i < (size_t)mgr->ncpus; i++) {
-		ns_clientmgr_destroy(&mgr->clientmgrs[i]);
+		ns_clientmgr_detach(&mgr->clientmgrs[i]);
 	}
 	isc_mem_put(mgr->mctx, mgr->clientmgrs,
 		    mgr->ncpus * sizeof(mgr->clientmgrs[0]));
@@ -453,6 +455,10 @@ ns_interfacemgr_shutdown(ns_interfacemgr_t *mgr) {
 	if (mgr->route != NULL) {
 		isc_nm_cancelread(mgr->route);
 	}
+
+	for (size_t i = 0; i < (size_t)mgr->ncpus; i++) {
+		ns_clientmgr_shutdown(mgr->clientmgrs[i]);
+	}
 }
 
 static void
@@ -463,9 +469,7 @@ interface_create(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr, const char *name,
 	REQUIRE(NS_INTERFACEMGR_VALID(mgr));
 
 	ifp = isc_mem_get(mgr->mctx, sizeof(*ifp));
-	*ifp = (ns_interface_t){ .generation = mgr->generation,
-				 .addr = *addr,
-				 .dscp = -1 };
+	*ifp = (ns_interface_t){ .generation = mgr->generation, .addr = *addr };
 
 	strlcpy(ifp->name, name, sizeof(ifp->name));
 
@@ -523,13 +527,6 @@ ns_interface_listentcp(ns_interface_t *ifp) {
 			      isc_result_totext(result));
 	}
 
-#if 0
-	if (ifp->dscp != -1) {
-		isc_socket_dscp(ifp->tcpsocket,ifp->dscp);
-	}
-
-	(void)isc_socket_filter(ifp->tcpsocket,"dataready");
-#endif /* if 0 */
 	return (result);
 }
 
@@ -677,7 +674,6 @@ interface_setup(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr, const char *name,
 		REQUIRE(!LISTENING(ifp));
 	}
 
-	ifp->dscp = elt->dscp;
 	ifp->flags |= NS_INTERFACEFLAG_LISTENING;
 
 	if (elt->is_http) {
@@ -713,7 +709,8 @@ interface_setup(ns_interfacemgr_t *mgr, isc_sockaddr_t *addr, const char *name,
 		result = ns_interface_listentcp(ifp);
 		if (result != ISC_R_SUCCESS) {
 			if ((result == ISC_R_ADDRINUSE) &&
-			    (addr_in_use != NULL)) {
+			    (addr_in_use != NULL))
+			{
 				*addr_in_use = true;
 			}
 
@@ -1086,17 +1083,6 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 			ifp = find_matching_interface(mgr, &listen_addr);
 			if (ifp != NULL) {
 				ifp->generation = mgr->generation;
-				if (le->dscp != -1 && ifp->dscp == -1) {
-					ifp->dscp = le->dscp;
-				} else if (le->dscp != ifp->dscp) {
-					isc_sockaddr_format(&listen_addr, sabuf,
-							    sizeof(sabuf));
-					isc_log_write(IFMGR_COMMON_LOGARGS,
-						      ISC_LOG_WARNING,
-						      "%s: conflicting DSCP "
-						      "values, using %d",
-						      sabuf, ifp->dscp);
-				}
 				if (LISTENING(ifp)) {
 					if (config) {
 						update_listener_configuration(
@@ -1176,11 +1162,13 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 		 * a temporary media glitch at rescan time.
 		 */
 		if (family == AF_INET &&
-		    isc_netaddr_equal(&interface.address, &zero_address)) {
+		    isc_netaddr_equal(&interface.address, &zero_address))
+		{
 			continue;
 		}
 		if (family == AF_INET6 &&
-		    isc_netaddr_equal(&interface.address, &zero_address6)) {
+		    isc_netaddr_equal(&interface.address, &zero_address6))
+		{
 			continue;
 		}
 
@@ -1203,7 +1191,8 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 		ll = (family == AF_INET) ? mgr->listenon4 : mgr->listenon6;
 		dolistenon = true;
 		for (le = ISC_LIST_HEAD(ll->elts); le != NULL;
-		     le = ISC_LIST_NEXT(le, link)) {
+		     le = ISC_LIST_NEXT(le, link))
+		{
 			int match;
 			bool addr_in_use = false;
 			bool ipv6_wildcard = false;
@@ -1237,25 +1226,14 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 			 * special considerations later, so remember it.
 			 */
 			if (family == AF_INET6 && ipv6only && ipv6pktinfo &&
-			    listenon_is_ip6_any(le)) {
+			    listenon_is_ip6_any(le))
+			{
 				ipv6_wildcard = true;
 			}
 
 			ifp = find_matching_interface(mgr, &listen_sockaddr);
 			if (ifp != NULL) {
 				ifp->generation = mgr->generation;
-				if (le->dscp != -1 && ifp->dscp == -1) {
-					ifp->dscp = le->dscp;
-				} else if (le->dscp != ifp->dscp) {
-					isc_sockaddr_format(&listen_sockaddr,
-							    sabuf,
-							    sizeof(sabuf));
-					isc_log_write(IFMGR_COMMON_LOGARGS,
-						      ISC_LOG_WARNING,
-						      "%s: conflicting DSCP "
-						      "values, using %d",
-						      sabuf, ifp->dscp);
-				}
 				if (LISTENING(ifp)) {
 					if (config) {
 						update_listener_configuration(
@@ -1270,7 +1248,8 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 			}
 
 			if (log_explicit && family == AF_INET6 &&
-			    listenon_is_ip6_any(le)) {
+			    listenon_is_ip6_any(le))
+			{
 				isc_log_write(IFMGR_COMMON_LOGARGS,
 					      verbose ? ISC_LOG_INFO
 						      : ISC_LOG_DEBUG(1),
@@ -1317,8 +1296,7 @@ do_scan(ns_interfacemgr_t *mgr, bool verbose, bool config) {
 		continue;
 	}
 	if (result != ISC_R_NOMORE) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "interface iteration failed: %s",
+		UNEXPECTED_ERROR("interface iteration failed: %s",
 				 isc_result_totext(result));
 	} else {
 		result = ((tried_listening && all_addresses_in_use)

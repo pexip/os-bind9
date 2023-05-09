@@ -326,7 +326,8 @@ setup_test(void **state __attribute__((unused))) {
 	noanswer = false;
 
 	if (isc_tlsctx_createserver(NULL, NULL, &tcp_listen_tlsctx) !=
-	    ISC_R_SUCCESS) {
+	    ISC_R_SUCCESS)
+	{
 		return (-1);
 	}
 	if (isc_tlsctx_createclient(&tcp_connect_tlsctx) != ISC_R_SUCCESS) {
@@ -335,9 +336,10 @@ setup_test(void **state __attribute__((unused))) {
 
 	isc_tlsctx_enable_dot_client_alpn(tcp_connect_tlsctx);
 
-	tcp_tlsctx_client_sess_cache = isc_tlsctx_client_session_cache_new(
+	isc_tlsctx_client_session_cache_create(
 		mctx, tcp_connect_tlsctx,
-		ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE);
+		ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE,
+		&tcp_tlsctx_client_sess_cache);
 
 	return (0);
 }
@@ -2642,7 +2644,7 @@ tlsdns_connect_connect_noalpn(isc_nmhandle_t *handle, isc_result_t eresult,
 	isc_refcount_decrement(&active_cconnects);
 
 	if (eresult != ISC_R_SUCCESS || connect_readcb == NULL ||
-	    !isc_nm_xfr_allowed(handle))
+	    isc_nm_xfr_checkperm(handle) != ISC_R_SUCCESS)
 	{
 		return;
 	}
@@ -2713,7 +2715,7 @@ tls_accept_cb_noalpn(isc_nmhandle_t *handle, isc_result_t eresult,
 
 	atomic_fetch_add(&saccepts, 1);
 
-	if (!isc_nm_xfr_allowed(handle)) {
+	if (isc_nm_xfr_checkperm(handle) != ISC_R_SUCCESS) {
 		return (ISC_R_FAILURE);
 	}
 

@@ -179,7 +179,7 @@ struct cfg_obj {
 		isc_sockaddr_t	 sockaddr;
 		struct {
 			isc_sockaddr_t sockaddr;
-			isc_dscp_t     dscp;
+			int32_t	       dscp;
 		} sockaddrdscp;
 		cfg_netprefix_t	  netprefix;
 		isccfg_duration_t duration;
@@ -270,6 +270,7 @@ struct cfg_parser {
 #define CFG_ADDR_V6OK	    0x00000004
 #define CFG_ADDR_WILDOK	    0x00000008
 #define CFG_ADDR_DSCPOK	    0x00000010
+#define CFG_ADDR_PORTOK	    0x00000020
 #define CFG_ADDR_MASK	    (CFG_ADDR_V6OK | CFG_ADDR_V4OK)
 /*@}*/
 
@@ -373,9 +374,6 @@ cfg_lookingat_netaddr(cfg_parser_t *pctx, unsigned int flags);
 
 isc_result_t
 cfg_parse_rawport(cfg_parser_t *pctx, unsigned int flags, in_port_t *port);
-
-isc_result_t
-cfg_parse_dscp(cfg_parser_t *pctx, isc_dscp_t *dscp);
 
 isc_result_t
 cfg_parse_sockaddr(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret);

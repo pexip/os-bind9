@@ -349,9 +349,8 @@ abbreviation is unambiguous; for example, :option:`+cd` is equivalent to
 
 .. option:: +dscp=value
 
-   This option sets the DSCP code point to be used when sending the query. Valid DSCP
-   code points are in the range [0...63]. By default no code point is
-   explicitly set.
+   This option formerly set the DSCP value used when sending a query.
+   It is now obsolete, and has no effect.
 
 .. option:: +edns[=#], +noedns
 
@@ -627,10 +626,11 @@ abbreviation is unambiguous; for example, :option:`+cd` is equivalent to
 
 .. option:: +tcp, +notcp
 
-   This option indicates whether to use TCP when querying name servers.
-   The default behavior is to use UDP unless a type ``any`` or ``ixfr=N``
-   query is requested, in which case the default is TCP. AXFR queries
-   always use TCP.
+   This option indicates whether to use TCP when querying name
+   servers.  The default behavior is to use UDP unless a type ``any``
+   or ``ixfr=N`` query is requested, in which case the default is
+   TCP. AXFR queries always use TCP. To prevent retry over TCP when
+   TC=1 is returned from a UDP query, use ``+ignore``.
 
 .. option:: +timeout=T
 
@@ -756,7 +756,7 @@ shows how :program:`dig` can be used from the command line to make three
 lookups: an ANY query for ``www.isc.org``, a reverse lookup of 127.0.0.1,
 and a query for the NS records of ``isc.org``. A global query option of
 :option:`+qr` is applied, so that :program:`dig` shows the initial query it made for
-each lookup. The final query has a local query option of :option:`+qr` which
+each lookup. The final query has a local query option of :option:`+noqr` which
 means that :program:`dig` does not print the initial query when it looks up the
 NS records for ``isc.org``.
 

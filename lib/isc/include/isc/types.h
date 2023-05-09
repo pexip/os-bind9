@@ -41,13 +41,12 @@ typedef struct isc_constregion	   isc_constregion_t;	  /*%< Const region */
 typedef struct isc_consttextregion isc_consttextregion_t; /*%< Const Text Region
 							   */
 typedef struct isc_counter isc_counter_t;		  /*%< Counter */
-typedef int16_t		   isc_dscp_t;	       /*%< Diffserv code point */
-typedef struct isc_event   isc_event_t;	       /*%< Event */
-typedef ISC_LIST(isc_event_t) isc_eventlist_t; /*%< Event List */
-typedef unsigned int	 isc_eventtype_t;      /*%< Event Type */
-typedef uint32_t	 isc_fsaccess_t;       /*%< FS Access */
-typedef struct isc_hash	 isc_hash_t;	       /*%< Hash */
-typedef struct isc_httpd isc_httpd_t;	       /*%< HTTP client */
+typedef struct isc_event   isc_event_t;			  /*%< Event */
+typedef ISC_LIST(isc_event_t) isc_eventlist_t;		  /*%< Event List */
+typedef unsigned int	 isc_eventtype_t;		  /*%< Event Type */
+typedef uint32_t	 isc_fsaccess_t;		  /*%< FS Access */
+typedef struct isc_hash	 isc_hash_t;			  /*%< Hash */
+typedef struct isc_httpd isc_httpd_t;			  /*%< HTTP client */
 typedef void(isc_httpdfree_t)(isc_buffer_t *, void *); /*%< HTTP free function
 							*/
 typedef struct isc_httpdmgr isc_httpdmgr_t;	       /*%< HTTP manager */
@@ -94,14 +93,6 @@ typedef struct isc_nm_http_endpoints isc_nm_http_endpoints_t;
 #endif /* HAVE_LIBNGHTTP2 */
 
 typedef void (*isc_taskaction_t)(isc_task_t *, isc_event_t *);
-
-/* The following cannot be listed alphabetically due to forward reference */
-typedef isc_result_t(isc_httpdaction_t)(
-	const char *url, isc_httpdurl_t *urlinfo, const char *querystring,
-	const char *headers, void *arg, unsigned int *retcode,
-	const char **retmsg, const char **mimetype, isc_buffer_t *body,
-	isc_httpdfree_t **freecb, void **freecb_args);
-typedef bool(isc_httpdclientok_t)(const isc_sockaddr_t *, void *);
 
 /*% Resource */
 typedef enum {

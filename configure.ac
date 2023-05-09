@@ -16,9 +16,9 @@
 #
 m4_define([bind_VERSION_MAJOR], 9)dnl
 m4_define([bind_VERSION_MINOR], 18)dnl
-m4_define([bind_VERSION_PATCH], 8)dnl
+m4_define([bind_VERSION_PATCH], 12)dnl
 m4_define([bind_VERSION_EXTRA], )dnl
-m4_define([bind_DESCRIPTION], [(Stable Release)])dnl
+m4_define([bind_DESCRIPTION], [(Extended Support Version)])dnl
 m4_define([bind_SRCID], [m4_esyscmd_s([git rev-parse --short HEAD | cut -b1-7])])dnl
 m4_define([bind_PKG_VERSION], [[bind_VERSION_MAJOR.bind_VERSION_MINOR.bind_VERSION_PATCH]bind_VERSION_EXTRA])dnl
 
@@ -498,7 +498,7 @@ LIBS="$PTHREAD_LIBS $LIBS"
 CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 CC="$PTHREAD_CC"
 
-AC_CHECK_FUNCS([pthread_attr_getstacksize pthread_attr_setstacksize])
+AC_CHECK_FUNCS([pthread_attr_getstacksize pthread_attr_setstacksize pthread_barrier_init])
 
 # [pairwise: --with-locktype=adaptive, --with-locktype=standard]
 AC_ARG_WITH([locktype],
@@ -564,7 +564,7 @@ AX_RESTORE_FLAGS([libuv])
 
 # [pairwise: --enable-doh --with-libnghttp2=auto, --enable-doh --with-libnghttp2=yes, --disable-doh]
 AC_ARG_ENABLE([doh],
-	      [AS_HELP_STRING([--disable-doh], [enable DNS over HTTPS, requires libnghttp2 (default=yes)])],
+	      [AS_HELP_STRING([--disable-doh], [disable DNS over HTTPS, removes dependency on libnghttp2 (default is --enable-doh)])],
 	      [], [enable_doh=yes])
 
 # [pairwise: skip]
@@ -583,7 +583,7 @@ AS_IF([test "$enable_doh" = "yes"],
 	       [AC_MSG_ERROR([Specifying libnghttp2 installation path is not supported, adjust PKG_CONFIG_PATH instead])])])
 
 AM_CONDITIONAL([HAVE_LIBNGHTTP2], [test -n "$LIBNGHTTP2_LIBS"])
-					  
+
 
 #
 # flockfile is usually provided by pthreads
@@ -1335,7 +1335,7 @@ AC_SUBST([CMOCKA_LIBS])
 AM_CONDITIONAL([HAVE_CMOCKA], [test "$with_cmocka" = "yes"])
 
 #
-# Compile with jemalloc (either provided as package or wired in the system on FreeBSD and NetBSD)
+# Compile with jemalloc (either provided as package or wired in the system on FreeBSD)
 #
 # [pairwise: --with-jemalloc=detect, --with-jemalloc=yes, --without-jemalloc]
 AC_ARG_WITH([jemalloc],
@@ -1355,8 +1355,7 @@ AS_CASE([$with_jemalloc],
 
 AS_IF([test "$with_jemalloc" = "no"],
       [AS_CASE([$host],
-	       [*-freebsd*],[AC_MSG_ERROR([You cannot compile without jemalloc; jemalloc is the system allocator on FreeBSD])],
-	       [*-netbsd*],[AC_MSG_ERROR([You cannot compile without jemalloc; jemalloc is the system allocator on NetBSD])])
+	       [*-freebsd*],[AC_MSG_ERROR([You cannot compile without jemalloc; jemalloc is the system allocator on FreeBSD])])
        AC_CHECK_FUNCS([malloc_size malloc_usable_size])])
 
 AM_CONDITIONAL([HAVE_JEMALLOC], [test "$with_jemalloc" = "yes"])
@@ -1464,10 +1463,7 @@ AC_COMPILE_IFELSE(
     AC_MSG_RESULT([no])
   ])
 
-# DNSRPS is not included in pairwise testing as the librpz library is not
-# present in the relevant Docker image.
-#
-# [pairwise: skip]
+# [pairwise: --enable-dnsrps --enable-dnsrps-dl, --disable-dnsrps]
 AC_ARG_ENABLE([dnsrps-dl],
 	      [AS_HELP_STRING([--enable-dnsrps-dl],
 			      [DNS Response Policy Service delayed link

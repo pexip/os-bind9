@@ -2165,7 +2165,7 @@ echo_i "waiting till 14s have passed since NTAs were added before restarting ns4
 $PERL -e 'my $delay = '"$start"' + 14 - time(); select(undef, undef, undef, $delay) if ($delay > 0);'
 
 if
-    start_server --noclean --restart --port "$PORT" dnssec ns4
+    start_server --noclean --restart --port "$PORT" ns4
 then
     echo_i "restarted server ns4"
 else
@@ -2231,7 +2231,7 @@ echo "secure.example. regular $future" > ns4/_default.nta
 start=$($PERL -e 'print time()."\n";')
 
 if
-    start_server --noclean --restart --port "$PORT" dnssec ns4
+    start_server --noclean --restart --port "$PORT" ns4
 then
     echo_i "restarted server ns4"
 else
@@ -2287,7 +2287,7 @@ echo "secure.example. forced $future" > ns4/_default.nta
 start=$($PERL -e 'print time()."\n";')
 
 if
-    start_server --noclean --restart --port "$PORT" dnssec ns4
+    start_server --noclean --restart --port "$PORT" ns4
 then
     echo_i "restarted server ns4"
 else
@@ -2335,7 +2335,7 @@ echo "secure.example. forced $future" > ns4/_default.nta
 added=$($PERL -e 'print time()."\n";')
 
 if
-    start_server --noclean --restart --port "$PORT" dnssec ns4
+    start_server --noclean --restart --port "$PORT" ns4
 then
     echo_i "restarted server ns4"
 else
@@ -2446,7 +2446,10 @@ status=$((status+ret))
 
 # Reconfigure caching server to use "dnssec-validation auto", and repeat
 # some of the DNSSEC validation tests to ensure that it works correctly.
+# Also setup a placeholder managed-keys zone to check if named can process it
+# correctly.
 echo_i "switching to automatic root key configuration"
+cp ns4/managed-keys.bind.in ns4/managed-keys.bind
 copy_setports ns4/named2.conf.in ns4/named.conf
 rndccmd 10.53.0.4 reconfig 2>&1 | sed 's/^/ns4 /' | cat_i
 sleep 5
@@ -3880,9 +3883,9 @@ ret=0
 dig_with_opts . dnskey +ednsopt=KEY-TAG:fffe +ednsopt=KEY-TAG:fffd @10.53.0.1 > dig.out.ns1.test$n || ret=1
 grep "trust-anchor-telemetry './IN' from .* 65534" ns1/named.run > /dev/null || ret=1
 grep "trust-anchor-telemetry './IN' from .* 65533" ns1/named.run > /dev/null && ret=1
-$PERL ../stop.pl dnssec ns1 || ret=1
+stop_server ns1 || ret=1
 nextpart ns1/named.run > /dev/null
-start_server --noclean --restart --port ${PORT} dnssec ns1 || ret=1
+start_server --noclean --restart --port ${PORT} ns1 || ret=1
 n=$(($n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))

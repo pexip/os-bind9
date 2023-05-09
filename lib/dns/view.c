@@ -123,8 +123,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass, const char *name,
 	view->zonetable = NULL;
 	result = dns_zt_create(mctx, rdclass, &view->zonetable);
 	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "dns_zt_create() failed: %s",
+		UNEXPECTED_ERROR("dns_zt_create() failed: %s",
 				 isc_result_totext(result));
 		result = ISC_R_UNEXPECTED;
 		goto cleanup_mutex;
@@ -135,8 +134,7 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass, const char *name,
 	view->fwdtable = NULL;
 	result = dns_fwdtable_create(mctx, &view->fwdtable);
 	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "dns_fwdtable_create() failed: %s",
+		UNEXPECTED_ERROR("dns_fwdtable_create() failed: %s",
 				 isc_result_totext(result));
 		result = ISC_R_UNEXPECTED;
 		goto cleanup_zt;
@@ -727,7 +725,8 @@ dns_view_dialup(dns_view_t *view) {
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(view->zonetable != NULL);
 
-	(void)dns_zt_apply(view->zonetable, false, NULL, dialup, NULL);
+	(void)dns_zt_apply(view->zonetable, isc_rwlocktype_read, false, NULL,
+			   dialup, NULL);
 }
 
 void
@@ -1114,7 +1113,8 @@ db_find:
 			dns_rdataset_disassociate(rdataset);
 		}
 		if (sigrdataset != NULL &&
-		    dns_rdataset_isassociated(sigrdataset)) {
+		    dns_rdataset_isassociated(sigrdataset))
+		{
 			dns_rdataset_disassociate(sigrdataset);
 		}
 		if (node != NULL) {
@@ -1142,7 +1142,8 @@ db_find:
 			if (dns_rdataset_isassociated(&zrdataset)) {
 				dns_rdataset_clone(&zrdataset, rdataset);
 				if (sigrdataset != NULL &&
-				    dns_rdataset_isassociated(&zsigrdataset)) {
+				    dns_rdataset_isassociated(&zsigrdataset))
+				{
 					dns_rdataset_clone(&zsigrdataset,
 							   sigrdataset);
 				}
@@ -1169,7 +1170,8 @@ db_find:
 			dns_rdataset_clone(rdataset, &zrdataset);
 			dns_rdataset_disassociate(rdataset);
 			if (sigrdataset != NULL &&
-			    dns_rdataset_isassociated(sigrdataset)) {
+			    dns_rdataset_isassociated(sigrdataset))
+			{
 				dns_rdataset_clone(sigrdataset, &zsigrdataset);
 				dns_rdataset_disassociate(sigrdataset);
 			}
@@ -1191,7 +1193,8 @@ db_find:
 			dns_rdataset_disassociate(rdataset);
 		}
 		if (sigrdataset != NULL &&
-		    dns_rdataset_isassociated(sigrdataset)) {
+		    dns_rdataset_isassociated(sigrdataset))
+		{
 			dns_rdataset_disassociate(sigrdataset);
 		}
 		if (db != NULL) {
@@ -1288,7 +1291,8 @@ dns_view_simplefind(dns_view_t *view, const dns_name_t *name,
 			dns_rdataset_disassociate(rdataset);
 		}
 		if (sigrdataset != NULL &&
-		    dns_rdataset_isassociated(sigrdataset)) {
+		    dns_rdataset_isassociated(sigrdataset))
+		{
 			dns_rdataset_disassociate(sigrdataset);
 		}
 	} else if (result != ISC_R_SUCCESS && result != DNS_R_GLUE &&
@@ -1300,7 +1304,8 @@ dns_view_simplefind(dns_view_t *view, const dns_name_t *name,
 			dns_rdataset_disassociate(rdataset);
 		}
 		if (sigrdataset != NULL &&
-		    dns_rdataset_isassociated(sigrdataset)) {
+		    dns_rdataset_isassociated(sigrdataset))
+		{
 			dns_rdataset_disassociate(sigrdataset);
 		}
 		result = ISC_R_NOTFOUND;
@@ -1407,7 +1412,8 @@ db_find:
 			dns_rdataset_clone(rdataset, &zrdataset);
 			dns_rdataset_disassociate(rdataset);
 			if (sigrdataset != NULL &&
-			    dns_rdataset_isassociated(sigrdataset)) {
+			    dns_rdataset_isassociated(sigrdataset))
+			{
 				dns_rdataset_clone(sigrdataset, &zsigrdataset);
 				dns_rdataset_disassociate(sigrdataset);
 			}
@@ -1461,7 +1467,8 @@ finish:
 		if (dns_rdataset_isassociated(rdataset)) {
 			dns_rdataset_disassociate(rdataset);
 			if (sigrdataset != NULL &&
-			    dns_rdataset_isassociated(sigrdataset)) {
+			    dns_rdataset_isassociated(sigrdataset))
+			{
 				dns_rdataset_disassociate(sigrdataset);
 			}
 		}
@@ -1471,7 +1478,8 @@ finish:
 		}
 		dns_rdataset_clone(&zrdataset, rdataset);
 		if (sigrdataset != NULL &&
-		    dns_rdataset_isassociated(&zrdataset)) {
+		    dns_rdataset_isassociated(&zrdataset))
+		{
 			dns_rdataset_clone(&zsigrdataset, sigrdataset);
 		}
 	} else if (try_hints) {
@@ -2472,7 +2480,8 @@ dns_view_loadnta(dns_view_t *view) {
 
 		CHECK(isc_lex_gettoken(lex, options, &token));
 		if (token.type != isc_tokentype_eol &&
-		    token.type != isc_tokentype_eof) {
+		    token.type != isc_tokentype_eof)
+		{
 			CHECK(ISC_R_UNEXPECTEDTOKEN);
 		}
 

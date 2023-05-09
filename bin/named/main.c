@@ -110,7 +110,6 @@
 #define BACKTRACE_MAXFRAME 128
 #endif /* ifndef BACKTRACE_MAXFRAME */
 
-extern int isc_dscp_check_value;
 extern unsigned int dns_zone_mkey_hour;
 extern unsigned int dns_zone_mkey_day;
 extern unsigned int dns_zone_mkey_month;
@@ -240,12 +239,12 @@ assertion_failed(const char *file, int line, isc_assertiontype_t type,
 }
 
 noreturn static void
-library_fatal_error(const char *file, int line, const char *format,
-		    va_list args) ISC_FORMAT_PRINTF(3, 0);
+library_fatal_error(const char *file, int line, const char *func,
+		    const char *format, va_list args) ISC_FORMAT_PRINTF(3, 0);
 
 static void
-library_fatal_error(const char *file, int line, const char *format,
-		    va_list args) {
+library_fatal_error(const char *file, int line, const char *func,
+		    const char *format, va_list args) {
 	/*
 	 * Handle isc_error_fatal() calls from our libraries.
 	 */
@@ -259,7 +258,7 @@ library_fatal_error(const char *file, int line, const char *format,
 
 		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			      NAMED_LOGMODULE_MAIN, ISC_LOG_CRITICAL,
-			      "%s:%d: fatal error:", file, line);
+			      "%s:%d:%s(): fatal error: ", file, line, func);
 		isc_log_vwrite(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			       NAMED_LOGMODULE_MAIN, ISC_LOG_CRITICAL, format,
 			       args);
@@ -267,7 +266,7 @@ library_fatal_error(const char *file, int line, const char *format,
 			      NAMED_LOGMODULE_MAIN, ISC_LOG_CRITICAL,
 			      "exiting (due to fatal error in library)");
 	} else {
-		fprintf(stderr, "%s:%d: fatal error: ", file, line);
+		fprintf(stderr, "%s:%d:%s(): fatal error: ", file, line, func);
 		vfprintf(stderr, format, args);
 		fprintf(stderr, "\n");
 		fflush(stderr);
@@ -280,12 +279,13 @@ library_fatal_error(const char *file, int line, const char *format,
 }
 
 static void
-library_unexpected_error(const char *file, int line, const char *format,
-			 va_list args) ISC_FORMAT_PRINTF(3, 0);
+library_unexpected_error(const char *file, int line, const char *func,
+			 const char *format, va_list args)
+	ISC_FORMAT_PRINTF(3, 0);
 
 static void
-library_unexpected_error(const char *file, int line, const char *format,
-			 va_list args) {
+library_unexpected_error(const char *file, int line, const char *func,
+			 const char *format, va_list args) {
 	/*
 	 * Handle isc_error_unexpected() calls from our libraries.
 	 */
@@ -293,12 +293,13 @@ library_unexpected_error(const char *file, int line, const char *format,
 	if (named_g_lctx != NULL) {
 		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			      NAMED_LOGMODULE_MAIN, ISC_LOG_ERROR,
-			      "%s:%d: unexpected error:", file, line);
+			      "%s:%d:%s(): unexpected error: ", file, line,
+			      func);
 		isc_log_vwrite(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			       NAMED_LOGMODULE_MAIN, ISC_LOG_ERROR, format,
 			       args);
 	} else {
-		fprintf(stderr, "%s:%d: fatal error: ", file, line);
+		fprintf(stderr, "%s:%d:%s(): fatal error: ", file, line, func);
 		vfprintf(stderr, format, args);
 		fprintf(stderr, "\n");
 		fflush(stderr);
@@ -437,7 +438,8 @@ set_flags(const char *arg, struct flag_def *defs, unsigned int *ret) {
 		arglen = (int)(end - arg);
 		for (def = defs; def->name != NULL; def++) {
 			if (arglen == (int)strlen(def->name) &&
-			    memcmp(arg, def->name, arglen) == 0) {
+			    memcmp(arg, def->name, arglen) == 0)
+			{
 				if (def->value == 0) {
 					clear = true;
 				}
@@ -491,14 +493,16 @@ static void
 list_hmac_algorithms(isc_buffer_t *b) {
 	isc_buffer_t sb = *b;
 	for (dst_algorithm_t i = DST_ALG_HMAC_FIRST; i <= DST_ALG_HMAC_LAST;
-	     i++) {
+	     i++)
+	{
 		if (dst_algorithm_supported(i)) {
 			isc_buffer_putstr(b, " ");
 			isc_buffer_putstr(b, dst_hmac_algorithm_totext(i));
 		}
 	}
 	for (unsigned char *s = isc_buffer_used(&sb); s != isc_buffer_used(b);
-	     s++) {
+	     s++)
+	{
 		*s = toupper(*s);
 	}
 }
@@ -506,7 +510,7 @@ list_hmac_algorithms(isc_buffer_t *b) {
 static void
 logit(isc_buffer_t *b) {
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-		      NAMED_LOGMODULE_MAIN, ISC_LOG_WARNING, "%.*s",
+		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE, "%.*s",
 		      (int)isc_buffer_usedlength(b),
 		      (char *)isc_buffer_base(b));
 }
@@ -639,6 +643,7 @@ printversion(bool verbose) {
 		isc_buffer_init(&b, buf, sizeof(buf));
 		format_supported_algorithms(printit);
 		printf("\n");
+		dst_lib_destroy();
 	} else {
 		printf("DST initialization failure: %s\n",
 		       isc_result_totext(result));
@@ -711,13 +716,9 @@ parse_T_opt(char *option) {
 	/*
 	 * force the server to behave (or misbehave) in
 	 * specified ways for testing purposes.
-	 * dscp=x:     check that dscp values are as
-	 * 	       expected and assert otherwise.
 	 */
 	if (!strcmp(option, "dropedns")) {
 		dropedns = true;
-	} else if (!strncmp(option, "dscp=", 5)) {
-		isc_dscp_check_value = atoi(option + 5);
 	} else if (!strcmp(option, "ednsformerr")) {
 		ednsformerr = true;
 	} else if (!strcmp(option, "ednsnotimp")) {
@@ -1426,8 +1427,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 
 	if ((h = scf_handle_create(SCF_VERSION)) == NULL) {
 		if (debug) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "scf_handle_create() failed: %s",
+			UNEXPECTED_ERROR("scf_handle_create() failed: %s",
 					 scf_strerror(scf_error()));
 		}
 		return (ISC_R_FAILURE);
@@ -1435,8 +1435,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 
 	if (scf_handle_bind(h) == -1) {
 		if (debug) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "scf_handle_bind() failed: %s",
+			UNEXPECTED_ERROR("scf_handle_bind() failed: %s",
 					 scf_strerror(scf_error()));
 		}
 		scf_handle_destroy(h);
@@ -1445,8 +1444,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 
 	if ((namelen = scf_myname(h, NULL, 0)) == -1) {
 		if (debug) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "scf_myname() failed: %s",
+			UNEXPECTED_ERROR("scf_myname() failed: %s",
 					 scf_strerror(scf_error()));
 		}
 		scf_handle_destroy(h);
@@ -1454,8 +1452,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 	}
 
 	if ((instance = isc_mem_allocate(mctx, namelen + 1)) == NULL) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "named_smf_get_instance memory "
+		UNEXPECTED_ERROR("named_smf_get_instance memory "
 				 "allocation failed: %s",
 				 isc_result_totext(ISC_R_NOMEMORY));
 		scf_handle_destroy(h);
@@ -1464,8 +1461,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 
 	if (scf_myname(h, instance, namelen + 1) == -1) {
 		if (debug) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "scf_myname() failed: %s",
+			UNEXPECTED_ERROR("scf_myname() failed: %s",
 					 scf_strerror(scf_error()));
 		}
 		scf_handle_destroy(h);
@@ -1576,8 +1572,7 @@ main(int argc, char *argv[]) {
 		if (result == ISC_R_RELOAD) {
 			named_server_reloadwanted(named_g_server);
 		} else if (result != ISC_R_SUCCESS) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "isc_app_run(): %s",
+			UNEXPECTED_ERROR("isc_app_run(): %s",
 					 isc_result_totext(result));
 			/*
 			 * Force exit.
@@ -1591,8 +1586,7 @@ main(int argc, char *argv[]) {
 		result = named_smf_get_instance(&instance, 1, named_g_mctx);
 		if (result == ISC_R_SUCCESS && instance != NULL) {
 			if (smf_disable_instance(instance, 0) != 0) {
-				UNEXPECTED_ERROR(__FILE__, __LINE__,
-						 "smf_disable_instance() "
+				UNEXPECTED_ERROR("smf_disable_instance() "
 						 "failed for %s : %s",
 						 instance,
 						 scf_strerror(scf_error()));

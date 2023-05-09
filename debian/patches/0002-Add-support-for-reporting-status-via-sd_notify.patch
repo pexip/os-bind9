@@ -1,0 +1,177 @@
+From: Debian DNS Team <team+dns@tracker.debian.org>
+Date: Wed, 25 Jan 2023 15:51:06 +0100
+Subject: Add-support-for-reporting-status-via-sd_notify
+
+---
+ bin/named/Makefile.am |  8 +++++++-
+ bin/named/server.c    | 44 +++++++++++++++++++++++++++++++++++++++++---
+ configure.ac          | 20 ++++++++++++++++++++
+ 3 files changed, 68 insertions(+), 4 deletions(-)
+
+diff --git a/bin/named/Makefile.am b/bin/named/Makefile.am
+index 57a023b..38045f0 100644
+--- a/bin/named/Makefile.am
++++ b/bin/named/Makefile.am
+@@ -14,6 +14,7 @@ AM_CPPFLAGS +=				\
+ 	$(MAXMINDDB_CFLAGS)		\
+ 	$(DNSTAP_CFLAGS)		\
+ 	$(LIBUV_CFLAGS)			\
++	$(LIBSYSTEMD_CFLAGS)		\
+ 	$(ZLIB_CFLAGS)
+ 
+ if HAVE_JSON_C
+@@ -109,7 +110,7 @@ named_LDADD =					\
+ 	$(MAXMINDDB_LIBS)			\
+ 	$(DNSTAP_LIBS)				\
+ 	$(LIBUV_LIBS)				\
+-	$(LIBXML2_LIBS)				\
++	$(LIBSYSTEMD_LIBS)			\
+ 	$(ZLIB_LIBS)
+ 
+ if HAVE_JSON_C
+@@ -121,3 +122,8 @@ if HAVE_LIBNGHTTP2
+ named_LDADD +=					\
+ 	$(LIBNGHTTP2_LIBS)
+ endif HAVE_LIBNGHTTP2
++
++if HAVE_LIBXML2
++named_LDADD +=					\
++	$(LIBXML2_LIBS)
++endif HAVE_LIBXML2
+diff --git a/bin/named/server.c b/bin/named/server.c
+index 1d74785..35af189 100644
+--- a/bin/named/server.c
++++ b/bin/named/server.c
+@@ -26,6 +26,10 @@
+ #include <fstrm.h>
+ #endif
+ 
++#ifdef HAVE_LIBSYSTEMD
++#include <systemd/sd-daemon.h>
++#endif
++
+ #include <isc/aes.h>
+ #include <isc/app.h>
+ #include <isc/attributes.h>
+@@ -219,11 +223,12 @@
+ 	} while (0)
+ 
+ #define CHECKFATAL(op, msg)                         \
+-	do {                                        \
++	{                                           \
+ 		result = (op);                      \
+-		if (result != ISC_R_SUCCESS)        \
++		if (result != ISC_R_SUCCESS) {      \
+ 			fatal(server, msg, result); \
+-	} while (0)
++		}                                   \
++	}
+ 
+ /*%
+  * Maximum ADB size for views that share a cache.  Use this limit to suppress
+@@ -9882,6 +9887,15 @@ view_loaded(void *arg) {
+ 			      "FIPS mode is %s",
+ 			      FIPS_mode() ? "enabled" : "disabled");
+ #endif /* ifdef HAVE_FIPS_MODE */
++
++#if HAVE_LIBSYSTEMD
++		sd_notifyf(0,
++			   "READY=1\n"
++			   "STATUS=running\n"
++			   "MAINPID=%" PRId64 "\n",
++			   (int64_t)getpid());
++#endif /* HAVE_LIBSYSTEMD */
++
+ 		atomic_store(&server->reload_status, NAMED_RELOAD_DONE);
+ 
+ 		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+@@ -10061,6 +10075,10 @@ shutdown_server(isc_task_t *task, isc_event_t *event) {
+ 	UNUSED(task);
+ 	INSIST(task == server->task);
+ 
++#if HAVE_LIBSYSTEMD
++	sd_notify(0, "STOPPING=1\n");
++#endif /* HAVE_LIBSYSTEMD */
++
+ 	/*
+ 	 * We need to shutdown the interface before going
+ 	 * exclusive (which would pause the netmgr).
+@@ -10481,6 +10499,10 @@ reload(named_server_t *server) {
+ 	isc_result_t result;
+ 
+ 	atomic_store(&server->reload_status, NAMED_RELOAD_IN_PROGRESS);
++#if HAVE_LIBSYSTEMD
++	sd_notify(0, "RELOADING=1\n"
++		     "STATUS=reload command received\n");
++#endif /* HAVE_LIBSYSTEMD */
+ 
+ 	CHECK(loadconfig(server));
+ 
+@@ -10497,6 +10519,12 @@ reload(named_server_t *server) {
+ 		atomic_store(&server->reload_status, NAMED_RELOAD_FAILED);
+ 	}
+ cleanup:
++#if HAVE_LIBSYSTEMD
++	sd_notifyf(0,
++		   "READY=1\n"
++		   "STATUS=reload command finished: %s\n",
++		   isc_result_totext(result));
++#endif /* HAVE_LIBSYSTEMD */
+ 	return (result);
+ }
+ 
+@@ -10856,6 +10884,10 @@ isc_result_t
+ named_server_reconfigcommand(named_server_t *server) {
+ 	isc_result_t result;
+ 	atomic_store(&server->reload_status, NAMED_RELOAD_IN_PROGRESS);
++#if HAVE_LIBSYSTEMD
++	sd_notify(0, "RELOADING=1\n"
++		     "STATUS=reconfig command received\n");
++#endif /* HAVE_LIBSYSTEMD */
+ 
+ 	CHECK(loadconfig(server));
+ 
+@@ -10872,6 +10904,12 @@ named_server_reconfigcommand(named_server_t *server) {
+ 		atomic_store(&server->reload_status, NAMED_RELOAD_FAILED);
+ 	}
+ cleanup:
++#if HAVE_LIBSYSTEMD
++	sd_notifyf(0,
++		   "READY=1\n"
++		   "STATUS=reconfig command finished: %s\n",
++		   isc_result_totext(result));
++#endif /* HAVE_LIBSYSTEMD */
+ 	return (result);
+ }
+ 
+diff --git a/configure.ac b/configure.ac
+index eb829a9..07b2456 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -908,6 +908,26 @@ AS_CASE([$with_zlib],
+ AC_SUBST([ZLIB_CFLAGS])
+ AC_SUBST([ZLIB_LIBS])
+ 
++#
++# was --with-libsystemd specified?
++#
++# [pairwise: --with-libsystemd=auto, --with-libsystemd=yes, --without-libsystemd]
++AC_ARG_WITH([libsystemd],
++	    [AS_HELP_STRING([--with-libsystemd],
++			    [build with libsystemd integration [default=auto]])],
++	    [], [with_libsystemd=auto])
++
++AS_CASE([$with_libsystemd],
++	[no],[],
++	[auto],[PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd],
++				  [AC_DEFINE([HAVE_LIBSYSTEMD], [1], [Use libsystemd library])],
++				  [:])],
++	[yes],[PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd],
++				 [AC_DEFINE([HAVE_LIBSYSTEMD], [1], [Use libsystemd library])])],
++	[AC_MSG_ERROR([Specifying libsystemd installation path is not supported, adjust PKG_CONFIG_PATH instead])])
++AC_SUBST([LIBSYSTEMD_CFLAGS])
++AC_SUBST([LIBSYSTEMD_LIBS])
++
+ #
+ # Check if the system supports glibc-compatible backtrace() function.
+ #

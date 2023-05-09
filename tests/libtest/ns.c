@@ -94,8 +94,7 @@ setup_server(void **state) {
 		return (-1);
 	}
 
-	result = ns_listenlist_default(mctx, port, -1, true, AF_INET,
-				       &listenon);
+	result = ns_listenlist_default(mctx, port, true, AF_INET, &listenon);
 	if (result != ISC_R_SUCCESS) {
 		return (-1);
 	}
@@ -635,7 +634,8 @@ ns_test_getdata(const char *file, unsigned char *buf, size_t bufsiz,
 				break;
 			}
 			if (*rp != ' ' && *rp != '\t' && *rp != '\r' &&
-			    *rp != '\n') {
+			    *rp != '\n')
+			{
 				*wp++ = *rp;
 				len++;
 			}

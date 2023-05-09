@@ -562,7 +562,8 @@ on_server_data_chunk_recv_callback(int32_t stream_id, const uint8_t *data,
 			size_t new_bufsize = isc_buffer_usedlength(&h2->rbuf) +
 					     len;
 			if (new_bufsize <= MAX_DNS_MESSAGE_SIZE &&
-			    new_bufsize <= h2->content_length) {
+			    new_bufsize <= h2->content_length)
+			{
 				isc_buffer_putmem(&h2->rbuf, data, len);
 				break;
 			}
@@ -1722,7 +1723,8 @@ server_handle_path_header(isc_nmsocket_t *socket, const uint8_t *value,
 		size_t dns_value_len = 0;
 
 		if (isc__nm_parse_httpquery((const char *)qstr, &dns_value,
-					    &dns_value_len)) {
+					    &dns_value_len))
+		{
 			const size_t decoded_size = dns_value_len / 4 * 3;
 			if (decoded_size <= MAX_DNS_MESSAGE_SIZE) {
 				if (socket->h2.query_data != NULL) {
@@ -2211,7 +2213,8 @@ server_httpsend(isc_nmhandle_t *handle, isc_nmsocket_t *sock,
 	isc_nm_cb_t cb = req->cb.send;
 	void *cbarg = req->cbarg;
 	if (isc__nmsocket_closing(sock) ||
-	    !http_session_active(handle->httpsession)) {
+	    !http_session_active(handle->httpsession))
+	{
 		failed_send_cb(sock, req, ISC_R_CANCELED);
 		return;
 	}
@@ -2527,6 +2530,9 @@ isc_nm_listenhttp(isc_nm_t *mgr, isc_sockaddr_t *iface, int backlog,
 	sock->tid = 0;
 	sock->fd = (uv_os_sock_t)-1;
 
+	isc__nmsocket_barrier_init(sock);
+	atomic_init(&sock->rchildren, sock->nchildren);
+
 	atomic_store(&sock->listening, true);
 	*sockp = sock;
 	return (ISC_R_SUCCESS);
@@ -2694,39 +2700,7 @@ isc__nm_http_stoplistening(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 	REQUIRE(sock->type == isc_nm_httplistener);
 
-	if (!atomic_compare_exchange_strong(&sock->closing, &(bool){ false },
-					    true)) {
-		UNREACHABLE();
-	}
-
-	if (!isc__nm_in_netthread()) {
-		isc__netievent_httpstop_t *ievent =
-			isc__nm_get_netievent_httpstop(sock->mgr, sock);
-		isc__nm_enqueue_ievent(&sock->mgr->workers[sock->tid],
-				       (isc__netievent_t *)ievent);
-	} else {
-		REQUIRE(isc_nm_tid() == sock->tid);
-		isc__netievent_httpstop_t ievent = { .sock = sock };
-		isc__nm_async_httpstop(NULL, (isc__netievent_t *)&ievent);
-	}
-}
-
-void
-isc__nm_async_httpstop(isc__networker_t *worker, isc__netievent_t *ev0) {
-	isc__netievent_httpstop_t *ievent = (isc__netievent_httpstop_t *)ev0;
-	isc_nmsocket_t *sock = ievent->sock;
-
-	UNUSED(worker);
-
-	REQUIRE(VALID_NMSOCK(sock));
-
-	atomic_store(&sock->listening, false);
-	atomic_store(&sock->closing, false);
-	atomic_store(&sock->closed, true);
-	if (sock->outer != NULL) {
-		isc_nm_stoplistening(sock->outer);
-		isc_nmsocket_close(&sock->outer);
-	}
+	isc__nmsocket_stop(sock);
 }
 
 static void
@@ -2759,7 +2733,8 @@ isc__nm_http_close(isc_nmsocket_t *sock) {
 	REQUIRE(!isc__nmsocket_active(sock));
 
 	if (!atomic_compare_exchange_strong(&sock->closing, &(bool){ false },
-					    true)) {
+					    true))
+	{
 		return;
 	}
 
@@ -3226,9 +3201,11 @@ isc__nm_http_cleanup_data(isc_nmsocket_t *sock) {
 	}
 
 	if (sock->type == isc_nm_httplistener ||
-	    sock->type == isc_nm_httpsocket) {
+	    sock->type == isc_nm_httpsocket)
+	{
 		if (sock->type == isc_nm_httplistener &&
-		    sock->h2.listener_endpoints != NULL) {
+		    sock->h2.listener_endpoints != NULL)
+		{
 			/* Delete all handlers */
 			http_cleanup_listener_endpoints(sock);
 		}
@@ -3338,7 +3315,8 @@ isc_nm_http_makeuri(const bool https, const isc_sockaddr_t *sa,
 		 * wrap it between [ and ].
 		 */
 		if (inet_pton(AF_INET6, hostname, &sa6) == 1 &&
-		    hostname[0] != '[') {
+		    hostname[0] != '[')
+		{
 			ipv6_addr = true;
 		}
 		host = hostname;
@@ -3556,7 +3534,8 @@ rule_value_char(isc_httpparser_state_t *st) {
 static bool
 rule_unreserved_char(isc_httpparser_state_t *st) {
 	if (MATCH_ALNUM() || MATCH('_') || MATCH('.') || MATCH('-') ||
-	    MATCH('~')) {
+	    MATCH('~'))
+	{
 		ADVANCE();
 		return (true);
 	}

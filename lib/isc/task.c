@@ -299,7 +299,8 @@ task_shutdown(isc_task_t *task) {
 	XTRACE("task_shutdown");
 
 	if (atomic_compare_exchange_strong(&task->shuttingdown,
-					   &(bool){ false }, true)) {
+					   &(bool){ false }, true))
+	{
 		XTRACE("shutting down");
 		if (task->state == task_state_idle) {
 			INSIST(EMPTY(task->events));
@@ -313,7 +314,8 @@ task_shutdown(isc_task_t *task) {
 		 * Note that we post shutdown events LIFO.
 		 */
 		for (event = TAIL(task->on_shutdown); event != NULL;
-		     event = prev) {
+		     event = prev)
+		{
 			prev = PREV(event, ev_link);
 			DEQUEUE(task->on_shutdown, event, ev_link);
 			ENQUEUE(task->events, event, ev_link);
@@ -612,12 +614,10 @@ isc_task_purge(isc_task_t *task, void *sender, isc_eventtype_t type,
 
 bool
 isc_task_purgeevent(isc_task_t *task, isc_event_t *event) {
-	isc_event_t *curr_event, *next_event;
+	bool found = false;
 
 	/*
 	 * Purge 'event' from a task's event queue.
-	 *
-	 * XXXRTH:  WARNING:  This method may be removed before beta.
 	 */
 
 	REQUIRE(VALID_TASK(task));
@@ -633,38 +633,20 @@ isc_task_purgeevent(isc_task_t *task, isc_event_t *event) {
 	 */
 
 	LOCK(&task->lock);
-	for (curr_event = HEAD(task->events); curr_event != NULL;
-	     curr_event = next_event)
-	{
-		next_event = NEXT(curr_event, ev_link);
-		if (curr_event == event && PURGE_OK(event)) {
-			DEQUEUE(task->events, curr_event, ev_link);
-			task->nevents--;
-			break;
-		}
+	if (ISC_LINK_LINKED(event, ev_link)) {
+		DEQUEUE(task->events, event, ev_link);
+		task->nevents--;
+		found = true;
 	}
 	UNLOCK(&task->lock);
 
-	if (curr_event == NULL) {
+	if (!found) {
 		return (false);
 	}
 
-	isc_event_free(&curr_event);
+	isc_event_free(&event);
 
 	return (true);
-}
-
-unsigned int
-isc_task_unsendrange(isc_task_t *task, void *sender, isc_eventtype_t first,
-		     isc_eventtype_t last, void *tag, isc_eventlist_t *events) {
-	/*
-	 * Remove events from a task's event queue.
-	 */
-	REQUIRE(VALID_TASK(task));
-
-	XTRACE("isc_task_unsendrange");
-
-	return (dequeue_events(task, sender, first, last, tag, events, false));
 }
 
 unsigned int
@@ -779,6 +761,16 @@ isc_task_getnetmgr(isc_task_t *task) {
 	return (task->manager->netmgr);
 }
 
+void
+isc_task_setquantum(isc_task_t *task, unsigned int quantum) {
+	REQUIRE(VALID_TASK(task));
+
+	LOCK(&task->lock);
+	task->quantum = (quantum > 0) ? quantum
+				      : task->manager->default_quantum;
+	UNLOCK(&task->lock);
+}
+
 /***
  *** Task Manager.
  ***/
@@ -789,11 +781,13 @@ task_run(isc_task_t *task) {
 	bool finished = false;
 	isc_event_t *event = NULL;
 	isc_result_t result = ISC_R_SUCCESS;
+	uint32_t quantum;
 
 	REQUIRE(VALID_TASK(task));
 
 	LOCK(&task->lock);
-	/* FIXME */
+	quantum = task->quantum;
+
 	if (task->state != task_state_ready) {
 		goto done;
 	}
@@ -855,7 +849,8 @@ task_run(isc_task_t *task) {
 			 */
 			XTRACE("empty");
 			if (isc_refcount_current(&task->references) == 0 &&
-			    TASK_SHUTTINGDOWN(task)) {
+			    TASK_SHUTTINGDOWN(task))
+			{
 				/*
 				 * The task is done.
 				 */
@@ -866,7 +861,7 @@ task_run(isc_task_t *task) {
 				task->state = task_state_idle;
 			}
 			break;
-		} else if (dispatch_count >= task->quantum) {
+		} else if (dispatch_count >= quantum) {
 			/*
 			 * Our quantum has expired, but there is more work to be
 			 * done.  We'll requeue it to the ready queue later.
@@ -1036,7 +1031,8 @@ isc__taskmgr_destroy(isc_taskmgr_t **managerp) {
 #ifdef ISC_TASK_TRACE
 	int counter = 0;
 	while (isc_refcount_current(&(*managerp)->references) > 1 &&
-	       counter++ < 1000) {
+	       counter++ < 1000)
+	{
 		usleep(10 * 1000);
 	}
 	INSIST(counter < 1000);

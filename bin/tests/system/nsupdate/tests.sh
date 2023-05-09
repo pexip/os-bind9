@@ -388,7 +388,7 @@ rm named.pid
 cd ..
 sleep 10
 if
-	start_server --noclean --restart --port ${PORT} nsupdate ns1
+	start_server --noclean --restart --port ${PORT} ns1
 then
 	echo_i "restarted server ns1"
 else
@@ -559,13 +559,13 @@ update add updated4.example.nil. 600 A 10.10.10.3
 send
 END
 sleep 3
-$PERL ../stop.pl --use-rndc --port ${CONTROLPORT} nsupdate ns1
+stop_server --use-rndc --port ${CONTROLPORT} ns1
 sleep 3
 # Removing the journal file and restarting the server means
 # that the data served by the new server process are exactly
 # those dumped to the file by "rndc stop".
 rm -f ns1/*jnl
-start_server --noclean --restart --port ${PORT} nsupdate ns1
+start_server --noclean --restart --port ${PORT} ns1
 for try in 0 1 2 3 4 5 6 7 8 9; do
     iret=0
     $DIG $DIGOPTS +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
@@ -1351,6 +1351,34 @@ send
 EOF
 grep '10.53.0.1.*REFUSED' nsupdate.out-$n > /dev/null || ret=1
 grep 'Reply from SOA query' nsupdate.out-$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=$((n + 1))
+ret=0
+echo_i "check that update is rejected if query is not allowed ($n)"
+{
+  $NSUPDATE -d <<END
+  local 10.53.0.2
+  server 10.53.0.1 ${PORT}
+  update add reject.other.nil 3600 IN TXT Whatever
+  send
+END
+} > nsupdate.out.test$n 2>&1
+grep 'failed: REFUSED' nsupdate.out.test$n > /dev/null || ret=1
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=$((n + 1))
+ret=0
+echo_i "check that update is rejected if quota is exceeded ($n)"
+for loop in 1 2 3 4 5 6 7 8 9 10; do
+{
+  $NSUPDATE -4 -l -p ${PORT} -k ns1/session.key > /dev/null 2>&1 <<END
+  update add txt-$loop.other.nil 3600 IN TXT Whatever
+  send
+END
+} &
+done
+wait_for_log 10 "too many DNS UPDATEs queued" ns1/named.run || ret=1
 [ $ret = 0 ] || { echo_i "failed"; status=1; }
 
 if ! $FEATURETEST --gssapi ; then

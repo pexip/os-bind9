@@ -1,3 +1,52 @@
+bind9 (1:9.18.12-1pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 09 May 2023 11:34:31 +0100
+
+bind9 (1:9.18.12-1) unstable; urgency=medium
+
+  * New upstream version 9.18.12
+  * Drop libtool-bin from B-D (Closes: #1022968)
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 10 Feb 2023 15:15:49 +0100
+
+bind9 (1:9.18.11-2) unstable; urgency=medium
+
+  * Allow the named to use systemd notify service
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 26 Jan 2023 21:13:55 +0100
+
+bind9 (1:9.18.11-1) unstable; urgency=medium
+
+  * New upstream version 9.18.11
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 25 Jan 2023 15:51:35 +0100
+
+bind9 (1:9.18.10-2) unstable; urgency=medium
+
+  * Backport upstream feature to use sd_notify()
+  * Use systemd notify for service readyness check (Closes: #994696)
+  * apparmor.d: Allow named to read all OpenSSL config files.
+    (Closes: #1025519)
+  * apparmor.d: Allow named to query for hugepages support.
+    (Closes: #1020315)
+  * Fix path to README.Debian (Closes: #1016646)
+
+ -- Bernhard Schmidt <berni@debian.org>  Thu, 22 Dec 2022 17:12:17 +0100
+
+bind9 (1:9.18.10-1) unstable; urgency=medium
+
+  * New upstream version 9.18.10
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Dec 2022 18:00:33 +0100
+
+bind9 (1:9.18.9-1) unstable; urgency=medium
+
+  * New upstream version 9.18.9
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Nov 2022 14:00:05 +0100
+
 bind9 (1:9.18.8-1pexip2) pexip; urgency=medium
 
   * Merge openssl3 changes to the bullseye branch

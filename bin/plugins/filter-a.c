@@ -347,7 +347,7 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 				       cfg_line, mctx, lctx, actx));
 	}
 
-	isc_ht_init(&inst->ht, mctx, 16);
+	isc_ht_init(&inst->ht, mctx, 16, ISC_HT_CASE_SENSITIVE);
 	isc_mutex_init(&inst->hlock);
 
 	/*
@@ -619,7 +619,8 @@ process_section(const section_filter_t *filter) {
 		}
 
 		if (section == DNS_SECTION_ANSWER ||
-		    section == DNS_SECTION_AUTHORITY) {
+		    section == DNS_SECTION_AUTHORITY)
+		{
 			message->flags &= ~DNS_MESSAGEFLAG_AD;
 		}
 	}
@@ -669,7 +670,8 @@ filter_prep_response_begin(void *arg, void *cbdata, isc_result_t *resp) {
 		result = ns_client_checkaclsilent(qctx->client, NULL,
 						  inst->a_acl, true);
 		if (result == ISC_R_SUCCESS && inst->v4_a != NONE &&
-		    is_v4_client(qctx->client)) {
+		    is_v4_client(qctx->client))
+		{
 			client_state->mode = inst->v4_a;
 		} else if (result == ISC_R_SUCCESS && inst->v6_a != NONE &&
 			   is_v6_client(qctx->client))

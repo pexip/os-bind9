@@ -314,9 +314,6 @@ file documentation:
     ``domain_name``
         A quoted string which is used as a DNS name; for example: ``my.test.domain``.
 
-    ``dscp``
-        An :term:`integer` between 0 and 63, used to select a Differentiated Services Code Point (DSCP) value for use with outgoing traffic on operating systems that support DSCP.
-
     ``fixedpoint``
         A non-negative real number that can be specified to the nearest one-hundredth. Up to five digits can be specified before a decimal point, and up to two digits after, so the maximum value is 99999.99. Acceptable values might be further limited by the contexts in which they are used.
 
@@ -1611,11 +1608,11 @@ default is used.
 
 .. namedconf:statement:: dscp
    :tags: server, query
-   :short: Specifies the global Differentiated Services Code Point (DSCP) value to classify outgoing DNS traffic.
+   :short: Sets the Differentiated Services Code Point (DSCP) value (obsolete).
 
-   This is the global Differentiated Services Code Point (DSCP) value to
-   classify outgoing DNS traffic, on operating systems that support DSCP.
-   Valid values are 0 through 63. It is not configured by default.
+   This option used to set the global Differentiated Services Code Point
+   (DSCP) value to classify outgoing DNS traffic. It is now obsolete and
+   has no effect.
 
 .. namedconf:statement:: preferred-glue
    :tags: query
@@ -1909,7 +1906,7 @@ default is used.
    cannot be longer than a week.
 
 :any:`max-zone-ttl`
-   :tags: zone, query
+   :tags: deprecated
    :short: Specifies a maximum permissible time-to-live (TTL) value, in seconds.
 
    This should now be configured as part of :namedconf:ref:`dnssec-policy`.
@@ -2158,11 +2155,16 @@ Boolean Options
 
    This option controls the addition of records to the authority and
    additional sections of responses. Such records may be included in
-   responses to be helpful to clients; for example, NS or MX records may
+   responses to be helpful to clients; for example, MX records may
    have associated address records included in the additional section,
    obviating the need for a separate address lookup. However, adding
    these records to responses is not mandatory and requires additional
    database lookups, causing extra latency when marshalling responses.
+
+   Responses to DNSKEY, DS, CDNSKEY, and CDS requests will never have
+   optional additional records added. Responses to NS requests will
+   always have additional section processing.
+
    :any:`minimal-responses` takes one of four values:
 
    -  ``no``: the server is as complete as possible when generating
@@ -2885,8 +2887,8 @@ authoritative and does not have the answer in its cache.
 
    This specifies a list of IP addresses to which queries are forwarded. The
    default is the empty list (no forwarding). Each address in the list can be
-   associated with an optional port number and/or DSCP value, and a default port
-   number and DSCP value can be set for the entire list.
+   associated with an optional port number. A default port number can be set
+   for the entire list.
 
 Forwarding can also be configured on a per-domain basis, allowing for
 the global forwarding options to be overridden in a variety of ways.
@@ -3271,11 +3273,11 @@ Query Address
 
 .. namedconf:statement:: query-source
    :tags: query
-   :short: Controls the IPv4 address and port from which queries are issued.
+   :short: Controls the IPv4 address from which queries are issued.
 
 .. namedconf:statement:: query-source-v6
    :tags: query
-   :short: Controls the IPv6 address and port from which queries are issued.
+   :short: Controls the IPv6 address from which queries are issued.
 
    If the server does not know the answer to a question, it queries other
    name servers. :any:`query-source` specifies the address and port used for
@@ -3291,20 +3293,24 @@ Query Address
       query-source address * port *;
       query-source-v6 address * port *;
 
-   .. note:: The address specified in the :any:`query-source` option is used for both
-      UDP and TCP queries, but the port applies only to UDP queries. TCP
-      queries always use a random unprivileged port.
+   .. note:: ``port`` configuration is deprecated. A warning will be logged
+      when this parameter is used.
+
+   .. note:: The address specified in the :any:`query-source` option is
+      used for both UDP and TCP queries, but the port applies only to UDP
+      queries. TCP queries always use a random unprivileged port.
 
 .. namedconf:statement:: use-v4-udp-ports
-   :tags: query
+   :tags: deprecated
    :short: Specifies a list of ports that are valid sources for UDP/IPv4 messages.
 
 .. namedconf:statement:: use-v6-udp-ports
-   :tags: query
+   :tags: deprecated
    :short: Specifies a list of ports that are valid sources for UDP/IPv6 messages.
 
-   These statements specify a list of IPv4 and IPv6 UDP ports that
-   are used as source ports for UDP messages.
+   These statements, which are deprecated and will be removed in a future
+   release, specify a list of IPv4 and IPv6 UDP ports that are used as
+   source ports for UDP messages.
 
    If :term:`port` is ``*`` or is omitted, a random port number from a
    pre-configured range is selected and used for each query. The
@@ -3323,15 +3329,16 @@ Query Address
       use-v6-udp-ports { range 1024 65535; };
 
 .. namedconf:statement:: avoid-v4-udp-ports
-   :tags: query
+   :tags: deprecated
    :short: Specifies the range(s) of ports to be excluded from use as sources for UDP/IPv4 messages.
 
 .. namedconf:statement:: avoid-v6-udp-ports
-   :tags: query
+   :tags: deprecated
    :short: Specifies the range(s) of ports to be excluded from use as sources for UDP/IPv6 messages.
 
-   These ranges are excluded from those
-   specified in the :any:`avoid-v4-udp-ports` and :any:`avoid-v6-udp-ports`
+   These statements, which are deprecated and will be removed in a future
+   release, specific ranges of port numbers to exclude from those specified
+   in the :any:`avoid-v4-udp-ports` and :any:`avoid-v6-udp-ports`
    options, respectively.
 
    The defaults of the :any:`avoid-v4-udp-ports` and :any:`avoid-v6-udp-ports`
@@ -3563,6 +3570,9 @@ options apply to zone transfers.
    :any:`transfer-source` statement within the :any:`view` or :any:`zone` block
    in the configuration file.
 
+   .. note:: ``port`` configuration is deprecated. A warning will be logged
+      when this parameter is used.
+
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
 
@@ -3572,11 +3582,11 @@ options apply to zone transfers.
    :tags: transfer
    :short: Defines which local IPv6 address(es) are bound to TCP connections used to fetch zones transferred inbound by the server.
 
-   This option is the same as :any:`transfer-source`, except zone transfers are performed
-   using IPv6.
+   This option is the same as :any:`transfer-source`, except zone transfers
+   are performed using IPv6.
 
 .. namedconf:statement:: alt-transfer-source
-   :tags: transfer
+   :tags: deprecated
    :short: Defines alternate local IPv4 address(es) to be used by the server for inbound zone transfers, if the address(es) defined by :any:`transfer-source` fail and :any:`use-alt-transfer-source` is enabled.
 
    This indicates an alternate transfer source if the one listed in :any:`transfer-source`
@@ -3588,14 +3598,14 @@ options apply to zone transfers.
       query.
 
 .. namedconf:statement:: alt-transfer-source-v6
-   :tags: transfer
+   :tags: deprecated
    :short: Defines alternate local IPv6 address(es) to be used by the server for inbound zone transfers.
 
    This indicates an alternate transfer source if the one listed in
    :any:`transfer-source-v6` fails and :any:`use-alt-transfer-source` is set.
 
 .. namedconf:statement:: use-alt-transfer-source
-   :tags: transfer
+   :tags: deprecated
    :short: Indicates whether :any:`alt-transfer-source` and :any:`alt-transfer-source-v6` can be used.
 
    This indicates whether the alternate transfer sources should be used. If views are specified,
@@ -3612,6 +3622,9 @@ options apply to zone transfers.
    :any:`notify-source` for all zones, but can be overridden on a per-zone
    or per-view basis by including a :any:`notify-source` statement within
    the :any:`zone` or :any:`view` block in the configuration file.
+
+   .. note:: ``port`` configuration is deprecated. A warning will be logged
+      when this parameter is used.
 
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
@@ -3637,19 +3650,19 @@ gigabyte. ``unlimited`` requests unlimited use, or the maximum available
 amount. ``default`` uses the limit that was in force when the server was
 started. See the description of :term:`size`.
 
-The following options set operating system resource limits for the name
-server process. Some operating systems do not support some or any of the
-limits; on such systems, a warning is issued if an unsupported
-limit is used.
+The following options are deprecated in favor of setting the operating system
+resource limits from the operating system and/or process supervisor, should not
+be used, and will be rendered non-operational in a future release.
+
 
 .. namedconf:statement:: coresize
-   :tags: server
+   :tags: deprecated
    :short: Sets the maximum size of a core dump.
 
    This sets the maximum size of a core dump. The default is ``default``.
 
 .. namedconf:statement:: datasize
-   :tags: server
+   :tags: deprecated
    :short: Sets the maximum amount of data memory that can be used by the server.
 
    This sets the maximum amount of data memory the server may use. The default is
@@ -3664,14 +3677,14 @@ limit is used.
    instead.
 
 .. namedconf:statement:: files
-   :tags: server
+   :tags: deprecated
    :short: Sets the maximum number of files the server may have open concurrently.
 
    This sets the maximum number of files the server may have open concurrently.
    The default is ``unlimited``.
 
 .. namedconf:statement:: stacksize
-   :tags: server
+   :tags: deprecated
    :short: Sets the maximum amount of stack memory that can be used by the server.
 
    This sets the maximum amount of stack memory the server may use. The default is
@@ -3976,6 +3989,14 @@ system.
    connections immediately. Ordinarily this should be set to the same
    value as :any:`tcp-keepalive-timeout`. This value can be updated at
    runtime by using :option:`rndc tcp-timeouts`.
+
+.. namedconf:statement:: update-quota
+   :tags: server
+   :short: Specifies the maximum number of concurrent DNS UPDATE messages that can be processed by the server.
+
+   This is the maximum number of simultaneous DNS UPDATE messages that
+   the server will accept for updating local authoritiative zones or
+   forwarding to a primary server. The default is ``100``.
 
 .. _intervals:
 
@@ -4601,7 +4622,7 @@ Tuning
 
    :any:`prefetch` specifies the "trigger" TTL value at which prefetch
    of the current query takes place; when a cache record with a
-   lower TTL value is encountered during query processing, it is
+   lower or equal TTL value is encountered during query processing, it is
    refreshed. Valid trigger TTL values are 1 to 10 seconds. Values
    larger than 10 seconds are silently reduced to 10. Setting a
    trigger TTL to zero causes prefetch to be disabled. The default
@@ -6527,6 +6548,9 @@ The following options apply to DS queries sent to :any:`parental-agents`:
    per-view basis by including a :any:`parental-source` statement within the
    :any:`zone` or :any:`view` block in the configuration file.
 
+   .. note:: ``port`` configuration is deprecated. A warning will be logged
+      when this parameter is used.
+
    .. warning:: Specifying a single port is discouraged, as it removes a layer of
       protection against spoofing errors.
 
@@ -7517,6 +7541,8 @@ the zone's filename, unless :any:`inline-signing` is enabled.
 
        The daemon replies with a four-byte value in network byte order, containing either 0 or 1; 0 indicates that the specified update is not permitted, and 1 indicates that it is.
 
+       .. warning:: The external daemon must not delay communication. This policy is evaluated synchronously; any wait period negatively affects :iscman:`named` performance.
+
 .. _multiple_views:
 
 Multiple Views
@@ -7897,6 +7923,11 @@ Name Server Statistics Counters
 
 ``UpdateBadPrereq``
     This indicates the number of dynamic updates rejected due to a prerequisite failure.
+
+``UpdateQuota``
+    This indicates the number of times a dynamic update or update
+    forwarding request was rejected because the number of pending
+    requests exceeded :any:`update-quota`.
 
 ``RateDropped``
     This indicates the number of responses dropped due to rate limits.

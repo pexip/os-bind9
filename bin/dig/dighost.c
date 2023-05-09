@@ -497,7 +497,8 @@ get_server_list(irs_resconf_t *resconf) {
 	debug("get_server_list()");
 	servers = irs_resconf_getnameservers(resconf);
 	for (sa = ISC_LIST_HEAD(*servers); sa != NULL;
-	     sa = ISC_LIST_NEXT(sa, link)) {
+	     sa = ISC_LIST_NEXT(sa, link))
+	{
 		int pf = isc_sockaddr_pf(sa);
 		isc_netaddr_t na;
 		isc_result_t result;
@@ -635,7 +636,6 @@ make_empty_lookup(void) {
 		.section_authority = true,
 		.section_additional = true,
 		.ednsneg = true,
-		.dscp = -1,
 	};
 
 	dns_fixedname_init(&looknew->fdomain);
@@ -643,7 +643,7 @@ make_empty_lookup(void) {
 	ISC_LIST_INIT(looknew->q);
 	ISC_LIST_INIT(looknew->my_server_list);
 
-	looknew->tls_ctx_cache = isc_tlsctx_cache_new(mctx);
+	isc_tlsctx_cache_create(mctx, &looknew->tls_ctx_cache);
 
 	isc_refcount_init(&looknew->references, 1);
 
@@ -810,7 +810,6 @@ clone_lookup(dig_lookup_t *lookold, bool servers) {
 	looknew->tsigctx = NULL;
 	looknew->need_search = lookold->need_search;
 	looknew->done_as_is = lookold->done_as_is;
-	looknew->dscp = lookold->dscp;
 	looknew->rrcomments = lookold->rrcomments;
 	looknew->fuzzing = lookold->fuzzing;
 	looknew->fuzztime = lookold->fuzztime;
@@ -1936,7 +1935,8 @@ followup_lookup(dns_message_t *msg, dig_query_t *query, dns_section_t section) {
 			dns_rdata_ns_t ns;
 
 			if (query->lookup->trace_root &&
-			    query->lookup->nsfound >= MXSERV) {
+			    query->lookup->nsfound >= MXSERV)
+			{
 				break;
 			}
 
@@ -1957,7 +1957,8 @@ followup_lookup(dns_message_t *msg, dig_query_t *query, dns_section_t section) {
 				cancel_lookup(query->lookup);
 				lookup->doing_xfr = false;
 				if (!lookup->trace_root &&
-				    section == DNS_SECTION_ANSWER) {
+				    section == DNS_SECTION_ANSWER)
+				{
 					lookup->trace = false;
 				} else {
 					lookup->trace = query->lookup->trace;
@@ -2808,7 +2809,8 @@ _cancel_lookup(dig_lookup_t *lookup, const char *file, unsigned int line) {
 		      query->lookup);
 		query->canceled = true;
 		if (query->readhandle != NULL &&
-		    !isc_nm_is_http_handle(query->readhandle)) {
+		    !isc_nm_is_http_handle(query->readhandle))
+		{
 			isc_nm_cancelread(query->readhandle);
 		}
 		query_detach(&query);
@@ -2884,7 +2886,8 @@ get_create_tls_context(dig_query_t *query, const bool is_https,
 		}
 
 		if (query->lookup->tls_key_file_set &&
-		    query->lookup->tls_cert_file_set) {
+		    query->lookup->tls_cert_file_set)
+		{
 			result = isc_tlsctx_load_certificate(
 				ctx, query->lookup->tls_key_file,
 				query->lookup->tls_cert_file);
@@ -2903,9 +2906,9 @@ get_create_tls_context(dig_query_t *query, const bool is_https,
 		}
 #endif /* HAVE_LIBNGHTTP2 */
 
-		sess_cache = isc_tlsctx_client_session_cache_new(
-			mctx, ctx,
-			ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE);
+		isc_tlsctx_client_session_cache_create(
+			mctx, ctx, ISC_TLSCTX_CLIENT_SESSION_CACHE_DEFAULT_SIZE,
+			&sess_cache);
 
 		result = isc_tlsctx_cache_add(
 			query->lookup->tls_ctx_cache, tlsctxname, transport,
@@ -2974,7 +2977,8 @@ start_tcp(dig_query_t *query) {
 		if (tls_mode) {
 			port = 853;
 		} else if (query->lookup->https_mode &&
-			   !query->lookup->http_plain) {
+			   !query->lookup->http_plain)
+		{
 			port = 443;
 		} else if (query->lookup->https_mode) {
 			port = 80;
@@ -3040,7 +3044,8 @@ start_tcp(dig_query_t *query) {
 
 		if (!specified_source) {
 			if ((isc_sockaddr_pf(&query->sockaddr) == AF_INET) &&
-			    have_ipv4) {
+			    have_ipv4)
+			{
 				isc_sockaddr_any(&localaddr);
 			} else {
 				isc_sockaddr_any6(&localaddr);
@@ -3087,10 +3092,7 @@ start_tcp(dig_query_t *query) {
 					     &query->sockaddr, tcp_connected,
 					     connectquery, local_timeout, 0);
 		}
-
-		/* XXX: set DSCP */
 	}
-
 	return;
 failure_tls:
 	if (query->lookup->tls_key_file_set != query->lookup->tls_cert_file_set)
@@ -3485,20 +3487,19 @@ launch_next_query(dig_query_t *query) {
 
 	xfr = query->lookup->rdtype == dns_rdatatype_ixfr ||
 	      query->lookup->rdtype == dns_rdatatype_axfr;
-	if (xfr && isc_nm_socket_type(query->handle) == isc_nm_tlsdnssocket &&
-	    !isc_nm_xfr_allowed(query->handle))
-	{
-		dighost_error("zone transfers over the "
-			      "established TLS connection are not allowed");
-		dighost_error("as the "
-			      "connection does not meet the requirements "
-			      "enforced by the RFC 9103");
-		isc_refcount_decrement0(&recvcount);
-		isc_nmhandle_detach(&query->readhandle);
-		cancel_lookup(l);
-		lookup_detach(&l);
-		clear_current_lookup();
-		return;
+	if (xfr && isc_nm_socket_type(query->handle) == isc_nm_tlsdnssocket) {
+		isc_result_t result = isc_nm_xfr_checkperm(query->handle);
+		if (result != ISC_R_SUCCESS) {
+			dighost_error("zone transfers over the established TLS "
+				      "connection are not allowed: %s",
+				      isc_result_totext(result));
+			isc_refcount_decrement0(&recvcount);
+			isc_nmhandle_detach(&query->readhandle);
+			cancel_lookup(l);
+			lookup_detach(&l);
+			clear_current_lookup();
+			return;
+		}
 	}
 
 	query_attach(query, &readquery);
@@ -3736,13 +3737,15 @@ check_for_more_data(dig_lookup_t *lookup, dig_query_t *query,
 				 * it's an SOA
 				 */
 				if ((!query->first_soa_rcvd) &&
-				    (rdata.type != dns_rdatatype_soa)) {
+				    (rdata.type != dns_rdatatype_soa))
+				{
 					puts("; Transfer failed.  "
 					     "Didn't start with SOA answer.");
 					return (true);
 				}
 				if ((!query->second_rr_rcvd) &&
-				    (rdata.type != dns_rdatatype_soa)) {
+				    (rdata.type != dns_rdatatype_soa))
+				{
 					query->second_rr_rcvd = true;
 					query->second_rr_serial = 0;
 					debug("got the second rr as nonsoa");
@@ -4312,7 +4315,8 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	}
 
 	if ((msg->flags & DNS_MESSAGEFLAG_TC) != 0 && !l->ignore &&
-	    !l->tcp_mode) {
+	    !l->tcp_mode)
+	{
 		if (l->cookie == NULL && l->sendcookie && msg->opt != NULL) {
 			process_opt(l, msg);
 		}
@@ -4444,7 +4448,8 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 
 	if (!l->doing_xfr || l->xfr_q == query) {
 		if (msg->rcode == dns_rcode_nxdomain &&
-		    (l->origin != NULL || l->need_search)) {
+		    (l->origin != NULL || l->need_search))
+		{
 			if (!next_origin(l) || showsearch) {
 				dighost_printmessage(query, &b, msg, true);
 				dighost_received(isc_buffer_usedlength(&b),
@@ -4679,7 +4684,8 @@ cancel_all(void) {
 			      current_lookup);
 			q->canceled = true;
 			if (q->readhandle != NULL &&
-			    !isc_nm_is_http_handle(q->readhandle)) {
+			    !isc_nm_is_http_handle(q->readhandle))
+			{
 				isc_nm_cancelread(q->readhandle);
 			}
 			query_detach(&q);

@@ -702,16 +702,19 @@ get_named_xfer_stats() {
 #
 # Convenience function to copy a configuration file, replacing the tokens
 # QUERYPORT, CONTROLPORT and EXTRAPORT[1-8] with the values of the equivalent
-# environment variables. (These values are set by "run.sh", which calls the
+# environment variables. (These values are set by test runner, which calls the
 # scripts invoking this function.)
 #
 # Usage:
 #   copy_setports infile outfile
 #
 copy_setports() {
-    sed -e "s/@PORT@/${PORT}/g" \
+    dir=$(echo "$TMPDIR" | sed 's/\//\\\//g')
+
+    sed -e "s/@TMPDIR@/${dir}/g" \
+        -e "s/@PORT@/${PORT}/g" \
         -e "s/@TLSPORT@/${TLSPORT}/g" \
-		-e "s/@HTTPPORT@/${HTTPPORT}/g" \
+        -e "s/@HTTPPORT@/${HTTPPORT}/g" \
         -e "s/@HTTPSPORT@/${HTTPSPORT}/g" \
         -e "s/@EXTRAPORT1@/${EXTRAPORT1}/g" \
         -e "s/@EXTRAPORT2@/${EXTRAPORT2}/g" \

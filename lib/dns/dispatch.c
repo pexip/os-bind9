@@ -206,6 +206,8 @@ qid_destroy(isc_mem_t *mctx, dns_qid_t **qidp);
 static void
 udp_startrecv(isc_nmhandle_t *handle, dns_dispentry_t *resp);
 static void
+udp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp);
+static void
 tcp_startrecv(isc_nmhandle_t *handle, dns_dispatch_t *disp,
 	      dns_dispentry_t *resp);
 static void
@@ -366,7 +368,7 @@ setup_socket(dns_dispatch_t *disp, dns_dispentry_t *resp,
 	dns_dispatchmgr_t *mgr = disp->mgr;
 	unsigned int nports;
 	in_port_t *ports = NULL;
-	in_port_t port;
+	in_port_t port = *portp;
 
 	if (resp->retries++ > 5) {
 		return (ISC_R_FAILURE);
@@ -386,11 +388,12 @@ setup_socket(dns_dispatch_t *disp, dns_dispentry_t *resp,
 	resp->local = disp->local;
 	resp->peer = *dest;
 
-	port = ports[isc_random_uniform(nports)];
-	isc_sockaddr_setport(&resp->local, port);
+	if (port == 0) {
+		port = ports[isc_random_uniform(nports)];
+		isc_sockaddr_setport(&resp->local, port);
+		*portp = port;
+	}
 	resp->port = port;
-
-	*portp = port;
 
 	return (ISC_R_SUCCESS);
 }
@@ -467,19 +470,15 @@ ISC_REFCOUNT_IMPL(dns_dispentry, dispentry_destroy);
 
 /*
  * How long in milliseconds has it been since this dispentry
- * started reading? (Only used for UDP, to adjust the timeout
- * downward when running getnext.)
+ * started reading?
  */
 static unsigned int
-dispentry_runtime(dns_dispentry_t *resp) {
-	isc_time_t now;
-
+dispentry_runtime(dns_dispentry_t *resp, const isc_time_t *now) {
 	if (isc_time_isepoch(&resp->start)) {
 		return (0);
 	}
 
-	TIME_NOW(&now);
-	return (isc_time_microdiff(&now, &resp->start) / 1000);
+	return (isc_time_microdiff(now, &resp->start) / 1000);
 }
 
 /*
@@ -509,6 +508,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	isc_netaddr_t netaddr;
 	int match, timeout = 0;
 	dispatch_cb_t response = NULL;
+	isc_time_t now;
 
 	REQUIRE(VALID_RESPONSE(resp));
 	REQUIRE(VALID_DISPATCH(resp->disp));
@@ -610,7 +610,8 @@ next:
 	 * This is the wrong response.  Check whether there is still enough
 	 * time to wait for the correct one to arrive before the timeout fires.
 	 */
-	timeout = resp->timeout - dispentry_runtime(resp);
+	TIME_NOW(&now);
+	timeout = resp->timeout - dispentry_runtime(resp, &now);
 	if (timeout <= 0) {
 		/*
 		 * The time window for receiving the correct response is
@@ -785,10 +786,14 @@ tcp_recv(isc_nmhandle_t *handle, isc_result_t result, isc_region_t *region,
 	char buf[ISC_SOCKADDR_FORMATSIZE];
 	isc_sockaddr_t peer;
 	dns_displist_t resps = ISC_LIST_INITIALIZER;
+	isc_time_t now;
+	int timeout;
 
 	REQUIRE(VALID_DISPATCH(disp));
 
 	qid = disp->mgr->qid;
+
+	TIME_NOW(&now);
 
 	LOCK(&disp->lock);
 	INSIST(disp->reading);
@@ -844,8 +849,7 @@ tcp_recv(isc_nmhandle_t *handle, isc_result_t result, isc_region_t *region,
 	for (resp = ISC_LIST_HEAD(disp->active); resp != NULL; resp = next) {
 		next = ISC_LIST_NEXT(resp, alink);
 
-		/* FIXME: dispentry_runtime is always 0 for TCP */
-		int timeout = resp->timeout - dispentry_runtime(resp);
+		timeout = resp->timeout - dispentry_runtime(resp, &now);
 		if (timeout <= 0) {
 			tcp_recv_add(&resps, resp, ISC_R_TIMEDOUT);
 		}
@@ -882,8 +886,12 @@ tcp_recv(isc_nmhandle_t *handle, isc_result_t result, isc_region_t *region,
 	/*
 	 * Phase 5: Resume reading if there are still active responses
 	 */
-	if (!ISC_LIST_EMPTY(disp->active)) {
-		tcp_startrecv(NULL, disp, ISC_LIST_HEAD(disp->active));
+	resp = ISC_LIST_HEAD(disp->active);
+	if (resp != NULL) {
+		timeout = resp->timeout - dispentry_runtime(resp, &now);
+		INSIST(timeout > 0);
+		tcp_startrecv(NULL, disp, resp);
+		isc_nmhandle_settimeout(handle, timeout);
 	}
 
 	UNLOCK(&disp->lock);
@@ -1421,7 +1429,7 @@ dns_dispatch_add(dns_dispatch_t *disp, unsigned int options,
 		 dns_dispentry_t **respp) {
 	dns_dispentry_t *resp = NULL;
 	dns_qid_t *qid = NULL;
-	in_port_t localport = 0;
+	in_port_t localport;
 	dns_messageid_t id;
 	unsigned int bucket;
 	bool ok = false;
@@ -1446,8 +1454,9 @@ dns_dispatch_add(dns_dispatch_t *disp, unsigned int options,
 
 	qid = disp->mgr->qid;
 
-	resp = isc_mem_get(disp->mgr->mctx, sizeof(*resp));
+	localport = isc_sockaddr_getport(&disp->local);
 
+	resp = isc_mem_get(disp->mgr->mctx, sizeof(*resp));
 	*resp = (dns_dispentry_t){
 		.port = localport,
 		.timeout = timeout,
@@ -1465,7 +1474,7 @@ dns_dispatch_add(dns_dispatch_t *disp, unsigned int options,
 
 #if DNS_DISPATCH_TRACE
 	fprintf(stderr, "dns_dispentry__init:%s:%s:%d:%p->references = 1\n",
-		__func__, __FILE__, __LINE__, res);
+		__func__, __FILE__, __LINE__, resp);
 #endif
 	isc_refcount_init(&resp->references, 1); /* DISPENTRY000 */
 
@@ -1539,6 +1548,8 @@ dns_dispatch_add(dns_dispatch_t *disp, unsigned int options,
 
 isc_result_t
 dns_dispatch_getnext(dns_dispentry_t *resp) {
+	isc_time_t now;
+
 	REQUIRE(VALID_RESPONSE(resp));
 	REQUIRE(VALID_DISPATCH(resp->disp));
 
@@ -1546,24 +1557,25 @@ dns_dispatch_getnext(dns_dispentry_t *resp) {
 	isc_result_t result = ISC_R_SUCCESS;
 	int32_t timeout = -1;
 
+	dispentry_log(resp, LVL(90), "getnext for QID %d", resp->id);
+
+	TIME_NOW(&now);
+	timeout = resp->timeout - dispentry_runtime(resp, &now);
+	if (timeout <= 0) {
+		return (ISC_R_TIMEDOUT);
+	}
+
 	LOCK(&disp->lock);
 	switch (disp->socktype) {
-	case isc_socktype_udp: {
-		timeout = resp->timeout - dispentry_runtime(resp);
-		if (timeout <= 0) {
-			result = ISC_R_TIMEDOUT;
-			break;
-		}
+	case isc_socktype_udp:
 		udp_dispatch_getnext(resp, timeout);
 		break;
-	}
 	case isc_socktype_tcp:
 		tcp_dispatch_getnext(disp, resp, timeout);
 		break;
 	default:
 		UNREACHABLE();
 	}
-
 	UNLOCK(&disp->lock);
 
 	return (result);
@@ -1774,7 +1786,6 @@ static void
 udp_startrecv(isc_nmhandle_t *handle, dns_dispentry_t *resp) {
 	REQUIRE(VALID_RESPONSE(resp));
 
-	TIME_NOW(&resp->start);
 	dispentry_log(resp, LVL(90), "attaching handle %p to %p", handle,
 		      &resp->handle);
 	isc_nmhandle_attach(handle, &resp->handle);
@@ -1796,6 +1807,7 @@ tcp_startrecv(isc_nmhandle_t *handle, dns_dispatch_t *disp,
 	dns_dispatch_ref(disp); /* DISPATCH002 */
 	if (resp != NULL) {
 		dispentry_log(resp, LVL(90), "reading from %p", disp->handle);
+		INSIST(!isc_time_isepoch(&resp->start));
 	} else {
 		dispatch_log(disp, LVL(90),
 			     "TCP reading without response from %p",
@@ -1885,9 +1897,6 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 }
 
 static void
-udp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp);
-
-static void
 udp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 	dns_dispentry_t *resp = (dns_dispentry_t *)arg;
 	dns_dispatch_t *disp = resp->disp;
@@ -1916,8 +1925,9 @@ udp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 		resp->state = DNS_DISPATCHSTATE_CONNECTED;
 		udp_startrecv(handle, resp);
 		break;
+	case ISC_R_NOPERM:
 	case ISC_R_ADDRINUSE: {
-		in_port_t localport = 0;
+		in_port_t localport = isc_sockaddr_getport(&disp->local);
 		isc_result_t result;
 
 		/* probably a port collision; try a different one */
@@ -1949,9 +1959,11 @@ static void
 udp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp) {
 	LOCK(&disp->lock);
 	resp->state = DNS_DISPATCHSTATE_CONNECTING;
+	TIME_NOW(&resp->start);
 	dns_dispentry_ref(resp); /* DISPENTRY004 */
 	ISC_LIST_APPEND(disp->pending, resp, plink);
 	UNLOCK(&disp->lock);
+
 	isc_nm_udpconnect(disp->mgr->nm, &resp->local, &resp->peer,
 			  udp_connected, resp, resp->timeout, 0);
 }
@@ -1965,6 +1977,7 @@ tcp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp) {
 		/* First connection, continue with connecting */
 		disp->state = DNS_DISPATCHSTATE_CONNECTING;
 		resp->state = DNS_DISPATCHSTATE_CONNECTING;
+		TIME_NOW(&resp->start);
 		dns_dispentry_ref(resp); /* DISPENTRY005 */
 		ISC_LIST_APPEND(disp->pending, resp, plink);
 		UNLOCK(&disp->lock);
@@ -1989,6 +2002,7 @@ tcp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp) {
 	case DNS_DISPATCHSTATE_CONNECTING:
 		/* Connection pending; add resp to the list */
 		resp->state = DNS_DISPATCHSTATE_CONNECTING;
+		TIME_NOW(&resp->start);
 		dns_dispentry_ref(resp); /* DISPENTRY005 */
 		ISC_LIST_APPEND(disp->pending, resp, plink);
 		UNLOCK(&disp->lock);
@@ -1996,6 +2010,7 @@ tcp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp) {
 
 	case DNS_DISPATCHSTATE_CONNECTED:
 		resp->state = DNS_DISPATCHSTATE_CONNECTED;
+		TIME_NOW(&resp->start);
 
 		/* Add the resp to the reading list */
 		ISC_LIST_APPEND(disp->active, resp, alink);

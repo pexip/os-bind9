@@ -136,6 +136,9 @@ static bool nonearest = false;
 static bool nosoa = false;
 static bool notcp = false;
 static bool sigvalinsecs = false;
+static bool transferinsecs = false;
+static bool transferslowly = false;
+static bool transferstuck = false;
 
 /*
  * -4 and -6
@@ -787,6 +790,12 @@ parse_T_opt(char *option) {
 		}
 	} else if (!strcmp(option, "sigvalinsecs")) {
 		sigvalinsecs = true;
+	} else if (!strcmp(option, "transferinsecs")) {
+		transferinsecs = true;
+	} else if (!strcmp(option, "transferslowly")) {
+		transferslowly = true;
+	} else if (!strcmp(option, "transferstuck")) {
+		transferstuck = true;
 	} else if (!strncmp(option, "tat=", 4)) {
 		named_g_tat_interval = atoi(option + 4);
 	} else {
@@ -1186,6 +1195,13 @@ setup(void) {
 		      "linked to OpenSSL version: %s",
 		      SSLeay_version(SSLEAY_VERSION));
 #endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
+	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
+		      "compiled with libuv version: %d.%d.%d", UV_VERSION_MAJOR,
+		      UV_VERSION_MINOR, UV_VERSION_PATCH);
+	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
+		      "linked to libuv version: %s", uv_version_string());
 #ifdef HAVE_LIBXML2
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
@@ -1363,6 +1379,15 @@ setup(void) {
 	}
 	if (sigvalinsecs) {
 		ns_server_setoption(sctx, NS_SERVER_SIGVALINSECS, true);
+	}
+	if (transferinsecs) {
+		ns_server_setoption(sctx, NS_SERVER_TRANSFERINSECS, true);
+	}
+	if (transferslowly) {
+		ns_server_setoption(sctx, NS_SERVER_TRANSFERSLOWLY, true);
+	}
+	if (transferstuck) {
+		ns_server_setoption(sctx, NS_SERVER_TRANSFERSTUCK, true);
 	}
 }
 

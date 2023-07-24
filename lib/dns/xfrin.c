@@ -22,6 +22,8 @@
 #include <isc/random.h>
 #include <isc/result.h>
 #include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/task.h>
+#include <isc/timer.h>
 #include <isc/util.h>
 
 #include <dns/callbacks.h>
@@ -185,6 +187,9 @@ struct dns_xfrin_ctx {
 	unsigned char *firstsoa_data;
 
 	isc_tlsctx_cache_t *tlsctx_cache;
+
+	isc_timer_t *max_time_timer;
+	isc_timer_t *max_idle_timer;
 };
 
 #define XFRIN_MAGIC    ISC_MAGIC('X', 'f', 'r', 'I')
@@ -247,6 +252,10 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 static void
 xfrin_destroy(dns_xfrin_ctx_t *xfr);
 
+static void
+xfrin_timedout(struct isc_task *, struct isc_event *);
+static void
+xfrin_idledout(struct isc_task *, struct isc_event *);
 static void
 xfrin_fail(dns_xfrin_ctx_t *xfr, isc_result_t result, const char *msg);
 static isc_result_t
@@ -758,6 +767,28 @@ dns_xfrin_create(dns_zone_t *zone, dns_rdatatype_t xfrtype,
 static void
 xfrin_cancelio(dns_xfrin_ctx_t *xfr);
 
+static void
+xfrin_timedout(struct isc_task *task, struct isc_event *event) {
+	UNUSED(task);
+
+	dns_xfrin_ctx_t *xfr = event->ev_arg;
+	REQUIRE(VALID_XFRIN(xfr));
+
+	xfrin_fail(xfr, ISC_R_TIMEDOUT, "maximum transfer time exceeded");
+	isc_event_free(&event);
+}
+
+static void
+xfrin_idledout(struct isc_task *task, struct isc_event *event) {
+	UNUSED(task);
+
+	dns_xfrin_ctx_t *xfr = event->ev_arg;
+	REQUIRE(VALID_XFRIN(xfr));
+
+	xfrin_fail(xfr, ISC_R_TIMEDOUT, "maximum idle time exceeded");
+	isc_event_free(&event);
+}
+
 void
 dns_xfrin_shutdown(dns_xfrin_ctx_t *xfr) {
 	REQUIRE(VALID_XFRIN(xfr));
@@ -833,6 +864,11 @@ xfrin_fail(dns_xfrin_ctx_t *xfr, isc_result_t result, const char *msg) {
 	if (atomic_compare_exchange_strong(&xfr->shuttingdown, &(bool){ false },
 					   true))
 	{
+		(void)isc_timer_reset(xfr->max_time_timer,
+				      isc_timertype_inactive, NULL, NULL, true);
+		(void)isc_timer_reset(xfr->max_idle_timer,
+				      isc_timertype_inactive, NULL, NULL, true);
+
 		if (result != DNS_R_UPTODATE && result != DNS_R_TOOMANYRECORDS)
 		{
 			xfrin_log(xfr, ISC_LOG_ERROR, "%s: %s", msg,
@@ -866,6 +902,9 @@ xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 	     dns_transport_t *transport, isc_tlsctx_cache_t *tlsctx_cache,
 	     dns_xfrin_ctx_t **xfrp) {
 	dns_xfrin_ctx_t *xfr = NULL;
+	dns_zonemgr_t *zmgr = dns_zone_getmgr(zone);
+	isc_timermgr_t *timermgr = dns_zonemgr_gettimermgr(zmgr);
+	isc_task_t *ztask = NULL;
 
 	xfr = isc_mem_get(mctx, sizeof(*xfr));
 	*xfr = (dns_xfrin_ctx_t){ .netmgr = netmgr,
@@ -876,7 +915,8 @@ xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 				  .maxrecords = dns_zone_getmaxrecords(zone),
 				  .primaryaddr = *primaryaddr,
 				  .sourceaddr = *sourceaddr,
-				  .firstsoa = DNS_RDATA_INIT };
+				  .firstsoa = DNS_RDATA_INIT,
+				  .magic = XFRIN_MAGIC };
 
 	isc_mem_attach(mctx, &xfr->mctx);
 	dns_zone_iattach(zone, &xfr->zone);
@@ -923,7 +963,12 @@ xfrin_create(isc_mem_t *mctx, dns_zone_t *zone, dns_db_t *db, isc_nm_t *netmgr,
 
 	isc_tlsctx_cache_attach(tlsctx_cache, &xfr->tlsctx_cache);
 
-	xfr->magic = XFRIN_MAGIC;
+	dns_zone_gettask(zone, &ztask);
+	isc_timer_create(timermgr, isc_timertype_inactive, NULL, NULL, ztask,
+			 xfrin_timedout, xfr, &xfr->max_time_timer);
+	isc_timer_create(timermgr, isc_timertype_inactive, NULL, NULL, ztask,
+			 xfrin_idledout, xfr, &xfr->max_idle_timer);
+	isc_task_detach(&ztask); /* dns_zone_task() attaches to the task */
 
 	*xfrp = xfr;
 }
@@ -1146,6 +1191,8 @@ xfrin_start(dns_xfrin_ctx_t *xfr) {
 	dns_transport_type_t transport_type = DNS_TRANSPORT_TCP;
 	isc_tlsctx_t *tlsctx = NULL;
 	isc_tlsctx_client_session_cache_t *sess_cache = NULL;
+	isc_interval_t interval;
+	isc_time_t next;
 
 	(void)isc_refcount_increment0(&xfr->connects);
 	dns_xfrin_attach(xfr, &connect_xfr);
@@ -1153,6 +1200,20 @@ xfrin_start(dns_xfrin_ctx_t *xfr) {
 	if (xfr->transport != NULL) {
 		transport_type = dns_transport_get_type(xfr->transport);
 	}
+
+	/* Set the maximum timer */
+	isc_interval_set(&interval, dns_zone_getmaxxfrin(xfr->zone), 0);
+	isc_time_nowplusinterval(&next, &interval);
+	result = isc_timer_reset(xfr->max_time_timer, isc_timertype_once, &next,
+				 NULL, true);
+	RUNTIME_CHECK(result == ISC_R_SUCCESS);
+
+	/* Set the idle timer */
+	isc_interval_set(&interval, dns_zone_getidlein(xfr->zone), 0);
+	isc_time_nowplusinterval(&next, &interval);
+	result = isc_timer_reset(xfr->max_idle_timer, isc_timertype_once, &next,
+				 NULL, true);
+	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	/*
 	 * XXX: timeouts are hard-coded to 30 seconds; this needs to be
@@ -1221,7 +1282,6 @@ xfrin_connect_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	const char *signer = "", *sep = "";
 	isc_sockaddr_t sockaddr;
 	dns_zonemgr_t *zmgr = NULL;
-	isc_time_t now;
 
 	REQUIRE(VALID_XFRIN(xfr));
 
@@ -1231,21 +1291,21 @@ xfrin_connect_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 		result = ISC_R_SHUTTINGDOWN;
 	}
 
-	CHECK(result);
+	if (result != ISC_R_SUCCESS) {
+		xfrin_fail(xfr, result, "failed to connect");
+		goto failure;
+	}
 
-	CHECK(isc_nm_xfr_checkperm(handle));
+	result = isc_nm_xfr_checkperm(handle);
+	if (result != ISC_R_SUCCESS) {
+		xfrin_fail(xfr, result, "connected but unable to transfer");
+		goto failure;
+	}
 
 	zmgr = dns_zone_getmgr(xfr->zone);
 	if (zmgr != NULL) {
-		if (result != ISC_R_SUCCESS) {
-			TIME_NOW(&now);
-			dns_zonemgr_unreachableadd(zmgr, &xfr->primaryaddr,
-						   &xfr->sourceaddr, &now);
-			CHECK(result);
-		} else {
-			dns_zonemgr_unreachabledel(zmgr, &xfr->primaryaddr,
-						   &xfr->sourceaddr);
-		}
+		dns_zonemgr_unreachabledel(zmgr, &xfr->primaryaddr,
+					   &xfr->sourceaddr);
 	}
 
 	xfr->handle = handle;
@@ -1262,14 +1322,40 @@ xfrin_connect_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	xfrin_log(xfr, ISC_LOG_INFO, "connected using %s%s%s", sourcetext, sep,
 		  signer);
 
-	CHECK(xfrin_send_request(xfr));
-
-failure:
+	result = xfrin_send_request(xfr);
 	if (result != ISC_R_SUCCESS) {
-		xfrin_fail(xfr, result, "failed to connect");
+		xfrin_fail(xfr, result, "connected but unable to send");
 	}
 
-	dns_xfrin_detach(&xfr); /* connect_xfr */
+failure:
+	switch (result) {
+	case ISC_R_SUCCESS:
+		break;
+	case ISC_R_NETDOWN:
+	case ISC_R_HOSTDOWN:
+	case ISC_R_NETUNREACH:
+	case ISC_R_HOSTUNREACH:
+	case ISC_R_CONNREFUSED:
+		/*
+		 * Add the server to unreachable primaries table only if
+		 * the server has a permanent networking error.
+		 */
+		zmgr = dns_zone_getmgr(xfr->zone);
+		if (zmgr != NULL) {
+			isc_time_t now;
+
+			TIME_NOW(&now);
+
+			dns_zonemgr_unreachableadd(zmgr, &xfr->primaryaddr,
+						   &xfr->sourceaddr, &now);
+		}
+		break;
+	default:
+		/* Retry sooner than in 10 minutes */
+		break;
+	}
+
+	dns_xfrin_detach(&xfr);
 }
 
 /*
@@ -1474,6 +1560,10 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 	if (atomic_load(&xfr->shuttingdown)) {
 		result = ISC_R_SHUTTINGDOWN;
 	}
+
+	/* Stop the idle timer */
+	(void)isc_timer_reset(xfr->max_idle_timer, isc_timertype_inactive, NULL,
+			      NULL, true);
 
 	CHECK(result);
 
@@ -1729,6 +1819,8 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 		}
 
 		atomic_store(&xfr->shuttingdown, true);
+		(void)isc_timer_reset(xfr->max_time_timer,
+				      isc_timertype_inactive, NULL, NULL, true);
 		xfr->shutdown_result = ISC_R_SUCCESS;
 		break;
 	default:
@@ -1740,6 +1832,13 @@ xfrin_recv_done(isc_nmhandle_t *handle, isc_result_t result,
 		dns_message_detach(&msg);
 		isc_refcount_increment0(&xfr->recvs);
 		isc_nm_read(xfr->handle, xfrin_recv_done, xfr);
+		isc_time_t next;
+		isc_interval_t interval;
+		isc_interval_set(&interval, dns_zone_getidlein(xfr->zone), 0);
+		isc_time_nowplusinterval(&next, &interval);
+		result = isc_timer_reset(xfr->max_idle_timer,
+					 isc_timertype_once, &next, NULL, true);
+		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 		return;
 	}
 
@@ -1865,6 +1964,9 @@ xfrin_destroy(dns_xfrin_ctx_t *xfr) {
 	if (xfr->tlsctx_cache != NULL) {
 		isc_tlsctx_cache_detach(&xfr->tlsctx_cache);
 	}
+
+	isc_timer_destroy(&xfr->max_idle_timer);
+	isc_timer_destroy(&xfr->max_time_timer);
 
 	isc_mem_putanddetach(&xfr->mctx, xfr, sizeof(*xfr));
 }

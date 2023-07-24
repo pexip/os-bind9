@@ -57,6 +57,14 @@ resolve_CPPFLAGS =		\
 
 resolve_LDADD = $(LIBISC_LIBS) $(LIBIRS_LIBS) $(LIBDNS_LIBS)
 
+rpz_dnsrps_CPPFLAGS =		\
+	$(AM_CPPFLAGS)		\
+	$(LIBDNS_CFLAGS)
+
+rpz_dnsrps_LDADD =		\
+	$(LDADD)		\
+	$(LIBDNS_LIBS)
+
 tkey_keycreate_CPPFLAGS =	\
 	$(AM_CPPFLAGS)		\
 	$(LIBDNS_CFLAGS)
@@ -239,9 +247,9 @@ LOG_DRIVER_V_1 = --verbose yes
 LOG_DRIVER = $(srcdir)/custom-test-driver
 AM_LOG_DRIVER_FLAGS = $(LOG_DRIVER_V)
 
-LOG_COMPILER = $(builddir)/run.sh
+LOG_COMPILER = $(builddir)/legacy.run.sh
 AM_LOG_FLAGS = -r
 
-$(TESTS): run.sh
+$(TESTS): legacy.run.sh
 
 test-local: check

@@ -651,7 +651,7 @@ by the channel (the default is ``info``), and whether to include a
    allowed to become before it is rolled to a backup file (``size``), how
    many backup versions of the file are saved each time this happens
    (``versions``), and the format to use for naming backup versions
-   (:any:`suffix`).
+   (``suffix``).
 
    The ``size`` option is used to limit log file growth. If the file ever
    exceeds the specified size, then :iscman:`named` stops writing to the file
@@ -667,18 +667,18 @@ by the channel (the default is ``info``), and whether to include a
    how many backup versions of the file should be kept. If set to
    ``unlimited``, there is no limit.
 
-   The :any:`suffix` option can be set to either ``increment`` or
+   The ``suffix`` option can be set to either ``increment`` or
    ``timestamp``. If set to ``timestamp``, then when a log file is rolled,
    it is saved with the current timestamp as a file suffix. If set to
    ``increment``, then backup files are saved with incrementing numbers as
    suffixes; older files are renamed when rolling. For example, if
-   ``versions`` is set to 3 and :any:`suffix` to ``increment``, then when
+   ``versions`` is set to 3 and ``suffix`` to ``increment``, then when
    ``filename.log`` reaches the size specified by ``size``,
    ``filename.log.1`` is renamed to ``filename.log.2``, ``filename.log.0``
    is renamed to ``filename.log.1``, and ``filename.log`` is renamed to
    ``filename.log.0``, whereupon a new ``filename.log`` is opened.
 
-   Here is an example using the ``size``, ``versions``, and :any:`suffix` options:
+   Here is an example using the ``size``, ``versions``, and ``suffix`` options:
 
    ::
 
@@ -1284,10 +1284,10 @@ default is used.
    options can be added: ``size`` indicates the size to which a
    :any:`dnstap` log file can grow before being rolled to a new file;
    ``versions`` specifies the number of rolled log files to retain; and
-   :any:`suffix` indicates whether to retain rolled log files with an
+   ``suffix`` indicates whether to retain rolled log files with an
    incrementing counter as the suffix (``increment``) or with the
    current timestamp (``timestamp``). These are similar to the ``size``,
-   ``versions``, and :any:`suffix` options in a :any:`logging` channel. The
+   ``versions``, and ``suffix`` options in a :any:`logging` channel. The
    default is to allow :any:`dnstap` log files to grow to any size without
    rolling.
 
@@ -1399,14 +1399,20 @@ default is used.
    :tags: query
    :short: Controls QNAME minimization behavior in the BIND 9 resolver.
 
-   This option controls QNAME minimization behavior in the BIND
-   resolver. When set to ``strict``, BIND follows the QNAME
+   When this is set to ``strict``, BIND follows the QNAME
    minimization algorithm to the letter, as specified in :rfc:`7816`.
+
    Setting this option to ``relaxed`` causes BIND to fall back to
    normal (non-minimized) query mode when it receives either NXDOMAIN or
    other unexpected responses (e.g., SERVFAIL, improper zone cut,
-   REFUSED) to a minimized query. ``disabled`` disables QNAME
-   minimization completely. ``off`` is a synonym for ``disabled``. The current default is ``relaxed``, but it
+   REFUSED) to a minimized query. A resolver can use a leading
+   underscore, like ``_.example.com``, in an attempt to improve
+   interoperability. (See :rfc:`7816` section 3.)
+
+   ``disabled`` disables QNAME minimization completely.
+   ``off`` is a synonym for ``disabled``.
+
+   The current default is ``relaxed``, but it
    may be changed to ``strict`` in a future release.
 
 .. namedconf:statement:: tkey-gssapi-keytab
@@ -1447,7 +1453,7 @@ default is used.
    is specified using :any:`tkey-gssapi-keytab`.
 
 .. namedconf:statement:: tkey-dhkey
-   :tags: security
+   :tags: deprecated
    :short: Sets the Diffie-Hellman key used by the server to generate shared keys.
 
    This is the Diffie-Hellman key used by the server to generate shared keys
@@ -1455,6 +1461,9 @@ default is used.
    must be able to load the public and private keys from files in the
    working directory. In most cases, the ``key_name`` should be the
    server's host name.
+
+   This option is deprecated, and will be rendered non-operational in a
+   future release.
 
 .. namedconf:statement:: dump-file
    :tags: logging
@@ -1624,7 +1633,7 @@ default is used.
    IPv4 and AAAA when responding to queries that arrived via IPv6.
 
 .. namedconf:statement:: root-delegation-only
-   :tags: query
+   :tags: deprecated
    :short: Turns on enforcement of delegation-only in top-level domains (TLDs) and root zones with an optional exclude list.
 
    This turns on enforcement of delegation-only in top-level domains (TLDs)
@@ -1659,6 +1668,9 @@ default is used.
       options {
           root-delegation-only exclude { "de"; "lv"; "us"; "museum"; };
       };
+
+   This option is deprecated, and will be rendered non-operational in a
+   future release.
 
 .. namedconf:statement:: disable-algorithms
    :tags: dnssec
@@ -3441,6 +3453,12 @@ options apply to zone transfers.
    terminated. The default is 60 minutes (1 hour). The maximum value
    is 28 days (40320 minutes).
 
+   .. note:: The inbound zone transfers are also affected by
+             ``tcp-idle-timeout``, the ``max-transfer-idle-in`` will close the
+             inbound zone transfer if there was no complete AXFR or no complete
+             IXFR chunk. The ``tcp-idle-timeout`` will close the connection if
+             there's no progress on the TCP level.
+
 .. namedconf:statement:: max-transfer-time-out
    :tags: transfer
    :short: Specifies the number of minutes after which outbound zone transfers are terminated.
@@ -3913,6 +3931,11 @@ system.
        :any:`max-cache-size` appropriately for each view, as using the
        default value of that option (90% of physical memory for each
        individual cache) may lead to memory exhaustion over time.
+
+   .. note::
+
+       :any:`max-cache-size` does not work reliably for the maximum
+       amount of memory of 100 MB or lower.
 
    Upon startup and reconfiguration, caches with a limited size
    preallocate a small amount of memory (less than 1% of
@@ -4497,9 +4520,8 @@ Tuning
    dropping patterns, the query is retried over TCP.  Per-server EDNS statistics
    are only retained in memory for the lifetime of a given server's ADB entry.
 
-   The :iscman:`named` now sets the DON'T FRAGMENT flag on outgoing UDP packets.
-   According to the measurements done by multiple parties this should not be
-   causing any operational problems as most of the Internet "core" is able to
+   According to the measurements done by multiple parties the default value
+   should not be causing the fragmentation as most of the Internet "core" is able to
    cope with IP message sizes between 1400-1500 bytes, the 1232 size was picked
    as a conservative minimal number that could be changed by the DNS operator to
    a estimated path MTU minus the estimated header space. In practice, the
@@ -5729,7 +5751,6 @@ any top-level :namedconf:ref:`server` statements are used as defaults.
 .. namedconf:statement:: keys
    :tags: server, security
    :short: Specifies one or more :any:`server_key` s to be used with a remote server.
-
    :suppress_grammar:
 
    .. warning::
@@ -6020,7 +6041,7 @@ to achieve Strict TLS, one needs to use :any:`remote-hostname` and, optionally,
 outgoing connections (e.g. the ones used to download zone from
 primaries via TLS). Providing any of the mentioned options will enable
 server authentication. If :any:`remote-hostname` is provided but :any:`ca-file` is
-missed, then the platform-specific certificate authority certificates
+missing, then the platform-specific certificate authority certificates
 are used for authentication. The set roughly corresponds to the one
 used by WEB-browsers to authenticate HTTPS hosts. On the other hand,
 if :any:`ca-file` is provided but :any:`remote-hostname` is missing, then the
@@ -6707,7 +6728,6 @@ Here is an example of a typical split DNS setup implemented using
 .. namedconf:statement:: zone
    :tags: zone
    :short: Specifies the zone in a BIND 9 configuration.
-
    :suppress_grammar:
 
 :any:`zone` Block Definition and Usage
@@ -6718,7 +6738,6 @@ Zone Types
 .. namedconf:statement:: type
    :tags: zone
    :short: Specifies the kind of zone in a given configuration.
-
    :suppress_grammar:
 
    The :any:`type` keyword is required for the :any:`zone` configuration unless
@@ -6953,18 +6972,21 @@ Zone Types
    zones are reloaded along with other zones.
 
 .. namedconf:statement:: type delegation-only
-   :tags: query
+   :tags: deprecated
    :short: Enforces the delegation-only status of infrastructure zones (COM, NET, ORG, etc.).
 
-   This zone type is used to enforce the delegation-only status of infrastructure
-   zones (e.g., COM, NET, ORG). Any answer that is received without an
-   explicit or implicit delegation in the authority section is treated
-   as NXDOMAIN. This does not apply to the zone apex, and should not be
-   applied to leaf zones.
+   This zone type is used to enforce the delegation-only status of
+   infrastructure zones (e.g., COM, NET, ORG). Any answer that is received
+   without an explicit or implicit delegation in the authority section is
+   treated as NXDOMAIN. This does not apply to the zone apex, and should
+   not be applied to leaf zones.
 
    :any:`delegation-only` has no effect on answers received from forwarders.
 
    See caveats in :any:`root-delegation-only`.
+
+   This zone type is deprecated, and will be rendered non-operational in a
+   future release.
 
 .. namedconf:statement:: in-view
    :tags: view, zone
@@ -7094,7 +7116,7 @@ Zone Options
    See the description of :any:`dialup` in :ref:`boolean_options`.
 
 .. namedconf:statement:: delegation-only
-   :tags: zone
+   :tags: deprecated
    :short: Indicates that a forward, hint, or stub zone is to be treated as a delegation-only type zone.
 
    This flag only applies to forward, hint, and stub zones. If set to
@@ -7102,6 +7124,9 @@ Zone Options
    delegation-only type zone.
 
    See caveats in :any:`root-delegation-only`.
+
+   This option is deprecated, and will be rendered non-operational in a
+   future release.
 
 .. namedconf:statement:: file
    :tags: zone
@@ -7892,7 +7917,7 @@ Name Server Statistics Counters
     This indicates the number of queries which the server attempted to recurse but for which it discovered an existing query with the same IP address, port, query ID, name, type, and class already being processed. This corresponds to the ``duplicate`` counter of previous versions of BIND 9.
 
 ``QryDropped``
-    This indicates the number of recursive queries for which the server discovered an excessive number of existing recursive queries for the same name, type, and class, and which were subsequently dropped. This is the number of dropped queries due to the reason explained with the :any:`clients-per-query` and :any:`max-clients-per-query` options. This corresponds to the ``dropped`` counter of previous versions of BIND 9.
+    This indicates the number of recursive queries dropped by the server as a result of configured limits. These limits include the settings of the :any:`fetches-per-zone`, :any:`fetches-per-server`, :any:`clients-per-query`, and :any:`max-clients-per-query` options, as well as the :any:`rate-limit` option. This corresponds to the ``dropped`` counter of previous versions of BIND 9.
 
 ``QryFailure``
     This indicates the number of query failures. This corresponds to the ``failure`` counter of previous versions of BIND 9. Note: this counter is provided mainly for backward compatibility with previous versions; normally, more fine-grained counters such as ``AuthQryRej`` and ``RecQryRej`` that would also fall into this counter are provided, so this counter is not of much interest in practice.
@@ -8032,6 +8057,12 @@ Resolver Statistics Counters
 ``QuerySockFail``
     This indicates the number of failures in opening query sockets. One common reason for such failures is due to a limitation on file descriptors.
 
+``QueryCurUDP``
+    This indicates the number of UDP queries in progress.
+
+``QueryCurTCP``
+    This indicates the number of TCP queries in progress.
+
 ``QueryTimeout``
     This indicates the number of query timeouts.
 
@@ -8061,6 +8092,48 @@ Resolver Statistics Counters
 
 ``QryRTTnn``
     This provides a frequency table on query round-trip times (RTTs). Each ``nn`` specifies the corresponding frequency. In the sequence of ``nn_1``, ``nn_2``, ..., ``nn_m``, the value of ``nn_i`` is the number of queries whose RTTs are between ``nn_(i-1)`` (inclusive) and ``nn_i`` (exclusive) milliseconds. For the sake of convenience, we define ``nn_0`` to be 0. The last entry should be represented as ``nn_m+``, which means the number of queries whose RTTs are equal to or greater than ``nn_m`` milliseconds.
+
+``NumFetch``
+    This indicates the number of active fetches.
+
+``BucketSize``
+    This indicates the number the resolver's internal buckets (a static number).
+
+``REFUSED``
+    This indicates the number of REFUSED responses received.
+
+``ClientCookieOut``
+    This indicates the number of COOKIE sent with client cookie only.
+
+``ServerCookieOut``
+    This indicates the number of COOKIE sent with client and server cookie.
+
+``CookieIn``
+    This indicates the number of COOKIE replies received.
+
+``CookieClientOk``
+    This indicates the number of COOKIE client ok.
+
+``BadEDNSVersion``
+    This indicates the number of bad EDNS version replies received.
+
+``BadCookieRcode``
+    This indicates the number of bad cookie rcode replies received.
+
+``ZoneQuota``
+    This indicates the number of queries spilled due to zone quota.
+
+``ServerQuota``
+    This indicates the number of queries spilled due to server quota.
+
+``ClientQuota``
+    This indicates the number of queries spilled due to clients per query quota.
+
+``NextItem``
+    This indicates the number of waits for next item, when an invalid response is received.
+
+``Priming``
+    This indicates the number of priming fetches performed by the resolver.
 
 .. _socket_stats:
 

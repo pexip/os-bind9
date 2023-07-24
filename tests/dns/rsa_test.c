@@ -11,6 +11,7 @@
  * information regarding copyright ownership.
  */
 
+#include <inttypes.h>
 #include <sched.h> /* IWYU pragma: keep */
 #include <setjmp.h>
 #include <stdarg.h>
@@ -19,6 +20,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+/*
+ * As a workaround, include an OpenSSL header file before including cmocka.h,
+ * because OpenSSL 3.1.0 uses __attribute__(malloc), conflicting with a
+ * redefined malloc in cmocka.h.
+ */
+#include <openssl/err.h>
 
 #define UNIT_TESTING
 #include <cmocka.h>

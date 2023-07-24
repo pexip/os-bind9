@@ -15,7 +15,6 @@ libisc_la_HEADERS =			\
 	include/isc/barrier.h		\
 	include/isc/base32.h		\
 	include/isc/base64.h		\
-	include/isc/bind9.h		\
 	include/isc/buffer.h		\
 	include/isc/cmocka.h		\
 	include/isc/commandline.h	\
@@ -31,7 +30,6 @@ libisc_la_HEADERS =			\
 	include/isc/eventclass.h	\
 	include/isc/file.h		\
 	include/isc/formatcheck.h	\
-	include/isc/fsaccess.h		\
 	include/isc/fuzz.h		\
 	include/isc/glob.h		\
 	include/isc/hash.h		\
@@ -120,7 +118,6 @@ libisc_la_SOURCES =		\
 	backtrace.c		\
 	base32.c		\
 	base64.c		\
-	bind9.c			\
 	buffer.c		\
 	commandline.c		\
 	condition.c		\
@@ -135,9 +132,6 @@ libisc_la_SOURCES =		\
 	error.c			\
 	event.c			\
 	file.c			\
-	fsaccess.c		\
-	fsaccess_common.c	\
-	fsaccess_common_p.h	\
 	glob.c			\
 	hash.c			\
 	heap.c			\

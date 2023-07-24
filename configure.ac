@@ -16,7 +16,7 @@
 #
 m4_define([bind_VERSION_MAJOR], 9)dnl
 m4_define([bind_VERSION_MINOR], 18)dnl
-m4_define([bind_VERSION_PATCH], 12)dnl
+m4_define([bind_VERSION_PATCH], 16)dnl
 m4_define([bind_VERSION_EXTRA], )dnl
 m4_define([bind_DESCRIPTION], [(Extended Support Version)])dnl
 m4_define([bind_SRCID], [m4_esyscmd_s([git rev-parse --short HEAD | cut -b1-7])])dnl
@@ -406,42 +406,6 @@ AC_COMPILE_IFELSE(
 AX_GCC_FUNC_ATTRIBUTE([returns_nonnull])
 
 #
-# check if we have kqueue
-#
-# [pairwise: --enable-kqueue, --disable-kqueue]
-AC_ARG_ENABLE([kqueue],
-	      [AS_HELP_STRING([--enable-kqueue],
-			      [use BSD kqueue when available [default=yes]])],
-	      [], enable_kqueue="yes")
-
-AS_IF([test "$enable_kqueue" = "yes"],
-      [AC_CHECK_FUNCS([kqueue])])
-
-#
-# check if we have epoll.  Linux kernel 2.4 has epoll_create() which fails,
-# so we need to try running the code, not just test its existence.
-#
-# [pairwise: --enable-epoll, --disable-epoll]
-AC_ARG_ENABLE([epoll],
-	      [AS_HELP_STRING([--enable-epoll],
-			      [use Linux epoll when available [default=auto]])],
-	      [], [enable_epoll="yes"])
-
-AS_IF([test "$enable_epoll" = "yes"],
-      [AC_CHECK_FUNCS([epoll_create1])])
-
-#
-# check if we support /dev/poll
-#
-# [pairwise: --enable-devpoll, --disable-devpoll]
-AC_ARG_ENABLE([devpoll],
-	      [AS_HELP_STRING([--enable-devpoll],
-			      [use /dev/poll when available [default=yes]])],
-	      [], [enable_devpoll="yes"])
-AS_IF([test "$enable_devpoll" = "yes"],
-      [AC_CHECK_HEADERS([sys/devpoll.h devpoll.h])])
-
-#
 # GeoIP support?
 #
 # Should be on by default if libmaxminddb exists.
@@ -541,9 +505,9 @@ AC_CHECK_FUNCS([pthread_setname_np pthread_set_name_np])
 AC_CHECK_HEADERS([pthread_np.h], [], [], [#include <pthread.h>])
 
 # libuv
-AC_MSG_CHECKING([for libuv])
-PKG_CHECK_MODULES([LIBUV], [libuv >= 1.0.0], [],
-		  [AC_MSG_ERROR([libuv not found])])
+PKG_CHECK_MODULES([LIBUV], [libuv >= 1.37.0], [],
+		  [PKG_CHECK_MODULES([LIBUV], [libuv >= 1.0.0 libuv < 1.35.0], [],
+				     [AC_MSG_ERROR([libuv >= 1.0.0 (except 1.35.0 and 1.36.0) not found])])])
 
 AX_SAVE_FLAGS([libuv])
 CFLAGS="$CFLAGS $LIBUV_CFLAGS"
@@ -1245,12 +1209,17 @@ AM_CONDITIONAL([HAVE_DNSTAP], [test "$enable_dnstap" != "no"])
 # Look for sphinx-build
 #
 AC_ARG_VAR([SPHINX_BUILD], [path to sphinx-build binary used to build the documentation])
-AC_PATH_PROG([SPHINX_BUILD], [sphinx-build], [:])
-AM_CONDITIONAL([HAVE_SPHINX_BUILD], [test "$SPHINX_BUILD" != ":"])
+AC_PATH_PROG([SPHINX_BUILD], [sphinx-build], [])
+AM_CONDITIONAL([HAVE_SPHINX_BUILD], [test -n "$SPHINX_BUILD"])
 
-AC_PATH_PROG([XELATEX], [xelatex], [:])
-AC_PATH_PROG([LATEXMK], [latexmk], [:])
-AM_CONDITIONAL([HAVE_XELATEX], [test "$XELATEX" != ":" && test "$LATEXMK" != ":"])
+AC_PATH_PROG([XELATEX], [xelatex], [])
+AC_PATH_PROG([LATEXMK], [latexmk], [])
+AM_CONDITIONAL([HAVE_XELATEX], [test -n "$XELATEX" && test -n "$LATEXMK"])
+
+#
+# Build the man pages only if we have prebuilt manpages or we can build them from RST sources
+#
+AM_CONDITIONAL([BUILD_MANPAGES], [test -e doc/man/named.conf.5in || test -n "$SPHINX_BUILD"])
 
 #
 # Pull release date from CHANGES file last modification date
@@ -1586,8 +1555,8 @@ AC_CONFIG_FILES([bin/tests/Makefile
 
 AC_CONFIG_FILES([bin/tests/system/ifconfig.sh],
 		[chmod +x bin/tests/system/ifconfig.sh])
-AC_CONFIG_FILES([bin/tests/system/run.sh],
-		[chmod +x bin/tests/system/run.sh])
+AC_CONFIG_FILES([bin/tests/system/legacy.run.sh],
+		[chmod +x bin/tests/system/legacy.run.sh])
 AC_CONFIG_FILES([bin/tests/system/start.sh],
 		[chmod +x bin/tests/system/start.sh])
 AC_CONFIG_FILES([bin/tests/system/stop.sh],

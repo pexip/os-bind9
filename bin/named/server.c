@@ -2500,9 +2500,9 @@ configure_rpz(dns_view_t *view, dns_view_t *pview, const cfg_obj_t **maps,
 	}
 #endif /* ifndef USE_DNSRPS */
 
-	result = dns_rpz_new_zones(&view->rpzs, rps_cstr, rps_cstr_size,
-				   view->mctx, named_g_taskmgr,
-				   named_g_timermgr);
+	result = dns_rpz_new_zones(view->mctx, named_g_taskmgr,
+				   named_g_timermgr, rps_cstr, rps_cstr_size,
+				   &view->rpzs);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
@@ -2638,8 +2638,10 @@ configure_rpz(dns_view_t *view, dns_view_t *pview, const cfg_obj_t **maps,
 	}
 
 	if (*old_rpz_okp) {
+		dns_rpz_shutdown_rpzs(view->rpzs);
 		dns_rpz_detach_rpzs(&view->rpzs);
 		dns_rpz_attach_rpzs(pview->rpzs, &view->rpzs);
+		dns_rpz_detach_rpzs(&pview->rpzs);
 	} else if (old != NULL && pview != NULL) {
 		++pview->rpzs->rpz_ver;
 		view->rpzs->rpz_ver = pview->rpzs->rpz_ver;
@@ -2875,7 +2877,7 @@ cleanup:
 		cfg_obj_destroy(cfg->add_parser, &zoneconf);
 	}
 	dns_catz_entry_detach(ev->origin, &ev->entry);
-	dns_catz_zone_detach(&ev->origin);
+	dns_catz_detach_catz(&ev->origin);
 	dns_view_detach(&ev->view);
 	isc_event_free(ISC_EVENT_PTR(&ev));
 }
@@ -2950,7 +2952,7 @@ cleanup:
 		dns_zone_detach(&zone);
 	}
 	dns_catz_entry_detach(ev->origin, &ev->entry);
-	dns_catz_zone_detach(&ev->origin);
+	dns_catz_detach_catz(&ev->origin);
 	dns_view_detach(&ev->view);
 	isc_event_free(ISC_EVENT_PTR(&ev));
 }
@@ -2992,7 +2994,7 @@ catz_create_chg_task(dns_catz_entry_t *entry, dns_catz_zone_t *origin,
 	event->mod = (type == DNS_EVENT_CATZMODZONE);
 
 	dns_catz_entry_attach(entry, &event->entry);
-	dns_catz_zone_attach(origin, &event->origin);
+	dns_catz_attach_catz(origin, &event->origin);
 	dns_view_attach(view, &event->view);
 
 	isc_task_send(task, ISC_EVENT_PTR(&event));
@@ -3159,7 +3161,7 @@ static dns_catz_zonemodmethods_t ns_catz_zonemodmethods = {
 static isc_result_t
 configure_catz(dns_view_t *view, dns_view_t *pview, const cfg_obj_t *config,
 	       const cfg_obj_t *catz_obj) {
-	const cfg_listelt_t *zone_element;
+	const cfg_listelt_t *zone_element = NULL;
 	const dns_catz_zones_t *old = NULL;
 	bool pview_must_detach = false;
 	isc_result_t result;
@@ -3172,9 +3174,8 @@ configure_catz(dns_view_t *view, dns_view_t *pview, const cfg_obj_t *config,
 		return (ISC_R_SUCCESS);
 	}
 
-	CHECK(dns_catz_new_zones(&view->catzs, &ns_catz_zonemodmethods,
-				 view->mctx, named_g_taskmgr,
-				 named_g_timermgr));
+	CHECK(dns_catz_new_zones(view->mctx, named_g_taskmgr, named_g_timermgr,
+				 &view->catzs, &ns_catz_zonemodmethods));
 
 	if (pview != NULL) {
 		old = pview->catzs;
@@ -3188,8 +3189,10 @@ configure_catz(dns_view_t *view, dns_view_t *pview, const cfg_obj_t *config,
 	}
 
 	if (old != NULL) {
-		dns_catz_catzs_detach(&view->catzs);
-		dns_catz_catzs_attach(pview->catzs, &view->catzs);
+		dns_catz_shutdown_catzs(view->catzs);
+		dns_catz_detach_catzs(&view->catzs);
+		dns_catz_attach_catzs(pview->catzs, &view->catzs);
+		dns_catz_detach_catzs(&pview->catzs);
 		dns_catz_prereconfig(view->catzs);
 	}
 
@@ -3920,8 +3923,7 @@ configure_dnstap(const cfg_obj_t **maps, dns_view_t *view) {
 	if (result == ISC_R_SUCCESS && cfg_obj_isboolean(obj)) {
 		/* "hostname" is interpreted as boolean true */
 		char buf[256];
-		result = named_os_gethostname(buf, sizeof(buf));
-		if (result == ISC_R_SUCCESS) {
+		if (gethostname(buf, sizeof(buf)) == 0) {
 			dns_dt_setidentity(named_g_server->dtenv, buf);
 		}
 	} else if (result == ISC_R_SUCCESS && !cfg_obj_isvoid(obj)) {
@@ -4042,6 +4044,28 @@ minimal_cache_allowed(const cfg_obj_t *maps[4],
 
 static const char *const response_synonyms[] = { "response", NULL };
 
+static const dns_name_t *
+algorithm_name(unsigned int alg) {
+	switch (alg) {
+	case DST_ALG_HMACMD5:
+		return (dns_tsig_hmacmd5_name);
+	case DST_ALG_HMACSHA1:
+		return (dns_tsig_hmacsha1_name);
+	case DST_ALG_HMACSHA224:
+		return (dns_tsig_hmacsha224_name);
+	case DST_ALG_HMACSHA256:
+		return (dns_tsig_hmacsha256_name);
+	case DST_ALG_HMACSHA384:
+		return (dns_tsig_hmacsha384_name);
+	case DST_ALG_HMACSHA512:
+		return (dns_tsig_hmacsha512_name);
+	case DST_ALG_GSSAPI:
+		return (dns_tsig_gssapi_name);
+	default:
+		UNREACHABLE();
+	}
+}
+
 /*
  * Configure 'view' according to 'vconfig', taking defaults from
  * 'config' where values are missing in 'vconfig'.
@@ -4072,7 +4096,8 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	const cfg_obj_t *dyndb_list, *plugin_list;
 	const cfg_obj_t *disabled;
 	const cfg_obj_t *obj, *obj2;
-	const cfg_listelt_t *element;
+	const cfg_listelt_t *element = NULL;
+	const cfg_listelt_t *zone_element_latest = NULL;
 	in_port_t port;
 	dns_cache_t *cache = NULL;
 	isc_result_t result;
@@ -4090,7 +4115,6 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	dns_dispatch_t *dispatch6 = NULL;
 	bool rpz_configured = false;
 	bool catz_configured = false;
-	bool zones_configured = false;
 	bool shared_cache = false;
 	int i = 0, j = 0, k = 0;
 	const char *str;
@@ -4201,8 +4225,8 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 		CHECK(configure_zone(config, zconfig, vconfig, mctx, view,
 				     viewlist, kasplist, actx, false,
 				     old_rpz_ok, false));
+		zone_element_latest = element;
 	}
-	zones_configured = true;
 
 	/*
 	 * Check that a primary or secondary zone was found for each
@@ -5074,8 +5098,18 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	 */
 	CHECK(named_tsigkeyring_fromconfig(config, vconfig, view->mctx, &ring));
 	if (named_g_server->sessionkey != NULL) {
-		CHECK(dns_tsigkeyring_add(ring, named_g_server->session_keyname,
-					  named_g_server->sessionkey));
+		dns_tsigkey_t *tsigkey = NULL;
+		result = dns_tsigkey_createfromkey(
+			named_g_server->session_keyname,
+			algorithm_name(named_g_server->session_keyalg),
+			named_g_server->sessionkey, false, NULL, 0, 0, mctx,
+			NULL, &tsigkey);
+		if (result == ISC_R_SUCCESS) {
+			result = dns_tsigkeyring_add(
+				ring, named_g_server->session_keyname, tsigkey);
+			dns_tsigkey_detach(&tsigkey);
+		}
+		CHECK(result);
 	}
 	dns_view_setkeyring(view, ring);
 	dns_tsigkeyring_detach(&ring);
@@ -6046,9 +6080,6 @@ cleanup:
 			    named_config_get(maps, "catalog-zones", &obj) ==
 				    ISC_R_SUCCESS)
 			{
-				if (pview->catzs != NULL) {
-					dns_catz_catzs_detach(&pview->catzs);
-				}
 				/*
 				 * We are swapping the places of the `view` and
 				 * `pview` in the function's parameters list
@@ -6076,7 +6107,7 @@ cleanup:
 			dns_view_detach(&pview);
 		}
 
-		if (zones_configured) {
+		if (zone_element_latest != NULL) {
 			for (element = cfg_list_first(zonelist);
 			     element != NULL; element = cfg_list_next(element))
 			{
@@ -6084,6 +6115,13 @@ cleanup:
 					cfg_listelt_value(element);
 				configure_zone_setviewcommit(result, zconfig,
 							     view);
+				if (element == zone_element_latest) {
+					/*
+					 * This was the latest element that was
+					 * successfully configured earlier.
+					 */
+					break;
+				}
 			}
 		}
 	}
@@ -7529,7 +7567,7 @@ cleanup_session_key(named_server_t *server, isc_mem_t *mctx) {
 	}
 
 	if (server->sessionkey != NULL) {
-		dns_tsigkey_detach(&server->sessionkey);
+		dst_key_free(&server->sessionkey);
 	}
 
 	server->session_keyalg = DST_ALG_UNKNOWN;
@@ -7539,9 +7577,8 @@ cleanup_session_key(named_server_t *server, isc_mem_t *mctx) {
 static isc_result_t
 generate_session_key(const char *filename, const char *keynamestr,
 		     const dns_name_t *keyname, const char *algstr,
-		     const dns_name_t *algname, unsigned int algtype,
-		     uint16_t bits, isc_mem_t *mctx, bool first_time,
-		     dns_tsigkey_t **tsigkeyp) {
+		     unsigned int algtype, uint16_t bits, isc_mem_t *mctx,
+		     bool first_time, dst_key_t **keyp) {
 	isc_result_t result = ISC_R_SUCCESS;
 	dst_key_t *key = NULL;
 	isc_buffer_t key_txtbuffer;
@@ -7549,8 +7586,6 @@ generate_session_key(const char *filename, const char *keynamestr,
 	char key_txtsecret[256];
 	char key_rawsecret[64];
 	isc_region_t key_rawregion;
-	isc_stdtime_t now;
-	dns_tsigkey_t *tsigkey = NULL;
 	FILE *fp = NULL;
 
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
@@ -7566,8 +7601,7 @@ generate_session_key(const char *filename, const char *keynamestr,
 	}
 
 	/*
-	 * Dump the key to the buffer for later use.  Should be done before
-	 * we transfer the ownership of key to tsigkey.
+	 * Dump the key to the buffer for later use.
 	 */
 	isc_buffer_init(&key_rawbuffer, &key_rawsecret, sizeof(key_rawsecret));
 	CHECK(dst_key_tobuffer(key, &key_rawbuffer));
@@ -7575,11 +7609,6 @@ generate_session_key(const char *filename, const char *keynamestr,
 	isc_buffer_usedregion(&key_rawbuffer, &key_rawregion);
 	isc_buffer_init(&key_txtbuffer, &key_txtsecret, sizeof(key_txtsecret));
 	CHECK(isc_base64_totext(&key_rawregion, -1, "", &key_txtbuffer));
-
-	/* Store the key in tsigkey. */
-	isc_stdtime_get(&now);
-	CHECK(dns_tsigkey_createfromkey(dst_key_name(key), algname, key, false,
-					NULL, now, now, mctx, NULL, &tsigkey));
 
 	/* Dump the key to the key file. */
 	fp = named_os_openfile(filename, S_IRUSR | S_IWUSR, first_time);
@@ -7605,10 +7634,7 @@ generate_session_key(const char *filename, const char *keynamestr,
 		goto cleanup;
 	}
 
-	dst_key_free(&key);
-
-	*tsigkeyp = tsigkey;
-
+	*keyp = key;
 	return (ISC_R_SUCCESS);
 
 cleanup:
@@ -7620,9 +7646,6 @@ cleanup:
 	if (fp != NULL) {
 		(void)isc_stdio_close(fp);
 		(void)isc_file_remove(filename);
-	}
-	if (tsigkey != NULL) {
-		dns_tsigkey_detach(&tsigkey);
 	}
 	if (key != NULL) {
 		dst_key_free(&key);
@@ -7728,8 +7751,8 @@ configure_session_key(const cfg_obj_t **maps, named_server_t *server,
 		server->session_keybits = bits;
 
 		CHECK(generate_session_key(keyfile, keynamestr, keyname, algstr,
-					   algname, algtype, bits, mctx,
-					   first_time, &server->sessionkey));
+					   algtype, bits, mctx, first_time,
+					   &server->sessionkey));
 	}
 
 	return (result);
@@ -8546,7 +8569,8 @@ load_configuration(const char *filename, named_server_t *server,
 	 * checked later when the modules are actually loaded and
 	 * registered.)
 	 */
-	CHECK(bind9_check_namedconf(config, false, named_g_lctx, named_g_mctx));
+	CHECK(bind9_check_namedconf(config, false, false, named_g_lctx,
+				    named_g_mctx));
 
 	/* Let's recreate the TLS context cache */
 	if (server->tlsctx_server_cache != NULL) {
@@ -9604,10 +9628,10 @@ load_configuration(const char *filename, named_server_t *server,
 
 	obj = NULL;
 	result = named_config_get(maps, "server-id", &obj);
-	server->sctx->gethostname = NULL;
+	server->sctx->usehostname = false;
 	if (result == ISC_R_SUCCESS && cfg_obj_isboolean(obj)) {
 		/* The parser translates "hostname" to true */
-		server->sctx->gethostname = named_os_gethostname;
+		server->sctx->usehostname = true;
 		result = ns_server_setserverid(server->sctx, NULL);
 	} else if (result == ISC_R_SUCCESS && !cfg_obj_isvoid(obj)) {
 		/* Found a quoted string */
@@ -9851,6 +9875,7 @@ view_loaded(void *arg) {
 	if (isc_refcount_decrement(&zl->refs) == 1) {
 		named_server_t *server = zl->server;
 		bool reconfig = zl->reconfig;
+		dns_view_t *view = NULL;
 
 		isc_refcount_destroy(&zl->refs);
 		isc_mem_put(server->mctx, zl, sizeof(*zl));
@@ -9869,6 +9894,28 @@ view_loaded(void *arg) {
 			isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 				      NAMED_LOGMODULE_SERVER, ISC_LOG_NOTICE,
 				      "all zones loaded");
+		}
+
+		for (view = ISC_LIST_HEAD(server->viewlist); view != NULL;
+		     view = ISC_LIST_NEXT(view, link))
+		{
+			if (view->managed_keys != NULL) {
+				result = dns_zone_synckeyzone(
+					view->managed_keys);
+				if (result != ISC_R_SUCCESS) {
+					isc_log_write(
+						named_g_lctx,
+						DNS_LOGCATEGORY_DNSSEC,
+						DNS_LOGMODULE_DNSSEC,
+						ISC_LOG_ERROR,
+						"failed to initialize "
+						"managed-keys for view %s "
+						"(%s): DNSSEC validation is "
+						"at risk",
+						view->name,
+						isc_result_totext(result));
+				}
+			}
 		}
 
 		CHECKFATAL(dns_zonemgr_forcemaint(server->zonemgr),
@@ -12307,8 +12354,7 @@ named_server_status(named_server_t *server, isc_buffer_t **text) {
 		 cb);
 	CHECK(putstr(text, line));
 
-	result = named_os_gethostname(hostname, sizeof(hostname));
-	if (result != ISC_R_SUCCESS) {
+	if (gethostname(hostname, sizeof(hostname)) == 0) {
 		strlcpy(hostname, "localhost", sizeof(hostname));
 	}
 	snprintf(line, sizeof(line), "running on %s: %s\n", hostname,

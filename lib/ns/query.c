@@ -1406,7 +1406,8 @@ query_getdb(ns_client_t *client, dns_name_t *name, dns_rdatatype_t qtype,
 		dns_db_t *tdbp;
 
 		dns_clientinfomethods_init(&cm, ns_client_sourceip);
-		dns_clientinfo_init(&ci, client, &client->ecs, NULL);
+		dns_clientinfo_init(&ci, client, NULL);
+		dns_clientinfo_setecs(&ci, &client->ecs);
 
 		tdbp = NULL;
 		tresult = dns_view_searchdlz(client->view, name, zonelabels,
@@ -1548,7 +1549,7 @@ query_additionalauthfind(dns_db_t *db, dns_dbversion_t *version,
 	isc_result_t result;
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Since we are looking for authoritative data, we do not set
@@ -1712,7 +1713,7 @@ query_additional_cb(void *arg, const dns_name_t *name, dns_rdatatype_t qtype,
 	CTRACE(ISC_LOG_DEBUG(3), "query_additional_cb");
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * We treat type A additional section processing as if it
@@ -2314,7 +2315,7 @@ mark_secure(ns_client_t *client, dns_db_t *db, dns_name_t *name,
 	rdataset->trust = dns_trust_secure;
 	sigrdataset->trust = dns_trust_secure;
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Save the updated secure state.  Ignore failures.
@@ -2351,7 +2352,7 @@ get_key(ns_client_t *client, dns_db_t *db, dns_rdata_rrsig_t *rrsig,
 	dns_clientinfo_t ci;
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	if (!dns_rdataset_isassociated(keyrdataset)) {
 		result = dns_db_findnodeext(db, &rrsig->signer, false, &cm, &ci,
@@ -2916,7 +2917,7 @@ rpz_rrset_find(ns_client_t *client, dns_name_t *name, dns_rdatatype_t type,
 	node = NULL;
 	found = dns_fixedname_initname(&fixed);
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 	result = dns_db_findext(*dbp, name, version, type, options, client->now,
 				&node, found, &cm, &ci, *rdatasetp, NULL);
 	if (result == DNS_R_DELEGATION && is_zone && USECACHE(client)) {
@@ -3063,7 +3064,7 @@ rpz_find_p(ns_client_t *client, dns_name_t *self_name, dns_rdatatype_t qtype,
 	CTRACE(ISC_LOG_DEBUG(3), "rpz_find_p");
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Try to find either a CNAME or the type of record demanded by the
@@ -4713,7 +4714,7 @@ query_findclosestnsec3(dns_name_t *qname, dns_db_t *db,
 	dns_name_clone(qname, &name);
 	labels = dns_name_countlabels(&name);
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Map unknown algorithm to known value.
@@ -4914,7 +4915,8 @@ redirect(ns_client_t *client, dns_name_t *name, dns_rdataset_t *rdataset,
 	dns_rdataset_init(&trdataset);
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, &client->ecs, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
+	dns_clientinfo_setecs(&ci, &client->ecs);
 
 	if (WANTDNSSEC(client) && dns_db_iszone(*dbp) && dns_db_issecure(*dbp))
 	{
@@ -5052,7 +5054,8 @@ redirect2(ns_client_t *client, dns_name_t *name, dns_rdataset_t *rdataset,
 	dns_rdataset_init(&trdataset);
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, &client->ecs, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
+	dns_clientinfo_setecs(&ci, &client->ecs);
 
 	if (WANTDNSSEC(client) && dns_db_iszone(*dbp) && dns_db_issecure(*dbp))
 	{
@@ -5824,6 +5827,7 @@ query_refresh_rrset(query_ctx_t *orig_qctx) {
 	qctx.client->query.dboptions &= ~(DNS_DBFIND_STALETIMEOUT |
 					  DNS_DBFIND_STALEOK |
 					  DNS_DBFIND_STALEENABLED);
+	qctx.client->nodetach = false;
 
 	/*
 	 * We'll need some resources...
@@ -5847,6 +5851,27 @@ query_refresh_rrset(query_ctx_t *orig_qctx) {
 	}
 
 	qctx_destroy(&qctx);
+}
+
+/*%
+ * Depending on the db lookup result, we can respond to the
+ * client this stale answer.
+ */
+static bool
+stale_client_answer(isc_result_t result) {
+	switch (result) {
+	case ISC_R_SUCCESS:
+	case DNS_R_EMPTYNAME:
+	case DNS_R_NXRRSET:
+	case DNS_R_NCACHENXRRSET:
+	case DNS_R_CNAME:
+	case DNS_R_DNAME:
+		return (true);
+	default:
+		return (false);
+	}
+
+	UNREACHABLE();
 }
 
 /*%
@@ -5876,9 +5901,10 @@ query_lookup(query_ctx_t *qctx) {
 	CALL_HOOK(NS_QUERY_LOOKUP_BEGIN, qctx);
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, qctx->client,
-			    HAVEECS(qctx->client) ? &qctx->client->ecs : NULL,
-			    NULL);
+	dns_clientinfo_init(&ci, qctx->client, NULL);
+	if (HAVEECS(qctx->client)) {
+		dns_clientinfo_setecs(&ci, &qctx->client->ecs);
+	}
 
 	/*
 	 * We'll need some resources...
@@ -5979,7 +6005,6 @@ query_lookup(query_ctx_t *qctx) {
 	{
 		/* Found non-stale usable rdataset. */
 		answer_found = true;
-		goto gotanswer;
 	}
 
 	if (dbfind_stale || stale_refresh_window || stale_timeout) {
@@ -6015,7 +6040,7 @@ query_lookup(query_ctx_t *qctx) {
 		if (stale_found) {
 			ns_client_extendederror(qctx->client, ede,
 						"resolver failure");
-		} else {
+		} else if (!answer_found) {
 			/*
 			 * Resolver failure, no stale data, nothing more we
 			 * can do, return SERVFAIL.
@@ -6038,7 +6063,7 @@ query_lookup(query_ctx_t *qctx) {
 			ns_client_extendederror(
 				qctx->client, ede,
 				"query within stale refresh time window");
-		} else {
+		} else if (!answer_found) {
 			/*
 			 * During the stale refresh window explicitly do not try
 			 * to refresh the data, because a recent lookup failed.
@@ -6048,7 +6073,7 @@ query_lookup(query_ctx_t *qctx) {
 		}
 	} else if (stale_timeout) {
 		if ((qctx->options & DNS_GETDB_STALEFIRST) != 0) {
-			if (!stale_found) {
+			if (!stale_found && !answer_found) {
 				/*
 				 * We have nothing useful in cache to return
 				 * immediately.
@@ -6065,7 +6090,7 @@ query_lookup(query_ctx_t *qctx) {
 						&qctx->client->query.fetch);
 				}
 				return (query_lookup(qctx));
-			} else {
+			} else if (stale_client_answer(result)) {
 				/*
 				 * Immediately return the stale answer, start a
 				 * resolver fetch to refresh the data in cache.
@@ -6076,10 +6101,20 @@ query_lookup(query_ctx_t *qctx) {
 					"%s stale answer used, an attempt to "
 					"refresh the RRset will still be made",
 					namebuf);
+
 				qctx->refresh_rrset = STALE(qctx->rdataset);
-				ns_client_extendederror(
-					qctx->client, ede,
-					"stale data prioritized over lookup");
+				/*
+				 * If we are refreshing the RRSet, we must not
+				 * detach from the client in query_send().
+				 */
+				qctx->client->nodetach = qctx->refresh_rrset;
+
+				if (stale_found) {
+					ns_client_extendederror(
+						qctx->client, ede,
+						"stale data prioritized over "
+						"lookup");
+				}
 			}
 		} else {
 			/*
@@ -6095,7 +6130,11 @@ query_lookup(query_ctx_t *qctx) {
 			if (stale_found) {
 				ns_client_extendederror(qctx->client, ede,
 							"client timeout");
-			} else {
+			} else if (!answer_found) {
+				return (result);
+			}
+
+			if (!stale_client_answer(result)) {
 				return (result);
 			}
 
@@ -6108,7 +6147,6 @@ query_lookup(query_ctx_t *qctx) {
 		}
 	}
 
-gotanswer:
 	if (stale_timeout && (answer_found || stale_found)) {
 		/*
 		 * Mark RRsets that we are adding to the client message on a
@@ -6503,7 +6541,7 @@ ns_query_recurse(ns_client_t *client, dns_rdatatype_t qtype, dns_name_t *qname,
 	if (recparam_match(&client->query.recparam, qtype, qname, qdomain)) {
 		ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_QUERY,
 			      ISC_LOG_INFO, "recursion loop detected");
-		return (ISC_R_FAILURE);
+		return (ISC_R_ALREADYRUNNING);
 	}
 
 	recparam_update(&client->query.recparam, qtype, qname, qdomain);
@@ -7620,10 +7658,21 @@ query_usestale(query_ctx_t *qctx, isc_result_t result) {
 		return (false);
 	}
 
-	if (result == DNS_R_DUPLICATE || result == DNS_R_DROP) {
+	if (qctx->refresh_rrset) {
+		/*
+		 * This is a refreshing query, we have already prioritized
+		 * stale data, so don't enable serve-stale again.
+		 */
+		return (false);
+	}
+
+	if (result == DNS_R_DUPLICATE || result == DNS_R_DROP ||
+	    result == ISC_R_ALREADYRUNNING)
+	{
 		/*
 		 * Don't enable serve-stale if the result signals a duplicate
-		 * query or query that is being dropped.
+		 * query or a query that is being dropped or can't proceed
+		 * because of a recursion loop.
 		 */
 		return (false);
 	}
@@ -8706,7 +8755,7 @@ query_notfound(query_ctx_t *qctx) {
 		dns_clientinfo_t ci;
 
 		dns_clientinfomethods_init(&cm, ns_client_sourceip);
-		dns_clientinfo_init(&ci, qctx->client, NULL, NULL);
+		dns_clientinfo_init(&ci, qctx->client, NULL);
 
 		dns_db_attach(qctx->view->hints, &qctx->db);
 		result = dns_db_findext(qctx->db, dns_rootname, NULL,
@@ -10201,7 +10250,7 @@ query_coveringnsec(query_ctx_t *qctx) {
 	nowild = dns_fixedname_initname(&fnowild);
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, qctx->client, NULL, NULL);
+	dns_clientinfo_init(&ci, qctx->client, NULL);
 
 	/*
 	 * All signer names must be the same to accept.
@@ -10915,25 +10964,18 @@ static isc_result_t
 query_addsoa(query_ctx_t *qctx, unsigned int override_ttl,
 	     dns_section_t section) {
 	ns_client_t *client = qctx->client;
-	dns_name_t *name;
-	dns_dbnode_t *node;
-	isc_result_t result, eresult;
+	dns_name_t *name = NULL;
+	dns_dbnode_t *node = NULL;
+	isc_result_t result, eresult = ISC_R_SUCCESS;
 	dns_rdataset_t *rdataset = NULL, *sigrdataset = NULL;
 	dns_rdataset_t **sigrdatasetp = NULL;
 	dns_clientinfomethods_t cm;
 	dns_clientinfo_t ci;
 
 	CTRACE(ISC_LOG_DEBUG(3), "query_addsoa");
-	/*
-	 * Initialization.
-	 */
-	eresult = ISC_R_SUCCESS;
-	name = NULL;
-	rdataset = NULL;
-	node = NULL;
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Don't add the SOA record for test which set "-T nosoa".
@@ -11082,7 +11124,7 @@ query_addns(query_ctx_t *qctx) {
 	fname = dns_fixedname_initname(&foundname);
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Get resources and make 'name' be the database origin.
@@ -11184,7 +11226,7 @@ query_addbestns(query_ctx_t *qctx) {
 	CTRACE(ISC_LOG_DEBUG(3), "query_addbestns");
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * Find the right database.
@@ -11390,7 +11432,7 @@ query_addwildcardproof(query_ctx_t *qctx, bool ispositive, bool nodata) {
 	CTRACE(ISC_LOG_DEBUG(3), "query_addwildcardproof");
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
-	dns_clientinfo_init(&ci, client, NULL, NULL);
+	dns_clientinfo_init(&ci, client, NULL);
 
 	/*
 	 * If a name has been specifically flagged as needing
@@ -11927,12 +11969,7 @@ ns_query_done(query_ctx_t *qctx) {
 	/*
 	 * Client may have been detached after query_send(), so
 	 * we test and store the flag state here, for safety.
-	 * If we are refreshing the RRSet, we must not detach from the client
-	 * in the query_send(), so we need to override the flag.
 	 */
-	if (qctx->refresh_rrset) {
-		qctx->client->nodetach = true;
-	}
 	nodetach = qctx->client->nodetach;
 	query_send(qctx->client);
 

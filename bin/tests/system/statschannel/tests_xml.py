@@ -12,6 +12,7 @@
 # information regarding copyright ownership.
 
 from datetime import datetime
+import os
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -25,7 +26,6 @@ requests = pytest.importorskip("requests")
 
 # XML helper functions
 def fetch_zones_xml(statsip, statsport):
-
     r = requests.get(
         "http://{}:{}/xml/v3/zones".format(statsip, statsport), timeout=600
     )
@@ -75,7 +75,6 @@ def fetch_traffic_xml(statsip, statsport):
 
 
 def load_timers_xml(zone, primary=True):
-
     name = zone.attrib["name"]
 
     loaded_el = zone.find("loaded")
@@ -114,6 +113,7 @@ def test_zone_timers_primary_xml(statsport):
     )
 
 
+@pytest.mark.xfail(reason="GL #3983", strict="LEGACY_TEST_RUNNER" not in os.environ)
 def test_zone_timers_secondary_xml(statsport):
     generic.test_zone_timers_secondary(
         fetch_zones_xml,

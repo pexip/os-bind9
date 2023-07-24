@@ -652,6 +652,7 @@ struct dns_zonemgr {
 	dns_keymgmt_t *keymgmt;
 
 	isc_tlsctx_cache_t *tlsctx_cache;
+	isc_rwlock_t tlsctx_cache_rwlock;
 };
 
 /*%
@@ -1000,6 +1001,20 @@ zone_journal_rollforward(dns_zone_t *zone, dns_db_t *db, bool *needdump,
 
 #define ENTER zone_debuglog(zone, me, 1, "enter")
 
+static void
+zmgr_tlsctx_attach(dns_zonemgr_t *zmgr, isc_tlsctx_cache_t **ptlsctx_cache);
+/*%<
+ *	Attach to TLS client context cache used for zone transfers via
+ *	encrypted transports (e.g. XoT).
+ *
+ * The obtained reference needs to be detached by a call to
+ * 'isc_tlsctx_cache_detach()' when not needed anymore.
+ *
+ * Requires:
+ *\li	'zmgr' is a valid zone manager.
+ *\li	'ptlsctx_cache' is not 'NULL' and points to 'NULL'.
+ */
+
 static const unsigned int dbargc_default = 1;
 static const char *dbargv_default[] = { "rbt" };
 
@@ -1328,7 +1343,7 @@ zone_free(dns_zone_t *zone) {
 		zone->rpz_num = DNS_RPZ_INVALID_NUM;
 	}
 	if (zone->catzs != NULL) {
-		dns_catz_catzs_detach(&zone->catzs);
+		dns_catz_detach_catzs(&zone->catzs);
 	}
 	zone_freedbargs(zone);
 	dns_zone_setparentals(zone, NULL, NULL, NULL, 0);
@@ -1981,7 +1996,7 @@ zone_catz_enable(dns_zone_t *zone, dns_catz_zones_t *catzs) {
 	INSIST(zone->catzs == NULL || zone->catzs == catzs);
 	dns_catz_catzs_set_view(catzs, zone->view);
 	if (zone->catzs == NULL) {
-		dns_catz_catzs_attach(catzs, &zone->catzs);
+		dns_catz_attach_catzs(catzs, &zone->catzs);
 	}
 }
 
@@ -2002,7 +2017,7 @@ zone_catz_disable(dns_zone_t *zone) {
 		if (zone->db != NULL) {
 			dns_zone_catz_disable_db(zone, zone->db);
 		}
-		dns_catz_catzs_detach(&zone->catzs);
+		dns_catz_detach_catzs(&zone->catzs);
 	}
 }
 
@@ -4768,8 +4783,7 @@ sync_keyzone(dns_zone_t *zone, dns_db_t *db) {
 	}
 
 failure:
-	if (result != ISC_R_SUCCESS && !DNS_ZONE_FLAG(zone, DNS_ZONEFLG_LOADED))
-	{
+	if (result != ISC_R_SUCCESS) {
 		dnssec_log(zone, ISC_LOG_ERROR,
 			   "unable to synchronize managed keys: %s",
 			   isc_result_totext(result));
@@ -5237,10 +5251,7 @@ zone_postload(dns_zone_t *zone, dns_db_t *db, isc_time_t loadtime,
 		break;
 
 	case dns_zone_key:
-		result = sync_keyzone(zone, db);
-		if (result != ISC_R_SUCCESS) {
-			goto cleanup;
-		}
+		/* Nothing needs to be done now */
 		break;
 
 	default:
@@ -5397,13 +5408,6 @@ zone_postload(dns_zone_t *zone, dns_db_t *db, isc_time_t loadtime,
 	goto done;
 
 cleanup:
-	if (zone->type == dns_zone_key && result != ISC_R_SUCCESS) {
-		dnssec_log(zone, ISC_LOG_ERROR,
-			   "failed to initialize managed-keys (%s): "
-			   "DNSSEC validation is at risk",
-			   isc_result_totext(result));
-	}
-
 	if (result != ISC_R_SUCCESS) {
 		dns_zone_rpz_disable_db(zone, db);
 		dns_zone_catz_disable_db(zone, db);
@@ -5892,11 +5896,11 @@ dns_zone_setkasp(dns_zone_t *zone, dns_kasp_t *kasp) {
 
 	LOCK_ZONE(zone);
 	if (zone->kasp != NULL) {
-		dns_kasp_t *oldkasp = zone->kasp;
-		zone->kasp = NULL;
-		dns_kasp_detach(&oldkasp);
+		dns_kasp_detach(&zone->kasp);
 	}
-	zone->kasp = kasp;
+	if (kasp != NULL) {
+		dns_kasp_attach(kasp, &zone->kasp);
+	}
 	UNLOCK_ZONE(zone);
 }
 
@@ -7231,8 +7235,14 @@ zone_resigninc(dns_zone_t *zone) {
 	}
 
 	ZONEDB_LOCK(&zone->dblock, isc_rwlocktype_read);
-	dns_db_attach(zone->db, &db);
+	if (zone->db != NULL) {
+		dns_db_attach(zone->db, &db);
+	}
 	ZONEDB_UNLOCK(&zone->dblock, isc_rwlocktype_read);
+	if (db == NULL) {
+		result = ISC_R_FAILURE;
+		goto failure;
+	}
 
 	result = dns_db_newversion(db, &version);
 	if (result != ISC_R_SUCCESS) {
@@ -9593,23 +9603,23 @@ zone_sign(dns_zone_t *zone) {
 		   use_kasp ? "yes" : "no");
 
 	/* Determine which type of chain to build */
-	if (use_kasp) {
-		build_nsec3 = dns_kasp_nsec3(kasp);
-		if (!dns_zone_check_dnskey_nsec3(zone, db, version, NULL,
-						 (dst_key_t **)&zone_keys,
-						 nkeys))
-		{
-			dnssec_log(zone, ISC_LOG_INFO,
-				   "wait building NSEC3 chain until NSEC only "
-				   "DNSKEYs are removed");
-			build_nsec3 = false;
-		}
-		build_nsec = !build_nsec3;
-	} else {
-		CHECK(dns_private_chains(db, version, zone->privatetype,
-					 &build_nsec, &build_nsec3));
-		/* If neither chain is found, default to NSEC */
-		if (!build_nsec && !build_nsec3) {
+	CHECK(dns_private_chains(db, version, zone->privatetype, &build_nsec,
+				 &build_nsec3));
+	if (!build_nsec && !build_nsec3) {
+		if (use_kasp) {
+			build_nsec3 = dns_kasp_nsec3(kasp);
+			if (!dns_zone_check_dnskey_nsec3(
+				    zone, db, version, NULL,
+				    (dst_key_t **)&zone_keys, nkeys))
+			{
+				dnssec_log(zone, ISC_LOG_INFO,
+					   "wait building NSEC3 chain until "
+					   "NSEC only DNSKEYs are removed");
+				build_nsec3 = false;
+			}
+			build_nsec = !build_nsec3;
+		} else {
+			/* If neither chain is found, default to NSEC */
 			build_nsec = true;
 		}
 	}
@@ -11044,6 +11054,11 @@ retry_keyfetch(dns_keyfetch_t *kfetch, dns_name_t *kname) {
 	isc_time_t timenow, timethen;
 	dns_zone_t *zone = kfetch->zone;
 	bool free_needed;
+	char namebuf[DNS_NAME_FORMATSIZE];
+
+	dns_name_format(kname, namebuf, sizeof(namebuf));
+	dnssec_log(zone, ISC_LOG_WARNING,
+		   "Failed to create fetch for %s DNSKEY update", namebuf);
 
 	/*
 	 * Error during a key fetch; cancel and retry in an hour.
@@ -11055,8 +11070,6 @@ retry_keyfetch(dns_keyfetch_t *kfetch, dns_name_t *kname) {
 	dns_rdataset_disassociate(&kfetch->keydataset);
 	dns_name_free(kname, zone->mctx);
 	isc_mem_putanddetach(&kfetch->mctx, kfetch, sizeof(*kfetch));
-	dnssec_log(zone, ISC_LOG_WARNING,
-		   "Failed to create fetch for DNSKEY update");
 
 	if (!DNS_ZONE_FLAG(zone, DNS_ZONEFLG_EXITING)) {
 		/* Don't really retry if we are exiting */
@@ -18029,6 +18042,7 @@ got_transfer_quota(isc_task_t *task, isc_event_t *event) {
 	isc_time_t now;
 	const char *soa_before = "";
 	bool loaded;
+	isc_tlsctx_cache_t *zmgr_tlsctx_cache = NULL;
 
 	UNUSED(task);
 
@@ -18170,10 +18184,15 @@ got_transfer_quota(isc_task_t *task, isc_event_t *event) {
 		dns_xfrin_detach(&zone->xfr);
 	}
 
+	zmgr_tlsctx_attach(zone->zmgr, &zmgr_tlsctx_cache);
+
 	CHECK(dns_xfrin_create(zone, xfrtype, &primaryaddr, &sourceaddr,
 			       zone->tsigkey, zone->transport,
-			       zone->zmgr->tlsctx_cache, zone->mctx,
+			       zmgr_tlsctx_cache, zone->mctx,
 			       zone->zmgr->netmgr, zone_xfrdone, &zone->xfr));
+
+	isc_tlsctx_cache_detach(&zmgr_tlsctx_cache);
+
 	LOCK_ZONE(zone);
 	if (xfrtype == dns_rdatatype_axfr) {
 		if (isc_sockaddr_pf(&primaryaddr) == PF_INET) {
@@ -18198,6 +18217,10 @@ failure:
 	 */
 	if (result != ISC_R_SUCCESS) {
 		zone_xfrdone(zone, result);
+	}
+
+	if (zmgr_tlsctx_cache != NULL) {
+		isc_tlsctx_cache_detach(&zmgr_tlsctx_cache);
 	}
 
 	isc_event_free(&event);
@@ -18826,6 +18849,7 @@ dns_zonemgr_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
 	isc_mutex_init(&zmgr->iolock);
 
 	zmgr->tlsctx_cache = NULL;
+	isc_rwlock_init(&zmgr->tlsctx_cache_rwlock, 0, 0);
 
 	zmgr->magic = ZONEMGR_MAGIC;
 
@@ -19177,6 +19201,7 @@ zonemgr_free(dns_zonemgr_t *zmgr) {
 
 	isc_rwlock_destroy(&zmgr->urlock);
 	isc_rwlock_destroy(&zmgr->rwlock);
+	isc_rwlock_destroy(&zmgr->tlsctx_cache_rwlock);
 
 	zonemgr_keymgmt_destroy(zmgr);
 
@@ -19221,6 +19246,13 @@ dns_zonemgr_gettaskmgr(dns_zonemgr_t *zmgr) {
 	REQUIRE(DNS_ZONEMGR_VALID(zmgr));
 
 	return (zmgr->taskmgr);
+}
+
+isc_timermgr_t *
+dns_zonemgr_gettimermgr(dns_zonemgr_t *zmgr) {
+	REQUIRE(DNS_ZONEMGR_VALID(zmgr));
+
+	return (zmgr->timermgr);
 }
 
 /*
@@ -23654,7 +23686,7 @@ dns_zonemgr_set_tlsctx_cache(dns_zonemgr_t *zmgr,
 	REQUIRE(DNS_ZONEMGR_VALID(zmgr));
 	REQUIRE(tlsctx_cache != NULL);
 
-	RWLOCK(&zmgr->rwlock, isc_rwlocktype_write);
+	RWLOCK(&zmgr->tlsctx_cache_rwlock, isc_rwlocktype_write);
 
 	if (zmgr->tlsctx_cache != NULL) {
 		isc_tlsctx_cache_detach(&zmgr->tlsctx_cache);
@@ -23662,5 +23694,18 @@ dns_zonemgr_set_tlsctx_cache(dns_zonemgr_t *zmgr,
 
 	isc_tlsctx_cache_attach(tlsctx_cache, &zmgr->tlsctx_cache);
 
-	RWUNLOCK(&zmgr->rwlock, isc_rwlocktype_write);
+	RWUNLOCK(&zmgr->tlsctx_cache_rwlock, isc_rwlocktype_write);
+}
+
+static void
+zmgr_tlsctx_attach(dns_zonemgr_t *zmgr, isc_tlsctx_cache_t **ptlsctx_cache) {
+	REQUIRE(DNS_ZONEMGR_VALID(zmgr));
+	REQUIRE(ptlsctx_cache != NULL && *ptlsctx_cache == NULL);
+
+	RWLOCK(&zmgr->tlsctx_cache_rwlock, isc_rwlocktype_read);
+
+	INSIST(zmgr->tlsctx_cache != NULL);
+	isc_tlsctx_cache_attach(zmgr->tlsctx_cache, ptlsctx_cache);
+
+	RWUNLOCK(&zmgr->tlsctx_cache_rwlock, isc_rwlocktype_read);
 }

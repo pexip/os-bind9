@@ -204,10 +204,10 @@ isc__nm_threadpool_initialize(uint32_t workers) {
 #elif HAVE_DECL_UV_UDP_MMSG_FREE
 #define MINIMAL_UV_VERSION UV_VERSION(1, 40, 0)
 #elif HAVE_DECL_UV_UDP_RECVMMSG
+#define MAXIMAL_UV_VERSION UV_VERSION(1, 39, 99)
 #define MINIMAL_UV_VERSION UV_VERSION(1, 37, 0)
-#elif HAVE_DECL_UV_UDP_MMSG_CHUNK
-#define MINIMAL_UV_VERSION UV_VERSION(1, 35, 0)
 #else
+#define MAXIMAL_UV_VERSION UV_VERSION(1, 34, 99)
 #define MINIMAL_UV_VERSION UV_VERSION(1, 0, 0)
 #endif
 
@@ -218,10 +218,19 @@ isc__netmgr_create(isc_mem_t *mctx, uint32_t workers, isc_nm_t **netmgrp) {
 
 	REQUIRE(workers > 0);
 
+#ifdef MAXIMAL_UV_VERSION
+	if (uv_version() > MAXIMAL_UV_VERSION) {
+		FATAL_ERROR("libuv version too new: running with libuv %s "
+			    "when compiled with libuv %s will lead to "
+			    "libuv failures",
+			    uv_version_string(), UV_VERSION_STRING);
+	}
+#endif /* MAXIMAL_UV_VERSION */
+
 	if (uv_version() < MINIMAL_UV_VERSION) {
 		FATAL_ERROR("libuv version too old: running with libuv %s "
 			    "when compiled with libuv %s will lead to "
-			    "libuv failures because of unknown flags",
+			    "libuv failures",
 			    uv_version_string(), UV_VERSION_STRING);
 	}
 
@@ -2008,11 +2017,6 @@ isc__nmsocket_connecttimeout_cb(uv_timer_t *timer) {
 
 	isc__nmsocket_timer_stop(sock);
 
-	if (sock->tls.pending_req != NULL) {
-		REQUIRE(req == sock->tls.pending_req);
-		sock->tls.pending_req = NULL;
-	}
-
 	/*
 	 * Mark the connection as timed out and shutdown the socket.
 	 */
@@ -2752,7 +2756,7 @@ isc__nmsocket_stop(isc_nmsocket_t *listener) {
 	}
 
 	if (isc__nm_in_netthread()) {
-		isc__nm_async_sockstop(&listener->mgr->workers[0],
+		isc__nm_async_sockstop(&listener->mgr->workers[isc_nm_tid()],
 				       (isc__netievent_t *)&ievent);
 	}
 }

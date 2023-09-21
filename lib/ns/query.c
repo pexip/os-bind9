@@ -10009,6 +10009,12 @@ query_synthcnamewildcard(query_ctx_t *qctx, dns_rdataset_t *rdataset,
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	dns_rdata_reset(&rdata);
 
+	if (dns_name_equal(qctx->client->query.qname, &cname.cname)) {
+		dns_message_puttempname(qctx->client->message, &tname);
+		dns_rdata_freestruct(&cname);
+		return (ISC_R_SUCCESS);
+	}
+
 	dns_name_copy(&cname.cname, tname);
 
 	dns_rdata_freestruct(&cname);
@@ -12389,8 +12395,6 @@ ns_query_start(ns_client_t *client, isc_nmhandle_t *handle) {
 					      DNS_FETCHOPT_QMIN_SKIP_IP6A;
 		if (client->view->qmin_strict) {
 			client->query.fetchoptions |= DNS_FETCHOPT_QMIN_STRICT;
-		} else {
-			client->query.fetchoptions |= DNS_FETCHOPT_QMIN_USE_A;
 		}
 	}
 

@@ -260,6 +260,7 @@ static const char *description[ISC_R_NRESULTS] = {
 	[DNS_R_RCODE14] = "<rcode 14>",
 	[DNS_R_RCODE15] = "<rcode 15>",
 	[DNS_R_BADVERS] = "BADVERS",
+	[DNS_R_BADCOOKIE] = "BADCOOKIE",
 
 	[ISCCC_R_UNKNOWNVERSION] = "unknown version",
 	[ISCCC_R_SYNTAX] = "syntax error",
@@ -267,6 +268,7 @@ static const char *description[ISC_R_NRESULTS] = {
 	[ISCCC_R_EXPIRED] = "expired",
 	[ISCCC_R_CLOCKSKEW] = "clock skew",
 	[ISCCC_R_DUPLICATE] = "duplicate",
+	[ISCCC_R_MAXDEPTH] = "max depth",
 };
 
 static const char *identifier[ISC_R_NRESULTS] = {
@@ -508,6 +510,7 @@ static const char *identifier[ISC_R_NRESULTS] = {
 	[DNS_R_RCODE14] = "DNS_R_RCODE14",
 	[DNS_R_RCODE15] = "DNS_R_RCODE15",
 	[DNS_R_BADVERS] = "DNS_R_BADVERS",
+	[DNS_R_BADCOOKIE] = "DNS_R_BADCOOKIE",
 
 	[ISCCC_R_UNKNOWNVERSION] = "ISCCC_R_UNKNOWNVERSION",
 	[ISCCC_R_SYNTAX] = "ISCCC_R_SYNTAX",
@@ -515,6 +518,7 @@ static const char *identifier[ISC_R_NRESULTS] = {
 	[ISCCC_R_EXPIRED] = "ISCCC_R_EXPIRED",
 	[ISCCC_R_CLOCKSKEW] = "ISCCC_R_CLOCKSKEW",
 	[ISCCC_R_DUPLICATE] = "ISCCC_R_DUPLICATE",
+	[ISCCC_R_MAXDEPTH] = "ISCCC_R_MAXDEPTH",
 };
 
 STATIC_ASSERT((DNS_R_SERVFAIL - DNS_R_NOERROR == 2),

@@ -11,6 +11,8 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 # shellcheck source=../conf.sh
 . ../conf.sh
 
@@ -37,7 +39,7 @@ grep "status: NXDOMAIN" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
    n=$((n+1))
    echo_i "checking non-cachable NXDOMAIN response handling using dns_client ($n)"
    ret=0
@@ -47,7 +49,7 @@ if [ -x ${RESOLVE} ] ; then
    status=$((status + ret))
 fi
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
    n=$((n+1))
    echo_i "checking that local bound address can be set (Can't query from a denied address) ($n)"
    ret=0
@@ -73,7 +75,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking non-cachable NODATA response handling using dns_client ($n)"
     ret=0
@@ -88,7 +90,7 @@ echo_i "checking handling of bogus referrals ($n)"
 # If the server has the "INSIST(!external)" bug, this query will kill it.
 dig_with_opts +tcp www.example.com. a @10.53.0.1 >/dev/null || { echo_i "failed"; status=$((status + 1)); }
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking handling of bogus referrals using dns_client ($n)"
     ret=0
@@ -135,7 +137,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking answer IPv4 address filtering using dns_client (accept) ($n)"
     ret=0
@@ -153,7 +155,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking answer IPv6 address filtering using dns_client (accept) ($n)"
     ret=0
@@ -179,7 +181,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking CNAME target filtering using dns_client (accept) ($n)"
     ret=0
@@ -198,7 +200,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking CNAME target filtering using dns_client (accept due to subdomain) ($n)"
     ret=0
@@ -226,7 +228,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking DNAME target filtering using dns_client (accept) ($n)"
     ret=0
@@ -245,7 +247,7 @@ grep "status: NOERROR" dig.out.ns1.test${n} > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if [ -x ${RESOLVE} ] ; then
+if [ -x "${RESOLVE}" ] ; then
     n=$((n+1))
     echo_i "checking DNAME target filtering using dns_client (accept due to subdomain) ($n)"
     ret=0
@@ -288,7 +290,7 @@ do
         # Expected queries = 2 * number of NS records, up to a maximum of 10.
         expected=$((nscount*2))
         if [ "$expected" -gt 10 ]; then expected=10; fi
-        # Count the number of logged fetches 
+        # Count the number of logged fetches
         nextpart ns5/named.run > /dev/null
         dig_with_opts @10.53.0.5 target${nscount}.sourcens A > dig.ns5.out.${nscount}.${n} || ret=1
         retry_quiet 5 count_fetches ns5/named.run $nscount $expected || {
@@ -593,9 +595,9 @@ n=$((n+1))
 echo_i "check that '-t aaaa' in .digrc does not have unexpected side effects ($n)"
 ret=0
 echo "-t aaaa" > .digrc
-HOME="$(pwd)" dig_with_opts @10.53.0.4 . > dig.out.1.${n} || ret=1
-HOME="$(pwd)" dig_with_opts @10.53.0.4 . A > dig.out.2.${n} || ret=1
-HOME="$(pwd)" dig_with_opts @10.53.0.4 -x 127.0.0.1 > dig.out.3.${n} || ret=1
+(HOME="$(pwd)" dig_with_opts @10.53.0.4 . > dig.out.1.${n}) || ret=1
+(HOME="$(pwd)" dig_with_opts @10.53.0.4 . A > dig.out.2.${n}) || ret=1
+(HOME="$(pwd)" dig_with_opts @10.53.0.4 -x 127.0.0.1 > dig.out.3.${n}) || ret=1
 grep ';\..*IN.*AAAA$' dig.out.1.${n} > /dev/null || ret=1
 grep ';\..*IN.*A$' dig.out.2.${n} > /dev/null || ret=1
 grep 'extra type option' dig.out.2.${n} > /dev/null && ret=1
@@ -948,7 +950,7 @@ dig_with_opts +timeout=15 large-referral.example.net @10.53.0.1 a > dig.out.ns1.
 grep "status: SERVFAIL" dig.out.ns1.test${n} > /dev/null || ret=1
 # Check the total number of findname() calls triggered by a single query
 # for large-referral.example.net/A.
-findname_call_count="$(grep -c "large-referral\.example\.net.*FINDNAME" ns1/named.run)"
+findname_call_count="$(grep -c "large-referral\.example\.net.*FINDNAME" ns1/named.run || true)"
 if [ "${findname_call_count}" -gt 1000 ]; then
 	echo_i "failed: ${findname_call_count} (> 1000) findname() calls detected for large-referral.example.net"
 	ret=1
@@ -1002,6 +1004,18 @@ grep "ANSWER: [12]," dig.out.2.${n} > /dev/null || ret=1
 lines=$(awk '$1 == "mixedttl.tld." && $2 > 30 { print }' dig.out.2.${n} | wc -l)
 test ${lines:-1} -ne 0 && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
+
+n=$((n+1))
+echo_i "check resolver behavior when FORMERR for EDNS options happens (${n})"
+ret=0
+msg="resolving options-formerr/A .* server sent FORMERR with echoed DNS COOKIE"
+if [ $ret != 0 ]; then echo_i "failed"; fi
+nextpart ns5/named.run >/dev/null
+dig_with_opts +tcp @10.53.0.5 options-formerr A > dig.out.${n} || ret=1
+grep "status: NOERROR" dig.out.${n} > /dev/null || ret=1
+nextpart ns5/named.run | grep "$msg" > /dev/null || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+
 status=$((status + ret))
 
 echo_i "exit status: $status"

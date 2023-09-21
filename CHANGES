@@ -1,3 +1,110 @@
+	--- 9.18.19 released ---
+
+6246.	[security]	Fix use-after-free error in TLS DNS code when sending
+			data. (CVE-2023-4236) [GL #4242]
+
+6245.	[security]	Limit the amount of recursion that can be performed
+			by isccc_cc_fromwire. (CVE-2023-3341) [GL #4152]
+
+6244.	[bug]		Adjust log levels on malformed messages to NOTICE when
+			transferring in a zone. [GL #4290]
+
+6241.	[bug]		Take into account the possibility of partial TLS writes
+			in TLS DNS code. That helps to prevent DNS messages
+			corruption on long DNS over TLS streams. [GL #4255]
+
+6240.	[bug]		Use dedicated per-worker thread jemalloc memory
+			arenas for send buffers allocation to reduce memory
+			consumption and avoid lock contention. [GL #4038]
+
+6239.	[func]		Deprecate the 'dnssec-must-be-secure' option.
+			[GL #3700]
+
+6237.	[bug]		Address memory leaks due to not clearing OpenSSL error
+			stack. [GL #4159]
+
+6235.	[doc]		Clarify BIND 9 time formats. [GL #4266]
+
+6234.	[bug]		Restore stale-refresh-time value after flushing the
+			cache. [GL #4278]
+
+6232.	[bug]		Following the introduction of krb5-subdomain-self-rhs
+			and ms-subdomain-self-rhs update rules, removal of
+			nonexistent PTR and SRV records via UPDATE could fail.
+			[GL #4280]
+
+6231.	[func]		Make nsupdate honor -v for SOA requests if the server
+			is specified. [GL #1181]
+
+6230.	[bug]		Prevent an unnecessary query restart if a synthesized
+			CNAME target points to the CNAME owner. [GL #3835]
+
+6227.	[bug]		Check the statistics-channel HTTP Content-length
+			to prevent negative or overflowing values from
+			causing a crash. [GL #4125]
+
+6224.	[bug]		Check the If-Modified-Since value length to prevent
+			out-of-bounds write. [GL #4124]
+
+	--- 9.18.18 released ---
+
+6220.	[func]		Deprecate the 'dialup' and 'heartbeat-interval'
+			options. [GL #3700]
+
+6219.	[bug]		Ignore 'max-zone-ttl' on 'dnssec-policy insecure'.
+			[GL #4032]
+
+6215.	[protocol]	Return REFUSED to GSS-API TKEY requests if GSS-API
+			support is not configured. [GL #4225]
+
+6213.	[bug]		Mark a primary server as temporarily unreachable if the
+			TCP connection attempt times out. [GL #4215]
+
+6212.	[bug]		Don't process detach and close netmgr events when
+			the netmgr has been paused. [GL #4200]
+
+	--- 9.18.17 released ---
+
+6206.	[bug]		Add shutdown checks in dns_catz_dbupdate_callback() to
+			avoid a race with dns_catz_shutdown_catzs(). [GL #4171]
+
+6205.	[bug]		Restore support to read legacy HMAC-MD5 K file pairs.
+			[GL #4154]
+
+6204.	[bug]		Use NS records for relaxed QNAME-minimization mode.
+			This reduces the number of queries named makes when
+			resolving, as it allows the non-existence of NS RRsets
+			at non-referral nodes to be cached in addition to the
+			referrals that are normally cached. [GL #3325]
+
+6200.	[bug]		Fix nslookup erroneously reporting a timeout when the
+			input is delayed. [GL #4044]
+
+6199.	[bug]		Improve HTTP Connection: header protocol conformance
+			in the statistics channel. [GL #4126]
+
+6198.	[func]		Remove the holes in the isc_result_t enum to compact
+			the isc_result tables. [GL #4149]
+
+6197.	[bug]		Fix a data race between the dns_zone and dns_catz
+			modules when registering/unregistering a database
+			update notification callback for a catalog zone.
+			[GL #4132]
+
+6196.	[cleanup]	Report "permission denied" instead of "unexpected error"
+			when trying to update a zone file on a read-only file
+			system. Thanks to Midnight Veil. [GL #4134]
+
+6193.	[bug]		Fix a catz db update notification callback registration
+			logic error, which could crash named when receiving an
+			AXFR update for a catalog zone while the previous update
+			process of the catalog zone was already running.
+			[GL #4136]
+
+6166.	[func]		Retry without DNS COOKIE on FORMERR if it appears that
+			the FORMERR was due to the presence of a DNS COOKIE
+			option. [GL #4049]
+
 	--- 9.18.16 released ---
 
 6192.	[security]	A query that prioritizes stale data over lookup

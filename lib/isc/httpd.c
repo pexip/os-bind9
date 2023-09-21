@@ -54,10 +54,11 @@
 #define HTTP_HEADERS_NUM     100
 #define HTTP_MAX_REQUEST_LEN 4096
 
-#define HTTPD_CLOSE	     0x0001 /* Got a Connection: close header */
-#define HTTPD_FOUNDHOST	     0x0002 /* Got a Host: header */
-#define HTTPD_KEEPALIVE	     0x0004 /* Got a Connection: Keep-Alive */
-#define HTTPD_ACCEPT_DEFLATE 0x0008
+typedef enum httpd_flags {
+	CONNECTION_CLOSE = 1 << 0,	/* connection must close */
+	CONNECTION_KEEP_ALIVE = 1 << 1, /* response needs a keep-alive header */
+	ACCEPT_DEFLATE = 1 << 2,	/* response can be compressed */
+} httpd_flags_t;
 
 #define HTTPD_MAGIC    ISC_MAGIC('H', 't', 'p', 'd')
 #define VALID_HTTPD(m) ISC_MAGIC_VALID(m, HTTPD_MAGIC)
@@ -96,8 +97,6 @@ struct isc_httpd {
 	isc_nmhandle_t *handle;	    /* Permanent pointer to handle */
 	isc_nmhandle_t *readhandle; /* Waiting for a read callback */
 
-	int flags;
-
 	/*%
 	 * Received data state.
 	 */
@@ -107,6 +106,7 @@ struct isc_httpd {
 
 	method_t method;
 	int minor_version;
+	httpd_flags_t flags;
 	const char *path;
 	isc_url_parser_t up;
 	isc_time_t if_modified_since;
@@ -422,8 +422,14 @@ process_request(isc_httpd_t *httpd, size_t last_len) {
 	}
 	httpd->path = path;
 
-	ssize_t content_len = 0;
+	/*
+	 * Examine headers that can affect this request's response
+	 */
+	httpd->flags = 0;
+
+	size_t content_len = 0;
 	bool keep_alive = false;
+	bool host_header = false;
 
 	isc_time_set(&httpd->if_modified_since, 0, 0);
 
@@ -432,25 +438,40 @@ process_request(isc_httpd_t *httpd, size_t last_len) {
 
 		if (name_match(header, "Content-Length")) {
 			char *endptr;
-			content_len = (size_t)strtoul(header->value, &endptr,
-						      10);
-			/* Consistency check, if we consumed all numbers */
+			long val = strtol(header->value, &endptr, 10);
+
+			errno = 0;
+
+			/* ensure we consumed all digits */
 			if ((header->value + header->value_len) != endptr) {
+				return (ISC_R_BADNUMBER);
+			}
+			/* ensure there was no minus sign */
+			if (val < 0) {
+				return (ISC_R_BADNUMBER);
+			}
+			/* ensure it did not overflow */
+			if (errno != 0) {
 				return (ISC_R_RANGE);
 			}
+			content_len = val;
 		} else if (name_match(header, "Connection")) {
+			/* multiple fields in a connection header are allowed */
 			if (value_match(header, "close")) {
-				httpd->flags |= HTTPD_CLOSE;
-			} else if (value_match(header, "keep-alive")) {
+				httpd->flags |= CONNECTION_CLOSE;
+			}
+			if (value_match(header, "keep-alive")) {
 				keep_alive = true;
 			}
 		} else if (name_match(header, "Host")) {
-			httpd->flags |= HTTPD_FOUNDHOST;
+			host_header = true;
 		} else if (name_match(header, "Accept-Encoding")) {
 			if (value_match(header, "deflate")) {
-				httpd->flags |= HTTPD_ACCEPT_DEFLATE;
+				httpd->flags |= ACCEPT_DEFLATE;
 			}
-		} else if (name_match(header, "If-Modified-Since")) {
+		} else if (name_match(header, "If-Modified-Since") &&
+			   header->value_len < ISC_FORMATHTTPTIMESTAMP_SIZE)
+		{
 			char timestamp[ISC_FORMATHTTPTIMESTAMP_SIZE + 1];
 			memmove(timestamp, header->value, header->value_len);
 			timestamp[header->value_len] = 0;
@@ -469,28 +490,33 @@ process_request(isc_httpd_t *httpd, size_t last_len) {
 		return (ISC_R_BADNUMBER);
 	}
 
-	if (content_len == (ssize_t)ULONG_MAX) {
-		/* Invalid number in the header value. */
-		return (ISC_R_BADNUMBER);
+	if (content_len >= HTTP_MAX_REQUEST_LEN) {
+		return (ISC_R_RANGE);
 	}
-	if (httpd->consume + content_len > httpd->recvlen) {
+
+	size_t consume = httpd->consume + content_len;
+	if (consume > httpd->recvlen) {
 		/* The request data isn't complete yet. */
 		return (ISC_R_NOMORE);
 	}
 
 	/* Consume the request's data, which we do not use. */
-	httpd->consume += content_len;
+	httpd->consume = consume;
 
 	switch (httpd->minor_version) {
 	case 0:
-		if (keep_alive == true) {
-			httpd->flags |= HTTPD_KEEPALIVE;
+		/*
+		 * RFC 9112 section 9.3 says close takes priority if
+		 * keep-alive is also present
+		 */
+		if ((httpd->flags & CONNECTION_CLOSE) == 0 && keep_alive) {
+			httpd->flags |= CONNECTION_KEEP_ALIVE;
 		} else {
-			httpd->flags |= HTTPD_CLOSE;
+			httpd->flags |= CONNECTION_CLOSE;
 		}
 		break;
 	case 1:
-		if ((httpd->flags & HTTPD_FOUNDHOST) == 0) {
+		if (!host_header) {
 			return (ISC_R_RANGE);
 		}
 		break;
@@ -804,7 +830,7 @@ prepare_response(isc_httpdmgr_t *mgr, isc_httpd_t *httpd,
 	}
 
 #ifdef HAVE_ZLIB
-	if ((httpd->flags & HTTPD_ACCEPT_DEFLATE) != 0) {
+	if ((httpd->flags & ACCEPT_DEFLATE) != 0) {
 		result = httpd_compress(req);
 		if (result == ISC_R_SUCCESS) {
 			is_compressed = true;
@@ -813,7 +839,10 @@ prepare_response(isc_httpdmgr_t *mgr, isc_httpd_t *httpd,
 #endif /* ifdef HAVE_ZLIB */
 
 	httpd_response(httpd, req);
-	if ((httpd->flags & HTTPD_KEEPALIVE) != 0) {
+	/* RFC 9112 § 9.6: SHOULD send Connection: close in last response */
+	if ((httpd->flags & CONNECTION_CLOSE) != 0) {
+		httpd_addheader(req, "Connection", "close");
+	} else if ((httpd->flags & CONNECTION_KEEP_ALIVE) != 0) {
 		httpd_addheader(req, "Connection", "Keep-Alive");
 	}
 	httpd_addheader(req, "Content-Type", req->mimetype);
@@ -943,6 +972,7 @@ httpd_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		return;
 	}
 
+	/* XXXFANF it would be more polite to reply 400 bad request */
 	if (result != ISC_R_SUCCESS) {
 		goto close_readhandle;
 	}
@@ -1045,7 +1075,8 @@ httpd_senddone(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 		goto detach;
 	}
 
-	if (eresult == ISC_R_SUCCESS && (httpd->flags & HTTPD_CLOSE) == 0) {
+	if (eresult == ISC_R_SUCCESS && (httpd->flags & CONNECTION_CLOSE) == 0)
+	{
 		/*
 		 * Calling httpd_request() with region NULL restarts
 		 * reading.

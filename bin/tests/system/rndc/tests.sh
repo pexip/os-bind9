@@ -11,6 +11,8 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 . ../conf.sh
 
 DIGOPTS="+tcp +noadd +nosea +nostat +noquest +nocomm +nocmd"
@@ -76,7 +78,7 @@ update add text2.nil. 600 IN TXT "addition 2"
 send
 END
 
-$DIGCMD @10.53.0.2 text2.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text2.nil. TXT > dig.out.1.test$n || ret=1
 grep 'addition 2' dig.out.1.test$n >/dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -93,7 +95,7 @@ zone nil.
 update add text3.nil. 600 IN TXT "addition 3"
 send
 END
-$DIGCMD @10.53.0.2 text3.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text3.nil. TXT > dig.out.1.test$n || ret=1
 grep 'addition 3' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -133,7 +135,7 @@ update add text4.nil. 600 IN TXT "addition 4"
 send
 END
 
-$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n || ret=1
 grep 'addition 4' dig.out.1.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -173,7 +175,7 @@ update add text5.nil. 600 IN TXT "addition 5"
 send
 END
 
-$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text4.nil. TXT > dig.out.1.test$n || ret=1
 grep 'addition 4' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -205,7 +207,7 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "checking that freezing static zones is not allowed ($n)"
 ret=0
-$RNDCCMD 10.53.0.2 freeze static > rndc.out.1.test$n 2>&1
+$RNDCCMD 10.53.0.2 freeze static > rndc.out.1.test$n 2>&1 && ret=1
 grep 'not dynamic' rndc.out.1.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -229,7 +231,7 @@ do
 	grep "addition 6" ns2/other.db > /dev/null && break
 	sleep 1
 done
-serial=`awk '$3 ~ /serial/ {print $1}' ns2/other.db`
+serial=$(awk '$3 ~ /serial/ {print $1}' ns2/other.db)
 newserial=$((serial + 1))
 sed s/$serial/$newserial/ ns2/other.db > ns2/other.db.new
 echo 'frozen TXT "frozen addition"' >> ns2/other.db.new
@@ -245,11 +247,11 @@ zone other.
 update add text7.other. 600 IN TXT "addition 7"
 send
 END
-$DIGCMD @10.53.0.2 text6.other. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text6.other. TXT > dig.out.1.test$n || ret=1
 grep 'addition 6' dig.out.1.test$n >/dev/null || ret=1
-$DIGCMD @10.53.0.2 text7.other. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.2 text7.other. TXT > dig.out.2.test$n || ret=1
 grep 'addition 7' dig.out.2.test$n >/dev/null || ret=1
-$DIGCMD @10.53.0.2 frozen.other. TXT > dig.out.3.test$n
+$DIGCMD @10.53.0.2 frozen.other. TXT > dig.out.3.test$n || ret=1
 grep 'frozen addition' dig.out.3.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -272,7 +274,7 @@ do
 	grep "addition 6" ns2/nil.db > /dev/null && break
 	sleep 1
 done
-serial=`awk '$3 ~ /serial/ {print $1}' ns2/nil.db`
+serial=$(awk '$3 ~ /serial/ {print $1}' ns2/nil.db)
 newserial=$((serial + 1))
 sed s/$serial/$newserial/ ns2/nil.db > ns2/nil.db.new
 echo 'frozen TXT "frozen addition"' >> ns2/nil.db.new
@@ -288,11 +290,11 @@ zone nil.
 update add text7.nil. 600 IN TXT "addition 7"
 send
 END
-$DIGCMD @10.53.0.2 text6.nil. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.2 text6.nil. TXT > dig.out.1.test$n || ret=1
 grep 'addition 6' dig.out.1.test$n > /dev/null || ret=1
-$DIGCMD @10.53.0.2 text7.nil. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.2 text7.nil. TXT > dig.out.2.test$n || ret=1
 grep 'addition 7' dig.out.2.test$n > /dev/null || ret=1
-$DIGCMD @10.53.0.2 frozen.nil. TXT > dig.out.3.test$n
+$DIGCMD @10.53.0.2 frozen.nil. TXT > dig.out.3.test$n || ret=1
 grep 'frozen addition' dig.out.3.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -324,7 +326,7 @@ n=$((n+1))
 echo_i "test 'rndc reload' on a zone with include files ($n)"
 ret=0
 grep "incl/IN: skipping load" ns2/named.run > /dev/null && ret=1
-loads=`grep "incl/IN: starting load" ns2/named.run | wc -l`
+loads=$(grep "incl/IN: starting load" ns2/named.run | wc -l)
 [ "$loads" -eq 1 ] || ret=1
 $RNDCCMD 10.53.0.2 reload > /dev/null || ret=1
 for i in 1 2 3 4 5 6 7 8 9
@@ -340,7 +342,7 @@ $RNDCCMD 10.53.0.2 reload > /dev/null || ret=1
 for i in 1 2 3 4 5 6 7 8 9
 do
     tmp=0
-    loads=`grep "incl/IN: starting load" ns2/named.run | wc -l`
+    loads=$(grep "incl/IN: starting load" ns2/named.run | wc -l)
     [ "$loads" -eq 2 ] || tmp=1
     [ $tmp -eq 0 ] && break
     sleep 1
@@ -489,7 +491,7 @@ $RNDCCMD4 nta -l 1d nta2.example > rndc.out.2.test$n 2>&1
 grep "Negative trust anchor added" rndc.out.2.test$n > /dev/null || ret=1
 $RNDCCMD4 nta -l 1w nta3.example > rndc.out.3.test$n 2>&1
 grep "Negative trust anchor added" rndc.out.3.test$n > /dev/null || ret=1
-$RNDCCMD4 nta -l 8d nta4.example > rndc.out.4.test$n 2>&1
+$RNDCCMD4 nta -l 8d nta4.example > rndc.out.4.test$n 2>&1 && ret=1
 grep "NTA lifetime cannot exceed one week" rndc.out.4.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -504,7 +506,7 @@ $RNDCCMD4 nta -c any nta1.example > rndc.out.2.test$n 2>&1
 nextpart ns4/named.run | grep "added NTA 'nta1.example'" > /dev/null || ret=1
 $RNDCCMD4 nta -c ch nta1.example > rndc.out.3.test$n 2>&1
 nextpart ns4/named.run | grep "added NTA 'nta1.example'" > /dev/null && ret=1
-$RNDCCMD4 nta -c fake nta1.example > rndc.out.4.test$n 2>&1
+$RNDCCMD4 nta -c fake nta1.example > rndc.out.4.test$n 2>&1 && ret=1
 nextpart ns4/named.run | grep "added NTA 'nta1.example'" > /dev/null && ret=1
 grep 'unknown class' rndc.out.4.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
@@ -516,8 +518,8 @@ do
 	echo_i "testing rndc buffer size limits (size=${i}) ($n)"
 	ret=0
 	$RNDC -s 10.53.0.4 -p ${EXTRAPORT6} -c ns4/key6.conf testgen ${i} 2>&1 > rndc.out.$i.test$n || ret=1
-	actual_size=`$GENCHECK rndc.out.$i.test$n`
-	if [ "$?" = "0" ]; then
+	{ actual_size=$($GENCHECK rndc.out.$i.test$n); rc=$?; } || true
+	if [ "$rc" = "0" ]; then
             expected_size=$((i+1))
 	    if [ $actual_size != $expected_size ]; then ret=1; fi
 	else
@@ -680,7 +682,7 @@ n=$((n+1))
 echo_i "check rndc nta reports adding to multiple views ($n)"
 ret=0
 $RNDCCMD 10.53.0.3 nta test.com > rndc.out.test$n 2>&1 || ret=1
-lines=`cat rndc.out.test$n | wc -l`
+lines=$(cat rndc.out.test$n | wc -l)
 [ ${lines:-0} -eq 2 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -691,7 +693,7 @@ ret=0
 $RNDCCMD 10.53.0.2 retransfer nil > rndc.out.test$n 2>&1 && ret=1
 grep "rndc: 'retransfer' failed: failure" rndc.out.test$n > /dev/null || ret=1
 grep "retransfer: inappropriate zone type: primary" rndc.out.test$n > /dev/null || ret=1
-lines=`cat rndc.out.test$n | wc -l`
+lines=$(cat rndc.out.test$n | wc -l)
 [ ${lines:-0} -eq 2 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -713,7 +715,7 @@ zone example.
 update add text2.example. 600 IN TXT "addition 3"
 send
 END
-$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n || ret=1
 grep 'addition 3' dig.out.1.test$n >/dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -735,7 +737,7 @@ zone example.
 update add text2.example. 600 IN TXT "addition 3"
 send
 END
-$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.4 -p ${PORT} text2.example. TXT > dig.out.1.test$n || ret=1
 grep 'addition 3' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -744,10 +746,10 @@ n=$((n+1))
 echo_i "checking initial in-view zone file is loaded ($n)"
 ret=0
 TSIG="$DEFAULT_HMAC:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
-$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n || ret=1
 grep 'include 1' dig.out.1.test$n >/dev/null || ret=1
 TSIG="$DEFAULT_HMAC:ext:FrSt77yPTFx6hTs4i2tKLB9LmE0="
-$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n || ret=1
 grep 'include 1' dig.out.2.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -770,7 +772,7 @@ status=$((status+ret))
 echo_i "checking update ($n)"
 ret=0
 TSIG="$DEFAULT_HMAC:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
-$DIGCMD @10.53.0.7 -y "$TSIG" text2.test. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.7 -y "$TSIG" text2.test. TXT > dig.out.1.test$n || ret=1
 grep 'addition 1' dig.out.1.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -800,10 +802,10 @@ n=$((n+1))
 echo_i "checking zone file edits are loaded ($n)"
 ret=0
 TSIG="$DEFAULT_HMAC:int:FrSt77yPTFx6hTs4i2tKLB9LmE0="
-$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.1.test$n || ret=1
 grep 'include 2' dig.out.1.test$n >/dev/null || ret=1
 TSIG="$DEFAULT_HMAC:ext:FrSt77yPTFx6hTs4i2tKLB9LmE0="
-$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n
+$DIGCMD @10.53.0.7 -y "$TSIG" text1.test. TXT > dig.out.2.test$n || ret=1
 grep 'include 2' dig.out.2.test$n >/dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))

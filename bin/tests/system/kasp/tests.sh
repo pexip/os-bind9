@@ -11,6 +11,8 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 # shellcheck source=conf.sh
 . ../conf.sh
 # shellcheck source=kasp.sh
@@ -328,7 +330,7 @@ ret=0
 
 nextpart $DIR/named.run > /dev/null
 rndccmd 10.53.0.3 loadkeys "$ZONE" > /dev/null || log_error "rndc loadkeys zone ${ZONE} failed"
-wait_for_log 3 "keymgr: done" $DIR/named.run
+wait_for_log 3 "keymgr: $ZONE done" $DIR/named.run
 privkey_stat2=$(key_stat "${basefile}.private")
 pubkey_stat2=$(key_stat "${basefile}.key")
 state_stat2=$(key_stat "${basefile}.state")
@@ -2164,7 +2166,7 @@ dnssec_verify
 n=$((n+1))
 echo_i "check that rndc dnssec -rollover fails if key is inactive ($n)"
 ret=0
-rndccmd "$SERVER" dnssec -rollover -key $(key_get KEY4 ID) "$ZONE" > rndc.dnssec.rollover.out.$ZONE.$n
+rndccmd "$SERVER" dnssec -rollover -key $(key_get KEY4 ID) "$ZONE" > rndc.dnssec.rollover.out.$ZONE.$n || ret=1
 grep "key is not actively signing" rndc.dnssec.rollover.out.$ZONE.$n > /dev/null || log_error "bad error message"
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
@@ -3544,10 +3546,81 @@ dnssec_verify
 #
 # Test #2375: Scheduled rollovers are happening faster than they can finish
 #
-set_zone "step1.three-is-a-crowd.kasp"
-set_policy "default" "1" "3600"
+set_zone "three-is-a-crowd.kasp"
+set_policy "ksk-doubleksk" "3" "7200"
 set_server "ns3" "10.53.0.3"
-# TODO (GL #2471).
+CDNSKEY="no"
+# These are the same time values as calculated for ksk-doubleksk.
+Lksk=5184000
+Lzsk=31536000
+IretKSK=180000
+IretZSK=867600
+# KSK (KEY1) is outgoing.
+key_clear        "KEY1"
+set_keyrole      "KEY1" "ksk"
+set_keylifetime  "KEY1" "${Lksk}"
+set_keyalgorithm "KEY1" "$DEFAULT_ALGORITHM_NUMBER" "$DEFAULT_ALGORITHM" "$DEFAULT_BITS"
+set_keysigning   "KEY1" "yes"
+set_zonesigning  "KEY1" "yes"
+set_keystate     "KEY1" "GOAL"         "hidden"
+set_keystate     "KEY1" "STATE_DNSKEY" "omnipresent"
+set_keystate     "KEY1" "STATE_KRRSIG" "omnipresent"
+set_keystate     "KEY1" "STATE_DS"     "unretentive"
+# KSK (KEY2) is incoming.
+key_clear        "KEY2"
+set_keyrole      "KEY2" "ksk"
+set_keylifetime  "KEY2" "${Lksk}"
+set_keyalgorithm "KEY2" "$DEFAULT_ALGORITHM_NUMBER" "$DEFAULT_ALGORITHM" "$DEFAULT_BITS"
+set_keysigning   "KEY2" "yes"
+set_zonesigning  "KEY2" "no"
+set_keystate     "KEY2" "GOAL"         "omnipresent"
+set_keystate     "KEY2" "STATE_DNSKEY" "omnipresent"
+set_keystate     "KEY2" "STATE_KRRSIG" "omnipresent"
+set_keystate     "KEY2" "STATE_DS"     "rumoured"
+# We will introduce the third KSK shortly.
+key_clear        "KEY3"
+# ZSK (KEY4).
+key_clear        "KEY4"
+set_keyrole      "KEY4" "zsk"
+set_keylifetime  "KEY4" "${Lzsk}"
+set_keyalgorithm "KEY4" "$DEFAULT_ALGORITHM_NUMBER" "$DEFAULT_ALGORITHM" "$DEFAULT_BITS"
+set_keysigning   "KEY4" "no"
+set_zonesigning  "KEY4" "yes"
+set_keystate     "KEY4" "GOAL"         "omnipresent"
+set_keystate     "KEY4" "STATE_DNSKEY" "omnipresent"
+set_keystate     "KEY4" "STATE_ZRRSIG" "omnipresent"
+# Run preliminary tests.
+check_keys
+check_dnssecstatus "$SERVER" "$POLICY" "$ZONE"
+check_apex
+check_subdomain
+dnssec_verify
+# Roll over KEY2.
+# Set expected key lifetime, which is DNSKEY TTL plus the zone propagation delay,
+# plus the publish-safety: 7200s + 1h + 1d = 97200 seconds.
+set_keylifetime  "KEY2" "97200"
+created=$(key_get KEY2 CREATED)
+rndc_rollover "$SERVER" "$DIR" $(key_get KEY2 ID) "${created}" "$ZONE"
+# Update expected number of keys and key states.
+set_keystate "KEY2" "GOAL" "hidden"
+set_policy "ksk-doubleksk" "4" "7200"
+CDNSKEY="no"
+# New KSK (KEY3) is introduced.
+set_keyrole      "KEY3" "ksk"
+set_keylifetime  "KEY3" "${Lksk}"
+set_keyalgorithm "KEY3" "$DEFAULT_ALGORITHM_NUMBER" "$DEFAULT_ALGORITHM" "$DEFAULT_BITS"
+set_keysigning   "KEY3" "yes"
+set_zonesigning  "KEY3" "no"
+set_keystate     "KEY3" "GOAL"         "omnipresent"
+set_keystate     "KEY3" "STATE_DNSKEY" "rumoured"
+set_keystate     "KEY3" "STATE_KRRSIG" "rumoured"
+set_keystate     "KEY3" "STATE_DS"     "hidden"
+# Run tests again. We now expect four keys (3x KSK, 1x ZSK).
+check_keys
+check_dnssecstatus "$SERVER" "$POLICY" "$ZONE"
+check_apex
+check_subdomain
+dnssec_verify
 
 # Test dynamic zones that switch to inline-signing.
 set_zone "dynamic2inline.kasp"

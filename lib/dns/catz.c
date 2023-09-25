@@ -25,6 +25,7 @@
 #include <isc/print.h>
 #include <isc/result.h>
 #include <isc/task.h>
+#include <isc/thread.h>
 #include <isc/util.h>
 
 #include <dns/catz.h>
@@ -790,7 +791,7 @@ dns_catz_new_zones(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
 				     .zmm = zmm,
 				     .magic = DNS_CATZ_ZONES_MAGIC };
 
-	result = isc_task_create_bound(taskmgr, 0, &catzs->updater, 0);
+	result = isc_taskmgr_excltask(taskmgr, &catzs->updater);
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup_task;
 	}
@@ -1019,7 +1020,7 @@ dns__catz_zones_destroy(dns_catz_zones_t *catzs) {
 	REQUIRE(catzs->zones == NULL);
 
 	catzs->magic = 0;
-	isc_task_destroy(&catzs->updater);
+	isc_task_detach(&catzs->updater);
 	isc_mutex_destroy(&catzs->lock);
 	isc_refcount_destroy(&catzs->references);
 
@@ -2136,9 +2137,17 @@ dns_catz_dbupdate_callback(dns_db_t *db, void *fn_arg) {
 	REQUIRE(DNS_DB_VALID(db));
 	REQUIRE(DNS_CATZ_ZONES_VALID(catzs));
 
+	if (atomic_load(&catzs->shuttingdown)) {
+		return (ISC_R_SHUTTINGDOWN);
+	}
+
 	dns_name_toregion(&db->origin, &r);
 
 	LOCK(&catzs->lock);
+	if (catzs->zones == NULL) {
+		result = ISC_R_SHUTTINGDOWN;
+		goto cleanup;
+	}
 	result = isc_ht_find(catzs->zones, r.base, r.length, (void **)&catz);
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
@@ -2146,20 +2155,23 @@ dns_catz_dbupdate_callback(dns_db_t *db, void *fn_arg) {
 
 	/* New zone came as AXFR */
 	if (catz->db != NULL && catz->db != db) {
+		/* Old db cleanup. */
 		if (catz->dbversion != NULL) {
 			dns_db_closeversion(catz->db, &catz->dbversion, false);
 		}
 		dns_db_updatenotify_unregister(
 			catz->db, dns_catz_dbupdate_callback, catz->catzs);
 		dns_db_detach(&catz->db);
-		/*
-		 * We're not registering db update callback, it will be
-		 * registered at the end of dns__catz_update_cb()
-		 */
 		catz->db_registered = false;
 	}
 	if (catz->db == NULL) {
+		/* New db registration. */
 		dns_db_attach(db, &catz->db);
+		result = dns_db_updatenotify_register(
+			db, dns_catz_dbupdate_callback, catz->catzs);
+		if (result == ISC_R_SUCCESS) {
+			catz->db_registered = true;
+		}
 	}
 
 	dns_name_format(&catz->name, dname, DNS_NAME_FORMATSIZE);
@@ -2217,6 +2229,22 @@ cleanup:
 	UNLOCK(&catzs->lock);
 
 	return (result);
+}
+
+void
+dns_catz_dbupdate_unregister(dns_db_t *db, dns_catz_zones_t *catzs) {
+	REQUIRE(DNS_DB_VALID(db));
+	REQUIRE(DNS_CATZ_ZONES_VALID(catzs));
+
+	dns_db_updatenotify_unregister(db, dns_catz_dbupdate_callback, catzs);
+}
+
+void
+dns_catz_dbupdate_register(dns_db_t *db, dns_catz_zones_t *catzs) {
+	REQUIRE(DNS_DB_VALID(db));
+	REQUIRE(DNS_CATZ_ZONES_VALID(catzs));
+
+	dns_db_updatenotify_register(db, dns_catz_dbupdate_callback, catzs);
 }
 
 static bool
@@ -2281,6 +2309,8 @@ dns__catz_update_cb(void *data) {
 			      "catz: zone '%s' not in config", bname);
 		goto exit;
 	}
+
+	INSIST(catz == oldcatz);
 
 	if (!is_active) {
 		/* This can happen during a reconfiguration. */
@@ -2517,22 +2547,6 @@ final:
 		      ISC_LOG_DEBUG(3),
 		      "catz: update_from_db: new zone merged");
 
-	/*
-	 * When we're doing reconfig and setting a new catalog zone
-	 * from an existing zone we won't have a chance to set up
-	 * update callback in zone_startload or axfr_makedb, but we will
-	 * call onupdate() artificially so we can register the callback here.
-	 */
-	LOCK(&catzs->lock);
-	if (!oldcatz->db_registered) {
-		result = dns_db_updatenotify_register(
-			updb, dns_catz_dbupdate_callback, oldcatz->catzs);
-		if (result == ISC_R_SUCCESS) {
-			oldcatz->db_registered = true;
-		}
-	}
-	UNLOCK(&catzs->lock);
-
 exit:
 	catz->updateresult = result;
 }
@@ -2552,6 +2566,21 @@ dns__catz_done_cb(void *data, isc_result_t result) {
 	catz->updaterunning = false;
 
 	dns_name_format(&catz->name, dname, DNS_NAME_FORMATSIZE);
+
+	/*
+	 * When we're doing reconfig and setting a new catalog zone
+	 * from an existing zone we won't have a chance to set up
+	 * update callback in zone_startload or axfr_makedb, but we will
+	 * call onupdate() artificially so we can register the callback
+	 * here.
+	 */
+	if (result == ISC_R_SUCCESS && !catz->db_registered) {
+		result = dns_db_updatenotify_register(
+			catz->db, dns_catz_dbupdate_callback, catz->catzs);
+		if (result == ISC_R_SUCCESS) {
+			catz->db_registered = true;
+		}
+	}
 
 	/* If there's no update pending, or if shutting down, finish. */
 	if (!catz->updatepending || atomic_load(&catz->catzs->shuttingdown)) {

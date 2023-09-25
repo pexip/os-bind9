@@ -16,6 +16,8 @@
 #          in the log file - need a better approach <sdm> - until then,
 #          if you add any tests above that point, you will break the test.
 
+set -e
+
 . ../conf.sh
 
 wait_for_serial() (
@@ -206,8 +208,8 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "testing ixfr-from-differences option ($n)"
 # ns3 is primary; ns4 is secondary
-$CHECKZONE test. ns3/mytest.db > /dev/null 2>&1
-if [ $? -ne 0 ]
+{ $CHECKZONE test. ns3/mytest.db > /dev/null 2>&1; rc=$?; } || true
+if [ $rc -ne 0 ]
 then
     echo_i "named-checkzone returned failure on ns3/mytest.db"
 fi
@@ -299,9 +301,9 @@ sub=$!
 $DIG -p ${PORT} ixfr=0 large @10.53.0.3 > dig.out.test$n
 kill $sub
 )
-lines=`grep hostmaster.large dig.out.test$n | wc -l`
+lines=$(grep hostmaster.large dig.out.test$n | wc -l)
 test ${lines:-0} -eq 2 || ret=1
-messages=`sed -n 's/^;;.*messages \([0-9]*\),.*/\1/p' dig.out.test$n`
+messages=$(sed -n 's/^;;.*messages \([0-9]*\),.*/\1/p' dig.out.test$n)
 test ${messages:-0} -gt 1 || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -405,13 +407,13 @@ _wait_for_stats () {
 n=$((n+1))
 echo_i "checking whether named calculates incoming IXFR statistics correctly ($n)"
 ret=0
-retry_quiet 10 _wait_for_stats 10.53.0.3 "Transfer completed" stats.incoming
+retry_quiet 10 _wait_for_stats 10.53.0.3 "Transfer completed" stats.incoming || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 n=$((n+1))
 echo_i "checking whether named calculates outgoing IXFR statistics correctly ($n)"
-retry_quiet 10 _wait_for_stats 10.53.0.4 "IXFR ended" stats.outgoing
+retry_quiet 10 _wait_for_stats 10.53.0.4 "IXFR ended" stats.outgoing || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 

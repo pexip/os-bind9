@@ -195,7 +195,7 @@ sub stop_rndc {
 
 sub server_died {
 	my ( $server, $signal ) = @_;
-	
+
 	print "I:$test:$server died before a SIG$signal was sent\n";
 	$errors = 1;
 
@@ -214,13 +214,7 @@ sub send_signal {
 
 	my $result = 0;
 
-	if (!$ans && ($^O eq 'cygwin' || $^O eq 'msys')) {
-		my $killout = `/bin/kill -f -$signal $pid 2>&1`;
-		chomp($killout);
-		$result = 1 if ($killout eq '');
-	} else {
-		$result = kill $signal, $pid;
-	}
+	$result = kill $signal, $pid;
 	return $result;
 }
 

@@ -11,6 +11,8 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 . ../conf.sh
 
 DIGOPTS="-p ${PORT}"
@@ -462,6 +464,28 @@ echo_i "end RT #482 regression test"
 
 n=$((n + 1))
 ret=0
+echo_i "remove nonexistent PTR record ($n)"
+$NSUPDATE -k ns1/ddns.key -d << EOF > nsupdate.out.test$n 2>&1 || ret=1
+server 10.53.0.1 ${PORT}
+zone example.nil.
+update delete nonexistent.example.nil. 0 IN PTR foo.
+send
+EOF
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=$((n + 1))
+ret=0
+echo_i "remove nonexistent SRV record ($n)"
+$NSUPDATE -k ns1/ddns.key -d << EOF > nsupdate.out.test$n 2>&1 || ret=1
+server 10.53.0.1 ${PORT}
+zone example.nil.
+update delete nonexistent.example.nil. 0 IN SRV 0 0 0 foo.
+send
+EOF
+[ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+n=$((n + 1))
+ret=0
 echo_i "start NSEC3PARAM changes via UPDATE on a unsigned zone test ($n)"
 $NSUPDATE << EOF
 server 10.53.0.3 ${PORT}
@@ -579,7 +603,7 @@ done
 
 ret=0
 echo_i "check that 'nsupdate -l' with a missing keyfile reports the missing file"
-$NSUPDATE -4 -p ${PORT} -l -k ns1/nonexistent.key 2> nsupdate.out < /dev/null
+$NSUPDATE -4 -p ${PORT} -l -k ns1/nonexistent.key 2> nsupdate.out < /dev/null && ret=1
 grep ns1/nonexistent.key nsupdate.out > /dev/null || ret=1
 if test $ret -ne 0
 then
@@ -629,7 +653,7 @@ fi
 n=$((n + 1))
 ret=0
 echo_i "check that 'update-policy tcp-self' refuses update of records via UDP ($n)"
-$NSUPDATE > nsupdate.out.$n 2>&1 << END
+$NSUPDATE > nsupdate.out.$n 2>&1 << END && ret=1
 server 10.53.0.6 ${PORT}
 local 127.0.0.1
 update add 1.0.0.127.in-addr.arpa. 600 PTR localhost.
@@ -667,7 +691,7 @@ fi
 n=$((n + 1))
 ret=0
 echo_i "check that 'update-policy tcp-self' refuses update of records for a different address from the client's own address via TCP ($n)"
-$NSUPDATE -v > nsupdate.out.$n 2>&1 << END
+$NSUPDATE -v > nsupdate.out.$n 2>&1 << END && ret=1
 server 10.53.0.6 ${PORT}
 local 127.0.0.1
 update add 1.0.168.192.in-addr.arpa. 600 PTR localhost.
@@ -821,13 +845,13 @@ echo_i "check command list ($n)"
 (
 while read cmd
 do
-    echo "$cmd" | $NSUPDATE  > /dev/null 2>&1
-    if test $? -gt 1 ; then
+    { echo "$cmd" | $NSUPDATE  > /dev/null 2>&1; rc=$?; } || true
+    if test $rc -gt 1 ; then
 	echo_i "failed ($cmd)"
 	ret=1
     fi
-    echo "$cmd " | $NSUPDATE  > /dev/null 2>&1
-    if test $? -gt 1 ; then
+    { echo "$cmd " | $NSUPDATE  > /dev/null 2>&1; rc=$?; } || true
+    if test $rc -gt 1 ; then
 	echo_i "failed ($cmd)"
 	ret=1
     fi
@@ -840,6 +864,37 @@ fi
 
 n=$((n + 1))
 ret=0
+
+n=$((n + 1))
+ret=0
+echo_i "check TSIG key algorithms using legacy K file pairs (nsupdate -k) ($n)"
+if $FEATURETEST --md5
+then
+	ALGS="157 161 162 163 164 165"
+else
+	ALGS="161 162 163 164 165"
+	echo_i "skipping disabled md5 (157) algorithm"
+fi
+for alg in $ALGS; do
+    $NSUPDATE -k ns1/legacy/Klegacy-${alg}.+${alg}+*.key <<END > nsupdate.alg-$alg.out 2>&1 || ret=1
+server 10.53.0.1 ${PORT}
+update add ${alg}.keytests.nil. 600 A 10.10.10.3
+send
+END
+done
+sleep 2
+for alg in $ALGS; do
+    $DIG $DIGOPTS +short @10.53.0.1 ${alg}.keytests.nil | grep 10.10.10.3 > /dev/null 2>&1 || ret=1
+    grep "Use of K\* file pairs for HMAC is deprecated" nsupdate.alg-$alg.out > /dev/null || ret=1
+done
+if [ $ret -ne 0 ]; then
+    echo_i "failed"
+    status=1
+fi
+
+n=$((n + 1))
+ret=0
+
 echo_i "check TSIG key algorithms (nsupdate -k) ($n)"
 if $FEATURETEST --md5
 then
@@ -1006,23 +1061,23 @@ retry_quiet 20 check_size_lt_5000 || ret=1
 n=$((n + 1))
 echo_i "check check-names processing ($n)"
 ret=0
-$NSUPDATE << EOF > nsupdate.out1-$n 2>&1
+$NSUPDATE << EOF > nsupdate.out1-$n 2>&1 && ret=1
 update add # 0 in a 1.2.3.4
 EOF
 grep "bad owner" nsupdate.out1-$n > /dev/null || ret=1
 
-$NSUPDATE << EOF > nsupdate.out2-$n 2>&1
+$NSUPDATE << EOF > nsupdate.out2-$n 2>&1 || ret=1
 check-names off
 update add # 0 in a 1.2.3.4
 EOF
 grep "bad owner" nsupdate.out2-$n > /dev/null && ret=1
 
-$NSUPDATE << EOF > nsupdate.out3-$n 2>&1
+$NSUPDATE << EOF > nsupdate.out3-$n 2>&1 && ret=1
 update add . 0 in mx 0 #
 EOF
 grep "bad name" nsupdate.out3-$n > /dev/null || ret=1
 
-$NSUPDATE << EOF > nsupdate.out4-$n 2>&1
+$NSUPDATE << EOF > nsupdate.out4-$n 2>&1 || ret=1
 check-names off
 update add . 0 in mx 0 #
 EOF
@@ -1084,7 +1139,7 @@ zone unreachable.
 update add unreachable. 600 A 192.0.2.1
 send
 END
-t2=`$PERL -e 'print time()'`
+t2=$($PERL -e 'print time()')
 grep "; Communication with 10.53.0.4#${PORT} failed: timed out" nsupdate.out.test$n > /dev/null 2>&1 || ret=1
 grep "not implemented" nsupdate.out.test$n > /dev/null 2>&1 && ret=1
 elapsed=$((t2 - t1))
@@ -1103,7 +1158,7 @@ zone unreachable.
 update add unreachable. 600 A 192.0.2.1
 send
 END
-t2=`$PERL -e 'print time()'`
+t2=$($PERL -e 'print time()')
 grep "; Communication with 10.53.0.4#${PORT} failed: timed out" nsupdate.out.test$n > /dev/null 2>&1 || ret=1
 grep "not implemented" nsupdate.out.test$n > /dev/null 2>&1 && ret=1
 elapsed=$((t2 - t1))
@@ -1122,7 +1177,7 @@ zone unreachable.
 update add unreachable. 600 A 192.0.2.1
 send
 END
-t2=`$PERL -e 'print time()'`
+t2=$($PERL -e 'print time()')
 grep "; Communication with 10.53.0.4#${PORT} failed: timed out" nsupdate.out.test$n > /dev/null 2>&1 || ret=1
 grep "not implemented" nsupdate.out.test$n > /dev/null 2>&1 && ret=1
 elapsed=$((t2 - t1))
@@ -1141,7 +1196,7 @@ zone unreachable.
 update add unreachable. 600 A 192.0.2.1
 send
 END
-t2=`$PERL -e 'print time()'`
+t2=$($PERL -e 'print time()')
 grep "; Communication with 10.53.0.4#${PORT} failed: timed out" nsupdate.out.test$n > /dev/null 2>&1 || ret=1
 grep "not implemented" nsupdate.out.test$n > /dev/null 2>&1 && ret=1
 elapsed=$((t2 - t1))
@@ -1160,7 +1215,7 @@ zone unreachable.
 update add unreachable. 600 A 192.0.2.1
 send
 END
-t2=`$PERL -e 'print time()'`
+t2=$($PERL -e 'print time()')
 grep "; Communication with 10.53.0.4#${PORT} failed: timed out" nsupdate.out.test$n > /dev/null 2>&1 || ret=1
 grep "not implemented" nsupdate.out.test$n > /dev/null 2>&1 && ret=1
 elapsed=$((t2 - t1))
@@ -1446,7 +1501,7 @@ n=$((n + 1))
 ret=0
 echo_i "check that update is rejected if query is not allowed ($n)"
 {
-  $NSUPDATE -d <<END
+  $NSUPDATE -d <<END && ret=1
   local 10.53.0.2
   server 10.53.0.1 ${PORT}
   update add reject.other.nil 3600 IN TXT Whatever
@@ -1473,6 +1528,24 @@ wait_for_log 10 "too many DNS UPDATEs queued" ns1/named.run || ret=1
 if ! $FEATURETEST --gssapi ; then
   echo_i "SKIPPED: GSSAPI tests"
 else
+  n=$((n + 1))
+  ret=0
+  echo_i "check GSS-API TKEY request rcode against a non configured server ($n)"
+  KRB5CCNAME="FILE:$(pwd)/ns7/machine.ccache"
+  export KRB5CCNAME
+  $NSUPDATE << EOF > nsupdate.out.test$n 2>&1 && ret=1
+  gsstsig
+  realm EXAMPLE.COM
+  server 10.53.0.7 ${PORT}
+  zone example.com
+  send
+EOF
+  grep "response to GSS-TSIG query was unsuccessful (REFUSED)" nsupdate.out.test$n > /dev/null  || ret=1
+  [ $ret = 0 ] || { echo_i "failed"; status=1; }
+
+  copy_setports ns7/named2.conf.in ns7/named.conf
+  rndc_reload ns7 10.53.0.7
+
   n=$((n + 1))
   ret=0
   echo_i "check krb5-self match ($n)"

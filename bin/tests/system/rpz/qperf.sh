@@ -11,9 +11,9 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-for QDIR in `echo "$PATH" | tr : ' '` ../../../../contrib/queryperf; do
+for QDIR in $(echo "$PATH" | tr : ' ') ../../../../contrib/queryperf; do
     QPERF=$QDIR/queryperf
-    if test -f $QPERF -a -x $QPERF; then
+    if test -f "$QPERF" -a -x "$QPERF"; then
 	echo $QPERF
 	exit 0
     fi

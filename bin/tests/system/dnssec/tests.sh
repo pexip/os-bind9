@@ -11,10 +11,10 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 # shellcheck source=conf.sh
 . ../conf.sh
-
-set -e
 
 status=0
 n=1
@@ -83,8 +83,7 @@ israw0 () {
     < "$1" $PERL -e 'binmode STDIN;
 	             read(STDIN, $input, 8);
 	             ($style, $version) = unpack("NN", $input);
-	             exit 1 if ($style != 2 || $version != 0);'
-    return $?
+	             exit 1 if ($style != 2 || $version != 0);' || return $?
 }
 
 # check that a zone file is raw format, version 1
@@ -93,8 +92,7 @@ israw1 () {
     < "$1" $PERL -e 'binmode STDIN;
 		     read(STDIN, $input, 8);
                      ($style, $version) = unpack("NN", $input);
-                     exit 1 if ($style != 2 || $version != 1);'
-    return $?
+                     exit 1 if ($style != 2 || $version != 1);' || return $?
 }
 
 # strip NS and RRSIG NS from input
@@ -113,8 +111,7 @@ check_secroots_layout () {
 	     /Start view/ { if (!empty) exit(1) }
 	     /Secure roots:/ { if (empty) exit(1) }
 	     /Negative trust anchors:/ { if (!empty) exit(1) }
-	     { empty=0 }' $1
-	return $?
+	     { empty=0 }' $1 || return $?
 }
 
 # Check that for a query against a validating resolver where the
@@ -197,7 +194,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive validation NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.example > delv.out$n || ret=1
@@ -229,7 +226,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive validation NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.nsec3.example > delv.out$n || ret=1
@@ -254,7 +251,7 @@ status=$((status+ret))
 
 SP="[[:space:]]+"
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive validation OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.optout.example > delv.out$n || ret=1
@@ -280,7 +277,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive wildcard validation NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.wild.example > delv.out$n || ret=1
@@ -322,7 +319,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive wildcard validation NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.wild.nsec3.example > delv.out$n || ret=1
@@ -348,7 +345,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking positive wildcard validation OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.wild.optout.example > delv.out$n || ret=1
@@ -370,7 +367,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NXDOMAIN NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.example > delv.out$n 2>&1 || ret=1
@@ -393,7 +390,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NXDOMAIN NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.nsec3.example > delv.out$n 2>&1 || ret=1
@@ -417,7 +414,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NXDOMAIN OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.optout.example > delv.out$n 2>&1 || ret=1
@@ -439,7 +436,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NODATA OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt a.example > delv.out$n 2>&1 || ret=1
@@ -463,7 +460,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NODATA NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt a.nsec3.example > delv.out$n 2>&1 || ret=1
@@ -487,7 +484,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative validation NODATA OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt a.optout.example > delv.out$n 2>&1 || ret=1
@@ -508,7 +505,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative wildcard validation NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt b.wild.example > delv.out$n 2>&1 || ret=1
@@ -528,7 +525,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative wildcard validation NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt b.wild.nsec3.example > delv.out$n 2>&1 || ret=1
@@ -552,7 +549,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking negative wildcard validation OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 txt b.optout.nsec3.example > delv.out$n 2>&1 || ret=1
@@ -576,7 +573,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server insecurity proof NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.insecure.example > delv.out$n || ret=1
@@ -598,7 +595,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server insecurity proof NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.insecure.nsec3.example > delv.out$n || ret=1
@@ -620,7 +617,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server insecurity proof OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 a a.insecure.optout.example > delv.out$n || ret=1
@@ -644,7 +641,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server negative insecurity proof NSEC using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.insecure.example > delv.out$n 2>&1 || ret=1
@@ -668,7 +665,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server negative insecurity proof NSEC3 using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.insecure.nsec3.example > delv.out$n 2>&1 || ret=1
@@ -692,7 +689,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking 1-server negative insecurity proof OPTOUT using dns_client ($n)"
    delv_with_opts @10.53.0.4 a q.insecure.optout.example > delv.out$n 2>&1 || ret=1
@@ -889,7 +886,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking failed validation using dns_client ($n)"
    delv_with_opts +cd @10.53.0.4 a a.bogus.example > delv.out$n 2>&1 || ret=1
@@ -934,7 +931,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking that validation fails when key record is missing using dns_client ($n)"
    delv_with_opts +cd @10.53.0.4 a a.b.keyless.example > delv.out$n 2>&1 || ret=1
@@ -953,7 +950,7 @@ n=$((n+1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status+ret))
 
-if [ -x ${DELV} ] ; then
+if [ -x "${DELV}" ] ; then
    ret=0
    echo_i "checking that validation succeeds when a revoked key is encountered using dns_client ($n)"
    delv_with_opts +cd @10.53.0.4 soa revkey.example > delv.out$n 2>&1 || ret=1
@@ -2428,8 +2425,8 @@ if $PERL -e 'use Net::DNS;' 2>/dev/null
 then
     echo_i "running DNSSEC update test"
     ret=0
-    output=$($PERL dnssec_update_test.pl -s 10.53.0.3 -p "$PORT" dynamic.example.)
-    test "$?" -eq 0 || ret=1
+    { output=$($PERL dnssec_update_test.pl -s 10.53.0.3 -p "$PORT" dynamic.example.); rc=$?; } || true
+    test "$rc" -eq 0 || ret=1
     echo "$output" | cat_i
     [ $ret -eq 1 ] && status=1
 else
@@ -2970,7 +2967,7 @@ status=$((status+ret))
 echo_i "testing legacy upper case signer name validation ($n)"
 ret=0
 $DIG +tcp +noadd +noauth +dnssec -p "$PORT" soa upper.example @10.53.0.4 \
-        > dig.out.ns4.test$n 2>&1
+        > dig.out.ns4.test$n 2>&1 || ret=1
 grep "flags:.* ad;" dig.out.ns4.test$n > /dev/null || ret=1
 grep "RRSIG.*SOA.* UPPER\\.EXAMPLE\\. " dig.out.ns4.test$n > /dev/null || ret=1
 n=$((n+1))
@@ -2980,7 +2977,7 @@ status=$((status+ret))
 echo_i "testing that we lower case signer name ($n)"
 ret=0
 $DIG +tcp +noadd +noauth +dnssec -p "$PORT" soa LOWER.EXAMPLE @10.53.0.4 \
-        > dig.out.ns4.test$n 2>&1
+        > dig.out.ns4.test$n 2>&1 || ret=1
 grep "flags:.* ad;" dig.out.ns4.test$n > /dev/null || ret=1
 grep "RRSIG.*SOA.* lower\\.example\\. " dig.out.ns4.test$n > /dev/null || ret=1
 n=$((n+1))
@@ -3280,11 +3277,11 @@ if [ -x "$PYTHON" ]; then
     # convert expiry date to a comma-separated list of integers python can
     # use as input to date(). strip leading 0s in months and days so
     # python3 will recognize them as integers.
-    $DIG +dnssec +short -p "$PORT" @10.53.0.3 soa siginterval.example > dig.out.soa.test$n
+    $DIG +dnssec +short -p "$PORT" @10.53.0.3 soa siginterval.example > dig.out.soa.test$n || ret=1
     soaexpire=$(awk '$1 ~ /SOA/ { print $5 }' dig.out.soa.test$n |
 	       sed 's/\(....\)\(..\)\(..\).*/\1, \2, \3/' |
 	       sed 's/ 0/ /g')
-    $DIG +dnssec +short -p "$PORT" @10.53.0.3 dnskey siginterval.example > dig.out.dnskey.test$n
+    $DIG +dnssec +short -p "$PORT" @10.53.0.3 dnskey siginterval.example > dig.out.dnskey.test$n || ret=1
     dnskeyexpire=$(awk '$1 ~ /DNSKEY/ { print $5; exit 0 }' dig.out.dnskey.test$n |
 		  sed 's/\(....\)\(..\)\(..\).*/\1, \2, \3/' |
 		  sed 's/ 0/ /g')
@@ -3376,7 +3373,7 @@ do
 	2) # Diffie Helman
 	    alg=$((alg+1))
 	    continue;;
-	159|160|161|162|163|164|165) # private - non standard
+	157|160|161|162|163|164|165) # private - non standard
 	    alg=$((alg+1))
 	    continue;;
 	1|5|7|8|10) # RSA algorithms

@@ -302,6 +302,13 @@ dns__rbtnode_namelen(dns_rbtnode_t *node) {
 	return (len);
 }
 
+unsigned int
+dns__rbtnode_getsize(dns_rbtnode_t *node) {
+	REQUIRE(DNS_RBTNODE_VALID(node));
+
+	return (NODE_SIZE(node));
+}
+
 /*
  * Initialize a red/black tree of trees.
  */
@@ -1569,6 +1576,7 @@ create_node(isc_mem_t *mctx, const dns_name_t *name, dns_rbtnode_t **nodep) {
 	HASHVAL(node) = 0;
 
 	ISC_LINK_INIT(node, deadlink);
+	ISC_LINK_INIT(node, prunelink);
 
 	LOCKNUM(node) = 0;
 	WILD(node) = 0;

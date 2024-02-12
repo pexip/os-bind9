@@ -82,7 +82,7 @@
 typedef uint32_t rbtdb_serial_t;
 typedef uint32_t rbtdb_rdatatype_t;
 
-#define RBTDB_RDATATYPE_BASE(type) ((dns_rdatatype_t)((type)&0xFFFF))
+#define RBTDB_RDATATYPE_BASE(type) ((dns_rdatatype_t)((type) & 0xFFFF))
 #define RBTDB_RDATATYPE_EXT(type)  ((dns_rdatatype_t)((type) >> 16))
 #define RBTDB_RDATATYPE_VALUE(base, ext)              \
 	((rbtdb_rdatatype_t)(((uint32_t)ext) << 16) | \
@@ -477,11 +477,26 @@ struct dns_rbtdb {
 	 */
 	rdatasetheaderlist_t *rdatasets;
 
+	/*
+	 * Start point % node_lock_count for next LRU cleanup.
+	 */
+	atomic_uint lru_sweep;
+
+	/*
+	 * When performing LRU cleaning limit cleaning to headers that were
+	 * last used at or before this.
+	 */
+	atomic_uint last_used;
+
 	/*%
 	 * Temporary storage for stale cache nodes and dynamically deleted
 	 * nodes that await being cleaned up.
 	 */
 	rbtnodelist_t *deadnodes;
+
+	/* List of nodes from which recursive tree pruning can be started from.
+	 * Locked by tree_lock. */
+	rbtnodelist_t prunenodes;
 
 	/*
 	 * Heaps.  These are used for TTL based expiry in a cache,
@@ -561,8 +576,7 @@ static void
 expire_header(dns_rbtdb_t *rbtdb, rdatasetheader_t *header, bool tree_locked,
 	      expire_t reason);
 static void
-overmem_purge(dns_rbtdb_t *rbtdb, unsigned int locknum_start, size_t purgesize,
-	      bool tree_locked);
+overmem_purge(dns_rbtdb_t *rbtdb, rdatasetheader_t *header, bool tree_locked);
 static void
 resign_insert(dns_rbtdb_t *rbtdb, int idx, rdatasetheader_t *newheader);
 static void
@@ -993,6 +1007,7 @@ free_rbtdb(dns_rbtdb_t *rbtdb, bool log, isc_event_t *event) {
 	unsigned int i;
 	isc_result_t result;
 	char buf[DNS_NAME_FORMATSIZE];
+	dns_rbtnode_t *node = NULL;
 	dns_rbt_t **treep;
 	isc_time_t start;
 
@@ -1018,13 +1033,17 @@ free_rbtdb(dns_rbtdb_t *rbtdb, bool log, isc_event_t *event) {
 	 * the overhead of unlinking all nodes here should be negligible.
 	 */
 	for (i = 0; i < rbtdb->node_lock_count; i++) {
-		dns_rbtnode_t *node;
-
 		node = ISC_LIST_HEAD(rbtdb->deadnodes[i]);
 		while (node != NULL) {
 			ISC_LIST_UNLINK(rbtdb->deadnodes[i], node, deadlink);
 			node = ISC_LIST_HEAD(rbtdb->deadnodes[i]);
 		}
+	}
+
+	node = ISC_LIST_HEAD(rbtdb->prunenodes);
+	while (node != NULL) {
+		ISC_LIST_UNLINK(rbtdb->prunenodes, node, prunelink);
+		node = ISC_LIST_HEAD(rbtdb->prunenodes);
 	}
 
 	if (event == NULL) {
@@ -1832,19 +1851,32 @@ is_leaf(dns_rbtnode_t *node) {
 		node->left == NULL && node->right == NULL);
 }
 
+/*%
+ * The tree lock must be held when this function is called as it reads and
+ * updates rbtdb->prunenodes.
+ */
 static void
 send_to_prune_tree(dns_rbtdb_t *rbtdb, dns_rbtnode_t *node,
 		   isc_rwlocktype_t locktype) {
-	isc_event_t *ev;
-	dns_db_t *db;
+	bool pruning_queued = (ISC_LIST_HEAD(rbtdb->prunenodes) != NULL);
 
-	ev = isc_event_allocate(rbtdb->common.mctx, NULL, DNS_EVENT_RBTPRUNE,
-				prune_tree, node, sizeof(isc_event_t));
+	INSIST(locktype == isc_rwlocktype_write);
+
 	new_reference(rbtdb, node, locktype);
-	db = NULL;
-	attach((dns_db_t *)rbtdb, &db);
-	ev->ev_sender = db;
-	isc_task_send(rbtdb->task, &ev);
+	INSIST(!ISC_LINK_LINKED(node, prunelink));
+	ISC_LIST_APPEND(rbtdb->prunenodes, node, prunelink);
+
+	if (!pruning_queued) {
+		isc_event_t *ev = NULL;
+		dns_db_t *db = NULL;
+
+		attach((dns_db_t *)rbtdb, &db);
+
+		ev = isc_event_allocate(rbtdb->common.mctx, NULL,
+					DNS_EVENT_RBTPRUNE, prune_tree, db,
+					sizeof(isc_event_t));
+		isc_task_send(rbtdb->task, &ev);
+	}
 }
 
 /*%
@@ -2119,17 +2151,26 @@ restore_locks:
 }
 
 /*
- * Prune the tree by recursively cleaning-up single leaves.  In the worst
- * case, the number of iteration is the number of tree levels, which is at
- * most the maximum number of domain name labels, i.e, 127.  In practice, this
- * should be much smaller (only a few times), and even the worst case would be
- * acceptable for a single event.
+ * Prune the tree by recursively cleaning up single leaves.  Go through all
+ * nodes stored in the rbtdb->prunenodes list; for each of them, in the worst
+ * case, it will be necessary to traverse a number of tree levels equal to the
+ * maximum legal number of domain name labels (127); in practice, the number of
+ * tree levels to traverse will virtually always be much smaller (a few levels
+ * at most).  While holding the tree lock throughout this entire operation is
+ * less than ideal, so is splitting the latter up by queueing a separate
+ * prune_tree() run for each node to start pruning from (as queueing requires
+ * allocating memory and can therefore potentially be exploited to exhaust
+ * available memory).  Also note that actually freeing up the memory used by
+ * RBTDB nodes (which is what this function does) is essential to keeping cache
+ * memory use in check, so since the tree lock needs to be acquired anyway,
+ * freeing as many nodes as possible before the tree lock gets released is
+ * prudent.
  */
 static void
 prune_tree(isc_task_t *task, isc_event_t *event) {
-	dns_rbtdb_t *rbtdb = event->ev_sender;
-	dns_rbtnode_t *node = event->ev_arg;
-	dns_rbtnode_t *parent;
+	dns_rbtdb_t *rbtdb = (dns_rbtdb_t *)event->ev_arg;
+	dns_rbtnode_t *node = NULL;
+	dns_rbtnode_t *parent = NULL;
 	unsigned int locknum;
 
 	UNUSED(task);
@@ -2137,44 +2178,60 @@ prune_tree(isc_task_t *task, isc_event_t *event) {
 	isc_event_free(&event);
 
 	RWLOCK(&rbtdb->tree_lock, isc_rwlocktype_write);
-	locknum = node->locknum;
-	NODE_LOCK(&rbtdb->node_locks[locknum].lock, isc_rwlocktype_write);
-	do {
-		parent = node->parent;
-		decrement_reference(rbtdb, node, 0, isc_rwlocktype_write,
-				    isc_rwlocktype_write, true);
 
-		if (parent != NULL && parent->down == NULL) {
-			/*
-			 * node was the only down child of the parent and has
-			 * just been removed.  We'll then need to examine the
-			 * parent.  Keep the lock if possible; otherwise,
-			 * release the old lock and acquire one for the parent.
-			 */
-			if (parent->locknum != locknum) {
-				NODE_UNLOCK(&rbtdb->node_locks[locknum].lock,
-					    isc_rwlocktype_write);
-				locknum = parent->locknum;
-				NODE_LOCK(&rbtdb->node_locks[locknum].lock,
-					  isc_rwlocktype_write);
+	while ((node = ISC_LIST_HEAD(rbtdb->prunenodes)) != NULL) {
+		locknum = node->locknum;
+		NODE_LOCK(&rbtdb->node_locks[locknum].lock,
+			  isc_rwlocktype_write);
+		do {
+			if (ISC_LINK_LINKED(node, prunelink)) {
+				ISC_LIST_UNLINK(rbtdb->prunenodes, node,
+						prunelink);
 			}
 
-			/*
-			 * We need to gain a reference to the node before
-			 * decrementing it in the next iteration.
-			 */
-			if (ISC_LINK_LINKED(parent, deadlink)) {
-				ISC_LIST_UNLINK(rbtdb->deadnodes[locknum],
+			parent = node->parent;
+			decrement_reference(rbtdb, node, 0,
+					    isc_rwlocktype_write,
+					    isc_rwlocktype_write, true);
+
+			if (parent != NULL && parent->down == NULL) {
+				/*
+				 * node was the only down child of the parent
+				 * and has just been removed.  We'll then need
+				 * to examine the parent.  Keep the lock if
+				 * possible; otherwise, release the old lock and
+				 * acquire one for the parent.
+				 */
+				if (parent->locknum != locknum) {
+					NODE_UNLOCK(
+						&rbtdb->node_locks[locknum].lock,
+						isc_rwlocktype_write);
+					locknum = parent->locknum;
+					NODE_LOCK(
+						&rbtdb->node_locks[locknum].lock,
+						isc_rwlocktype_write);
+				}
+
+				/*
+				 * We need to gain a reference to the node
+				 * before decrementing it in the next iteration.
+				 */
+				if (ISC_LINK_LINKED(parent, deadlink)) {
+					ISC_LIST_UNLINK(
+						rbtdb->deadnodes[locknum],
 						parent, deadlink);
+				}
+				new_reference(rbtdb, parent,
+					      isc_rwlocktype_write);
+			} else {
+				parent = NULL;
 			}
-			new_reference(rbtdb, parent, isc_rwlocktype_write);
-		} else {
-			parent = NULL;
-		}
 
-		node = parent;
-	} while (node != NULL);
-	NODE_UNLOCK(&rbtdb->node_locks[locknum].lock, isc_rwlocktype_write);
+			node = parent;
+		} while (node != NULL);
+		NODE_UNLOCK(&rbtdb->node_locks[locknum].lock,
+			    isc_rwlocktype_write);
+	}
 	RWUNLOCK(&rbtdb->tree_lock, isc_rwlocktype_write);
 
 	detach((dns_db_t **)&rbtdb);
@@ -6444,6 +6501,9 @@ find_header:
 			if (header->rdh_ttl > newheader->rdh_ttl) {
 				set_ttl(rbtdb, header, newheader->rdh_ttl);
 			}
+			if (header->last_used != now) {
+				update_header(rbtdb, header, now);
+			}
 			if (header->noqname == NULL &&
 			    newheader->noqname != NULL)
 			{
@@ -6496,6 +6556,9 @@ find_header:
 			if (header->rdh_ttl > newheader->rdh_ttl) {
 				set_ttl(rbtdb, header, newheader->rdh_ttl);
 			}
+			if (header->last_used != now) {
+				update_header(rbtdb, header, now);
+			}
 			if (header->noqname == NULL &&
 			    newheader->noqname != NULL)
 			{
@@ -6523,6 +6586,9 @@ find_header:
 			idx = newheader->node->locknum;
 			if (IS_CACHE(rbtdb)) {
 				if (ZEROTTL(newheader)) {
+					newheader->last_used =
+						atomic_load(&rbtdb->last_used) +
+						1;
 					ISC_LIST_APPEND(rbtdb->rdatasets[idx],
 							newheader, link);
 				} else {
@@ -6564,6 +6630,9 @@ find_header:
 				INSIST(rbtdb->heaps != NULL);
 				isc_heap_insert(rbtdb->heaps[idx], newheader);
 				if (ZEROTTL(newheader)) {
+					newheader->last_used =
+						atomic_load(&rbtdb->last_used) +
+						1;
 					ISC_LIST_APPEND(rbtdb->rdatasets[idx],
 							newheader, link);
 				} else {
@@ -6969,8 +7038,7 @@ addrdataset(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
 	}
 
 	if (cache_is_overmem) {
-		overmem_purge(rbtdb, rbtnode->locknum, rdataset_size(newheader),
-			      tree_locked);
+		overmem_purge(rbtdb, newheader, tree_locked);
 	}
 
 	NODE_LOCK(&rbtdb->node_locks[rbtnode->locknum].lock,
@@ -8304,6 +8372,8 @@ dns_rbtdb_create(isc_mem_t *mctx, const dns_name_t *origin, dns_dbtype_t type,
 	for (i = 0; i < (int)rbtdb->node_lock_count; i++) {
 		ISC_LIST_INIT(rbtdb->deadnodes[i]);
 	}
+
+	ISC_LIST_INIT(rbtdb->prunenodes);
 
 	rbtdb->active = rbtdb->node_lock_count;
 
@@ -9640,7 +9710,7 @@ rehash_bits(rbtdb_version_t *version, size_t newcount) {
 	uint32_t newbits = oldbits;
 
 	while (newcount >= HASHSIZE(newbits) &&
-	       newbits <= RBTDB_GLUE_TABLE_MAX_BITS)
+	       newbits < RBTDB_GLUE_TABLE_MAX_BITS)
 	{
 		newbits += 1;
 	}
@@ -10147,7 +10217,10 @@ expire_lru_headers(dns_rbtdb_t *rbtdb, unsigned int locknum, size_t purgesize,
 	size_t purged = 0;
 
 	for (header = ISC_LIST_TAIL(rbtdb->rdatasets[locknum]);
-	     header != NULL && purged <= purgesize; header = header_prev)
+	     header != NULL &&
+	     header->last_used <= atomic_load(&rbtdb->last_used) &&
+	     purged <= purgesize;
+	     header = header_prev)
 	{
 		header_prev = ISC_LIST_PREV(header, link);
 		/*
@@ -10171,30 +10244,58 @@ expire_lru_headers(dns_rbtdb_t *rbtdb, unsigned int locknum, size_t purgesize,
  * entries under the overmem condition.  To recover from this condition quickly,
  * we cleanup entries up to the size of newly added rdata (passed as purgesize).
  *
- * This process is triggered while adding a new entry, and we specifically avoid
- * purging entries in the same LRU bucket as the one to which the new entry will
- * belong.  Otherwise, we might purge entries of the same name of different RR
- * types while adding RRsets from a single response (consider the case where
- * we're adding A and AAAA glue records of the same NS name).
+ * The LRU lists tails are processed in LRU order to the nearest second.
+ *
+ * A write lock on the tree must be held.
  */
 static void
-overmem_purge(dns_rbtdb_t *rbtdb, unsigned int locknum_start, size_t purgesize,
+overmem_purge(dns_rbtdb_t *rbtdb, rdatasetheader_t *newheader,
 	      bool tree_locked) {
-	unsigned int locknum;
+	uint32_t locknum_start = atomic_fetch_add(&rbtdb->lru_sweep, 1) %
+				 rbtdb->node_lock_count;
+	uint32_t locknum = locknum_start;
+	/* Size of added data, possible node and possible ENT node. */
+	size_t purgesize = rdataset_size(newheader) +
+			   2 * dns__rbtnode_getsize(newheader->node);
 	size_t purged = 0;
+	isc_stdtime_t min_last_used = 0;
+	size_t max_passes = 8;
 
-	for (locknum = (locknum_start + 1) % rbtdb->node_lock_count;
-	     locknum != locknum_start && purged <= purgesize;
-	     locknum = (locknum + 1) % rbtdb->node_lock_count)
-	{
+again:
+	do {
 		NODE_LOCK(&rbtdb->node_locks[locknum].lock,
 			  isc_rwlocktype_write);
 
 		purged += expire_lru_headers(rbtdb, locknum, purgesize - purged,
 					     tree_locked);
 
+		/*
+		 * Work out the oldest remaining last_used values of the list
+		 * tails as we walk across the array of lru lists.
+		 */
+		rdatasetheader_t *header =
+			ISC_LIST_TAIL(rbtdb->rdatasets[locknum]);
+		if (header != NULL &&
+		    (min_last_used == 0 || header->last_used < min_last_used))
+		{
+			min_last_used = header->last_used;
+		}
 		NODE_UNLOCK(&rbtdb->node_locks[locknum].lock,
 			    isc_rwlocktype_write);
+		locknum = (locknum + 1) % rbtdb->node_lock_count;
+	} while (locknum != locknum_start && purged <= purgesize);
+
+	/*
+	 * Update rbtdb->last_used if we have walked all the list tails and have
+	 * not freed the required amount of memory.
+	 */
+	if (purged < purgesize) {
+		if (min_last_used != 0) {
+			atomic_store(&rbtdb->last_used, min_last_used);
+			if (max_passes-- > 0) {
+				goto again;
+			}
+		}
 	}
 }
 

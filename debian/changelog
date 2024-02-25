@@ -1,3 +1,9 @@
+bind9 (1:9.18.24-1+pexip24u1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Sun, 25 Feb 2024 11:45:17 +0000
+
 bind9 (1:9.18.24-1) bookworm-security; urgency=high
 
   * New upstream version 9.18.24

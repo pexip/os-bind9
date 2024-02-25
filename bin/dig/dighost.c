@@ -3249,6 +3249,7 @@ udp_ready(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 			start_udp(next);
 			check_if_done();
 		} else {
+			dighost_error("no servers could be reached\n");
 			clear_current_lookup();
 		}
 
@@ -3654,6 +3655,7 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 			start_tcp(next);
 			check_if_done();
 		} else {
+			dighost_error("no servers could be reached\n");
 			clear_current_lookup();
 		}
 

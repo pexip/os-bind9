@@ -124,6 +124,12 @@ struct dns_rbtnode {
 	 */
 	ISC_LINK(dns_rbtnode_t) deadlink;
 
+	/*%
+	 * This linked list is used to store nodes from which tree pruning can
+	 * be started.
+	 */
+	ISC_LINK(dns_rbtnode_t) prunelink;
+
 	/*@{*/
 	/*!
 	 * These values are used in the RBT DB implementation.  The appropriate
@@ -992,4 +998,11 @@ dns__rbtnode_namelen(dns_rbtnode_t *node);
  * Returns the length of the full name of the node. Used only internally
  * and in unit tests.
  */
+
+unsigned int
+dns__rbtnode_getsize(dns_rbtnode_t *node);
+/*
+ * Return allocated size for a node.
+ */
+
 ISC_LANG_ENDDECLS

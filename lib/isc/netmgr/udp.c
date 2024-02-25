@@ -152,18 +152,19 @@ isc_nm_listenudp(isc_nm_t *mgr, isc_sockaddr_t *iface, isc_nm_recv_cb_t cb,
 	isc_result_t result = ISC_R_SUCCESS;
 	isc_nmsocket_t *sock = NULL;
 	size_t children_size = 0;
-	REQUIRE(VALID_NM(mgr));
 	uv_os_sock_t fd = -1;
 
+	REQUIRE(VALID_NM(mgr));
+
 	/*
-	 * We are creating mgr->nworkers duplicated sockets, one
+	 * We are creating mgr->nlisteners duplicated sockets, one
 	 * socket for each worker thread.
 	 */
 	sock = isc_mem_get(mgr->mctx, sizeof(isc_nmsocket_t));
 	isc__nmsocket_init(sock, mgr, isc_nm_udplistener, iface);
 
 	atomic_init(&sock->rchildren, 0);
-	sock->nchildren = mgr->nworkers;
+	sock->nchildren = mgr->nlisteners;
 	children_size = sock->nchildren * sizeof(sock->children[0]);
 	sock->children = isc_mem_get(mgr->mctx, children_size);
 	memset(sock->children, 0, children_size);
@@ -693,6 +694,7 @@ isc__nm_udp_send(isc_nmhandle_t *handle, const isc_region_t *region,
 	uint32_t maxudp = atomic_load(&sock->mgr->maxudp);
 	int ntid;
 
+	REQUIRE(VALID_NMSOCK(sock));
 	INSIST(sock->type == isc_nm_udpsocket);
 
 	/*
@@ -1035,7 +1037,7 @@ isc_nm_udpconnect(isc_nm_t *mgr, isc_sockaddr_t *local, isc_sockaddr_t *peer,
 		isc__nm_put_netievent_udpconnect(mgr, event);
 	} else {
 		atomic_init(&sock->active, false);
-		sock->tid = isc_random_uniform(mgr->nworkers);
+		sock->tid = isc_random_uniform(mgr->nlisteners);
 		isc__nm_enqueue_ievent(&mgr->workers[sock->tid],
 				       (isc__netievent_t *)event);
 	}

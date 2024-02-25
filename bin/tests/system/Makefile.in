@@ -95,39 +95,14 @@ target_triplet = @target@
 @HOST_MACOS_TRUE@am__append_1 = \
 @HOST_MACOS_TRUE@	-Wl,-flat_namespace
 
-@HAVE_PERL_TRUE@noinst_PROGRAMS = feature-test$(EXEEXT) \
-@HAVE_PERL_TRUE@	makejournal$(EXEEXT) \
-@HAVE_PERL_TRUE@	pipelined/pipequeries$(EXEEXT) \
-@HAVE_PERL_TRUE@	resolve$(EXEEXT) rndc/gencheck$(EXEEXT) \
-@HAVE_PERL_TRUE@	rpz/dnsrps$(EXEEXT) tkey/keycreate$(EXEEXT) \
-@HAVE_PERL_TRUE@	tkey/keydelete$(EXEEXT)
-@HAVE_PERLMOD_TIME_HIRES_TRUE@@HAVE_PERL_TRUE@am__append_2 = serve-stale
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_3 = \
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	rpzrecurse
-
-@HAVE_LIBNGHTTP2_TRUE@@HAVE_PERL_TRUE@am__append_4 = \
-@HAVE_LIBNGHTTP2_TRUE@@HAVE_PERL_TRUE@	doth
-
-@HAVE_LMDB_TRUE@@HAVE_PERL_TRUE@am__append_5 = nzd2nzf
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_6 = \
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	fetchlimit	\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	ixfr		\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	nsupdate	\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	resolver	\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	statistics	\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	stress		\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	upforwd		\
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@	zero
-
-@HAVE_DNSTAP_TRUE@@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_7 = dnstap
-@HAVE_PERLMOD_FILE_FETCH_TRUE@@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_8 = statschannel
-@HAVE_PERLMOD_DIGEST_HMAC_TRUE@@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_9 = xfer
-@HAVE_PERLMOD_NET_DNS_NAMESERVER_TRUE@@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@am__append_10 = reclimit
-@HAVE_PERL_TRUE@@HAVE_PYTHON_TRUE@am__append_11 = kasp keymgr2kasp tcp pipelined
-@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@am__append_12 = checkds dispatch rpzextra shutdown timeouts
-@HAVE_PERL_TRUE@@HAVE_PYMOD_DNS_TRUE@@HAVE_PYTHON_TRUE@am__append_13 = qmin cookie
-@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@@HAVE_PYMOD_DNS_TRUE@@HAVE_PYTHON_TRUE@am__append_14 = digdelv dnssec forward
-@HAVE_PERLMOD_NET_DNS_NAMESERVER_TRUE@@HAVE_PERLMOD_NET_DNS_TRUE@@HAVE_PERL_TRUE@@HAVE_PYMOD_DNS_TRUE@@HAVE_PYTHON_TRUE@am__append_15 = chain
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@noinst_PROGRAMS = feature-test$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	makejournal$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	pipelined/pipequeries$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	resolve$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rndc/gencheck$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rpz/dnsrps$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tkey/keycreate$(EXEEXT) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tkey/keydelete$(EXEEXT)
 subdir = bin/tests/system
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
@@ -136,11 +111,9 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
 	$(top_srcdir)/m4/ax_gcc_func_attribute.m4 \
 	$(top_srcdir)/m4/ax_jemalloc.m4 \
 	$(top_srcdir)/m4/ax_lib_lmdb.m4 \
-	$(top_srcdir)/m4/ax_perl_module.m4 \
 	$(top_srcdir)/m4/ax_posix_shell.m4 \
 	$(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
 	$(top_srcdir)/m4/ax_pthread.m4 \
-	$(top_srcdir)/m4/ax_python_module.m4 \
 	$(top_srcdir)/m4/ax_restore_flags.m4 \
 	$(top_srcdir)/m4/ax_save_flags.m4 $(top_srcdir)/m4/ax_tls.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -165,30 +138,40 @@ am__v_lt_0 = --silent
 am__v_lt_1 = 
 makejournal_SOURCES = makejournal.c
 makejournal_OBJECTS = makejournal-makejournal.$(OBJEXT)
-@HAVE_PERL_TRUE@makejournal_DEPENDENCIES = $(LDADD) $(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@makejournal_DEPENDENCIES =  \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 pipelined_pipequeries_SOURCES = pipelined/pipequeries.c
 am__dirstamp = $(am__leading_dot)dirstamp
 pipelined_pipequeries_OBJECTS =  \
 	pipelined/pipequeries-pipequeries.$(OBJEXT)
-@HAVE_PERL_TRUE@pipelined_pipequeries_DEPENDENCIES = $(LDADD) \
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@pipelined_pipequeries_DEPENDENCIES =  \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 resolve_SOURCES = resolve.c
 resolve_OBJECTS = resolve-resolve.$(OBJEXT)
-@HAVE_PERL_TRUE@resolve_DEPENDENCIES = $(LIBISC_LIBS) $(LIBIRS_LIBS) \
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@resolve_DEPENDENCIES = $(LIBISC_LIBS) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBIRS_LIBS) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 rndc_gencheck_SOURCES = rndc/gencheck.c
 rndc_gencheck_OBJECTS = rndc/gencheck.$(OBJEXT)
 rndc_gencheck_LDADD = $(LDADD)
 rndc_gencheck_DEPENDENCIES = $(LIBISC_LIBS)
 rpz_dnsrps_SOURCES = rpz/dnsrps.c
 rpz_dnsrps_OBJECTS = rpz/dnsrps-dnsrps.$(OBJEXT)
-@HAVE_PERL_TRUE@rpz_dnsrps_DEPENDENCIES = $(LDADD) $(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@rpz_dnsrps_DEPENDENCIES =  \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 tkey_keycreate_SOURCES = tkey/keycreate.c
 tkey_keycreate_OBJECTS = tkey/keycreate-keycreate.$(OBJEXT)
-@HAVE_PERL_TRUE@tkey_keycreate_DEPENDENCIES = $(LDADD) $(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keycreate_DEPENDENCIES =  \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 tkey_keydelete_SOURCES = tkey/keydelete.c
 tkey_keydelete_OBJECTS = tkey/keydelete-keydelete.$(OBJEXT)
-@HAVE_PERL_TRUE@tkey_keydelete_DEPENDENCIES = $(LDADD) $(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keydelete_DEPENDENCIES =  \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD) \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -767,88 +750,181 @@ LIBBIND9_LIBS = \
 
 EXTRA_DIST = .
 SUBDIRS = dyndb/driver dlzexternal/driver hooks/driver
-@HAVE_PERL_TRUE@feature_test_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@feature_test_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@makejournal_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@makejournal_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@makejournal_LDADD = \
-@HAVE_PERL_TRUE@	$(LDADD)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@makejournal_LDADD = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 
-@HAVE_PERL_TRUE@pipelined_pipequeries_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)			\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@pipelined_pipequeries_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@pipelined_pipequeries_LDADD = \
-@HAVE_PERL_TRUE@	$(LDADD)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@pipelined_pipequeries_LDADD = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 
-@HAVE_PERL_TRUE@resolve_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBISC_CFLAGS)	\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)	\
-@HAVE_PERL_TRUE@	$(LIBIRS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@resolve_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBISC_CFLAGS)	\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)	\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBIRS_CFLAGS)
 
-@HAVE_PERL_TRUE@resolve_LDADD = $(LIBISC_LIBS) $(LIBIRS_LIBS) $(LIBDNS_LIBS)
-@HAVE_PERL_TRUE@rpz_dnsrps_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@resolve_LDADD = $(LIBISC_LIBS) $(LIBIRS_LIBS) $(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@rpz_dnsrps_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@rpz_dnsrps_LDADD = \
-@HAVE_PERL_TRUE@	$(LDADD)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@rpz_dnsrps_LDADD = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 
-@HAVE_PERL_TRUE@tkey_keycreate_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keycreate_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@tkey_keycreate_LDADD = \
-@HAVE_PERL_TRUE@	$(LDADD)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keycreate_LDADD = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 
-@HAVE_PERL_TRUE@tkey_keydelete_CPPFLAGS = \
-@HAVE_PERL_TRUE@	$(AM_CPPFLAGS)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_CFLAGS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keydelete_CPPFLAGS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(AM_CPPFLAGS)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_CFLAGS)
 
-@HAVE_PERL_TRUE@tkey_keydelete_LDADD = \
-@HAVE_PERL_TRUE@	$(LDADD)		\
-@HAVE_PERL_TRUE@	$(LIBDNS_LIBS)
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@tkey_keydelete_LDADD = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LDADD)		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	$(LIBDNS_LIBS)
 
-@HAVE_PERL_TRUE@TESTS = $(am__append_2) $(am__append_3) \
-@HAVE_PERL_TRUE@	$(am__append_4) acl additional addzone \
-@HAVE_PERL_TRUE@	allow-query auth autosign builtin cacheclean \
-@HAVE_PERL_TRUE@	case catz cds checkconf checknames checkzone \
-@HAVE_PERL_TRUE@	database dialup dlzexternal dns64 dsdigest \
-@HAVE_PERL_TRUE@	dupsigs dyndb ecdsa eddsa ednscompliance \
-@HAVE_PERL_TRUE@	emptyzones enginepkcs11 filter-aaaa formerr \
-@HAVE_PERL_TRUE@	geoip2 glue idna include-multiplecfg inline \
-@HAVE_PERL_TRUE@	integrity hooks host journal keepalive \
-@HAVE_PERL_TRUE@	keyfromlabel legacy limits logfileconfig \
-@HAVE_PERL_TRUE@	masterfile masterformat metadata mirror mkeys \
-@HAVE_PERL_TRUE@	names notify nsec3 nslookup padding pending \
-@HAVE_PERL_TRUE@	redirect rndc rootkeysentinel rpz rrchecker \
-@HAVE_PERL_TRUE@	rrl rrsetorder rsabigexponent runtime sfcache \
-@HAVE_PERL_TRUE@	smartsign sortlist spf staticstub stub \
-@HAVE_PERL_TRUE@	synthfromdnssec tkey tools transport-acl tsig \
-@HAVE_PERL_TRUE@	tsiggss ttl unknown verify views wildcard \
-@HAVE_PERL_TRUE@	xferquota zonechecks $(am__append_5) \
-@HAVE_PERL_TRUE@	$(am__append_6) $(am__append_7) \
-@HAVE_PERL_TRUE@	$(am__append_8) $(am__append_9) \
-@HAVE_PERL_TRUE@	$(am__append_10) $(am__append_11) \
-@HAVE_PERL_TRUE@	$(am__append_12) $(am__append_13) \
-@HAVE_PERL_TRUE@	$(am__append_14) $(am__append_15)
+
+# Longer running tests are listed (and executed) first to take the most
+# advantage of parallel execution.
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@TESTS = \
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rpz			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rpzrecurse		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	serve-stale		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	timeouts		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	upforwd			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	acl			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	additional		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	addzone			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	allow-query		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	auth			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	autosign		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	builtin			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	cacheclean		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	case			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	catz			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	cds			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	chain			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	checkconf		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	checkds			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	checknames		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	checkzone		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	cookie			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	database		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dialup			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	digdelv			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dispatch		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dlzexternal		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dns64			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dnssec			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dnstap			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	doth			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dsdigest		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dupsigs			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	dyndb			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	ecdsa			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	eddsa			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	ednscompliance		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	emptyzones		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	enginepkcs11		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	filter-aaaa		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	fetchlimit		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	formerr			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	forward			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	geoip2			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	glue			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	idna			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	include-multiplecfg	\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	inline			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	integrity		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	ixfr			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	hooks			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	host			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	journal			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	kasp			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	keepalive		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	keyfromlabel		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	keymgr2kasp		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	legacy			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	limits			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	logfileconfig		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	masterfile		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	masterformat		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	metadata		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	mirror			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	mkeys			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	names			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	notify			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	nsec3			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	nslookup		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	nsupdate		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	nzd2nzf			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	padding			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	pending			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	pipelined		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	qmin			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	reclimit		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	redirect		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	resolver		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rndc			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rootkeysentinel		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rpzextra		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rrchecker		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rrl			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rrsetorder		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	rsabigexponent		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	runtime			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	sfcache			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	shutdown		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	smartsign		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	sortlist		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	spf			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	staticstub		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	statistics		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	statschannel		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	stress			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	stub			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	synthfromdnssec		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tcp			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tkey			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tools			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	transport-acl		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tsig			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	tsiggss			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	ttl			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	unknown			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	verify			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	views			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	wildcard		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	xfer			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	xferquota		\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	zero			\
+@HAVE_PERL_TRUE@@HAVE_PYTEST_TRUE@@HAVE_PYTHON_TRUE@	zonechecks
+
 LOG_DRIVER_V = $(LOG_DRIVER_V_@AM_V@)
 LOG_DRIVER_V_ = $(LOG_DRIVER_V_@AM_DEFAULT_V@)
 LOG_DRIVER_V_0 = --verbose no
 LOG_DRIVER_V_1 = --verbose yes
 LOG_DRIVER = $(srcdir)/custom-test-driver
 AM_LOG_DRIVER_FLAGS = $(LOG_DRIVER_V)
-LOG_COMPILER = $(builddir)/legacy.run.sh
-AM_LOG_FLAGS = -r
+LOG_COMPILER = $(srcdir)/run.sh
 all: all-recursive
 
 .SUFFIXES:
@@ -1369,9 +1445,9 @@ recheck: all
 	        am__force_recheck=am--force-recheck \
 	        TEST_LOGS="$$log_list"; \
 	exit $$?
-serve-stale.log: serve-stale
-	@p='serve-stale'; \
-	b='serve-stale'; \
+rpz.log: rpz
+	@p='rpz'; \
+	b='rpz'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1383,9 +1459,23 @@ rpzrecurse.log: rpzrecurse
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-doth.log: doth
-	@p='doth'; \
-	b='doth'; \
+serve-stale.log: serve-stale
+	@p='serve-stale'; \
+	b='serve-stale'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+timeouts.log: timeouts
+	@p='timeouts'; \
+	b='timeouts'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+upforwd.log: upforwd
+	@p='upforwd'; \
+	b='upforwd'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1467,9 +1557,23 @@ cds.log: cds
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+chain.log: chain
+	@p='chain'; \
+	b='chain'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 checkconf.log: checkconf
 	@p='checkconf'; \
 	b='checkconf'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+checkds.log: checkds
+	@p='checkds'; \
+	b='checkds'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1488,6 +1592,13 @@ checkzone.log: checkzone
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+cookie.log: cookie
+	@p='cookie'; \
+	b='cookie'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 database.log: database
 	@p='database'; \
 	b='database'; \
@@ -1502,6 +1613,20 @@ dialup.log: dialup
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+digdelv.log: digdelv
+	@p='digdelv'; \
+	b='digdelv'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+dispatch.log: dispatch
+	@p='dispatch'; \
+	b='dispatch'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 dlzexternal.log: dlzexternal
 	@p='dlzexternal'; \
 	b='dlzexternal'; \
@@ -1512,6 +1637,27 @@ dlzexternal.log: dlzexternal
 dns64.log: dns64
 	@p='dns64'; \
 	b='dns64'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+dnssec.log: dnssec
+	@p='dnssec'; \
+	b='dnssec'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+dnstap.log: dnstap
+	@p='dnstap'; \
+	b='dnstap'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+doth.log: doth
+	@p='doth'; \
+	b='doth'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1579,9 +1725,23 @@ filter-aaaa.log: filter-aaaa
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+fetchlimit.log: fetchlimit
+	@p='fetchlimit'; \
+	b='fetchlimit'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 formerr.log: formerr
 	@p='formerr'; \
 	b='formerr'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+forward.log: forward
+	@p='forward'; \
+	b='forward'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1628,6 +1788,13 @@ integrity.log: integrity
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+ixfr.log: ixfr
+	@p='ixfr'; \
+	b='ixfr'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 hooks.log: hooks
 	@p='hooks'; \
 	b='hooks'; \
@@ -1649,6 +1816,13 @@ journal.log: journal
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+kasp.log: kasp
+	@p='kasp'; \
+	b='kasp'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 keepalive.log: keepalive
 	@p='keepalive'; \
 	b='keepalive'; \
@@ -1659,6 +1833,13 @@ keepalive.log: keepalive
 keyfromlabel.log: keyfromlabel
 	@p='keyfromlabel'; \
 	b='keyfromlabel'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+keymgr2kasp.log: keymgr2kasp
+	@p='keymgr2kasp'; \
+	b='keymgr2kasp'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1747,6 +1928,20 @@ nslookup.log: nslookup
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+nsupdate.log: nsupdate
+	@p='nsupdate'; \
+	b='nsupdate'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+nzd2nzf.log: nzd2nzf
+	@p='nzd2nzf'; \
+	b='nzd2nzf'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 padding.log: padding
 	@p='padding'; \
 	b='padding'; \
@@ -1761,9 +1956,37 @@ pending.log: pending
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+pipelined.log: pipelined
+	@p='pipelined'; \
+	b='pipelined'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+qmin.log: qmin
+	@p='qmin'; \
+	b='qmin'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+reclimit.log: reclimit
+	@p='reclimit'; \
+	b='reclimit'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 redirect.log: redirect
 	@p='redirect'; \
 	b='redirect'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+resolver.log: resolver
+	@p='resolver'; \
+	b='resolver'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1782,9 +2005,9 @@ rootkeysentinel.log: rootkeysentinel
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-rpz.log: rpz
-	@p='rpz'; \
-	b='rpz'; \
+rpzextra.log: rpzextra
+	@p='rpzextra'; \
+	b='rpzextra'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1831,6 +2054,13 @@ sfcache.log: sfcache
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+shutdown.log: shutdown
+	@p='shutdown'; \
+	b='shutdown'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 smartsign.log: smartsign
 	@p='smartsign'; \
 	b='smartsign'; \
@@ -1859,6 +2089,27 @@ staticstub.log: staticstub
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+statistics.log: statistics
+	@p='statistics'; \
+	b='statistics'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+statschannel.log: statschannel
+	@p='statschannel'; \
+	b='statschannel'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+stress.log: stress
+	@p='stress'; \
+	b='stress'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 stub.log: stub
 	@p='stub'; \
 	b='stub'; \
@@ -1869,6 +2120,13 @@ stub.log: stub
 synthfromdnssec.log: synthfromdnssec
 	@p='synthfromdnssec'; \
 	b='synthfromdnssec'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tcp.log: tcp
+	@p='tcp'; \
+	b='tcp'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1943,72 +2201,16 @@ wildcard.log: wildcard
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+xfer.log: xfer
+	@p='xfer'; \
+	b='xfer'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 xferquota.log: xferquota
 	@p='xferquota'; \
 	b='xferquota'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-zonechecks.log: zonechecks
-	@p='zonechecks'; \
-	b='zonechecks'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-nzd2nzf.log: nzd2nzf
-	@p='nzd2nzf'; \
-	b='nzd2nzf'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-fetchlimit.log: fetchlimit
-	@p='fetchlimit'; \
-	b='fetchlimit'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-ixfr.log: ixfr
-	@p='ixfr'; \
-	b='ixfr'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-nsupdate.log: nsupdate
-	@p='nsupdate'; \
-	b='nsupdate'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-resolver.log: resolver
-	@p='resolver'; \
-	b='resolver'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-statistics.log: statistics
-	@p='statistics'; \
-	b='statistics'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-stress.log: stress
-	@p='stress'; \
-	b='stress'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-upforwd.log: upforwd
-	@p='upforwd'; \
-	b='upforwd'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -2020,135 +2222,9 @@ zero.log: zero
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-dnstap.log: dnstap
-	@p='dnstap'; \
-	b='dnstap'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-statschannel.log: statschannel
-	@p='statschannel'; \
-	b='statschannel'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-xfer.log: xfer
-	@p='xfer'; \
-	b='xfer'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-reclimit.log: reclimit
-	@p='reclimit'; \
-	b='reclimit'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-kasp.log: kasp
-	@p='kasp'; \
-	b='kasp'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-keymgr2kasp.log: keymgr2kasp
-	@p='keymgr2kasp'; \
-	b='keymgr2kasp'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-tcp.log: tcp
-	@p='tcp'; \
-	b='tcp'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-pipelined.log: pipelined
-	@p='pipelined'; \
-	b='pipelined'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-checkds.log: checkds
-	@p='checkds'; \
-	b='checkds'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-dispatch.log: dispatch
-	@p='dispatch'; \
-	b='dispatch'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-rpzextra.log: rpzextra
-	@p='rpzextra'; \
-	b='rpzextra'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-shutdown.log: shutdown
-	@p='shutdown'; \
-	b='shutdown'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-timeouts.log: timeouts
-	@p='timeouts'; \
-	b='timeouts'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-qmin.log: qmin
-	@p='qmin'; \
-	b='qmin'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-cookie.log: cookie
-	@p='cookie'; \
-	b='cookie'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-digdelv.log: digdelv
-	@p='digdelv'; \
-	b='digdelv'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-dnssec.log: dnssec
-	@p='dnssec'; \
-	b='dnssec'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-forward.log: forward
-	@p='forward'; \
-	b='forward'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-chain.log: chain
-	@p='chain'; \
-	b='chain'; \
+zonechecks.log: zonechecks
+	@p='zonechecks'; \
+	b='zonechecks'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -2400,16 +2476,20 @@ dist-hook:
 	        sed -n "s|^Would remove \(.*\)|$(distdir)/\1|p" | \
 	        xargs -I{} rm -rf "{}"
 
+@HAVE_PERL_TRUE@@HAVE_PYTEST_FALSE@@HAVE_PYTHON_TRUE@check:
+@HAVE_PERL_TRUE@@HAVE_PYTEST_FALSE@@HAVE_PYTHON_TRUE@	echo pytest is not available, no tests were ran
+@HAVE_PERL_TRUE@@HAVE_PYTEST_FALSE@@HAVE_PYTHON_TRUE@	exit 1
+@HAVE_PERL_TRUE@@HAVE_PYTHON_FALSE@check:
+@HAVE_PERL_TRUE@@HAVE_PYTHON_FALSE@	echo Python is not available, no tests were ran
+@HAVE_PERL_TRUE@@HAVE_PYTHON_FALSE@	exit 1
 @HAVE_PERL_FALSE@check:
 @HAVE_PERL_FALSE@	echo Perl is not available, no tests were ran
 @HAVE_PERL_FALSE@	exit 1
 
-$(TESTS): legacy.run.sh
-
 test-local: check
 
 clean-local::
-	-find $(builddir) -maxdepth 1 -type d -name "*_*" | xargs rm -rf
+	-find -L . -mindepth 1 -maxdepth 1 -type d -name "*_*" -and -not -name "_common" -exec rm -rf {} \;
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

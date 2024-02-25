@@ -1,3 +1,141 @@
+	--- 9.18.24 released ---
+
+6343.	[bug]		Fix case insensitive setting for isc_ht hashtable.
+			[GL #4568]
+
+	--- 9.18.23 released ---
+
+6322.	[security]	Specific DNS answers could cause a denial-of-service
+			condition due to DNS validation taking a long time.
+			(CVE-2023-50387) [GL #4424]
+
+6321.	[security]	Change 6315 inadvertently introduced regressions that
+			could cause named to crash. [GL #4234]
+
+6320.	[bug]		Under some circumstances, the DoT code in client
+			mode could process more than one message at a time when
+			that was not expected. That has been fixed. [GL #4487]
+
+	--- 9.18.22 released ---
+
+6319.	[func]		Limit isc_task_send() overhead for RBTDB tree pruning.
+			[GL #4383]
+
+6317.	[security]	Restore DNS64 state when handling a serve-stale timeout.
+			(CVE-2023-5679) [GL #4334]
+
+6316.	[security]	Specific queries could trigger an assertion check with
+			nxdomain-redirect enabled. (CVE-2023-5517) [GL #4281]
+
+6315.	[security]	Speed up parsing of DNS messages with many different
+			names. (CVE-2023-4408) [GL #4234]
+
+6314.	[bug]		Address race conditions in dns_tsigkey_find().
+			[GL #4182]
+
+6312.	[bug]		Conversion from NSEC3 signed to NSEC signed could
+			temporarily put the zone into a state where it was
+			treated as unsigned until the NSEC chain was built.
+			Additionally conversion from one set of NSEC3 parameters
+			to another could also temporarily put the zone into a
+			state where it was treated as unsigned until the new
+			NSEC3 chain was built. [GL #1794] [GL #4495]
+
+6310.	[bug]		Memory leak in zone.c:sign_zone. When named signed a
+			zone it could leak dst_keys due to a misplaced
+			'continue'. [GL #4488]
+
+6306.	[func]		Log more details about the cause of "not exact" errors.
+			[GL #4500]
+
+6304.	[bug]		The wrong time was being used to determine what RRSIGs
+			where to be generated when dnssec-policy was in use.
+			[GL #4494]
+
+6302.	[func]		The "trust-anchor-telemetry" statement is no longer
+			marked as experimental. This silences a relevant log
+			message that was emitted even when the feature was
+			explicitly disabled. [GL #4497]
+
+6300.	[bug]		Fix statistics export to use full 64 bit signed numbers
+			instead of truncating values to unsigned 32 bits.
+			[GL #4467]
+
+6299.	[port]		NetBSD has added 'hmac' to libc which collides with our
+			use of 'hmac'. [GL #4478]
+
+	--- 9.18.21 released ---
+
+6297.	[bug]		Improve LRU cleaning behaviour. [GL #4448]
+
+6296.	[func]		The "resolver-nonbackoff-tries" and
+			"resolver-retry-interval" options are deprecated;
+			a warning will be logged if they are used. [GL #4405]
+
+6294.	[bug]		BIND might sometimes crash after startup or
+			re-configuration when one 'tls' entry is used multiple
+			times to connect to remote servers due to initialisation
+			attempts from contexts of multiple threads. That has
+			been fixed. [GL #4464]
+
+6290.	[bug]		Dig +yaml will now report "no servers could be reached"
+			also for UDP setup failure when no other servers or
+			tries are left. [GL #1229]
+
+6287.	[bug]		Recognize escapes when reading the public key from file.
+			[GL !8502]
+
+6286.	[bug]		Dig +yaml will now report "no servers could be reached"
+			on TCP connection failure as well as for UDP timeouts.
+			[GL #4396]
+
+6282.	[func]		Deprecate AES-based DNS cookies. [GL #4421]
+
+	--- 9.18.20 released ---
+
+6280.	[bug]		Fix missing newlines in the output of "rndc nta -dump".
+			[GL !8454]
+
+6277.	[bug]		Take into account local authoritative zones when
+			falling back to serve-stale. [GL #4355]
+
+6275.	[bug]		Fix assertion failure when using lock-file configuration
+			option together -X argument to named. [GL #4386]
+
+6274.	[bug]		The 'lock-file' file was being removed when it
+			shouldn't have been making it ineffective if named was
+			started 3 or more times. [GL #4387]
+
+6271.	[bug]		Fix a shutdown race in dns__catz_update_cb(). [GL #4381]
+
+6269.	[maint]		B.ROOT-SERVERS.NET addresses are now 170.247.170.2 and
+			2801:1b8:10::b. [GL #4101]
+
+6267.	[func]		The timeouts for resending zone refresh queries over UDP
+			were lowered to enable named to more quickly determine
+			that a primary is down. [GL #4260]
+
+6265.	[bug]		Don't schedule resign operations on the raw version
+			of an inline-signing zone. [GL #4350]
+
+6261.	[bug]		Fix a possible assertion failure on an error path in
+			resolver.c:fctx_query(), when using an uninitialized
+			link. [GL #4331]
+
+6254.	[cleanup]	Add semantic patch to do an explicit cast from char
+			to unsigned char in ctype.h class of functions.
+			[GL #4327]
+
+6252.	[test]		Python system tests have to be executed by invoking
+			pytest directly. Executing them with the legacy test
+			runner is no longer supported. [GL #4250]
+
+6250.	[bug]		The wrong covered value was being set by
+			dns_ncache_current for RRSIG records in the returned
+			rdataset structure. This resulted in TYPE0 being
+			reported as the covered value of the RRSIG when dumping
+			the cache contents. [GL #4314]
+
 	--- 9.18.19 released ---
 
 6246.	[security]	Fix use-after-free error in TLS DNS code when sending

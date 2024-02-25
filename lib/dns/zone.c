@@ -126,7 +126,7 @@
  */
 #define RANGE(a, min, max) (((a) < (min)) ? (min) : ((a) < (max) ? (a) : (max)))
 
-#define NSEC3REMOVE(x) (((x)&DNS_NSEC3FLAG_REMOVE) != 0)
+#define NSEC3REMOVE(x) (((x) & DNS_NSEC3FLAG_REMOVE) != 0)
 
 /*%
  * Key flags
@@ -3971,15 +3971,11 @@ set_resigntime(dns_zone_t *zone) {
 	INSIST(LOCKED_ZONE(zone));
 
 	/* We only re-sign zones that can be dynamically updated */
-	if (zone->update_disabled) {
+	if (!dns_zone_isdynamic(zone, false)) {
 		return;
 	}
 
-	if (!inline_secure(zone) &&
-	    (zone->type != dns_zone_primary ||
-	     (zone->ssutable == NULL &&
-	      (zone->update_acl == NULL || dns_acl_isnone(zone->update_acl)))))
-	{
+	if (inline_raw(zone)) {
 		return;
 	}
 
@@ -5330,7 +5326,7 @@ zone_postload(dns_zone_t *zone, dns_db_t *db, isc_time_t loadtime,
 		is_dynamic = dns_zone_isdynamic(zone, false);
 		if (zone->type == dns_zone_primary &&
 		    !DNS_ZONEKEY_OPTION(zone, DNS_ZONEKEY_NORESIGN) &&
-		    is_dynamic && dns_db_issecure(db))
+		    is_dynamic && dns_db_issecure(db) && !inline_raw(zone))
 		{
 			dns_name_t *name;
 			dns_fixedname_t fixed;
@@ -6931,8 +6927,9 @@ failure:
 static isc_result_t
 add_sigs(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name, dns_zone_t *zone,
 	 dns_rdatatype_t type, dns_diff_t *diff, dst_key_t **keys,
-	 unsigned int nkeys, isc_mem_t *mctx, isc_stdtime_t inception,
-	 isc_stdtime_t expire, bool check_ksk, bool keyset_kskonly) {
+	 unsigned int nkeys, isc_mem_t *mctx, isc_stdtime_t now,
+	 isc_stdtime_t inception, isc_stdtime_t expire, bool check_ksk,
+	 bool keyset_kskonly) {
 	isc_result_t result;
 	dns_dbnode_t *node = NULL;
 	dns_stats_t *dnssecsignstats;
@@ -7124,7 +7121,7 @@ add_sigs(dns_db_t *db, dns_dbversion_t *ver, dns_name_t *name, dns_zone_t *zone,
 					continue;
 				}
 			} else if (!dst_key_is_signing(keys[i], DST_BOOL_ZSK,
-						       inception, &when))
+						       now, &when))
 			{
 				/*
 				 * This key is not active for zone-signing.
@@ -7343,7 +7340,7 @@ zone_resigninc(dns_zone_t *zone) {
 		 */
 		result = add_sigs(db, version, name, zone, covers,
 				  zonediff.diff, zone_keys, nkeys, zone->mctx,
-				  inception,
+				  now, inception,
 				  resign > (now - 300) ? expire : fullexpire,
 				  check_ksk, keyset_kskonly);
 		if (result != ISC_R_SUCCESS) {
@@ -7406,7 +7403,7 @@ zone_resigninc(dns_zone_t *zone) {
 	 * termination is sensible.
 	 */
 	result = add_sigs(db, version, &zone->origin, zone, dns_rdatatype_soa,
-			  zonediff.diff, zone_keys, nkeys, zone->mctx,
+			  zonediff.diff, zone_keys, nkeys, zone->mctx, now,
 			  inception, soaexpire, check_ksk, keyset_kskonly);
 	if (result != ISC_R_SUCCESS) {
 		dns_zone_log(zone, ISC_LOG_ERROR,
@@ -7642,10 +7639,11 @@ failure:
 static isc_result_t
 sign_a_node(dns_db_t *db, dns_zone_t *zone, dns_name_t *name,
 	    dns_dbnode_t *node, dns_dbversion_t *version, bool build_nsec3,
-	    bool build_nsec, dst_key_t *key, isc_stdtime_t inception,
-	    isc_stdtime_t expire, dns_ttl_t nsecttl, bool is_ksk, bool is_zsk,
-	    bool keyset_kskonly, bool is_bottom_of_zone, dns_diff_t *diff,
-	    int32_t *signatures, isc_mem_t *mctx) {
+	    bool build_nsec, dst_key_t *key, isc_stdtime_t now,
+	    isc_stdtime_t inception, isc_stdtime_t expire, dns_ttl_t nsecttl,
+	    bool is_ksk, bool is_zsk, bool keyset_kskonly,
+	    bool is_bottom_of_zone, dns_diff_t *diff, int32_t *signatures,
+	    isc_mem_t *mctx) {
 	isc_result_t result;
 	dns_rdatasetiter_t *iterator = NULL;
 	dns_rdataset_t rdataset;
@@ -7740,8 +7738,8 @@ sign_a_node(dns_db_t *db, dns_zone_t *zone, dns_name_t *name,
 			}
 		} else if (!is_zsk) {
 			goto next_rdataset;
-		} else if (is_zsk && !dst_key_is_signing(key, DST_BOOL_ZSK,
-							 inception, &when))
+		} else if (is_zsk &&
+			   !dst_key_is_signing(key, DST_BOOL_ZSK, now, &when))
 		{
 			/* Only applies to dnssec-policy. */
 			if (dns_zone_getkasp(zone) != NULL) {
@@ -8344,8 +8342,8 @@ dns__zone_updatesigs(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *version,
 		}
 		result = add_sigs(db, version, &tuple->name, zone,
 				  tuple->rdata.type, zonediff->diff, zone_keys,
-				  nkeys, zone->mctx, inception, exp, check_ksk,
-				  keyset_kskonly);
+				  nkeys, zone->mctx, now, inception, exp,
+				  check_ksk, keyset_kskonly);
 		if (result != ISC_R_SUCCESS) {
 			dns_zone_log(zone, ISC_LOG_ERROR,
 				     "dns__zone_updatesigs:add_sigs -> %s",
@@ -9119,7 +9117,7 @@ skip_removals:
 	}
 
 	result = add_sigs(db, version, &zone->origin, zone, dns_rdatatype_soa,
-			  zonediff.diff, zone_keys, nkeys, zone->mctx,
+			  zonediff.diff, zone_keys, nkeys, zone->mctx, now,
 			  inception, soaexpire, check_ksk, keyset_kskonly);
 	if (result != ISC_R_SUCCESS) {
 		dnssec_log(zone, ISC_LOG_ERROR,
@@ -9659,16 +9657,7 @@ zone_sign(dns_zone_t *zone) {
 				if (ALG(zone_keys[i]) == signing->algorithm &&
 				    dst_key_id(zone_keys[i]) == signing->keyid)
 				{
-					bool ksk = false;
-					isc_result_t ret = dst_key_getbool(
-						zone_keys[i], DST_BOOL_KSK,
-						&ksk);
-					if (ret != ISC_R_SUCCESS) {
-						ksk = KSK(zone_keys[i]);
-					}
-					if (ksk) {
-						dst_key_free(&zone_keys[i]);
-					}
+					dst_key_free(&zone_keys[i]);
 					continue;
 				}
 				zone_keys[j] = zone_keys[i];
@@ -9848,8 +9837,8 @@ zone_sign(dns_zone_t *zone) {
 
 			CHECK(sign_a_node(
 				db, zone, name, node, version, build_nsec3,
-				build_nsec, zone_keys[i], inception, expire,
-				zone_nsecttl(zone), is_ksk, is_zsk,
+				build_nsec, zone_keys[i], now, inception,
+				expire, zone_nsecttl(zone), is_ksk, is_zsk,
 				(both && keyset_kskonly), is_bottom_of_zone,
 				zonediff.diff, &signatures, zone->mctx));
 			/*
@@ -9984,7 +9973,7 @@ zone_sign(dns_zone_t *zone) {
 	 * termination is sensible.
 	 */
 	result = add_sigs(db, version, &zone->origin, zone, dns_rdatatype_soa,
-			  zonediff.diff, zone_keys, nkeys, zone->mctx,
+			  zonediff.diff, zone_keys, nkeys, zone->mctx, now,
 			  inception, soaexpire, check_ksk, keyset_kskonly);
 	if (result != ISC_R_SUCCESS) {
 		dnssec_log(zone, ISC_LOG_ERROR, "zone_sign:add_sigs -> %s",
@@ -12705,14 +12694,14 @@ notify_send_toaddr(isc_task_t *task, isc_event_t *event) {
 		result = ISC_R_NOTIMPLEMENTED;
 		goto cleanup_key;
 	}
-	timeout = 15;
+	timeout = 5;
 	if (DNS_ZONE_FLAG(notify->zone, DNS_ZONEFLG_DIALNOTIFY)) {
 		timeout = 30;
 	}
-	result = dns_request_create(notify->zone->view->requestmgr, message,
-				    &src, &notify->dst, options, key,
-				    timeout * 3, timeout, 2, notify->zone->task,
-				    notify_done, notify, &notify->request);
+	result = dns_request_create(
+		notify->zone->view->requestmgr, message, &src, &notify->dst,
+		options, key, timeout * 3 + 1, timeout, 2, notify->zone->task,
+		notify_done, notify, &notify->request);
 	if (result == ISC_R_SUCCESS) {
 		if (isc_sockaddr_pf(&notify->dst) == AF_INET) {
 			inc_stats(notify->zone,
@@ -14672,13 +14661,13 @@ again:
 	}
 
 	zone_iattach(zone, &dummy);
-	timeout = 15;
+	timeout = 5;
 	if (DNS_ZONE_FLAG(zone, DNS_ZONEFLG_DIALREFRESH)) {
 		timeout = 30;
 	}
 	result = dns_request_create(
 		zone->view->requestmgr, message, &zone->sourceaddr,
-		&zone->primaryaddr, options, key, timeout * 3, timeout, 2,
+		&zone->primaryaddr, options, key, timeout * 3 + 1, timeout, 2,
 		zone->task, refresh_callback, zone, &zone->request);
 	if (result != ISC_R_SUCCESS) {
 		zone_idetach(&dummy);
@@ -14928,7 +14917,7 @@ ns_query(dns_zone_t *zone, dns_rdataset_t *soardataset, dns_stub_t *stub) {
 		POST(result);
 		goto cleanup;
 	}
-	timeout = 15;
+	timeout = 5;
 	if (DNS_ZONE_FLAG(zone, DNS_ZONEFLG_DIALREFRESH)) {
 		timeout = 30;
 	}
@@ -14946,7 +14935,7 @@ ns_query(dns_zone_t *zone, dns_rdataset_t *soardataset, dns_stub_t *stub) {
 
 	result = dns_request_create(
 		zone->view->requestmgr, message, &zone->sourceaddr,
-		&zone->primaryaddr, DNS_REQUESTOPT_TCP, key, timeout * 3,
+		&zone->primaryaddr, DNS_REQUESTOPT_TCP, key, timeout * 3 + 1,
 		timeout, 2, zone->task, stub_callback, cb_args, &zone->request);
 	if (result != ISC_R_SUCCESS) {
 		zone_debuglog(zone, me, 1, "dns_request_create() failed: %s",
@@ -17666,6 +17655,12 @@ again:
 			DNS_ZONE_TIME_ADD(&now, zone->expire,
 					  &zone->expiretime);
 		}
+
+		/*
+		 * Set loadtime.
+		 */
+		zone->loadtime = now;
+
 		if (result == ISC_R_SUCCESS && xfrresult == ISC_R_SUCCESS) {
 			char buf[DNS_NAME_FORMATSIZE + sizeof(": TSIG ''")];
 			if (zone->tsigkey != NULL) {
@@ -20490,7 +20485,7 @@ tickle_apex_rrset(dns_rdatatype_t rrtype, dns_zone_t *zone, dns_db_t *db,
 			return (result);
 		}
 		result = add_sigs(db, ver, &zone->origin, zone, rrtype,
-				  zonediff->diff, keys, nkeys, zone->mctx,
+				  zonediff->diff, keys, nkeys, zone->mctx, now,
 				  inception, keyexpire, check_ksk,
 				  keyset_kskonly);
 		if (result != ISC_R_SUCCESS) {
@@ -21252,11 +21247,11 @@ checkds_send_toaddr(isc_task_t *task, isc_event_t *event) {
 	dns_zone_log(checkds->zone, ISC_LOG_DEBUG(3),
 		     "checkds: create request for DS query to %s", addrbuf);
 
-	timeout = 15;
+	timeout = 5;
 	options |= DNS_REQUESTOPT_TCP;
 	result = dns_request_create(
 		checkds->zone->view->requestmgr, message, &src, &checkds->dst,
-		options, key, timeout * 3, timeout, 2, checkds->zone->task,
+		options, key, timeout * 3 + 1, timeout, 2, checkds->zone->task,
 		checkds_done, checkds, &checkds->request);
 	if (result != ISC_R_SUCCESS) {
 		dns_zone_log(checkds->zone, ISC_LOG_DEBUG(3),

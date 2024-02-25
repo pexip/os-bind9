@@ -48,10 +48,10 @@
 			goto failure;        \
 	} while (0)
 
-#define OPTOUT(x)  (((x)&DNS_NSEC3FLAG_OPTOUT) != 0)
-#define CREATE(x)  (((x)&DNS_NSEC3FLAG_CREATE) != 0)
-#define INITIAL(x) (((x)&DNS_NSEC3FLAG_INITIAL) != 0)
-#define REMOVE(x)  (((x)&DNS_NSEC3FLAG_REMOVE) != 0)
+#define OPTOUT(x)  (((x) & DNS_NSEC3FLAG_OPTOUT) != 0)
+#define CREATE(x)  (((x) & DNS_NSEC3FLAG_CREATE) != 0)
+#define INITIAL(x) (((x) & DNS_NSEC3FLAG_INITIAL) != 0)
+#define REMOVE(x)  (((x) & DNS_NSEC3FLAG_REMOVE) != 0)
 
 isc_result_t
 dns_nsec3_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
@@ -1138,12 +1138,6 @@ dns_nsec3param_deletechains(dns_db_t *db, dns_dbversion_t *ver,
 		dns_rdata_t private = DNS_RDATA_INIT;
 
 		dns_rdataset_current(&rdataset, &rdata);
-
-		CHECK(dns_difftuple_create(diff->mctx, DNS_DIFFOP_DEL, origin,
-					   rdataset.ttl, &rdata, &tuple));
-		CHECK(do_one_tuple(&tuple, db, ver, diff));
-		INSIST(tuple == NULL);
-
 		dns_nsec3param_toprivate(&rdata, &private, privatetype, buf,
 					 sizeof(buf));
 		buf[2] = DNS_NSEC3FLAG_REMOVE;

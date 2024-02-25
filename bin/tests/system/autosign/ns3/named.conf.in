@@ -42,7 +42,7 @@ controls {
 
 zone "." {
 	type hint;
-	file "../../common/root.hint";
+	file "../../_common/root.hint";
 };
 
 zone "example" {
@@ -167,6 +167,7 @@ zone "nsec3-to-nsec.example" {
 	type primary;
 	file "nsec3-to-nsec.example.db";
 	allow-update { any; };
+	max-journal-size 10M;
 	auto-dnssec maintain;
 };
 
@@ -183,6 +184,14 @@ zone "secure-to-insecure2.example" {
 	allow-update { any; };
 	auto-dnssec maintain;
 	dnssec-secure-to-insecure yes;
+};
+
+zone "nsec3-to-nsec3.example" {
+	type primary;
+	file "nsec3-to-nsec3.example.db";
+	allow-update { any; };
+	inline-signing no;
+	max-journal-size 10M;
 };
 
 zone "oldsigs.example" {

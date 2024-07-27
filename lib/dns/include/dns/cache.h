@@ -56,32 +56,29 @@ ISC_LANG_BEGINDECLS
  ***	Functions
  ***/
 isc_result_t
-dns_cache_create(isc_mem_t *cmctx, isc_mem_t *hmctx, isc_taskmgr_t *taskmgr,
+dns_cache_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
 		 isc_timermgr_t *timermgr, dns_rdataclass_t rdclass,
 		 const char *cachename, const char *db_type,
 		 unsigned int db_argc, char **db_argv, dns_cache_t **cachep);
 /*%<
- * Create a new DNS cache.
- *
- * dns_cache_create2() will create a named cache.
- *
- * dns_cache_create3() will create a named cache using two separate memory
- * contexts, one for cache data which can be cleaned and a separate one for
- * memory allocated for the heap (which can grow without an upper limit and
- * has no mechanism for shrinking).
- *
- * dns_cache_create() is a backward compatible version that internally
- * specifies an empty cache name and a single memory context.
+ * Create a new named DNS cache using two separate memory contexts, one for
+ * cache data which can be cleaned and a separate one for memory allocated for
+ * the heap (which can grow without an upper limit and has no mechanism for
+ * shrinking).
  *
  * Requires:
  *
- *\li	'cmctx' (and 'hmctx' if applicable) is a valid memory context.
+ *\li	'mctx' is a valid memory context.
+ *
+ *\li	'taskmgr' is a valid task manager (if 'db_type' is "rbt").
  *
  *\li	'taskmgr' is a valid task manager and 'timermgr' is a valid timer
- * 	manager, or both are NULL.  If NULL, no periodic cleaning of the
- * 	cache will take place.
+ * 	manager, or both are NULL (if 'db_type' is not "rbt").  If NULL, no
+ * 	periodic cleaning of the cache will take place.
  *
  *\li	'cachename' is a valid string.  This must not be NULL.
+
+ *\li	'mctx' is a valid memory context.
  *
  *\li	'cachep' is a valid pointer, and *cachep == NULL
  *
@@ -281,6 +278,18 @@ void
 dns_cache_updatestats(dns_cache_t *cache, isc_result_t result);
 /*
  * Update cache statistics based on result code in 'result'
+ */
+
+void
+dns_cache_setmaxrrperset(dns_cache_t *cache, uint32_t value);
+/*%<
+ * Set the maximum resource records per RRSet that can be cached.
+ */
+
+void
+dns_cache_setmaxtypepername(dns_cache_t *cache, uint32_t value);
+/*%<
+ * Set the maximum resource record types per owner name that can be cached.
  */
 
 #ifdef HAVE_LIBXML2

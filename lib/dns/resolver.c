@@ -1920,11 +1920,15 @@ resquery_senddone(isc_result_t eresult, isc_region_t *region, void *arg) {
 	case ISC_R_SHUTTINGDOWN:
 		break;
 
+	case ISC_R_HOSTDOWN:
 	case ISC_R_HOSTUNREACH:
+	case ISC_R_NETDOWN:
 	case ISC_R_NETUNREACH:
 	case ISC_R_NOPERM:
 	case ISC_R_ADDRNOTAVAIL:
 	case ISC_R_CONNREFUSED:
+	case ISC_R_CONNECTIONRESET:
+	case ISC_R_TIMEDOUT:
 		/* No route to remote. */
 		FCTXTRACE3("query canceled in resquery_senddone(): "
 			   "no route to host; no response",
@@ -2994,8 +2998,10 @@ resquery_connected(isc_result_t eresult, isc_region_t *region, void *arg) {
 		fctx_done_detach(&fctx, eresult);
 		break;
 
-	case ISC_R_NETUNREACH:
+	case ISC_R_HOSTDOWN:
 	case ISC_R_HOSTUNREACH:
+	case ISC_R_NETDOWN:
+	case ISC_R_NETUNREACH:
 	case ISC_R_CONNREFUSED:
 	case ISC_R_NOPERM:
 	case ISC_R_ADDRNOTAVAIL:
@@ -7388,7 +7394,7 @@ resume_dslookup(isc_task_t *task, isc_event_t *event) {
 	dns_rdataset_t nameservers;
 	dns_fixedname_t fixed;
 	dns_name_t *domain = NULL;
-	unsigned int n;
+	unsigned int n, options;
 
 	REQUIRE(event->ev_type == DNS_EVENT_FETCHDONE);
 
@@ -7515,11 +7521,11 @@ resume_dslookup(isc_task_t *task, isc_event_t *event) {
 
 		/* Starting a new fetch, so restore the extra reference */
 		fctx_addref(fctx);
+		options = fctx->options & ~DNS_FETCHOPT_TRYSTALE_ONTIMEOUT;
 		result = dns_resolver_createfetch(
 			res, fctx->nsname, dns_rdatatype_ns, domain, nsrdataset,
-			NULL, NULL, 0, fctx->options, 0, NULL, task,
-			resume_dslookup, fctx, &fctx->nsrrset, NULL,
-			&fctx->nsfetch);
+			NULL, NULL, 0, options, 0, NULL, task, resume_dslookup,
+			fctx, &fctx->nsrrset, NULL, &fctx->nsfetch);
 		if (result != ISC_R_SUCCESS) {
 			if (result == DNS_R_DUPLICATE) {
 				result = DNS_R_SERVFAIL;
@@ -8175,7 +8181,9 @@ rctx_dispfail(respctx_t *rctx) {
 	 */
 	switch (rctx->result) {
 	case ISC_R_EOF:
+	case ISC_R_HOSTDOWN:
 	case ISC_R_HOSTUNREACH:
+	case ISC_R_NETDOWN:
 	case ISC_R_NETUNREACH:
 	case ISC_R_CONNREFUSED:
 	case ISC_R_CONNECTIONRESET:
@@ -9867,7 +9875,7 @@ rctx_chaseds(respctx_t *rctx, dns_message_t *message,
 	     dns_adbaddrinfo_t *addrinfo, isc_result_t result) {
 	fetchctx_t *fctx = rctx->fctx;
 	isc_task_t *task = NULL;
-	unsigned int n;
+	unsigned int n, options;
 
 	add_bad(fctx, message, addrinfo, result, rctx->broken_type);
 	fctx_cancelqueries(fctx, true, false);
@@ -9880,9 +9888,10 @@ rctx_chaseds(respctx_t *rctx, dns_message_t *message,
 
 	fctx_addref(fctx);
 	task = fctx->res->buckets[fctx->bucketnum].task;
+	options = fctx->options & ~DNS_FETCHOPT_TRYSTALE_ONTIMEOUT;
 	result = dns_resolver_createfetch(
 		fctx->res, fctx->nsname, dns_rdatatype_ns, NULL, NULL, NULL,
-		NULL, 0, fctx->options, 0, NULL, task, resume_dslookup, fctx,
+		NULL, 0, options, 0, NULL, task, resume_dslookup, fctx,
 		&fctx->nsrrset, NULL, &fctx->nsfetch);
 	if (result != ISC_R_SUCCESS) {
 		if (result == DNS_R_DUPLICATE) {

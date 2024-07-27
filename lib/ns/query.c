@@ -193,11 +193,13 @@ client_trace(ns_client_t *client, int level, const char *message) {
 #define CCTRACE(l, m) ((void)m)
 #endif /* WANT_QUERYTRACE */
 
-#define DNS_GETDB_NOEXACT    0x01U
-#define DNS_GETDB_NOLOG	     0x02U
-#define DNS_GETDB_PARTIAL    0x04U
-#define DNS_GETDB_IGNOREACL  0x08U
-#define DNS_GETDB_STALEFIRST 0X0CU
+enum {
+	DNS_GETDB_NOEXACT = 1 << 0,
+	DNS_GETDB_NOLOG = 1 << 1,
+	DNS_GETDB_PARTIAL = 1 << 2,
+	DNS_GETDB_IGNOREACL = 1 << 3,
+	DNS_GETDB_STALEFIRST = 1 << 4,
+};
 
 #define PENDINGOK(x) (((x) & DNS_DBFIND_PENDINGOK) != 0)
 
@@ -5323,6 +5325,7 @@ qctx_freedata(query_ctx_t *qctx) {
 		ns_client_releasename(qctx->client, &qctx->zfname);
 		dns_db_detachnode(qctx->zdb, &qctx->znode);
 		dns_db_detach(&qctx->zdb);
+		qctx->zversion = NULL;
 	}
 
 	if (qctx->event != NULL && !qctx->client->nodetach) {
@@ -7357,9 +7360,7 @@ query_checkrpz(query_ctx_t *qctx, isc_result_t result) {
 		 * Add SOA record to additional section
 		 */
 		if (qctx->rpz_st->m.rpz->addsoa) {
-			bool override_ttl =
-				dns_rdataset_isassociated(qctx->rdataset);
-			rresult = query_addsoa(qctx, override_ttl,
+			rresult = query_addsoa(qctx, UINT32_MAX,
 					       DNS_SECTION_ADDITIONAL);
 			if (rresult != ISC_R_SUCCESS) {
 				QUERY_ERROR(qctx, result);
@@ -11244,20 +11245,49 @@ query_addbestns(query_ctx_t *qctx) {
 	isc_buffer_t b;
 	dns_clientinfomethods_t cm;
 	dns_clientinfo_t ci;
+	dns_name_t qname;
 
 	CTRACE(ISC_LOG_DEBUG(3), "query_addbestns");
 
 	dns_clientinfomethods_init(&cm, ns_client_sourceip);
 	dns_clientinfo_init(&ci, client, NULL);
 
+	dns_name_init(&qname, NULL);
+	dns_name_clone(client->query.qname, &qname);
+
 	/*
 	 * Find the right database.
 	 */
-	result = query_getdb(client, client->query.qname, dns_rdatatype_ns, 0,
-			     &zone, &db, &version, &is_zone);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
+	do {
+		result = query_getdb(client, &qname, dns_rdatatype_ns, 0, &zone,
+				     &db, &version, &is_zone);
+		if (result != ISC_R_SUCCESS) {
+			goto cleanup;
+		}
+
+		/*
+		 * If this is a static stub zone look for a parent zone.
+		 */
+		if (zone != NULL &&
+		    dns_zone_gettype(zone) == dns_zone_staticstub)
+		{
+			unsigned int labels = dns_name_countlabels(&qname);
+			dns_db_detach(&db);
+			dns_zone_detach(&zone);
+			version = NULL;
+			if (labels != 1) {
+				dns_name_split(&qname, labels - 1, NULL,
+					       &qname);
+				continue;
+			}
+			if (!USECACHE(client)) {
+				goto cleanup;
+			}
+			dns_db_attach(client->view->cachedb, &db);
+			is_zone = false;
+		}
+		break;
+	} while (true);
 
 db_find:
 	/*
@@ -12357,9 +12387,7 @@ ns_query_start(ns_client_t *client, isc_nmhandle_t *handle) {
 	/*
 	 * Turn on minimal response for (C)DNSKEY and (C)DS queries.
 	 */
-	if (qtype == dns_rdatatype_dnskey || qtype == dns_rdatatype_ds ||
-	    qtype == dns_rdatatype_cdnskey || qtype == dns_rdatatype_cds)
-	{
+	if (dns_rdatatype_iskeymaterial(qtype) || qtype == dns_rdatatype_ds) {
 		client->query.attributes |= (NS_QUERYATTR_NOAUTHORITY |
 					     NS_QUERYATTR_NOADDITIONAL);
 	} else if (qtype == dns_rdatatype_ns) {

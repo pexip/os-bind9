@@ -148,11 +148,11 @@
 #endif /* HAVE_LMDB */
 
 #ifndef SIZE_MAX
-#define SIZE_MAX ((size_t)-1)
+#define SIZE_MAX ((size_t) - 1)
 #endif /* ifndef SIZE_MAX */
 
 #ifndef SIZE_AS_PERCENT
-#define SIZE_AS_PERCENT ((size_t)-2)
+#define SIZE_AS_PERCENT ((size_t) - 2)
 #endif /* ifndef SIZE_AS_PERCENT */
 
 #ifdef TUNE_LARGE
@@ -394,6 +394,9 @@ const char *empty_zones[] = {
 
 	/* RFC 8375 */
 	"HOME.ARPA",
+
+	/* RFC 9462 */
+	"RESOLVER.ARPA",
 
 	NULL
 };
@@ -2701,7 +2704,7 @@ catz_addmodzone_taskaction(isc_task_t *task, isc_event_t *event0) {
 		goto cleanup;
 	}
 
-	result = dns_zt_find(ev->view->zonetable, name, 0, NULL, &zone);
+	result = dns_view_findzone(ev->view, name, &zone);
 
 	if (ev->mod) {
 		dns_catz_zone_t *parentcatz;
@@ -2878,7 +2881,7 @@ cleanup:
 	}
 	dns_catz_entry_detach(ev->origin, &ev->entry);
 	dns_catz_detach_catz(&ev->origin);
-	dns_view_detach(&ev->view);
+	dns_view_weakdetach(&ev->view);
 	isc_event_free(ISC_EVENT_PTR(&ev));
 }
 
@@ -2896,8 +2899,8 @@ catz_delzone_taskaction(isc_task_t *task, isc_event_t *event0) {
 
 	dns_name_format(dns_catz_entry_getname(ev->entry), cname,
 			DNS_NAME_FORMATSIZE);
-	result = dns_zt_find(ev->view->zonetable,
-			     dns_catz_entry_getname(ev->entry), 0, NULL, &zone);
+	result = dns_view_findzone(ev->view, dns_catz_entry_getname(ev->entry),
+				   &zone);
 	if (result != ISC_R_SUCCESS) {
 		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 			      NAMED_LOGMODULE_SERVER, ISC_LOG_WARNING,
@@ -2953,7 +2956,7 @@ cleanup:
 	}
 	dns_catz_entry_detach(ev->origin, &ev->entry);
 	dns_catz_detach_catz(&ev->origin);
-	dns_view_detach(&ev->view);
+	dns_view_weakdetach(&ev->view);
 	isc_event_free(ISC_EVENT_PTR(&ev));
 }
 
@@ -2995,7 +2998,7 @@ catz_create_chg_task(dns_catz_entry_t *entry, dns_catz_zone_t *origin,
 
 	dns_catz_entry_attach(entry, &event->entry);
 	dns_catz_attach_catz(origin, &event->origin);
-	dns_view_attach(view, &event->view);
+	dns_view_weakattach(view, &event->view);
 
 	isc_task_send(task, ISC_EVENT_PTR(&event));
 	isc_task_detach(&task);
@@ -4737,21 +4740,11 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 			 * view but is not yet configured.  If it is not the
 			 * view name but not a forward reference either, then it
 			 * is simply a named cache that is not shared.
-			 *
-			 * We use two separate memory contexts for the
-			 * cache, for the main cache memory and the heap
-			 * memory.
 			 */
-			isc_mem_create(&cmctx);
-			isc_mem_setname(cmctx, "cache");
-			isc_mem_create(&hmctx);
-			isc_mem_setname(hmctx, "cache_heap");
-			CHECK(dns_cache_create(cmctx, hmctx, named_g_taskmgr,
+			CHECK(dns_cache_create(mctx, named_g_taskmgr,
 					       named_g_timermgr, view->rdclass,
 					       cachename, "rbt", 0, NULL,
 					       &cache));
-			isc_mem_detach(&cmctx);
-			isc_mem_detach(&hmctx);
 		}
 		nsc = isc_mem_get(mctx, sizeof(*nsc));
 		nsc->cache = NULL;
@@ -5562,6 +5555,24 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	INSIST(result == ISC_R_SUCCESS);
 	dns_resolver_setclientsperquery(view->resolver, cfg_obj_asuint32(obj),
 					max_clients_per_query);
+
+	/*
+	 * This is used for the cache and also as a default value
+	 * for zone databases.
+	 */
+	obj = NULL;
+	result = named_config_get(maps, "max-records-per-type", &obj);
+	INSIST(result == ISC_R_SUCCESS);
+	dns_view_setmaxrrperset(view, cfg_obj_asuint32(obj));
+
+	/*
+	 * This is used for the cache and also as a default value
+	 * for zone databases.
+	 */
+	obj = NULL;
+	result = named_config_get(maps, "max-types-per-name", &obj);
+	INSIST(result == ISC_R_SUCCESS);
+	dns_view_setmaxtypepername(view, cfg_obj_asuint32(obj));
 
 	obj = NULL;
 	result = named_config_get(maps, "max-recursion-depth", &obj);

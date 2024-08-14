@@ -1,3 +1,173 @@
+	--- 9.18.28 released ---
+
+6404.	[security]	Remove SIG(0) support from named as a countermeasure
+			for CVE-2024-1975. [GL #4480]
+
+6403.	[security]	qctx-zversion was not being cleared when it should have
+			been leading to an assertion failure if it needed to be
+			reused. (CVE-2024-4076) [GL #4507]
+
+6401.	[security]	An excessively large number of rrtypes per owner can
+			slow down database query processing, so a limit has been
+			placed on the number of rrtypes that can be stored per
+			owner (node) in a cache or zone database. This is
+			configured with the new "max-rrtypes-per-name" option,
+			and defaults to 100. (CVE-2024-1737)
+			[GL #3403] [GL #4548]
+
+6400.	[security]	Excessively large rdatasets can slow down database
+			query processing, so a limit has been placed on the
+			number of records that can be stored per rdataset
+			in a cache or zone database. This is configured
+			with the new "max-records-per-type" option, and
+			defaults to 100. (CVE-2024-1737)
+			[GL #497] [GL #3405]
+
+6399.	[security]	Malicious DNS client that sends many queries over
+			TCP but never reads responses can cause server to
+			respond slowly or not respond at all for other
+			clients. (CVE-2024-0760) [GL #4481]
+
+6398.	[bug]		Fix potential data races in our DoH implementation
+			related to HTTP/2 session object management and
+			endpoints set object management after reconfiguration.
+			We would like to thank Dzintars and Ivo from nic.lv
+			for bringing this to our attention. [GL #4473]
+
+6397.	[bug]		Clear DNS_FETCHOPT_TRYSTALE_ONTIMEOUT when looking for
+			parent NS records needed to get the DS result.
+			[GL #4661]
+
+6395.	[bug]		Handle ISC_R_HOSTDOWN and ISC_R_NETDOWN in resolver.c.
+			[GL #4736]
+
+6394.	[bug]		Named's -4 and -6 options now apply to zone primaries,
+			also-notify and parental-agents.  Report when a zone
+			has these options configured but does not have an IPv4
+			or IPv6 address listed respectively. [GL #3472]
+
+6393.	[func]		Deal with uv_tcp_close_reset() error return codes
+			more gracefully. [GL #4708]
+
+6392.	[bug]		Use a completely new memory context when flushing the
+			cache. [GL #2744]
+
+6391.	[bug]		TCP client statistics could sometimes fail to decrease
+			when accepting client connection fails. [GL #4742]
+
+6390.	[bug]		Fix a data race in isc_task_purgeevent(). [GL !8937]
+
+6389.	[bug]		dnssec-verify and dnssec-signzone could fail if there
+			was an obscured DNSKEY RRset at a delegatation.
+			[GL #4517]
+
+6388.	[bug]		Prevent an assertion failure caused by passing NULL to
+			dns_dispatch_resume() when a dns_request times out close
+			to view shutdown. [GL #4719]
+
+6386.	[bug]		When shutting down catzs->view could point to freed
+			memory. Obtain a reference to the view to prevent this.
+			[GL #4502]
+
+6385.	[func]		Relax SVCB alias mode checks to allow parameters.
+			[GL #4704]
+
+6384.	[bug]		Remove infinite loop when including a directory in a
+			zone file. [GL #4357]
+
+6383.	[bug]		Address an infinite loop in $GENERATE when a negative
+			value was converted in nibble mode. [GL #4353]
+
+6382.	[bug]		Fix RPZ response's SOA record TTL, which was incorrectly
+			set to 1 if 'add-soa' is used. [GL #3323]
+
+	--- 9.18.27 released ---
+
+6374.	[bug]		Skip to next RRSIG if signature has expired or is in
+			the future rather than failing immediately. [GL #4586]
+
+6372.	[func]		Implement signature jitter for dnssec-policy. [GL #4554]
+
+	--- 9.18.26 released ---
+
+6364.	[protocol]	Add RESOLVER.ARPA to the built in empty zones.
+			[GL #4580]
+
+6363.	[bug]		dig/mdig +ednsflags=<non-zero-value> did not re-enable
+			EDNS if it had been disabled. [GL #4641]
+
+6361.	[bug]		Some invalid ISO 8601 durations were accepted
+			erroneously. [GL #4624]
+
+6360.	[bug]		Don't return static-stub synthesised NS RRset.
+			[GL #4608]
+
+6359.	[bug]		Fix bug in Depends (keymgr_dep) function. [GL #4552]
+
+6351.	[protocol]	Support for the RESINFO record type has been added.
+			[GL #4413]
+
+6346.	[bug]		Cleaned up several minor bugs in the RBTDB dbiterator
+			implementation. [GL !8741]
+
+6345.	[bug]		Added missing dns_rdataset_disassociate calls in
+			validator.c:findnsec3proofs. [GL #4571]
+
+6340.	[test]		Fix incorrectly reported errors when running tests
+			with `make test` on platforms with older pytest.
+			[GL #4560]
+
+6338.	[func]		Optimize slabheader placement, so the infrastructure
+			records are put in the beginning of the slabheader
+			linked list. [GL !8675]
+
+6334.	[doc]		Improve ARM parental-agents definition. [GL #4531]
+
+6333.	[bug]		Fix the DNS_GETDB_STALEFIRST flag, which was defined
+			incorrectly in lib/ns/query.c. [GL !8683]
+
+6330.	[doc]		Update ZSK minimum lifetime documentation in ARM, also
+			depends on signing delay. [GL #4510]
+
+6328.	[func]		Add workaround to enforce dynamic linker to pull
+			jemalloc earlier than libc to ensure all memory
+			allocations are done via jemalloc. [GL #4404]
+
+6326.	[bug]		Changes to "listen-on" statements were ignored on
+			reconfiguration unless the port or interface address was
+			changed, making it impossible to change a related
+			listener transport type. Thanks to Thomas Amgarten.
+			[GL #4518] [GL #4528]
+
+6325.	[func]		Expose the TCP client count in statistics channel.
+			[GL #4425]
+
+6324.	[bug]		Fix a possible crash in 'dig +nssearch +nofail' and
+			'host -C' commands when one of the name servers returns
+			SERVFAIL. [GL #4508]
+
+6313.	[bug]		When dnssec-policy is in effect the DNSKEY's TTLs in
+			the zone where not being updated to match the policy.
+			This lead to failures when DNSKEYs where updated as the
+			TTLs mismatched. [GL #4466]
+
+	--- 9.18.25 released ---
+
+6356.	[bug]		Create the pruning task in the dns_cache_flush(), so
+			the cache pruning still works after the flush.
+			[GL #4621]
+
+6353.	[bug]		Improve the TTL-based cleaning by removing the expired
+			headers from the heap, so they don't block the next
+			cleaning round and clean more than a single item for
+			each new addition to the RBTDB. [GL #4591]
+
+6352.	[bug]		Revert change 6319 and decrease lock contention during
+			RBTDB tree pruning by not cleaning up nodes recursively
+			within a single prune_tree() call. [GL #4596]
+
+6350.	[bug]		Address use after free in expire_lru_headers. [GL #4495]
+
 	--- 9.18.24 released ---
 
 6343.	[bug]		Fix case insensitive setting for isc_ht hashtable.
@@ -8,6 +178,10 @@
 6322.	[security]	Specific DNS answers could cause a denial-of-service
 			condition due to DNS validation taking a long time.
 			(CVE-2023-50387) [GL #4424]
+
+			The same code change also addresses another problem:
+			preparing NSEC3 closest encloser proofs could exhaust
+			available CPU resources. (CVE-2023-50868) [GL #4459]
 
 6321.	[security]	Change 6315 inadvertently introduced regressions that
 			could cause named to crash. [GL #4234]

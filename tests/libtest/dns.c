@@ -24,9 +24,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define UNIT_TESTING
-#include <cmocka.h>
-
 #include <isc/buffer.h>
 #include <isc/file.h>
 #include <isc/hash.h>
@@ -71,7 +68,7 @@ dns_test_makeview(const char *name, bool with_cache, dns_view_t **viewp) {
 	}
 
 	if (with_cache) {
-		result = dns_cache_create(mctx, mctx, taskmgr, timermgr,
+		result = dns_cache_create(mctx, taskmgr, timermgr,
 					  dns_rdataclass_in, "", "rbt", 0, NULL,
 					  &cache);
 		if (result != ISC_R_SUCCESS) {
@@ -259,7 +256,7 @@ dns_test_tohex(const unsigned char *data, size_t len, char *buf,
 	memset(buf, 0, buflen);
 	isc_buffer_init(&target, buf, buflen);
 	result = isc_hex_totext((isc_region_t *)&source, 1, " ", &target);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	INSIST(result == ISC_R_SUCCESS);
 
 	return (buf);
 }
@@ -426,7 +423,7 @@ dns_test_namefromstring(const char *namestr, dns_fixedname_t *fname) {
 
 	isc_buffer_putmem(b, (const unsigned char *)namestr, length);
 	result = dns_name_fromtext(name, b, dns_rootname, 0, NULL);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	INSIST(result == ISC_R_SUCCESS);
 
 	isc_buffer_free(&b);
 }

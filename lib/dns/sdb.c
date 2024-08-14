@@ -1263,26 +1263,40 @@ overmem(dns_db_t *db, bool over) {
 }
 
 static void
-settask(dns_db_t *db, isc_task_t *task) {
+settask(dns_db_t *db, isc_task_t *task, isc_task_t *prunetask) {
 	UNUSED(db);
 	UNUSED(task);
+	UNUSED(prunetask);
 }
 
 static dns_dbmethods_t sdb_methods = {
-	attach,		detach,
-	beginload,	endload,
-	dump,		currentversion,
-	newversion,	attachversion,
-	closeversion,	NULL, /* findnode */
-	NULL,		      /* find */
-	findzonecut,	attachnode,
-	detachnode,	expirenode,
-	printnode,	createiterator,
-	findrdataset,	allrdatasets,
-	addrdataset,	subtractrdataset,
-	deleterdataset, issecure,
-	nodecount,	ispersistent,
-	overmem,	settask,
+	attach,
+	detach,
+	beginload,
+	endload,
+	dump,
+	currentversion,
+	newversion,
+	attachversion,
+	closeversion,
+	NULL, /* findnode */
+	NULL, /* find */
+	findzonecut,
+	attachnode,
+	detachnode,
+	expirenode,
+	printnode,
+	createiterator,
+	findrdataset,
+	allrdatasets,
+	addrdataset,
+	subtractrdataset,
+	deleterdataset,
+	issecure,
+	nodecount,
+	ispersistent,
+	overmem,
+	settask,
 	getoriginnode, /* getoriginnode */
 	NULL,	       /* transfernode */
 	NULL,	       /* getnsec3parameters */
@@ -1294,7 +1308,8 @@ static dns_dbmethods_t sdb_methods = {
 	NULL,	       /* getrrsetstats */
 	NULL,	       /* rpz_attach */
 	NULL,	       /* rpz_ready */
-	findnodeext,	findext,
+	findnodeext,
+	findext,
 	NULL, /* setcachestats */
 	NULL, /* hashsize */
 	NULL, /* nodefullname */
@@ -1304,6 +1319,8 @@ static dns_dbmethods_t sdb_methods = {
 	NULL, /* setservestalerefresh */
 	NULL, /* getservestalerefresh */
 	NULL, /* setgluecachestats */
+	NULL, /* setmaxrrperset */
+	NULL  /* setmaxtypepername */
 };
 
 static isc_result_t

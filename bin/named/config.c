@@ -233,8 +233,10 @@ options {\n\
 	ixfr-from-differences false;\n\
 	max-journal-size default;\n\
 	max-records 0;\n\
+	max-records-per-type 100;\n\
 	max-refresh-time 2419200; /* 4 weeks */\n\
 	max-retry-time 1209600; /* 2 weeks */\n\
+	max-types-per-name 100;\n\
 	max-transfer-idle-in 60;\n\
 	max-transfer-idle-out 60;\n\
 	max-transfer-time-in 120;\n\
@@ -309,6 +311,7 @@ dnssec-policy \"default\" {\n\
 	publish-safety " DNS_KASP_PUBLISH_SAFETY "; \n\
 	retire-safety " DNS_KASP_RETIRE_SAFETY "; \n\
 	purge-keys " DNS_KASP_PURGE_KEYS "; \n\
+	signatures-jitter " DNS_KASP_SIG_JITTER "; \n\
 	signatures-refresh " DNS_KASP_SIG_REFRESH "; \n\
 	signatures-validity " DNS_KASP_SIG_VALIDITY "; \n\
 	signatures-validity-dnskey " DNS_KASP_SIG_VALIDITY_DNSKEY "; \n\

@@ -2211,6 +2211,7 @@ static cfg_clausedef_t dnssecpolicy_clauses[] = {
 	{ "publish-safety", &cfg_type_duration, 0 },
 	{ "purge-keys", &cfg_type_duration, 0 },
 	{ "retire-safety", &cfg_type_duration, 0 },
+	{ "signatures-jitter", &cfg_type_duration, 0 },
 	{ "signatures-refresh", &cfg_type_duration, 0 },
 	{ "signatures-validity", &cfg_type_duration, 0 },
 	{ "signatures-validity-dnskey", &cfg_type_duration, 0 },
@@ -2297,6 +2298,12 @@ static cfg_clausedef_t zone_clauses[] = {
 	{ "max-journal-size", &cfg_type_size,
 	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR },
 	{ "max-records", &cfg_type_uint32,
+	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR |
+		  CFG_ZONE_STUB | CFG_ZONE_STATICSTUB | CFG_ZONE_REDIRECT },
+	{ "max-records-per-type", &cfg_type_uint32,
+	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR |
+		  CFG_ZONE_STUB | CFG_ZONE_STATICSTUB | CFG_ZONE_REDIRECT },
+	{ "max-types-per-name", &cfg_type_uint32,
 	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR |
 		  CFG_ZONE_STUB | CFG_ZONE_STATICSTUB | CFG_ZONE_REDIRECT },
 	{ "max-refresh-time", &cfg_type_uint32,

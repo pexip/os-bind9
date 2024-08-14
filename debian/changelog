@@ -1,3 +1,28 @@
+bind9 (1:9.18.28-1+pexip24u1~deb12u1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Wed, 14 Aug 2024 17:11:50 +0000
+
+bind9 (1:9.18.28-1~deb12u2) bookworm-security; urgency=medium
+
+  * Fix the assertion failure in samba-libs DLZ module. (Closes #1074378)
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 27 Jul 2024 05:13:42 +0200
+
+bind9 (1:9.18.28-1~deb12u1) bookworm-security; urgency=high
+
+  * New upstream version 9.18.28
+   - CVE-2024-0760: A flood of DNS messages over TCP may make the server
+     unstable
+   - CVE-2024-1737: BIND's database will be slow if a very large number of
+     RRs exist at the same name
+   - CVE-2024-1975: SIG(0) can be used to exhaust CPU resources
+   - CVE-2024-4076: Assertion failure when serving both stale cache data
+     and authoritative zone content
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 16 Jul 2024 17:22:50 +0200
+
 bind9 (1:9.18.24-1+pexip24u1) pexip; urgency=medium
 
   * New upstream release

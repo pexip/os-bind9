@@ -1590,6 +1590,10 @@ validate_answer(dns_validator_t *val, bool resume) {
 		}
 
 		vresult = verify(val, val->key, &rdata, val->siginfo->keyid);
+		if (vresult == DNS_R_SIGEXPIRED || vresult == DNS_R_SIGFUTURE) {
+			resume = false;
+			continue;
+		}
 		if (vresult != ISC_R_SUCCESS) {
 			val->failed = true;
 			validator_log(val, ISC_LOG_DEBUG(3),
@@ -2223,6 +2227,9 @@ findnsec3proofs(dns_validator_t *val) {
 	POST(result);
 
 	if (dns_name_countlabels(zonename) == 0) {
+		if (dns_rdataset_isassociated(&trdataset)) {
+			dns_rdataset_disassociate(&trdataset);
+		}
 		return (ISC_R_SUCCESS);
 	}
 
@@ -2292,6 +2299,9 @@ findnsec3proofs(dns_validator_t *val) {
 			{
 				proofs[DNS_VALIDATOR_NOWILDCARDPROOF] = name;
 			}
+			if (dns_rdataset_isassociated(&trdataset)) {
+				dns_rdataset_disassociate(&trdataset);
+			}
 			return (result);
 		}
 		if (result != ISC_R_SUCCESS) {
@@ -2345,8 +2355,14 @@ findnsec3proofs(dns_validator_t *val) {
 	{
 		result = checkwildcard(val, dns_rdatatype_nsec3, zonename);
 		if (result != ISC_R_SUCCESS) {
+			if (dns_rdataset_isassociated(&trdataset)) {
+				dns_rdataset_disassociate(&trdataset);
+			}
 			return (result);
 		}
+	}
+	if (dns_rdataset_isassociated(&trdataset)) {
+		dns_rdataset_disassociate(&trdataset);
 	}
 	return (result);
 }

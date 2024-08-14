@@ -1055,7 +1055,7 @@ if [ -x "$DIG" ]; then
   echo_i "check that dig tries the next server after a TCP socket connection error/timeout ($n)"
   ret=0
   dig_with_opts +tcp @10.53.0.99 @10.53.0.3 a.example >dig.out.test$n 2>&1 || ret=1
-  test $(grep -F -e "connection refused" -e "timed out" -e "network unreachable" dig.out.test$n | wc -l) -eq 3 || ret=1
+  test $(grep -F -e "connection refused" -e "timed out" -e "network unreachable" -e "host unreachable" dig.out.test$n | wc -l) -eq 3 || ret=1
   grep -F "status: NOERROR" dig.out.test$n >/dev/null || ret=1
   if [ $ret -ne 0 ]; then echo_i "failed"; fi
   status=$((status + ret))
@@ -1096,6 +1096,14 @@ if [ -x "$DIG" ]; then
   ret=0
   dig_with_opts +timeout=1 +qr +y @127.0.0.1 @10.53.0.3 a.example >dig.out.test$n 2>&1 || ret=1
   grep -F "IN A 10.0.0.1" dig.out.test$n >/dev/null || ret=1
+  if [ $ret -ne 0 ]; then echo_i "failed"; fi
+  status=$((status + ret))
+
+  n=$((n + 1))
+  echo_i "check that dig +noedns +ednsflags=<nonzero> re-enables EDNS ($n)"
+  dig_with_opts @10.53.0.3 +qr +noedns +ednsflags=0x70 a.example >dig.out.test$n 2>&1 || ret=1
+  grep "; EDNS: version: 0, flags:; MBZ: 0x0070, udp: 1232" dig.out.test$n >/dev/null || ret=1
+  grep "; EDNS: version: 0, flags:; udp: 1232" dig.out.test$n >/dev/null || ret=1
   if [ $ret -ne 0 ]; then echo_i "failed"; fi
   status=$((status + ret))
 else

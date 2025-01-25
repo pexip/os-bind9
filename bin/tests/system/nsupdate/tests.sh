@@ -589,6 +589,26 @@ EOF
 
 n=$((n + 1))
 ret=0
+i=0
+echo_i "check that nsupdate does not hang when processing a large number of updates interactively ($n)"
+{
+  echo "server 10.53.0.3 ${PORT}"
+  echo "zone many-updates.test."
+  while [ $i -le 2000 ]; do
+    echo "update add host$i.many-updates.test. 3600 IN TXT \"host $i\""
+    i=$((i + 1))
+  done
+  echo "send"
+} | $NSUPDATE
+echo_i "query for host2000.many-updates.test ($n)"
+retry_quiet 5 has_positive_response host2000.many-updates.test TXT 10.53.0.3 || ret=1
+[ $ret = 0 ] || {
+  echo_i "failed"
+  status=1
+}
+
+n=$((n + 1))
+ret=0
 echo_i "start NSEC3PARAM changes via UPDATE on a unsigned zone test ($n)"
 $NSUPDATE <<EOF
 server 10.53.0.3 ${PORT}
@@ -817,6 +837,90 @@ $DIG $DIGOPTS @10.53.0.6 \
   +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
   -x 192.168.0.1 >dig.out.ns6.$n
 grep localhost. dig.out.ns6.$n >/dev/null 2>&1 && ret=1
+if test $ret -ne 0; then
+  echo_i "failed"
+  status=1
+fi
+
+n=$((n + 1))
+ret=0
+echo_i "check that 'update-policy 6to4-self' refuses update of records via UDP over IPv4 ($n)"
+REVERSE_NAME=6.0.0.0.5.3.a.0.2.0.0.2.ip6.arpa
+$NSUPDATE >nsupdate.out.$n 2>&1 <<END && ret=1
+server 10.53.0.6 ${PORT}
+local 10.53.0.6
+zone 2.0.0.2.ip6.arpa
+update add ${REVERSE_NAME} 600 NS localhost.
+send
+END
+grep REFUSED nsupdate.out.$n >/dev/null 2>&1 || ret=1
+$DIG $DIGOPTS @10.53.0.6 \
+  +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
+  $REVERSE_NAME NS >dig.out.ns6.$n
+grep localhost. dig.out.ns6.$n >/dev/null 2>&1 && ret=1
+if test $ret -ne 0; then
+  echo_i "failed"
+  status=1
+fi
+
+n=$((n + 1))
+echo_i "check that 'update-policy 6to4-self' permits update of records for the client's own address via TCP over IPv4 ($n)"
+ret=0
+REVERSE_NAME=6.0.0.0.5.3.a.0.2.0.0.2.ip6.arpa
+$NSUPDATE -v >nsupdate.out.$n 2>&1 <<END || ret=1
+server 10.53.0.6 ${PORT}
+local 10.53.0.6
+zone 2.0.0.2.ip6.arpa
+update add ${REVERSE_NAME} 600 NS localhost.
+send
+END
+grep REFUSED nsupdate.out.$n >/dev/null 2>&1 && ret=1
+$DIG $DIGOPTS @10.53.0.6 \
+  +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
+  $REVERSE_NAME NS >dig.out.ns6.$n || ret=1
+grep localhost. dig.out.ns6.$n >/dev/null 2>&1 || ret=1
+if test $ret -ne 0; then
+  echo_i "failed"
+  status=1
+fi
+
+n=$((n + 1))
+ret=0
+echo_i "check that 'update-policy 6to4-self' refuses update of records via UDP over IPv6 ($n)"
+REVERSE_NAME=7.0.0.0.5.3.a.0.2.0.0.2.ip6.arpa
+$NSUPDATE >nsupdate.out.$n 2>&1 <<END && ret=1
+server fd92:7065:b8e:ffff::6 ${PORT}
+local 2002:a35:7::1
+zone 2.0.0.2.ip6.arpa
+update add ${REVERSE_NAME} 600 NS localhost.
+send
+END
+grep REFUSED nsupdate.out.$n >/dev/null 2>&1 || ret=1
+$DIG $DIGOPTS @fd92:7065:b8e:ffff::6 \
+  +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
+  $REVERSE_NAME NS >dig.out.ns6.$n
+grep localhost. dig.out.ns6.$n >/dev/null 2>&1 && ret=1
+if test $ret -ne 0; then
+  echo_i "failed"
+  status=1
+fi
+
+n=$((n + 1))
+echo_i "check that 'update-policy 6to4-self' permits update of records for the client's own address via TCP over IPv6 ($n)"
+ret=0
+REVERSE_NAME=7.0.0.0.5.3.a.0.2.0.0.2.ip6.arpa
+$NSUPDATE -v >nsupdate.out.$n 2>&1 <<END || ret=1
+server fd92:7065:b8e:ffff::6 ${PORT}
+local 2002:a35:7::1
+zone 2.0.0.2.ip6.arpa
+update add ${REVERSE_NAME} 600 NS localhost.
+send
+END
+grep REFUSED nsupdate.out.$n >/dev/null 2>&1 && ret=1
+$DIG $DIGOPTS @fd92:7065:b8e:ffff::6 \
+  +tcp +noadd +nosea +nostat +noquest +nocomm +nocmd \
+  $REVERSE_NAME NS >dig.out.ns6.$n || ret=1
+grep localhost. dig.out.ns6.$n >/dev/null 2>&1 || ret=1
 if test $ret -ne 0; then
   echo_i "failed"
   status=1
@@ -1121,6 +1225,27 @@ if [ $ret -ne 0 ]; then
   echo_i "failed"
   status=1
 fi
+
+n=$((n + 1))
+echo_i "check adding more records than max-records-per-type fails ($n)"
+ret=0
+$NSUPDATE <<END >nsupdate.out.test$n 2>&1 && ret=1
+server 10.53.0.1 ${PORT}
+zone max-ttl.nil.
+update add a.max-ttl.nil. 60 IN A 192.0.2.1
+update add a.max-ttl.nil. 60 IN A 192.0.2.2
+update add a.max-ttl.nil. 60 IN A 192.0.2.3
+update add a.max-ttl.nil. 60 IN A 192.0.2.4
+send
+END
+grep "update failed: SERVFAIL" nsupdate.out.test$n >/dev/null || ret=1
+msg="error updating 'a.max-ttl.nil/A' in 'max-ttl.nil/IN' (zone): too many records (must not exceed 3)"
+wait_for_log 10 "$msg" ns1/named.run || ret=1
+[ $ret = 0 ] || {
+  echo_i "failed"
+  status=1
+}
+nextpart ns1/named.run >/dev/null
 
 n=$((n + 1))
 ret=0

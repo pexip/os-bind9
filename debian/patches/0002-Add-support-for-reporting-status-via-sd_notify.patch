@@ -4,9 +4,9 @@ Subject: Add-support-for-reporting-status-via-sd_notify
 
 ---
  bin/named/Makefile.am |  8 +++++++-
- bin/named/server.c    | 44 +++++++++++++++++++++++++++++++++++++++++---
+ bin/named/server.c    | 37 +++++++++++++++++++++++++++++++++++++
  configure.ac          | 20 ++++++++++++++++++++
- 3 files changed, 68 insertions(+), 4 deletions(-)
+ 3 files changed, 64 insertions(+), 1 deletion(-)
 
 diff --git a/bin/named/Makefile.am b/bin/named/Makefile.am
 index 57a023b..38045f0 100644
@@ -39,7 +39,7 @@ index 57a023b..38045f0 100644
 +	$(LIBXML2_LIBS)
 +endif HAVE_LIBXML2
 diff --git a/bin/named/server.c b/bin/named/server.c
-index 6ad090f..2c510d5 100644
+index a0a28c0..0644899 100644
 --- a/bin/named/server.c
 +++ b/bin/named/server.c
 @@ -26,6 +26,10 @@
@@ -53,23 +53,7 @@ index 6ad090f..2c510d5 100644
  #include <isc/aes.h>
  #include <isc/app.h>
  #include <isc/attributes.h>
-@@ -219,11 +223,12 @@
- 	} while (0)
- 
- #define CHECKFATAL(op, msg)                         \
--	do {                                        \
-+	{                                           \
- 		result = (op);                      \
--		if (result != ISC_R_SUCCESS)        \
-+		if (result != ISC_R_SUCCESS) {      \
- 			fatal(server, msg, result); \
--	} while (0)
-+		}                                   \
-+	}
- 
- /*%
-  * Maximum ADB size for views that share a cache.  Use this limit to suppress
-@@ -9934,6 +9939,15 @@ view_loaded(void *arg) {
+@@ -10053,6 +10057,15 @@ view_loaded(void *arg) {
  			      "FIPS mode is %s",
  			      FIPS_mode() ? "enabled" : "disabled");
  #endif /* ifdef HAVE_FIPS_MODE */
@@ -85,7 +69,7 @@ index 6ad090f..2c510d5 100644
  		atomic_store(&server->reload_status, NAMED_RELOAD_DONE);
  
  		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-@@ -10113,6 +10127,10 @@ shutdown_server(isc_task_t *task, isc_event_t *event) {
+@@ -10232,6 +10245,10 @@ shutdown_server(isc_task_t *task, isc_event_t *event) {
  	UNUSED(task);
  	INSIST(task == server->task);
  
@@ -96,7 +80,7 @@ index 6ad090f..2c510d5 100644
  	/*
  	 * We need to shutdown the interface before going
  	 * exclusive (which would pause the netmgr).
-@@ -10533,6 +10551,10 @@ reload(named_server_t *server) {
+@@ -10648,6 +10665,10 @@ reload(named_server_t *server) {
  	isc_result_t result;
  
  	atomic_store(&server->reload_status, NAMED_RELOAD_IN_PROGRESS);
@@ -107,7 +91,7 @@ index 6ad090f..2c510d5 100644
  
  	CHECK(loadconfig(server));
  
-@@ -10549,6 +10571,12 @@ reload(named_server_t *server) {
+@@ -10664,6 +10685,12 @@ reload(named_server_t *server) {
  		atomic_store(&server->reload_status, NAMED_RELOAD_FAILED);
  	}
  cleanup:
@@ -117,10 +101,10 @@ index 6ad090f..2c510d5 100644
 +		   "STATUS=reload command finished: %s\n",
 +		   isc_result_totext(result));
 +#endif /* HAVE_LIBSYSTEMD */
- 	return (result);
+ 	return result;
  }
  
-@@ -10908,6 +10936,10 @@ isc_result_t
+@@ -11023,6 +11050,10 @@ isc_result_t
  named_server_reconfigcommand(named_server_t *server) {
  	isc_result_t result;
  	atomic_store(&server->reload_status, NAMED_RELOAD_IN_PROGRESS);
@@ -131,7 +115,7 @@ index 6ad090f..2c510d5 100644
  
  	CHECK(loadconfig(server));
  
-@@ -10924,6 +10956,12 @@ named_server_reconfigcommand(named_server_t *server) {
+@@ -11039,6 +11070,12 @@ named_server_reconfigcommand(named_server_t *server) {
  		atomic_store(&server->reload_status, NAMED_RELOAD_FAILED);
  	}
  cleanup:
@@ -141,14 +125,14 @@ index 6ad090f..2c510d5 100644
 +		   "STATUS=reconfig command finished: %s\n",
 +		   isc_result_totext(result));
 +#endif /* HAVE_LIBSYSTEMD */
- 	return (result);
+ 	return result;
  }
  
 diff --git a/configure.ac b/configure.ac
-index 6bc11de..1dbbba1 100644
+index b941a99..a1550fc 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -849,6 +849,26 @@ AS_CASE([$with_zlib],
+@@ -857,6 +857,26 @@ AS_CASE([$with_zlib],
  AC_SUBST([ZLIB_CFLAGS])
  AC_SUBST([ZLIB_LIBS])
  

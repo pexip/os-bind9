@@ -40,8 +40,6 @@
 
 #include <tests/dns.h>
 
-static bool debug = false;
-
 /*
  * An array of these structures is passed to compare_ok().
  */
@@ -155,7 +153,7 @@ wire_to_rdata(const unsigned char *src, size_t srclen, dns_rdataclass_t rdclass,
 	dns_decompress_invalidate(&dctx);
 	detect_uncleared_libcrypto_error();
 
-	return (result);
+	return result;
 }
 
 /*
@@ -183,7 +181,7 @@ rdata_towire(dns_rdata_t *rdata, unsigned char *dst, size_t dstlen,
 
 	*length = isc_buffer_usedlength(&target);
 
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -193,7 +191,7 @@ additionaldata_cb(void *arg, const dns_name_t *name, dns_rdatatype_t qtype,
 	UNUSED(name);
 	UNUSED(qtype);
 	UNUSED(found);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 /*
@@ -201,8 +199,8 @@ additionaldata_cb(void *arg, const dns_name_t *name, dns_rdatatype_t qtype,
  */
 static isc_result_t
 rdata_additionadata(dns_rdata_t *rdata) {
-	return (dns_rdata_additionaldata(rdata, dns_rootname, additionaldata_cb,
-					 NULL));
+	return dns_rdata_additionaldata(rdata, dns_rootname, additionaldata_cb,
+					NULL);
 }
 
 /*
@@ -2402,6 +2400,18 @@ ISC_RUN_TEST_IMPL(sshfp) {
 		    dns_rdatatype_sshfp, sizeof(dns_rdata_sshfp_t));
 }
 
+ISC_RUN_TEST_IMPL(wallet) {
+	text_ok_t text_ok[] = { TEXT_VALID_CHANGED("cid-example wid-example",
+						   "\"cid-example\" "
+						   "\"wid-example\""),
+				/*
+				 * Sentinel.
+				 */
+				TEXT_SENTINEL() };
+	check_rdata(text_ok, NULL, NULL, false, dns_rdataclass_in,
+		    dns_rdatatype_wallet, sizeof(dns_rdata_rkey_t));
+}
+
 /*
  * WKS tests.
  *
@@ -2553,6 +2563,10 @@ ISC_RUN_TEST_IMPL(https_svcb) {
 		TEXT_INVALID("2 svc.example.net. alpn=,h1"),
 		TEXT_INVALID("2 svc.example.net. alpn=h1,"),
 		TEXT_INVALID("2 svc.example.net. alpn=h1,,h2"),
+		/* empty alpn-id sub fields - RFC 1035 escaped commas */
+		TEXT_INVALID("2 svc.example.net. alpn=\\,abc"),
+		TEXT_INVALID("2 svc.example.net. alpn=abc\\,"),
+		TEXT_INVALID("2 svc.example.net. alpn=a\\,\\,abc"),
 		/* mandatory */
 		TEXT_VALID_LOOP(2, "2 svc.example.net. mandatory=alpn "
 				   "alpn=\"h2\""),
@@ -2595,13 +2609,50 @@ ISC_RUN_TEST_IMPL(https_svcb) {
 		TEXT_INVALID("1 foo.example.com. ( mandatory=key123,key123 "
 			     "key123=abc)"),
 		/* dohpath tests */
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{dns}",
+				   "1 example.net. key7=\"/{dns}\""),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{+dns}",
+				   "1 example.net. key7=\"/{+dns}\""),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{#dns}",
+				   "1 example.net. key7=\"/{#dns}\""),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{.dns}",
+				   "1 example.net. key7=\"/{.dns}\""),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=\"/{;dns}\"",
+				   "1 example.net. key7=\"/{;dns}\""),
 		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{?dns}",
 				   "1 example.net. key7=\"/{?dns}\""),
 		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/some/path{?dns}",
 				   "1 example.net. key7=\"/some/path{?dns}\""),
-		TEXT_INVALID("1 example.com. dohpath=no-slash"),
-		TEXT_INVALID("1 example.com. dohpath=/{?notdns}"),
-		TEXT_INVALID("1 example.com. dohpath=/notvariable"),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{dns:9999}",
+				   "1 example.net. key7=\"/{dns:9999}\""),
+		TEXT_VALID_LOOPCHG(1, "1 example.net. dohpath=/{dns*}",
+				   "1 example.net. key7=\"/{dns*}\""),
+		TEXT_VALID_LOOPCHG(
+			1, "1 example.net. dohpath=/some/path?key=value{&dns}",
+			"1 example.net. key7=\"/some/path?key=value{&dns}\""),
+		TEXT_VALID_LOOPCHG(1,
+				   "1 example.net. "
+				   "dohpath=/some/path?key=value{&dns,x*}",
+				   "1 example.net. "
+				   "key7=\"/some/path?key=value{&dns,x*}\""),
+		TEXT_INVALID("1 example.com. dohpath=not-relative"),
+		TEXT_INVALID("1 example.com. dohpath=/{?no_dns_variable}"),
+		TEXT_INVALID("1 example.com. dohpath=/novariable"),
+		TEXT_INVALID("1 example.com. dohpath=/{?dnsx}"),
+		/* index too big > 9999 */
+		TEXT_INVALID("1 example.com. dohpath=/{?dns:10000}"),
+		/* index not postive */
+		TEXT_INVALID("1 example.com. dohpath=/{?dns:0}"),
+		/* index leading zero */
+		TEXT_INVALID("1 example.com. dohpath=/{?dns:01}"),
+		/* two operators */
+		TEXT_INVALID("1 example.com. dohpath=/{??dns}"),
+		/* invalid % encoding */
+		TEXT_INVALID("1 example.com. dohpath=/%a{?dns}"),
+		/* invalid % encoding */
+		TEXT_INVALID("1 example.com. dohpath=/{?dns,%a}"),
+		/* incomplete macro */
+		TEXT_INVALID("1 example.com. dohpath=/{?dns" /*}*/),
 		TEXT_SENTINEL()
 
 	};
@@ -3102,6 +3153,7 @@ ISC_TEST_ENTRY(nxt)
 ISC_TEST_ENTRY(rkey)
 ISC_TEST_ENTRY(resinfo)
 ISC_TEST_ENTRY(sshfp)
+ISC_TEST_ENTRY(wallet)
 ISC_TEST_ENTRY(wks)
 ISC_TEST_ENTRY(zonemd)
 

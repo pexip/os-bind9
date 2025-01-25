@@ -617,7 +617,8 @@ AM_CFLAGS = $(STD_CFLAGS) -I$(top_srcdir)/tests/include $(TEST_CFLAGS) \
 	$(am__append_2)
 AM_CPPFLAGS = $(STD_CPPFLAGS) -include $(top_builddir)/config.h \
 	-I$(srcdir)/include $(LIBISC_CFLAGS) $(LIBIRS_CFLAGS) \
-	$(CMOCKA_CFLAGS) -DNAMED_PLUGINDIR=\"$(pkglibdir)\" \
+	$(LIBUV_CFLAGS) -I$(top_srcdir)/lib/isc $(CMOCKA_CFLAGS) \
+	-DNAMED_PLUGINDIR=\"$(pkglibdir)\" \
 	-DTESTS_DIR=\"$(abs_srcdir)\"
 AM_LDFLAGS = $(STD_LDFLAGS) $(am__append_1)
 LDADD = $(LIBISC_LIBS) $(LIBIRS_LIBS) \

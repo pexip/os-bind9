@@ -10,6 +10,7 @@
 # information regarding copyright ownership.
 
 from functools import partial
+import filecmp
 import os
 from pathlib import Path
 import re
@@ -167,16 +168,25 @@ def pytest_collection_modifyitems(items):
 
 class NodeResult:
     def __init__(self, report=None):
-        self.outcome = None
-        self.messages = []
+        self._outcomes = {}
+        self.messages = {}
         if report is not None:
             self.update(report)
 
     def update(self, report):
-        if self.outcome is None or report.outcome != "passed":
-            self.outcome = report.outcome
-        if report.longreprtext:
-            self.messages.append(report.longreprtext)
+        # Allow the same nodeid/when to be overriden. This only happens when
+        # the test is re-run with flaky plugin. In that case, we want the
+        # latest result to override any previous results.
+        key = (report.nodeid, report.when)
+        self._outcomes[key] = report.outcome
+        self.messages[key] = report.longreprtext
+
+    @property
+    def outcome(self):
+        for outcome in self._outcomes.values():
+            if outcome != "passed":
+                return outcome
+        return "passed"
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -345,17 +355,43 @@ def logger(request, system_test_name):
 
 
 @pytest.fixture(scope="module")
-def system_test_dir(
-    request, env, system_test_name
-):  # pylint: disable=too-many-statements,too-many-locals
+def expected_artifacts(request):
+    common_artifacts = [
+        ".libs/*",  # possible build artifacts, see GL #5055
+        "ns*/named.conf",
+        "ns*/named.lock",
+        "ns*/named.memstats",
+        "ns*/named.run",
+        "ns*/named.run.prev",
+        "pytest.log.txt",
+    ]
+
+    if "USE_RR" in os.environ:
+        common_artifacts += [
+            "ns*/cpu_lock",
+            "ns*/latest-trace",
+            "ns*/named-[0-9]*",
+        ]
+
+    try:
+        test_specific_artifacts = request.node.get_closest_marker("extra_artifacts")
+    except AttributeError:
+        return None
+
+    if test_specific_artifacts:
+        return common_artifacts + test_specific_artifacts.args[0]
+
+    return common_artifacts
+
+
+@pytest.fixture(scope="module")
+def system_test_dir(request, env, system_test_name, expected_artifacts):
     """
     Temporary directory for executing the test.
 
     This fixture is responsible for creating (and potentially removing) a
     copy of the system test directory which is used as a temporary
     directory for the test execution.
-
-    FUTURE: This removes the need to have clean.sh scripts.
     """
 
     def get_test_result():
@@ -377,7 +413,7 @@ def system_test_dir(
         messages = []
         for node, result in test_results.items():
             isctest.log.debug("%s %s", result.outcome.upper(), node)
-            messages.extend(result.messages)
+            messages.extend(result.messages.values())
         for message in messages:
             isctest.log.debug("\n" + message)
         failed = any(res.outcome == "failed" for res in test_results.values())
@@ -395,6 +431,39 @@ def system_test_dir(
         except FileNotFoundError:
             pass
 
+    def check_artifacts(source_dir, run_dir):
+        def check_artifacts_recursive(dcmp):
+            def artifact_expected(path, expected):
+                for glob in expected:
+                    if path.match(glob):
+                        return True
+                return False
+
+            # test must not remove any Git-tracked file, ignore libtool and gcov artifacts
+            for name in dcmp.left_only:
+                path = Path(name)
+                assert path.name.startswith("lt-") or path.suffix == ".gcda"
+            assert not dcmp.diff_files, "test must not modify any Git-tracked file"
+
+            dir_path = Path(dcmp.left).relative_to(source_dir)
+            for name in dcmp.right_only:
+                file = dir_path / Path(name)
+                if not artifact_expected(file, expected_artifacts):
+                    unexpected_files.append(str(file))
+            for subdir in dcmp.subdirs.values():
+                check_artifacts_recursive(subdir)
+
+        if expected_artifacts is None:  # skip the check if artifact list is unavailable
+            return
+
+        unexpected_files = []
+        dcmp = filecmp.dircmp(source_dir, run_dir)
+        check_artifacts_recursive(dcmp)
+
+        assert (
+            not unexpected_files
+        ), f"Unexpected files found in test directory: {unexpected_files}"
+
     # Create a temporary directory with a copy of the original system test dir contents
     system_test_root = Path(f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}")
     testdir = Path(
@@ -404,7 +473,7 @@ def system_test_dir(
     shutil.copytree(system_test_root / system_test_name, testdir)
 
     # Create a convenience symlink with a stable and predictable name
-    module_name = SYMLINK_REPLACEMENT_RE.sub(r"\1", request.node.name)
+    module_name = SYMLINK_REPLACEMENT_RE.sub(r"\1", str(_get_node_path(request.node)))
     symlink_dst = system_test_root / module_name
     unlink(symlink_dst)
     symlink_dst.symlink_to(os.path.relpath(testdir, start=system_test_root))
@@ -422,6 +491,9 @@ def system_test_dir(
         isctest.log.debug("changed workdir to: %s", old_cwd)
 
         result = get_test_result()
+
+        if result == "passed":
+            check_artifacts(system_test_root / system_test_name, testdir)
 
         # Clean temporary dir unless it should be kept
         keep = False
@@ -455,7 +527,12 @@ def system_test_dir(
             unlink(symlink_dst)
 
 
-def _run_script(  # pylint: disable=too-many-arguments
+@pytest.fixture(scope="module")
+def templates(system_test_dir: Path, env):
+    return isctest.template.TemplateEngine(system_test_dir, env)
+
+
+def _run_script(
     env,
     system_test_dir: Path,
     interpreter: str,
@@ -497,6 +574,15 @@ def _run_script(  # pylint: disable=too-many-arguments
         isctest.log.debug("  exited with %d", returncode)
 
 
+def _get_node_path(node) -> Path:
+    if isinstance(node.parent, pytest.Session):
+        if _pytest_major_ver >= 8:
+            return Path()
+        return Path(node.name)
+    assert node.parent is not None
+    return _get_node_path(node.parent) / node.name
+
+
 @pytest.fixture(scope="module")
 def shell(env, system_test_dir):
     """Function to call a shell script with arguments."""
@@ -520,10 +606,11 @@ def run_tests_sh(system_test_dir, shell):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def system_test(  # pylint: disable=too-many-arguments,too-many-statements
+def system_test(
     request,
     env: Dict[str, str],
     system_test_dir,
+    templates,
     shell,
     perl,
 ):
@@ -565,6 +652,7 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
             pytest.skip("Prerequisites missing.")
 
     def setup_test():
+        templates.render_auto()
         try:
             shell(f"{system_test_dir}/setup.sh")
         except FileNotFoundError:
@@ -596,7 +684,7 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
             pytest.fail(f"get_core_dumps.sh exited with {exc.returncode}")
 
     os.environ.update(env)  # Ensure pytests have the same env vars as shell tests.
-    isctest.log.info(f"test started: {request.node.name}")
+    isctest.log.info(f"test started: {_get_node_path(request.node)}")
     port = int(env["PORT"])
     isctest.log.info("using port range: <%d, %d>", port, port + PORTS_PER_TEST - 1)
 

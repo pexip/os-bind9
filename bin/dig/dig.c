@@ -91,9 +91,9 @@ rcode_totext(dns_rcode_t rcode) {
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	if (strspn(buf + 1, "0123456789") == strlen(buf + 1)) {
 		buf[0] = '?';
-		return (buf);
+		return buf;
 	}
-	return (buf + 1);
+	return buf + 1;
 }
 
 /*% print usage */
@@ -121,7 +121,7 @@ usage(void) {
 	print_usage(stderr);
 	fprintf(stderr, "\nUse \"dig -h\" (or \"dig -h | more\") "
 			"for complete list of options\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 #endif /* if TARGET_OS_IPHONE */
 
@@ -443,7 +443,7 @@ say_message(dns_rdata_t *rdata, dig_query_t *query, isc_buffer_t *buf) {
 	if (query->lookup->trace || query->lookup->ns_search_only) {
 		result = dns_rdatatype_totext(rdata->type, buf);
 		if (result != ISC_R_SUCCESS) {
-			return (result);
+			return result;
 		}
 		ADD_STRING(buf, " ");
 	}
@@ -464,7 +464,7 @@ say_message(dns_rdata_t *rdata, dig_query_t *query, isc_buffer_t *buf) {
 	result = dns_rdata_tofmttext(rdata, NULL, styleflags, 0, splitwidth,
 				     " ", buf);
 	if (result == ISC_R_NOSPACE) {
-		return (result);
+		return result;
 	}
 	check_result(result, "dns_rdata_totext");
 	if (query->lookup->identify) {
@@ -481,7 +481,7 @@ say_message(dns_rdata_t *rdata, dig_query_t *query, isc_buffer_t *buf) {
 		ADD_STRING(buf, store);
 	}
 	ADD_STRING(buf, "\n");
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 /*%
@@ -504,14 +504,14 @@ dns64prefix_answer(dns_message_t *msg, isc_buffer_t *buf) {
 				      dns_rdatatype_aaaa, dns_rdatatype_none,
 				      NULL, &rdataset);
 	if (result == DNS_R_NXDOMAIN || result == DNS_R_NXRRSET) {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	} else if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 
 	result = dns_dns64_findprefix(rdataset, prefix, &count);
 	if (result == ISC_R_NOTFOUND) {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 	if (count > 10) {
 		count = 10;
@@ -519,15 +519,15 @@ dns64prefix_answer(dns_message_t *msg, isc_buffer_t *buf) {
 	for (i = 0; i < count; i++) {
 		result = isc_netaddr_totext(&prefix[i].addr, buf);
 		if (result != ISC_R_SUCCESS) {
-			return (result);
+			return result;
 		}
 		result = isc_buffer_printf(buf, "/%u\n", prefix[i].prefixlen);
 		if (result != ISC_R_SUCCESS) {
-			return (result);
+			return result;
 		}
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 /*%
@@ -547,9 +547,9 @@ short_answer(dns_message_t *msg, dns_messagetextflag_t flags, isc_buffer_t *buf,
 	dns_name_init(&empty_name, NULL);
 	result = dns_message_firstname(msg, DNS_SECTION_ANSWER);
 	if (result == ISC_R_NOMORE) {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	} else if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 
 	for (;;) {
@@ -564,7 +564,7 @@ short_answer(dns_message_t *msg, dns_messagetextflag_t flags, isc_buffer_t *buf,
 				dns_rdataset_current(rdataset, &rdata);
 				result = say_message(&rdata, query, buf);
 				if (result == ISC_R_NOSPACE) {
-					return (result);
+					return result;
 				}
 				check_result(result, "say_message");
 				loopresult = dns_rdataset_next(rdataset);
@@ -575,11 +575,11 @@ short_answer(dns_message_t *msg, dns_messagetextflag_t flags, isc_buffer_t *buf,
 		if (result == ISC_R_NOMORE) {
 			break;
 		} else if (result != ISC_R_SUCCESS) {
-			return (result);
+			return result;
 		}
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 static bool
@@ -597,10 +597,10 @@ isdotlocal(dns_message_t *msg) {
 		dns_name_t *name = NULL;
 		dns_message_currentname(msg, DNS_SECTION_QUESTION, &name);
 		if (dns_name_issubdomain(name, &local)) {
-			return (true);
+			return true;
 		}
 	}
-	return (false);
+	return false;
 }
 
 /*
@@ -717,8 +717,7 @@ printmessage(dig_query_t *query, const isc_buffer_t *msgbuf, dns_message_t *msg,
 		char *hash;
 		int pf;
 
-		printf("-\n");
-		printf("  type: MESSAGE\n");
+		printf("- type: MESSAGE\n");
 		printf("  message:\n");
 
 		if (isquery) {
@@ -994,7 +993,7 @@ repopulate_buffer:
 
 	dig_idnsetup(query->lookup, false);
 
-	return (result);
+	return result;
 }
 
 /*%
@@ -1178,7 +1177,7 @@ plus_option(char *option, bool is_batchfile, bool *need_clone,
 
 	if ((cmd = strtok_r(option, "=", &last)) == NULL) {
 		printf(";; Invalid option %s\n", option);
-		return (lookup);
+		return lookup;
 	}
 	if (strncasecmp(cmd, "no", 2) == 0) {
 		cmd += 2;
@@ -1481,9 +1480,12 @@ plus_option(char *option, bool is_batchfile, bool *need_clone,
 							     "specified");
 							goto exit_or_usage;
 						}
-						extra = strtok_r(NULL, "\0",
+						extra = strtok_r(NULL, "",
 								 &last);
 						save_opt(lookup, code, extra);
+						if (extra != NULL) {
+							extra[-1] = ':';
+						}
 						break;
 					default:
 						goto invalid_option;
@@ -2207,7 +2209,10 @@ plus_option(char *option, bool is_batchfile, bool *need_clone,
 		fprintf(stderr, "Invalid option: +%s\n", option);
 		usage();
 	}
-	return (lookup);
+	if (value != NULL) {
+		value[-1] = '=';
+	}
+	return lookup;
 
 #if !TARGET_OS_IPHONE
 exit_or_usage:
@@ -2253,7 +2258,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			} else {
 				fatal("can't find IPv4 networking");
 				UNREACHABLE();
-				return (false);
+				return false;
 			}
 			break;
 		case '6':
@@ -2263,7 +2268,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			} else {
 				fatal("can't find IPv6 networking");
 				UNREACHABLE();
-				return (false);
+				return false;
 			}
 			break;
 		case 'd':
@@ -2272,14 +2277,14 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 				cmd = option;
 				FULLCHECK("debug");
 				debugging = true;
-				return (false);
+				return false;
 			} else {
 				debugging = true;
 			}
 			break;
 		case 'h':
 			help();
-			exit(0);
+			exit(EXIT_SUCCESS);
 			break;
 		case 'i':
 			/* deprecated */
@@ -2299,13 +2304,13 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			break;
 		case 'v':
 			version();
-			exit(0);
+			exit(EXIT_SUCCESS);
 			break;
 		}
 		if (strlen(option) > 1U) {
 			option = &option[1];
 		} else {
-			return (false);
+			return false;
 		}
 	}
 	opt = option[0];
@@ -2349,7 +2354,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			*hash = '#';
 		}
 		specified_source = true;
-		return (value_from_next);
+		return value_from_next;
 	case 'c':
 		if ((*lookup)->rdclassset) {
 			fprintf(stderr, ";; Warning, extra class option\n");
@@ -2368,13 +2373,13 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 				"invalid class %s\n",
 				value);
 		}
-		return (value_from_next);
+		return value_from_next;
 	case 'f':
 		atomic_store(&batchname, (uintptr_t)value);
-		return (value_from_next);
+		return value_from_next;
 	case 'k':
 		strlcpy(keyfile, value, sizeof(keyfile));
-		return (value_from_next);
+		return value_from_next;
 	case 'p':
 		result = parse_uint(&num, value, MAXPORT, "port number");
 		if (result != ISC_R_SUCCESS) {
@@ -2382,7 +2387,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 		}
 		port = num;
 		port_set = true;
-		return (value_from_next);
+		return value_from_next;
 	case 'q':
 		if (!config_only) {
 			if (*need_clone) {
@@ -2401,7 +2406,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			ISC_LIST_APPEND(lookup_list, (*lookup), link);
 			debug("looking up %s", (*lookup)->textname);
 		}
-		return (value_from_next);
+		return value_from_next;
 	case 't':
 		*open_type_class = false;
 		if (strncasecmp(value, "ixfr=", 5) == 0) {
@@ -2459,7 +2464,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 				"invalid type %s\n",
 				value);
 		}
-		return (value_from_next);
+		return value_from_next;
 	case 'y':
 		if ((ptr = strtok_r(value, ":", &last)) == NULL) {
 			usage();
@@ -2468,8 +2473,8 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 								    * secret */
 			usage();
 		}
-		if ((ptr3 = strtok_r(NULL, ":", &last)) != NULL) { /* secret or
-								    * NULL */
+		if ((ptr3 = strtok_r(NULL, "", &last)) != NULL) { /* secret or
+								   * NULL */
 			parse_hmac(ptr);
 			ptr = ptr2;
 			ptr2 = ptr3;
@@ -2480,7 +2485,11 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 		/* XXXONDREJ: FIXME */
 		strlcpy(keynametext, ptr, sizeof(keynametext));
 		strlcpy(keysecret, ptr2, sizeof(keysecret));
-		return (value_from_next);
+		if (ptr3 != NULL) {
+			ptr[-1] = ':';
+		}
+		ptr2[-1] = ':';
+		return value_from_next;
 	case 'x':
 		if (*need_clone) {
 			*lookup = clone_lookup(default_lookup, true);
@@ -2508,16 +2517,16 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
 			ISC_LIST_APPEND(lookup_list, *lookup, link);
 		} else {
 			fprintf(stderr, "Invalid IP address %s\n", value);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
-		return (value_from_next);
+		return value_from_next;
 	invalid_option:
 	default:
 		fprintf(stderr, "Invalid option: -%s\n", option);
 		usage();
 	}
 	UNREACHABLE();
-	return (false);
+	return false;
 }
 
 /*%
@@ -2611,7 +2620,7 @@ split_batchline(char *batchline, char **bargv, int len, const char *msg) {
 	{
 		debug("%s %d: %s", msg, bargc, bargv[bargc]);
 	}
-	return (bargc);
+	return bargc;
 }
 
 static void
@@ -2965,8 +2974,7 @@ dig_error(const char *format, ...) {
 	va_list args;
 
 	if (yaml) {
-		printf("-\n");
-		printf("  type: DIG_ERROR\n");
+		printf("- type: DIG_ERROR\n");
 
 		/*
 		 * Print an indent before a literal block quote.
@@ -2983,10 +2991,7 @@ dig_error(const char *format, ...) {
 	va_start(args, format);
 	vprintf(format, args);
 	va_end(args);
-
-	if (!yaml) {
-		printf("\n");
-	}
+	printf("\n"); /* We get the error without a newline */
 }
 
 static void
@@ -3084,7 +3089,7 @@ void
 dig_shutdown(void) {
 	destroy_lookup(default_lookup);
 	if (atomic_load(&batchname) != 0) {
-		if (batchfp != stdin) {
+		if (batchfp != NULL && batchfp != stdin) {
 			fclose(batchfp);
 		}
 		atomic_store(&batchname, 0);
@@ -3102,5 +3107,5 @@ main(int argc, char **argv) {
 	dig_startup();
 	dig_shutdown();
 
-	return (exitcode);
+	return exitcode;
 }

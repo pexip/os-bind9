@@ -1014,7 +1014,7 @@ main(int argc, char **argv) {
 		default:
 			fprintf(stderr, "%s: unhandled option -%c\n", program,
 				isc_commandline_option);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -1118,8 +1118,8 @@ main(int argc, char **argv) {
 	isc_mem_destroy(&rndc_mctx);
 
 	if (failed) {
-		return (1);
+		return 1;
 	}
 
-	return (0);
+	return 0;
 }

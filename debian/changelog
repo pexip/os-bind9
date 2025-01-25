@@ -1,3 +1,12 @@
+bind9 (1:9.18.33-1~deb12u2) bookworm-security; urgency=high
+
+  * New upstream version 9.18.33
+   - CVE-2024-12705: DNS-over-HTTPS flooding fixes
+   - CVE-2024-11187: Limit additional section processing for large RDATA
+     sets
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 25 Jan 2025 11:14:58 +0100
+
 bind9 (1:9.18.28-1~deb12u2) bookworm-security; urgency=medium
 
   * Fix the assertion failure in samba-libs DLZ module. (Closes #1074378)

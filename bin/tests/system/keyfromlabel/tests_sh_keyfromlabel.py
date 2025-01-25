@@ -9,6 +9,24 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+import pytest
 
+import isctest.mark
+
+pytestmark = pytest.mark.extra_artifacts(
+    [
+        "*.example.db",
+        "*.example.db.signed",
+        "K*",
+        "dsset-*",
+        "keyfromlabel.out.*",
+        "pin",
+        "pkcs11-tool.out.*",
+        "signer.out.*",
+    ]
+)
+
+
+@isctest.mark.supported_openssl_version
 def test_keyfromlabel(run_tests_sh):
     run_tests_sh()

@@ -9,23 +9,15 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-from typing import Any, Optional
+import shutil
+from typing import Optional
 
 import dns.rcode
 import dns.message
 import dns.zone
 
 import isctest.log
-
-# compatiblity with dnspython<2.0.0
-try:
-    # In dnspython>=2.0.0, dns.rcode.Rcode class is available
-    # pylint: disable=invalid-name
-    dns_rcode = dns.rcode.Rcode  # type: Any
-except AttributeError:
-    # In dnspython<2.0.0, selected rcodes are available as integers directly
-    # from dns.rcode
-    dns_rcode = dns.rcode
+from isctest.compat import dns_rcode
 
 
 def rcode(message: dns.message.Message, expected_rcode) -> None:
@@ -34,6 +26,14 @@ def rcode(message: dns.message.Message, expected_rcode) -> None:
 
 def noerror(message: dns.message.Message) -> None:
     rcode(message, dns_rcode.NOERROR)
+
+
+def notimp(message: dns.message.Message) -> None:
+    rcode(message, dns_rcode.NOTIMP)
+
+
+def refused(message: dns.message.Message) -> None:
+    rcode(message, dns_rcode.REFUSED)
 
 
 def servfail(message: dns.message.Message) -> None:
@@ -95,3 +95,26 @@ def zones_equal(
                 )
                 assert found_rdataset
                 assert found_rdataset.ttl == rdataset.ttl
+
+
+def is_executable(cmd: str, errmsg: str) -> None:
+    executable = shutil.which(cmd)
+    assert executable is not None, errmsg
+
+
+def nxdomain(message: dns.message.Message) -> None:
+    rcode(message, dns.rcode.NXDOMAIN)
+
+
+def single_question(message: dns.message.Message) -> None:
+    assert len(message.question) == 1, str(message)
+
+
+def empty_answer(message: dns.message.Message) -> None:
+    assert not message.answer, str(message)
+
+
+def is_response_to(response: dns.message.Message, query: dns.message.Message) -> None:
+    single_question(response)
+    single_question(query)
+    assert query.is_response(response), str(response)

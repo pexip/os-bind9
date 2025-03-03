@@ -39,6 +39,11 @@ controls {
         inet 10.53.0.3 port @CONTROLPORT@ allow { any; } keys { rndc_key; };
 };
 
+zone "." {
+	type hint;
+	file "../../_common/root.hint.blackhole";
+};
+
 /* Zones that are getting initially signed */
 
 /* The default case: No keys created, using default policy. */
@@ -288,6 +293,16 @@ zone "expired-sigs.autosign" {
 };
 
 /*
+ * Zone that has DNSKEY TTL mismatch with the dnssec-policy.
+ */
+zone "dnskey-ttl-mismatch.autosign" {
+	type primary;
+	file "dnskey-ttl-mismatch.autosign.db";
+	inline-signing yes;
+	dnssec-policy "autosign";
+};
+
+/*
  * Zone that has valid, fresh signatures.
  */
 zone "fresh-sigs.autosign" {
@@ -303,6 +318,16 @@ zone "fresh-sigs.autosign" {
 zone "unfresh-sigs.autosign" {
 	type primary;
 	file "unfresh-sigs.autosign.db";
+	inline-signing yes;
+	dnssec-policy "autosign";
+};
+
+/*
+ * Zone that has missing key files.
+ */
+zone "keyfiles-missing.autosign" {
+	type primary;
+	file "keyfiles-missing.autosign.db";
 	inline-signing yes;
 	dnssec-policy "autosign";
 };

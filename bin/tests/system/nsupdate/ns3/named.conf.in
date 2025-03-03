@@ -26,6 +26,11 @@ options {
 	dnssec-validation yes;
 };
 
+zone "." {
+	type hint;
+	file "../../_common/root.hint.blackhole";
+};
+
 zone "example" {
 	type primary;
 	allow-update { any; };
@@ -63,6 +68,13 @@ zone "too-big.test" {
 	max-records 3;
 	file "too-big.test.db";
 };
+
+zone "many-updates.test" {
+	type primary;
+	allow-update { any; };
+	file "many-updates.test.db";
+};
+
 
 /* Zone for testing CDS and CDNSKEY updates from other provider */
 zone "multisigner.test" {

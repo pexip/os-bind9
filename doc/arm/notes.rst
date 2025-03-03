@@ -9,6 +9,8 @@
 .. See the COPYRIGHT file distributed with this work for additional
 .. information regarding copyright ownership.
 
+.. _relnotes:
+
 Release Notes
 =============
 
@@ -19,7 +21,8 @@ Introduction
 
 BIND 9.18 (Extended Support Version) is a stable branch of BIND. This
 document summarizes significant changes since the last production
-release on that branch.
+release on that branch. Please see the :ref:`changelog` file for
+a more detailed list of changes and bug fixes.
 
 Supported Platforms
 -------------------
@@ -33,8 +36,24 @@ The latest versions of BIND 9 software can always be found at
 https://www.isc.org/download/. There you will find additional
 information about each release, and source code.
 
-.. include:: ../notes/notes-known-issues.rst
+.. _relnotes_known_issues:
 
+Known Issues
+------------
+
+The list of known issues affecting the latest version in the 9.18 branch can be
+found at
+https://gitlab.isc.org/isc-projects/bind9/-/wikis/Known-Issues-in-BIND-9.18
+
+.. include:: ../notes/notes-9.18.33.rst
+.. include:: ../notes/notes-9.18.32.rst
+.. include:: ../notes/notes-9.18.31.rst
+.. include:: ../notes/notes-9.18.30.rst
+.. include:: ../notes/notes-9.18.29.rst
+.. include:: ../notes/notes-9.18.28.rst
+.. include:: ../notes/notes-9.18.27.rst
+.. include:: ../notes/notes-9.18.26.rst
+.. include:: ../notes/notes-9.18.25.rst
 .. include:: ../notes/notes-9.18.24.rst
 .. include:: ../notes/notes-9.18.23.rst
 .. include:: ../notes/notes-9.18.22.rst

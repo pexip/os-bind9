@@ -53,8 +53,7 @@ Unix style: # to end of line
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 acl <string> { <address_match_element>; ... }; // may occur multiple times
 
 controls {
@@ -78,6 +77,7 @@ dnssec\-policy <string> {
 	publish\-safety <duration>;
 	purge\-keys <duration>;
 	retire\-safety <duration>;
+	signatures\-jitter <duration>;
 	signatures\-refresh <duration>;
 	signatures\-validity <duration>;
 	signatures\-validity\-dnskey <duration>;
@@ -236,7 +236,10 @@ options {
 	max\-ixfr\-ratio ( unlimited | <percentage> );
 	max\-journal\-size ( default | unlimited | <sizeval> );
 	max\-ncache\-ttl <duration>;
+	max\-query\-count <integer>;
+	max\-query\-restarts <integer>;
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-recursion\-depth <integer>;
 	max\-recursion\-queries <integer>;
 	max\-refresh\-time <integer>;
@@ -247,6 +250,7 @@ options {
 	max\-transfer\-idle\-out <integer>;
 	max\-transfer\-time\-in <integer>;
 	max\-transfer\-time\-out <integer>;
+	max\-types\-per\-name <integer>;
 	max\-udp\-size <integer>;
 	max\-zone\-ttl ( unlimited | <duration> );
 	memstatistics <boolean>;
@@ -526,7 +530,10 @@ view <string> [ <class> ] {
 	max\-ixfr\-ratio ( unlimited | <percentage> );
 	max\-journal\-size ( default | unlimited | <sizeval> );
 	max\-ncache\-ttl <duration>;
+	max\-query\-count <integer>;
+	max\-query\-restarts <integer>;
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-recursion\-depth <integer>;
 	max\-recursion\-queries <integer>;
 	max\-refresh\-time <integer>;
@@ -536,6 +543,7 @@ view <string> [ <class> ] {
 	max\-transfer\-idle\-out <integer>;
 	max\-transfer\-time\-in <integer>;
 	max\-transfer\-time\-out <integer>;
+	max\-types\-per\-name <integer>;
 	max\-udp\-size <integer>;
 	max\-zone\-ttl ( unlimited | <duration> );
 	message\-compression <boolean>;
@@ -653,8 +661,7 @@ view <string> [ <class> ] {
 }; // may occur multiple times
 
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -662,8 +669,7 @@ Any of these zone statements can also be set inside the view statement.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type primary;
 	allow\-query { <address_match_element>; ... };
@@ -704,8 +710,10 @@ zone <string> [ <class> ] {
 	max\-ixfr\-ratio ( unlimited | <percentage> );
 	max\-journal\-size ( default | unlimited | <sizeval> );
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-transfer\-idle\-out <integer>;
 	max\-transfer\-time\-out <integer>;
+	max\-types\-per\-name <integer>;
 	max\-zone\-ttl ( unlimited | <duration> );
 	notify ( explicit | master\-only | primary\-only | <boolean> );
 	notify\-delay <integer>;
@@ -727,15 +735,13 @@ zone <string> [ <class> ] {
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type secondary;
 	allow\-notify { <address_match_element>; ... };
@@ -768,12 +774,14 @@ zone <string> [ <class> ] {
 	max\-ixfr\-ratio ( unlimited | <percentage> );
 	max\-journal\-size ( default | unlimited | <sizeval> );
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-refresh\-time <integer>;
 	max\-retry\-time <integer>;
 	max\-transfer\-idle\-in <integer>;
 	max\-transfer\-idle\-out <integer>;
 	max\-transfer\-time\-in <integer>;
 	max\-transfer\-time\-out <integer>;
+	max\-types\-per\-name <integer>;
 	min\-refresh\-time <integer>;
 	min\-retry\-time <integer>;
 	multi\-master <boolean>;
@@ -802,15 +810,13 @@ zone <string> [ <class> ] {
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type mirror;
 	allow\-notify { <address_match_element>; ... };
@@ -831,12 +837,14 @@ zone <string> [ <class> ] {
 	max\-ixfr\-ratio ( unlimited | <percentage> );
 	max\-journal\-size ( default | unlimited | <sizeval> );
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-refresh\-time <integer>;
 	max\-retry\-time <integer>;
 	max\-transfer\-idle\-in <integer>;
 	max\-transfer\-idle\-out <integer>;
 	max\-transfer\-time\-in <integer>;
 	max\-transfer\-time\-out <integer>;
+	max\-types\-per\-name <integer>;
 	min\-refresh\-time <integer>;
 	min\-retry\-time <integer>;
 	multi\-master <boolean>;
@@ -855,15 +863,13 @@ zone <string> [ <class> ] {
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type forward;
 	delegation\-only <boolean>; // deprecated
@@ -871,15 +877,13 @@ zone <string> [ <class> ] {
 	forwarders [ port <integer> ]  { ( <ipv4_address> | <ipv6_address> ) [ port <integer> ]; ... };
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type hint;
 	check\-names ( fail | warn | ignore );
@@ -887,15 +891,13 @@ zone <string> [ <class> ] {
 	file <quoted_string>;
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type redirect;
 	allow\-query { <address_match_element>; ... };
@@ -905,20 +907,20 @@ zone <string> [ <class> ] {
 	masterfile\-format ( raw | text );
 	masterfile\-style ( full | relative );
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
+	max\-types\-per\-name <integer>;
 	max\-zone\-ttl ( unlimited | <duration> );
 	primaries [ port <integer> ]  { ( <remote\-servers> | <ipv4_address> [ port <integer> ] | <ipv6_address> [ port <integer> ] ) [ key <string> ] [ tls <string> ]; ... };
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type static\-stub;
 	allow\-query { <address_match_element>; ... };
@@ -926,20 +928,20 @@ zone <string> [ <class> ] {
 	forward ( first | only );
 	forwarders [ port <integer> ]  { ( <ipv4_address> | <ipv6_address> ) [ port <integer> ]; ... };
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
+	max\-types\-per\-name <integer>;
 	server\-addresses { ( <ipv4_address> | <ipv6_address> ); ... };
 	server\-names { <string>; ... };
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type stub;
 	allow\-query { <address_match_element>; ... };
@@ -954,10 +956,12 @@ zone <string> [ <class> ] {
 	masterfile\-format ( raw | text );
 	masterfile\-style ( full | relative );
 	max\-records <integer>;
+	max\-records\-per\-type <integer>;
 	max\-refresh\-time <integer>;
 	max\-retry\-time <integer>;
 	max\-transfer\-idle\-in <integer>;
 	max\-transfer\-time\-in <integer>;
+	max\-types\-per\-name <integer>;
 	min\-refresh\-time <integer>;
 	min\-retry\-time <integer>;
 	multi\-master <boolean>;
@@ -968,34 +972,29 @@ zone <string> [ <class> ] {
 	zone\-statistics ( full | terse | none | <boolean> );
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	type delegation\-only;
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 zone <string> [ <class> ] {
 	in\-view <string>;
 };
 
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH FILES
@@ -1007,6 +1006,6 @@ zone <string> [ <class> ] {
 .SH AUTHOR
 Internet Systems Consortium
 .SH COPYRIGHT
-2024, Internet Systems Consortium
+2025, Internet Systems Consortium
 .\" Generated by docutils manpage writer.
 .

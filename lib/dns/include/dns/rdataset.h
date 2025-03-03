@@ -54,6 +54,8 @@
 #include <dns/rdatastruct.h>
 #include <dns/types.h>
 
+#define DNS_RDATASET_MAXADDITIONAL 13
+
 ISC_LANG_BEGINDECLS
 
 typedef enum {
@@ -148,11 +150,10 @@ struct dns_rdataset {
 
 #define DNS_RDATASET_COUNT_UNDEFINED UINT32_MAX
 
-#define DNS_RDATASET_INIT                                                  \
-	{                                                                  \
-		.magic = DNS_RDATASET_MAGIC, .link = ISC_LINK_INITIALIZER, \
-		.count = DNS_RDATASET_COUNT_UNDEFINED                      \
-	}
+#define DNS_RDATASET_INIT               \
+	{ .magic = DNS_RDATASET_MAGIC,  \
+	  .link = ISC_LINK_INITIALIZER, \
+	  .count = DNS_RDATASET_COUNT_UNDEFINED }
 
 /*!
  * \def DNS_RDATASETATTR_RENDERED
@@ -201,6 +202,7 @@ struct dns_rdataset {
 #define DNS_RDATASETATTR_ANCIENT      0x02000000
 #define DNS_RDATASETATTR_STALE_WINDOW 0x04000000
 #define DNS_RDATASETATTR_STALE_ADDED  0x08000000
+#define DNS_RDATASETATTR_STATICSTUB   0x20000000
 
 /*%
  * _OMITDNSSEC:
@@ -454,7 +456,8 @@ dns_rdataset_towirepartial(dns_rdataset_t   *rdataset,
 isc_result_t
 dns_rdataset_additionaldata(dns_rdataset_t	    *rdataset,
 			    const dns_name_t	    *owner_name,
-			    dns_additionaldatafunc_t add, void *arg);
+			    dns_additionaldatafunc_t add, void *arg,
+			    size_t limit);
 /*%<
  * For each rdata in rdataset, call 'add' for each name and type in the
  * rdata which is subject to additional section processing.
@@ -473,9 +476,14 @@ dns_rdataset_additionaldata(dns_rdataset_t	    *rdataset,
  *\li	If a call to dns_rdata_additionaldata() is not successful, the
  *	result returned will be the result of dns_rdataset_additionaldata().
  *
+ *\li	If 'limit' is non-zero and the number of the rdatasets is larger
+ *	than 'limit', no additional data will be processed.
+ *
  * Returns:
  *
  *\li	#ISC_R_SUCCESS
+ *
+ *\li	#DNS_R_TOOMANYRECORDS in case rdataset count is larger than 'limit'
  *
  *\li	Any error that dns_rdata_additionaldata() can return.
  */

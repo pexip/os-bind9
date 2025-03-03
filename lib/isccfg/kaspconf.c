@@ -45,10 +45,10 @@ static isc_result_t
 confget(cfg_obj_t const *const *maps, const char *name, const cfg_obj_t **obj) {
 	for (size_t i = 0;; i++) {
 		if (maps[i] == NULL) {
-			return (ISC_R_NOTFOUND);
+			return ISC_R_NOTFOUND;
 		}
 		if (cfg_map_get(maps[i], name, obj) == ISC_R_SUCCESS) {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 	}
 }
@@ -69,7 +69,7 @@ parse_duration(const char *str) {
 	if (result == ISC_R_SUCCESS) {
 		time = isccfg_duration_toseconds(&duration);
 	}
-	return (time);
+	return time;
 }
 
 /*
@@ -83,10 +83,10 @@ get_duration(const cfg_obj_t **maps, const char *option, const char *dfl) {
 
 	result = confget(maps, option, &obj);
 	if (result == ISC_R_NOTFOUND) {
-		return (parse_duration(dfl));
+		return parse_duration(dfl);
 	}
 	INSIST(result == ISC_R_SUCCESS);
-	return (cfg_obj_asduration(obj));
+	return cfg_obj_asduration(obj);
 }
 
 /*
@@ -102,7 +102,7 @@ cfg_kaspkey_fromconfig(const cfg_obj_t *config, dns_kasp_t *kasp,
 	/* Create a new key reference. */
 	result = dns_kasp_key_create(kasp, &key);
 	if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 
 	if (config == NULL) {
@@ -210,12 +210,12 @@ cfg_kaspkey_fromconfig(const cfg_obj_t *config, dns_kasp_t *kasp,
 	}
 
 	dns_kasp_addkey(kasp, key);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 cleanup:
 
 	dns_kasp_key_destroy(key);
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -262,7 +262,7 @@ cfg_nsec3param_fromconfig(const cfg_obj_t *config, dns_kasp_t *kasp,
 			obj, logctx, ISC_LOG_ERROR,
 			"dnssec-policy: cannot use nsec3 with algorithm '%s'",
 			algstr);
-		return (DNS_R_NSEC3BADALG);
+		return DNS_R_NSEC3BADALG;
 	}
 
 	if (iter > dns_nsec3_maxiterations()) {
@@ -274,7 +274,7 @@ cfg_nsec3param_fromconfig(const cfg_obj_t *config, dns_kasp_t *kasp,
 			    "dnssec-policy: nsec3 iterations value %u "
 			    "out of range",
 			    iter);
-		return (ret);
+		return ret;
 	}
 
 	/* Opt-out? */
@@ -292,11 +292,11 @@ cfg_nsec3param_fromconfig(const cfg_obj_t *config, dns_kasp_t *kasp,
 		cfg_obj_log(obj, logctx, ISC_LOG_ERROR,
 			    "dnssec-policy: nsec3 salt length %u too high",
 			    saltlen);
-		return (DNS_R_NSEC3SALTRANGE);
+		return DNS_R_NSEC3SALTRANGE;
 	}
 
 	dns_kasp_setnsec3param(kasp, iter, optout, saltlen);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 isc_result_t
@@ -312,7 +312,7 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 	const char *kaspname = NULL;
 	dns_kasp_t *kasp = NULL;
 	size_t i = 0;
-	uint32_t sigrefresh = 0, sigvalidity = 0;
+	uint32_t sigjitter = 0, sigrefresh = 0, sigvalidity = 0;
 	uint32_t dnskeyttl = 0, dsttl = 0, maxttl = 0;
 	uint32_t publishsafety = 0, retiresafety = 0;
 	uint32_t zonepropdelay = 0, parentpropdelay = 0;
@@ -336,17 +336,17 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 			"dnssec-policy: duplicately named policy found '%s'",
 			kaspname);
 		dns_kasp_detach(&kasp);
-		return (ISC_R_EXISTS);
+		return ISC_R_EXISTS;
 	}
 	if (result != ISC_R_NOTFOUND) {
-		return (result);
+		return result;
 	}
 
 	/* No kasp with configured name was found in list, create new one. */
 	INSIST(kasp == NULL);
 	result = dns_kasp_create(mctx, kaspname, &kasp);
 	if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 	INSIST(kasp != NULL);
 
@@ -360,6 +360,10 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 	maps[i] = NULL;
 
 	/* Configuration: Signatures */
+	sigjitter = get_duration(maps, "signatures-jitter",
+				 DNS_KASP_SIG_JITTER);
+	dns_kasp_setsigjitter(kasp, sigjitter);
+
 	sigrefresh = get_duration(maps, "signatures-refresh",
 				  DNS_KASP_SIG_REFRESH);
 	dns_kasp_setsigrefresh(kasp, sigrefresh);
@@ -376,6 +380,15 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 	}
 	dns_kasp_setsigvalidity_dnskey(kasp, sigvalidity);
 
+	if (sigjitter > sigvalidity) {
+		cfg_obj_log(
+			config, logctx, ISC_LOG_ERROR,
+			"dnssec-policy: policy '%s' signatures-jitter cannot "
+			"be larger than signatures-validity-dnskey",
+			kaspname);
+		result = ISC_R_FAILURE;
+	}
+
 	sigvalidity = get_duration(maps, "signatures-validity",
 				   DNS_KASP_SIG_VALIDITY);
 	if (sigrefresh >= (sigvalidity * 0.9)) {
@@ -387,6 +400,15 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 		result = ISC_R_FAILURE;
 	}
 	dns_kasp_setsigvalidity(kasp, sigvalidity);
+
+	if (sigjitter > sigvalidity) {
+		cfg_obj_log(
+			config, logctx, ISC_LOG_ERROR,
+			"dnssec-policy: policy '%s' signatures-jitter cannot "
+			"be larger than signatures-validity",
+			kaspname);
+		result = ISC_R_FAILURE;
+	}
 
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
@@ -566,11 +588,11 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
 	dns_kasp_attach(kasp, kaspp);
 
 	/* Don't detach as kasp is on '*kasplist' */
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 cleanup:
 
 	/* Something bad happened, detach (destroys kasp) and return error. */
 	dns_kasp_detach(&kasp);
-	return (result);
+	return result;
 }

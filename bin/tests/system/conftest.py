@@ -10,7 +10,7 @@
 # information regarding copyright ownership.
 
 from functools import partial
-import logging
+import filecmp
 import os
 from pathlib import Path
 import re
@@ -22,8 +22,9 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-
 pytest.register_assert_rewrite("isctest")
+
+import isctest
 
 
 # Silence warnings caused by passing a pytest fixture to another fixture.
@@ -46,7 +47,6 @@ else:
 
 # ----------------------- Globals definition -----------------------------
 
-LOG_FORMAT = "%(asctime)s %(levelname)7s:%(name)s  %(message)s"
 XDIST_WORKER = os.environ.get("PYTEST_XDIST_WORKER", "")
 FILE_DIR = os.path.abspath(Path(__file__).parent)
 ENV_RE = re.compile(b"([^=]+)=(.*)")
@@ -63,44 +63,11 @@ PRIORITY_TESTS = [
     "upforwd/",
 ]
 PRIORITY_TESTS_RE = re.compile("|".join(PRIORITY_TESTS))
-CONFTEST_LOGGER = logging.getLogger("conftest")
 SYSTEM_TEST_DIR_GIT_PATH = "bin/tests/system"
 SYSTEM_TEST_NAME_RE = re.compile(f"{SYSTEM_TEST_DIR_GIT_PATH}" + r"/([^/]+)")
 SYMLINK_REPLACEMENT_RE = re.compile(r"/tests(_.*)\.py")
 
 # ---------------------- Module initialization ---------------------------
-
-
-def init_pytest_conftest_logger(conftest_logger):
-    """
-    This initializes the conftest logger which is used for pytest setup
-    and configuration before tests are executed -- aka any logging in this
-    file that is _not_ module-specific.
-    """
-    conftest_logger.setLevel(logging.DEBUG)
-    file_handler = logging.FileHandler("pytest.conftest.log.txt")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    conftest_logger.addHandler(file_handler)
-
-
-init_pytest_conftest_logger(CONFTEST_LOGGER)
-
-
-def avoid_duplicated_logs():
-    """
-    Remove direct root logger output to file descriptors.
-    This default is causing duplicates because all our messages go through
-    regular logging as well and are thus displayed twice.
-    """
-    todel = []
-    for handler in logging.root.handlers:
-        if handler.__class__ == logging.StreamHandler:
-            # Beware: As for pytest 7.2.2, LiveLogging and LogCapture
-            # handlers inherit from logging.StreamHandler
-            todel.append(handler)
-    for handler in todel:
-        logging.root.handlers.remove(handler)
 
 
 def parse_env(env_bytes):
@@ -127,7 +94,7 @@ def get_env_bytes(cmd):
             stdout=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as exc:
-        CONFTEST_LOGGER.error("failed to get shell env: %s", exc)
+        isctest.log.error("failed to get shell env: %s", exc)
         raise exc
     env_bytes = proc.stdout
     return parse_env(env_bytes)
@@ -137,7 +104,7 @@ def get_env_bytes(cmd):
 # FUTURE: Remove conf.sh entirely and define all variables in pytest only.
 CONF_ENV = get_env_bytes(". ./conf.sh && env")
 os.environb.update(CONF_ENV)
-CONFTEST_LOGGER.debug("variables in env: %s", ", ".join([str(key) for key in CONF_ENV]))
+isctest.log.debug("variables in env: %s", ", ".join([str(key) for key in CONF_ENV]))
 
 # --------------------------- pytest hooks -------------------------------
 
@@ -161,7 +128,7 @@ def pytest_configure(config):
             try:
                 import xdist.scheduler.loadscope  # pylint: disable=unused-import
             except ImportError:
-                CONFTEST_LOGGER.debug(
+                isctest.log.debug(
                     "xdist is too old and does not have "
                     "scheduler.loadscope, disabling parallelism"
                 )
@@ -181,7 +148,7 @@ def pytest_ignore_collect(path):
     # is otherwise and invalid character for a system test name.
     match = SYSTEM_TEST_NAME_RE.search(str(path))
     if match is None:
-        CONFTEST_LOGGER.warning("unexpected test path: %s (ignored)", path)
+        isctest.log.warning("unexpected test path: %s (ignored)", path)
         return True
     system_test_name = match.groups()[0]
     return "_" in system_test_name
@@ -201,16 +168,25 @@ def pytest_collection_modifyitems(items):
 
 class NodeResult:
     def __init__(self, report=None):
-        self.outcome = None
-        self.messages = []
+        self._outcomes = {}
+        self.messages = {}
         if report is not None:
             self.update(report)
 
     def update(self, report):
-        if self.outcome is None or report.outcome != "passed":
-            self.outcome = report.outcome
-        if report.longreprtext:
-            self.messages.append(report.longreprtext)
+        # Allow the same nodeid/when to be overriden. This only happens when
+        # the test is re-run with flaky plugin. In that case, we want the
+        # latest result to override any previous results.
+        key = (report.nodeid, report.when)
+        self._outcomes[key] = report.outcome
+        self.messages[key] = report.longreprtext
+
+    @property
+    def outcome(self):
+        for outcome in self._outcomes.values():
+            if outcome != "passed":
+                return outcome
+        return "passed"
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -349,31 +325,73 @@ def system_test_name(request):
     return path.parent.name
 
 
-@pytest.fixture(scope="module")
-def mlogger(system_test_name):
-    """Logging facility specific to this test module."""
-    avoid_duplicated_logs()
-    return logging.getLogger(system_test_name)
+def _get_marker(node, marker):
+    try:
+        # pytest >= 4.x
+        return node.get_closest_marker(marker)
+    except AttributeError:
+        # pytest < 4.x
+        return node.get_marker(marker)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
+def wait_for_zones_loaded(request, servers):
+    """Wait for all zones to be loaded by specified named instances."""
+    instances = _get_marker(request.node, "requires_zones_loaded")
+    if not instances:
+        return
+
+    for instance in instances.args:
+        with servers[instance].watch_log_from_start() as watcher:
+            watcher.wait_for_line("all zones loaded")
+
+
+@pytest.fixture(autouse=True)
 def logger(request, system_test_name):
-    """Logging facility specific to a particular test."""
-    return logging.getLogger(f"{system_test_name}.{request.node.name}")
+    """Sets up logging facility specific to a particular test."""
+    isctest.log.init_test_logger(system_test_name, request.node.name)
+    yield
+    isctest.log.deinit_test_logger()
 
 
 @pytest.fixture(scope="module")
-def system_test_dir(
-    request, env, system_test_name, mlogger
-):  # pylint: disable=too-many-statements,too-many-locals
+def expected_artifacts(request):
+    common_artifacts = [
+        ".libs/*",  # possible build artifacts, see GL #5055
+        "ns*/named.conf",
+        "ns*/named.lock",
+        "ns*/named.memstats",
+        "ns*/named.run",
+        "ns*/named.run.prev",
+        "pytest.log.txt",
+    ]
+
+    if "USE_RR" in os.environ:
+        common_artifacts += [
+            "ns*/cpu_lock",
+            "ns*/latest-trace",
+            "ns*/named-[0-9]*",
+        ]
+
+    try:
+        test_specific_artifacts = request.node.get_closest_marker("extra_artifacts")
+    except AttributeError:
+        return None
+
+    if test_specific_artifacts:
+        return common_artifacts + test_specific_artifacts.args[0]
+
+    return common_artifacts
+
+
+@pytest.fixture(scope="module")
+def system_test_dir(request, env, system_test_name, expected_artifacts):
     """
     Temporary directory for executing the test.
 
     This fixture is responsible for creating (and potentially removing) a
     copy of the system test directory which is used as a temporary
     directory for the test execution.
-
-    FUTURE: This removes the need to have clean.sh scripts.
     """
 
     def get_test_result():
@@ -384,7 +402,7 @@ def system_test_dir(
         except AttributeError:
             # This may happen if pytest execution is interrupted and
             # pytest_runtest_makereport() is never called.
-            mlogger.debug("can't obtain test results, test run was interrupted")
+            isctest.log.debug("can't obtain test results, test run was interrupted")
             return "error"
         test_results = {
             node.nodeid: all_test_results[node.nodeid]
@@ -394,10 +412,10 @@ def system_test_dir(
         assert len(test_results)
         messages = []
         for node, result in test_results.items():
-            mlogger.debug("%s %s", result.outcome.upper(), node)
-            messages.extend(result.messages)
+            isctest.log.debug("%s %s", result.outcome.upper(), node)
+            messages.extend(result.messages.values())
         for message in messages:
-            mlogger.debug("\n" + message)
+            isctest.log.debug("\n" + message)
         failed = any(res.outcome == "failed" for res in test_results.values())
         skipped = any(res.outcome == "skipped" for res in test_results.values())
         if failed:
@@ -413,6 +431,39 @@ def system_test_dir(
         except FileNotFoundError:
             pass
 
+    def check_artifacts(source_dir, run_dir):
+        def check_artifacts_recursive(dcmp):
+            def artifact_expected(path, expected):
+                for glob in expected:
+                    if path.match(glob):
+                        return True
+                return False
+
+            # test must not remove any Git-tracked file, ignore libtool and gcov artifacts
+            for name in dcmp.left_only:
+                path = Path(name)
+                assert path.name.startswith("lt-") or path.suffix == ".gcda"
+            assert not dcmp.diff_files, "test must not modify any Git-tracked file"
+
+            dir_path = Path(dcmp.left).relative_to(source_dir)
+            for name in dcmp.right_only:
+                file = dir_path / Path(name)
+                if not artifact_expected(file, expected_artifacts):
+                    unexpected_files.append(str(file))
+            for subdir in dcmp.subdirs.values():
+                check_artifacts_recursive(subdir)
+
+        if expected_artifacts is None:  # skip the check if artifact list is unavailable
+            return
+
+        unexpected_files = []
+        dcmp = filecmp.dircmp(source_dir, run_dir)
+        check_artifacts_recursive(dcmp)
+
+        assert (
+            not unexpected_files
+        ), f"Unexpected files found in test directory: {unexpected_files}"
+
     # Create a temporary directory with a copy of the original system test dir contents
     system_test_root = Path(f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}")
     testdir = Path(
@@ -422,65 +473,67 @@ def system_test_dir(
     shutil.copytree(system_test_root / system_test_name, testdir)
 
     # Create a convenience symlink with a stable and predictable name
-    module_name = SYMLINK_REPLACEMENT_RE.sub(r"\1", request.node.name)
+    module_name = SYMLINK_REPLACEMENT_RE.sub(r"\1", str(_get_node_path(request.node)))
     symlink_dst = system_test_root / module_name
     unlink(symlink_dst)
     symlink_dst.symlink_to(os.path.relpath(testdir, start=system_test_root))
 
-    # Configure logger to write to a file inside the temporary test directory
-    mlogger.handlers.clear()
-    mlogger.setLevel(logging.DEBUG)
-    handler = logging.FileHandler(testdir / "pytest.log.txt", mode="w")
-    formatter = logging.Formatter(LOG_FORMAT)
-    handler.setFormatter(formatter)
-    mlogger.addHandler(handler)
+    isctest.log.init_module_logger(system_test_name, testdir)
 
     # System tests are meant to be executed from their directory - switch to it.
     old_cwd = os.getcwd()
     os.chdir(testdir)
-    mlogger.debug("switching to tmpdir: %s", testdir)
+    isctest.log.info("switching to tmpdir: %s", testdir)
     try:
         yield testdir  # other fixtures / tests will execute here
     finally:
         os.chdir(old_cwd)
-        mlogger.debug("changed workdir to: %s", old_cwd)
+        isctest.log.debug("changed workdir to: %s", old_cwd)
 
         result = get_test_result()
+
+        if result == "passed":
+            check_artifacts(system_test_root / system_test_name, testdir)
 
         # Clean temporary dir unless it should be kept
         keep = False
         if request.config.getoption("--noclean"):
-            mlogger.debug(
+            isctest.log.debug(
                 "--noclean requested, keeping temporary directory %s", testdir
             )
             keep = True
         elif result == "failed":
-            mlogger.debug(
+            isctest.log.debug(
                 "test failure detected, keeping temporary directory %s", testdir
             )
             keep = True
         elif not request.node.stash[FIXTURE_OK]:
-            mlogger.debug(
+            isctest.log.debug(
                 "test setup/teardown issue detected, keeping temporary directory %s",
                 testdir,
             )
             keep = True
 
         if keep:
-            mlogger.info(
+            isctest.log.info(
                 "test artifacts in: %s", symlink_dst.relative_to(system_test_root)
             )
         else:
-            mlogger.debug("deleting temporary directory")
-            handler.flush()
-            handler.close()
+            isctest.log.debug("deleting temporary directory")
+
+        isctest.log.deinit_module_logger()
+        if not keep:
             shutil.rmtree(testdir)
             unlink(symlink_dst)
 
 
-def _run_script(  # pylint: disable=too-many-arguments
+@pytest.fixture(scope="module")
+def templates(system_test_dir: Path, env):
+    return isctest.template.TemplateEngine(system_test_dir, env)
+
+
+def _run_script(
     env,
-    mlogger,
     system_test_dir: Path,
     interpreter: str,
     script: str,
@@ -497,8 +550,8 @@ def _run_script(  # pylint: disable=too-many-arguments
     cwd = os.getcwd()
     if not path.exists():
         raise FileNotFoundError(f"script {script} not found in {cwd}")
-    mlogger.debug("running script: %s %s %s", interpreter, script, " ".join(args))
-    mlogger.debug("  workdir: %s", cwd)
+    isctest.log.debug("running script: %s %s %s", interpreter, script, " ".join(args))
+    isctest.log.debug("  workdir: %s", cwd)
     returncode = 1
 
     cmd = [interpreter, script] + args
@@ -513,24 +566,33 @@ def _run_script(  # pylint: disable=too-many-arguments
     ) as proc:
         if proc.stdout:
             for line in proc.stdout:
-                mlogger.info("    %s", line.rstrip("\n"))
+                isctest.log.info("    %s", line.rstrip("\n"))
         proc.communicate()
         returncode = proc.returncode
         if returncode:
             raise subprocess.CalledProcessError(returncode, cmd)
-        mlogger.debug("  exited with %d", returncode)
+        isctest.log.debug("  exited with %d", returncode)
+
+
+def _get_node_path(node) -> Path:
+    if isinstance(node.parent, pytest.Session):
+        if _pytest_major_ver >= 8:
+            return Path()
+        return Path(node.name)
+    assert node.parent is not None
+    return _get_node_path(node.parent) / node.name
 
 
 @pytest.fixture(scope="module")
-def shell(env, system_test_dir, mlogger):
+def shell(env, system_test_dir):
     """Function to call a shell script with arguments."""
-    return partial(_run_script, env, mlogger, system_test_dir, env["SHELL"])
+    return partial(_run_script, env, system_test_dir, env["SHELL"])
 
 
 @pytest.fixture(scope="module")
-def perl(env, system_test_dir, mlogger):
+def perl(env, system_test_dir):
     """Function to call a perl script with arguments."""
-    return partial(_run_script, env, mlogger, system_test_dir, env["PERL"])
+    return partial(_run_script, env, system_test_dir, env["PERL"])
 
 
 @pytest.fixture(scope="module")
@@ -544,11 +606,11 @@ def run_tests_sh(system_test_dir, shell):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def system_test(  # pylint: disable=too-many-arguments,too-many-statements
+def system_test(
     request,
     env: Dict[str, str],
-    mlogger,
     system_test_dir,
+    templates,
     shell,
     perl,
 ):
@@ -578,7 +640,7 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
         try:
             perl("testsock.pl", ["-p", env["PORT"]])
         except subprocess.CalledProcessError as exc:
-            mlogger.error("testsock.pl: exited with code %d", exc.returncode)
+            isctest.log.error("testsock.pl: exited with code %d", exc.returncode)
             pytest.skip("Network interface aliases not set up.")
 
     def check_prerequisites():
@@ -590,26 +652,27 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
             pytest.skip("Prerequisites missing.")
 
     def setup_test():
+        templates.render_auto()
         try:
             shell(f"{system_test_dir}/setup.sh")
         except FileNotFoundError:
             pass  # setup.sh is optional
         except subprocess.CalledProcessError as exc:
-            mlogger.error("Failed to run test setup")
+            isctest.log.error("Failed to run test setup")
             pytest.fail(f"setup.sh exited with {exc.returncode}")
 
     def start_servers():
         try:
             perl("start.pl", ["--port", env["PORT"], system_test_dir.name])
         except subprocess.CalledProcessError as exc:
-            mlogger.error("Failed to start servers")
+            isctest.log.error("Failed to start servers")
             pytest.fail(f"start.pl exited with {exc.returncode}")
 
     def stop_servers():
         try:
             perl("stop.pl", [system_test_dir.name])
         except subprocess.CalledProcessError as exc:
-            mlogger.error("Failed to stop servers")
+            isctest.log.error("Failed to stop servers")
             get_core_dumps()
             pytest.fail(f"stop.pl exited with {exc.returncode}")
 
@@ -617,13 +680,13 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
         try:
             shell("get_core_dumps.sh", [system_test_dir.name])
         except subprocess.CalledProcessError as exc:
-            mlogger.error("Found core dumps or sanitizer reports")
+            isctest.log.error("Found core dumps or sanitizer reports")
             pytest.fail(f"get_core_dumps.sh exited with {exc.returncode}")
 
     os.environ.update(env)  # Ensure pytests have the same env vars as shell tests.
-    mlogger.info(f"test started: {request.node.name}")
+    isctest.log.info(f"test started: {_get_node_path(request.node)}")
     port = int(env["PORT"])
-    mlogger.info("using port range: <%d, %d>", port, port + PORTS_PER_TEST - 1)
+    isctest.log.info("using port range: <%d, %d>", port, port + PORTS_PER_TEST - 1)
 
     if not hasattr(request.node, "stash"):  # compatibility with pytest<7.0.0
         request.node.stash = {}  # use regular dict instead of pytest.Stash
@@ -641,10 +704,28 @@ def system_test(  # pylint: disable=too-many-arguments,too-many-statements
     setup_test()
     try:
         start_servers()
-        mlogger.debug("executing test(s)")
+        isctest.log.debug("executing test(s)")
         yield
     finally:
-        mlogger.debug("test(s) finished")
+        isctest.log.debug("test(s) finished")
         stop_servers()
         get_core_dumps()
         request.node.stash[FIXTURE_OK] = True
+
+
+@pytest.fixture
+def servers(ports, system_test_dir):
+    instances = {}
+    for entry in system_test_dir.rglob("*"):
+        if entry.is_dir():
+            try:
+                dir_name = entry.name
+                # LATER: Make ports fixture return NamedPorts directly
+                named_ports = isctest.instance.NamedPorts(
+                    dns=int(ports["PORT"]), rndc=int(ports["CONTROLPORT"])
+                )
+                instance = isctest.instance.NamedInstance(dir_name, named_ports)
+                instances[dir_name] = instance
+            except ValueError:
+                continue
+    return instances

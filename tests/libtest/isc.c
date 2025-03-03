@@ -41,6 +41,7 @@ isc_timermgr_t *timermgr = NULL;
 isc_nm_t *netmgr = NULL;
 unsigned int workers = 0;
 isc_task_t *maintask = NULL;
+bool debug = false;
 
 int
 setup_managers(void **state) {
@@ -63,17 +64,17 @@ setup_managers(void **state) {
 	result = isc_managers_create(mctx, workers, 0, &netmgr, &taskmgr,
 				     &timermgr);
 	if (result != ISC_R_SUCCESS) {
-		return (-1);
+		return -1;
 	}
 
 	result = isc_task_create_bound(taskmgr, 0, &maintask, 0);
 	if (result != ISC_R_SUCCESS) {
-		return (-1);
+		return -1;
 	}
 
 	isc_taskmgr_setexcltask(taskmgr, maintask);
 
-	return (0);
+	return 0;
 }
 
 int
@@ -83,5 +84,5 @@ teardown_managers(void **state) {
 	isc_task_detach(&maintask);
 	isc_managers_destroy(&netmgr, &taskmgr, &timermgr);
 
-	return (0);
+	return 0;
 }

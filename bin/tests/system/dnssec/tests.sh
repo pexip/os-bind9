@@ -3672,6 +3672,18 @@ n=$((n + 1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status + ret))
 
+# Check that a query for a domain that has a KSK that is not actively signing
+# the DNSKEY RRset. This should not result in a broken trust chain if there is
+# another KSK that is signing the DNSKEY RRset.
+echo_i "checking that a secure chain with one active and one inactive KSK validates as secure ($n)"
+ret=0
+dig_with_opts @10.53.0.4 a.lazy-ksk A >dig.out.ns4.test$n
+grep "status: NOERROR," dig.out.ns4.test$n >/dev/null || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+test "$ret" -eq 0 || echo_i "failed"
+status=$((status + ret))
+
 # TODO: test case for GL #1689.
 # If we allow the dnssec tools to use deprecated algorithms (such as RSAMD5)
 # we could write a test that signs a zone with supported and unsupported
@@ -3945,9 +3957,9 @@ ret=0
 dig_with_opts any x.insecure.example. @10.53.0.3 >dig.out.ns3.1.test$n || ret=1
 grep "status: NOERROR" dig.out.ns3.1.test$n >/dev/null || ret=1
 grep "ANSWER: 0," dig.out.ns3.1.test$n >/dev/null || ret=1
-dig_with_opts any zz.secure.example. @10.53.0.3 >dig.out.ns3.2.test$n || ret=1
+dig_with_opts any z.secure.example. @10.53.0.3 >dig.out.ns3.2.test$n || ret=1
 grep "status: NOERROR" dig.out.ns3.2.test$n >/dev/null || ret=1
-# DNSKEY+RRSIG, NSEC+RRSIG
+# A+RRSIG, NSEC+RRSIG
 grep "ANSWER: 4," dig.out.ns3.2.test$n >/dev/null || ret=1
 n=$((n + 1))
 test "$ret" -eq 0 || echo_i "failed"
@@ -4452,6 +4464,35 @@ dig_with_opts @10.53.0.4 a.insecure2.example. a >dig.out.ns4.test$n || ret=1
 grep "ANSWER: 1, AUTHORITY: 1, " dig.out.ns4.test$n >/dev/null || ret=1
 grep "flags: qr rd ra;" dig.out.ns4.test$n >/dev/null || ret=1
 grep "status: NOERROR" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "checking that records other than DNSKEY are not signed by a revoked key by dnssec-signzone ($n)"
+ret=0
+(
+  cd signer || exit 0
+  key1=$(${KEYGEN} -a "${DEFAULT_ALGORITHM}" -f KSK revoke.example)
+  key2=$(${KEYGEN} -a "${DEFAULT_ALGORITHM}" -f KSK revoke.example)
+  key3=$(${KEYGEN} -a "${DEFAULT_ALGORITHM}" revoke.example)
+  rkey=$(${REVOKE} "$key2")
+  cat >>revoke.example.db <<EOF
+\$TTL 3600
+@ SOA . . 0 0 0 0 3600
+@ NS .
+\$INCLUDE "${key1}.key"
+\$INCLUDE "${rkey}.key"
+\$INCLUDE "${key3}.key"
+EOF
+  "${DSFROMKEY}" -C "$key1" >>revoke.example.db
+  "${SIGNER}" -o revoke.example revoke.example.db >signer.out.$n
+) || ret=1
+keycount=$(grep -c "RRSIG.DNSKEY ${DEFAULT_ALGORITHM_NUMBER} " signer/revoke.example.db.signed)
+cdscount=$(grep -c "RRSIG.CDS ${DEFAULT_ALGORITHM_NUMBER} " signer/revoke.example.db.signed)
+soacount=$(grep -c "RRSIG.SOA ${DEFAULT_ALGORITHM_NUMBER} " signer/revoke.example.db.signed)
+[ $keycount -eq 3 ] || ret=1
+[ $cdscount -eq 2 ] || ret=1
+[ $soacount -eq 1 ] || ret=1
 n=$((n + 1))
 if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
 status=$((status + ret))

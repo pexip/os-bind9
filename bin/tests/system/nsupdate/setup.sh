@@ -13,11 +13,6 @@
 
 . ../conf.sh
 
-#
-# jnl and database files MUST be removed before we start
-#
-$SHELL clean.sh
-
 copy_setports ns1/named.conf.in ns1/named.conf
 copy_setports ns2/named.conf.in ns2/named.conf
 copy_setports ns3/named.conf.in ns3/named.conf
@@ -107,6 +102,7 @@ cp ns2/sample.db.in ns2/sample.db
 cp -f ns1/maxjournal.db.in ns1/maxjournal.db
 
 cp -f ns5/local.db.in ns5/local.db
+cp -f ns6/2.0.0.2.ip6.addr.db.in ns6/2.0.0.2.ip6.addr.db
 cp -f ns6/in-addr.db.in ns6/in-addr.db
 cp -f ns7/in-addr.db.in ns7/in-addr.db
 cp -f ns7/example.com.db.in ns7/example.com.db

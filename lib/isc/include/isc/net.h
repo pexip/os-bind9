@@ -79,21 +79,13 @@
 #ifndef IN6ADDR_LOOPBACK_INIT
 #ifdef s6_addr
 /*% IPv6 address loopback init */
-#define IN6ADDR_LOOPBACK_INIT                                                  \
-	{                                                                      \
-		{                                                              \
-			{                                                      \
-				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 \
-			}                                                      \
-		}                                                              \
-	}
-#else /* ifdef s6_addr */
 #define IN6ADDR_LOOPBACK_INIT                                          \
 	{                                                              \
-		{                                                      \
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 \
-		}                                                      \
+		{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 } } \
 	}
+#else /* ifdef s6_addr */
+#define IN6ADDR_LOOPBACK_INIT \
+	{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 } }
 #endif /* ifdef s6_addr */
 #endif /* ifndef IN6ADDR_LOOPBACK_INIT */
 
@@ -102,20 +94,11 @@
 /*% IPv6 v4mapped prefix init */
 #define IN6ADDR_V4MAPPED_INIT                                                \
 	{                                                                    \
-		{                                                            \
-			{                                                    \
-				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, \
-					0, 0, 0                              \
-			}                                                    \
-		}                                                            \
+		{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0, 0 } } \
 	}
 #else /* ifdef s6_addr */
-#define IN6ADDR_V4MAPPED_INIT                                                \
-	{                                                                    \
-		{                                                            \
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0, 0 \
-		}                                                            \
-	}
+#define IN6ADDR_V4MAPPED_INIT \
+	{ { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0, 0 } }
 #endif /* ifdef s6_addr */
 #endif /* ifndef IN6ADDR_V4MAPPED_INIT */
 

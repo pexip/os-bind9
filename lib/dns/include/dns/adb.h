@@ -210,6 +210,10 @@ struct dns_adbfind {
  *	Don't perform a fetch even if there are no address records available.
  */
 #define DNS_ADBFIND_NOFETCH 0x00000800
+/*%
+ *	Only look for glue record for static stub.
+ */
+#define DNS_ADBFIND_STATICSTUB 0x00001000
 
 /*%
  * The answers to queries come back as a list of these.
@@ -337,7 +341,8 @@ dns_adb_createfind(dns_adb_t *adb, isc_task_t *task, isc_taskaction_t action,
 		   void *arg, const dns_name_t *name, const dns_name_t *qname,
 		   dns_rdatatype_t qtype, unsigned int options,
 		   isc_stdtime_t now, dns_name_t *target, in_port_t port,
-		   unsigned int depth, isc_counter_t *qc, dns_adbfind_t **find);
+		   unsigned int depth, isc_counter_t *qc, isc_counter_t *gqc,
+		   dns_adbfind_t **find);
 /*%<
  * Main interface for clients. The adb will look up the name given in
  * "name" and will build up a list of found addresses, and perhaps start

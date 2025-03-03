@@ -42,7 +42,8 @@ isc_stdtime_get(isc_stdtime_t *t) {
 		FATAL_SYSERROR(errno, "clock_gettime()");
 	}
 
-	REQUIRE(ts.tv_sec > 0 && ts.tv_nsec >= 0 && ts.tv_nsec < NS_PER_SEC);
+	REQUIRE(ts.tv_sec > 0 && ts.tv_nsec >= 0 &&
+		ts.tv_nsec < (long)NS_PER_SEC);
 
 	*t = (isc_stdtime_t)ts.tv_sec;
 }
@@ -58,6 +59,6 @@ isc_stdtime_tostring(isc_stdtime_t t, char *out, size_t outlen) {
 
 	/* time_t and isc_stdtime_t might be different sizes */
 	when = t;
-	INSIST((ctime_r(&when, out) != NULL));
+	INSIST(ctime_r(&when, out) != NULL);
 	*(out + strlen(out) - 1) = '\0';
 }

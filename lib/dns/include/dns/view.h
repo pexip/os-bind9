@@ -191,6 +191,10 @@ struct dns_view {
 	dns_dlzdblist_t	  dlz_unsearched;
 	uint32_t	  fail_ttl;
 	dns_badcache_t	 *failcache;
+	uint32_t	  maxrrperset;
+	uint32_t	  maxtypepername;
+	uint16_t	  max_queries;
+	uint8_t		  max_restarts;
 
 	/*
 	 * Configurable data for server use only,
@@ -1411,6 +1415,42 @@ dns_view_sfd_find(dns_view_t *view, const dns_name_t *name,
  *\li	'view' to be valid.
  *\li	'name' to be valid.
  *\li	'foundname' to be valid with a buffer sufficient to hold the name.
+ */
+
+void
+dns_view_setmaxrrperset(dns_view_t *view, uint32_t value);
+/*%<
+ * Set the maximum resource records per RRSet that can be cached.
+ */
+
+void
+dns_view_setmaxtypepername(dns_view_t *view, uint32_t value);
+/*%<
+ * Set the maximum resource record types per owner name that can be cached.
+ */
+
+void
+dns_view_setmaxrestarts(dns_view_t *view, uint8_t max_restarts);
+/*%<
+ * Set the number of permissible chained queries before we give up,
+ * to prevent CNAME loops. This defaults to 11.
+ *
+ * Requires:
+ *
+ *\li	'view' is valid;
+ *\li	'max_restarts' is greater than 0.
+ */
+
+void
+dns_view_setmaxqueries(dns_view_t *view, uint16_t max_queries);
+/*%
+ * Set the number of permissible outgoing queries before we give up.
+ * This defaults to 200.
+ *
+ * Requires:
+ *
+ *\li	'view' is valid;
+ *\li	'max_queries' is greater than 0.
  */
 
 ISC_LANG_ENDDECLS

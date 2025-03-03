@@ -5,6 +5,7 @@ EXTRA_DIST =					\
 	advanced.inc.rst			\
 	build.inc.rst				\
 	catz.inc.rst				\
+	changelog.rst				\
 	chapter10.rst				\
 	chapter1.rst				\
 	chapter2.rst				\
@@ -51,7 +52,6 @@ EXTRA_DIST =					\
 	recursive-query.png			\
 	reference.rst				\
 	requirements.inc.rst			\
-	requirements.txt			\
 	resolver-forward.dia			\
 	resolver-forward.png			\
 	rpz.inc.rst				\
@@ -66,6 +66,7 @@ EXTRA_DIST =					\
 	_ext/namedconf.py			\
 	_ext/rndcconf.py			\
 	_static/custom.css			\
+	../changelog/*.rst			\
 	../dnssec-guide				\
 	../misc/options				\
 	../misc/rndc.grammar			\

@@ -184,7 +184,7 @@ named_main_earlyfatal(const char *format, ...) {
 	}
 	va_end(args);
 
-	exit(1);
+	_exit(EXIT_FAILURE);
 }
 
 noreturn static void
@@ -238,7 +238,7 @@ assertion_failed(const char *file, int line, isc_assertiontype_t type,
 	if (named_g_coreok) {
 		abort();
 	}
-	exit(1);
+	_exit(EXIT_FAILURE);
 }
 
 noreturn static void
@@ -278,7 +278,7 @@ library_fatal_error(const char *file, int line, const char *func,
 	if (named_g_coreok) {
 		abort();
 	}
-	exit(1);
+	_exit(EXIT_FAILURE);
 }
 
 static void
@@ -411,7 +411,7 @@ parse_int(char *arg, const char *desc) {
 	if (tmp < 0 || tmp != ltmp) {
 		named_main_earlyfatal("%s '%s' out of range", desc, arg);
 	}
-	return (tmp);
+	return tmp;
 }
 
 static struct flag_def {
@@ -898,7 +898,7 @@ parse_command_line(int argc, char *argv[]) {
 			printf("# Built-in default values. "
 			       "This is NOT the run-time configuration!\n");
 			printf("%s", named_config_getdefault());
-			exit(0);
+			exit(EXIT_SUCCESS);
 		case 'd':
 			named_g_debuglevel = parse_int(isc_commandline_argument,
 						       "debug "
@@ -963,10 +963,10 @@ parse_command_line(int argc, char *argv[]) {
 			break;
 		case 'v':
 			printversion(false);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		case 'V':
 			printversion(true);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		case 'x':
 			/* Obsolete. No longer in use. Ignore. */
 			break;
@@ -985,7 +985,7 @@ parse_command_line(int argc, char *argv[]) {
 		case '?':
 			usage();
 			if (isc_commandline_option == '?') {
-				exit(0);
+				exit(EXIT_SUCCESS);
 			}
 			p = strchr(NAMED_MAIN_ARGS, isc_commandline_option);
 			if (p == NULL || *++p != ':') {
@@ -1042,12 +1042,12 @@ create_managers(void) {
 				     0 /* quantum */, &named_g_netmgr,
 				     &named_g_taskmgr, &named_g_timermgr);
 	if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 
 	isc_nm_maxudp(named_g_netmgr, maxudp);
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 static void
@@ -1458,7 +1458,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 			UNEXPECTED_ERROR("scf_handle_create() failed: %s",
 					 scf_strerror(scf_error()));
 		}
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
 	if (scf_handle_bind(h) == -1) {
@@ -1467,7 +1467,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 					 scf_strerror(scf_error()));
 		}
 		scf_handle_destroy(h);
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
 	if ((namelen = scf_myname(h, NULL, 0)) == -1) {
@@ -1476,7 +1476,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 					 scf_strerror(scf_error()));
 		}
 		scf_handle_destroy(h);
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
 	if ((instance = isc_mem_allocate(mctx, namelen + 1)) == NULL) {
@@ -1484,7 +1484,7 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 				 "allocation failed: %s",
 				 isc_result_totext(ISC_R_NOMEMORY));
 		scf_handle_destroy(h);
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
 	if (scf_myname(h, instance, namelen + 1) == -1) {
@@ -1494,12 +1494,12 @@ named_smf_get_instance(char **ins_name, int debug, isc_mem_t *mctx) {
 		}
 		scf_handle_destroy(h);
 		isc_mem_free(mctx, instance);
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
 	scf_handle_destroy(h);
 	*ins_name = instance;
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 #endif /* HAVE_LIBSCF */
 
@@ -1659,5 +1659,5 @@ main(int argc, char *argv[]) {
 	ProfilerStop();
 #endif /* ifdef HAVE_GPERFTOOLS_PROFILER */
 
-	return (0);
+	return 0;
 }

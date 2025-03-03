@@ -1,3 +1,18 @@
+bind9 (1:9.18.33-1+pexip24u1~deb12u2) pexip; urgency=medium
+
+  * New upstream release
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 03 Mar 2025 12:04:20 +0000
+
+bind9 (1:9.18.33-1~deb12u2) bookworm-security; urgency=high
+
+  * New upstream version 9.18.33
+   - CVE-2024-12705: DNS-over-HTTPS flooding fixes
+   - CVE-2024-11187: Limit additional section processing for large RDATA
+     sets
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 25 Jan 2025 11:14:58 +0100
+
 bind9 (1:9.18.28-1+pexip24u1~deb12u2) pexip; urgency=medium
 
   * No-change rebuild; fix version to match what's upstream

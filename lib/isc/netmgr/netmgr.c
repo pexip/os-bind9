@@ -184,12 +184,12 @@ nmhandle_detach_cb(isc_nmhandle_t **handlep FLARG);
 
 int
 isc_nm_tid(void) {
-	return (isc__nm_tid_v);
+	return isc__nm_tid_v;
 }
 
 bool
 isc__nm_in_netthread(void) {
-	return (isc__nm_tid_v >= 0);
+	return isc__nm_tid_v >= 0;
 }
 
 void
@@ -631,7 +631,7 @@ bool
 isc_nm_getloadbalancesockets(isc_nm_t *mgr) {
 	REQUIRE(VALID_NM(mgr));
 
-	return (mgr->load_balance_sockets);
+	return mgr->load_balance_sockets;
 }
 
 void
@@ -764,7 +764,7 @@ nm_thread(isc_threadarg_t worker0) {
 	SIGNAL(&mgr->wkstatecond);
 	UNLOCK(&mgr->lock);
 
-	return ((isc_threadresult_t)0);
+	return (isc_threadresult_t)0;
 }
 
 static bool
@@ -793,7 +793,7 @@ process_all_queues(isc__networker_t *worker) {
 		}
 	}
 
-	return (reschedule);
+	return reschedule;
 }
 
 /*
@@ -998,6 +998,8 @@ process_netievent(isc__networker_t *worker, isc__netievent_t *ievent) {
 		NETIEVENT_CASE(httpsend);
 		NETIEVENT_CASE(httpclose);
 		NETIEVENT_CASE(httpendpoints);
+
+		NETIEVENT_CASE(asyncrun);
 #endif
 		NETIEVENT_CASE(settlsctx);
 		NETIEVENT_CASE(sockstop);
@@ -1015,7 +1017,7 @@ process_netievent(isc__networker_t *worker, isc__netievent_t *ievent) {
 	default:
 		UNREACHABLE();
 	}
-	return (true);
+	return true;
 }
 
 static isc_result_t
@@ -1032,7 +1034,7 @@ process_queue(isc__networker_t *worker, netievent_type_t type) {
 	ievent = ISC_LIST_HEAD(list);
 	if (ievent == NULL) {
 		/* There's nothing scheduled */
-		return (ISC_R_EMPTY);
+		return ISC_R_EMPTY;
 	}
 
 	while (ievent != NULL) {
@@ -1051,14 +1053,14 @@ process_queue(isc__networker_t *worker, netievent_type_t type) {
 						     list, link);
 				UNLOCK(&worker->ievents[type].lock);
 			}
-			return (ISC_R_SUSPEND);
+			return ISC_R_SUSPEND;
 		}
 
 		ievent = next;
 	}
 
 	/* We processed at least one */
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 void *
@@ -1068,7 +1070,7 @@ isc__nm_get_netievent(isc_nm_t *mgr, isc__netievent_type type) {
 
 	*event = (isc__netievent_storage_t){ .ni.type = type };
 	ISC_LINK_INIT(&(event->ni), link);
-	return (event);
+	return event;
 }
 
 void
@@ -1116,6 +1118,8 @@ NETIEVENT_SOCKET_DEF(tlsdnsshutdown);
 NETIEVENT_SOCKET_REQ_DEF(httpsend);
 NETIEVENT_SOCKET_DEF(httpclose);
 NETIEVENT_SOCKET_HTTP_EPS_DEF(httpendpoints);
+
+NETIEVENT_ASYNCRUN_DEF(asyncrun);
 #endif /* HAVE_LIBNGHTTP2 */
 
 NETIEVENT_SOCKET_REQ_DEF(tcpconnect);
@@ -1201,10 +1205,10 @@ bool
 isc__nmsocket_active(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 	if (sock->parent != NULL) {
-		return (atomic_load(&sock->parent->active));
+		return atomic_load(&sock->parent->active);
 	}
 
-	return (atomic_load(&sock->active));
+	return atomic_load(&sock->active);
 }
 
 bool
@@ -1212,12 +1216,12 @@ isc__nmsocket_deactivate(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 
 	if (sock->parent != NULL) {
-		return (atomic_compare_exchange_strong(&sock->parent->active,
-						       &(bool){ true }, false));
+		return atomic_compare_exchange_strong(&sock->parent->active,
+						      &(bool){ true }, false);
 	}
 
-	return (atomic_compare_exchange_strong(&sock->active, &(bool){ true },
-					       false));
+	return atomic_compare_exchange_strong(&sock->active, &(bool){ true },
+					      false);
 }
 
 void
@@ -1627,6 +1631,7 @@ isc___nmsocket_init(isc_nmsocket_t *sock, isc_nm_t *mgr, isc_nmsocket_type type,
 	atomic_init(&sock->keepalive, false);
 	atomic_init(&sock->connected, false);
 	atomic_init(&sock->timedout, false);
+	atomic_init(&sock->manual_read_timer, false);
 
 	atomic_init(&sock->active_child_connections, 0);
 
@@ -1676,7 +1681,7 @@ alloc_handle(isc_nmsocket_t *sock) {
 #endif
 	isc_refcount_init(&handle->references, 1);
 
-	return (handle);
+	return handle;
 }
 
 isc_nmhandle_t *
@@ -1756,7 +1761,7 @@ isc___nmhandle_get(isc_nmsocket_t *sock, isc_sockaddr_t *peer,
 	}
 #endif
 
-	return (handle);
+	return handle;
 }
 
 void
@@ -1776,11 +1781,11 @@ bool
 isc_nmhandle_is_stream(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 
-	return (handle->sock->type == isc_nm_tcpsocket ||
-		handle->sock->type == isc_nm_tcpdnssocket ||
-		handle->sock->type == isc_nm_tlssocket ||
-		handle->sock->type == isc_nm_tlsdnssocket ||
-		handle->sock->type == isc_nm_httpsocket);
+	return handle->sock->type == isc_nm_tcpsocket ||
+	       handle->sock->type == isc_nm_tcpdnssocket ||
+	       handle->sock->type == isc_nm_tlssocket ||
+	       handle->sock->type == isc_nm_tlsdnssocket ||
+	       handle->sock->type == isc_nm_httpsocket;
 }
 
 static void
@@ -1925,7 +1930,7 @@ void *
 isc_nmhandle_getdata(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 
-	return (handle->opaque);
+	return handle->opaque;
 }
 
 void
@@ -2136,6 +2141,15 @@ void
 isc__nmsocket_timer_restart(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 
+	switch (sock->type) {
+#if HAVE_LIBNGHTTP2
+	case isc_nm_tlssocket:
+		return isc__nmsocket_tls_timer_restart(sock);
+#endif /*  HAVE_LIBNGHTTP2 */
+	default:
+		break;
+	}
+
 	if (uv_is_closing((uv_handle_t *)&sock->read_timer)) {
 		return;
 	}
@@ -2170,7 +2184,16 @@ bool
 isc__nmsocket_timer_running(isc_nmsocket_t *sock) {
 	REQUIRE(VALID_NMSOCK(sock));
 
-	return (uv_is_active((uv_handle_t *)&sock->read_timer));
+	switch (sock->type) {
+#if HAVE_LIBNGHTTP2
+	case isc_nm_tlssocket:
+		return isc__nmsocket_tls_timer_running(sock);
+#endif /*  HAVE_LIBNGHTTP2 */
+	default:
+		break;
+	}
+
+	return uv_is_active((uv_handle_t *)&sock->read_timer);
 }
 
 void
@@ -2189,6 +2212,15 @@ isc__nmsocket_timer_stop(isc_nmsocket_t *sock) {
 	int r;
 
 	REQUIRE(VALID_NMSOCK(sock));
+
+	switch (sock->type) {
+#if HAVE_LIBNGHTTP2
+	case isc_nm_tlssocket:
+		return isc__nmsocket_tls_timer_stop(sock);
+#endif /*  HAVE_LIBNGHTTP2 */
+	default:
+		break;
+	}
 
 	/* uv_timer_stop() is idempotent, no need to check if running */
 
@@ -2218,7 +2250,7 @@ isc__nm_get_read_req(isc_nmsocket_t *sock, isc_sockaddr_t *sockaddr) {
 		break;
 	}
 
-	return (req);
+	return req;
 }
 
 /*%<
@@ -2270,7 +2302,7 @@ isc__nm_start_reading(isc_nmsocket_t *sock) {
 	int r;
 
 	if (atomic_load(&sock->reading)) {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 
 	switch (sock->type) {
@@ -2299,7 +2331,7 @@ isc__nm_start_reading(isc_nmsocket_t *sock) {
 		atomic_store(&sock->reading, true);
 	}
 
-	return (result);
+	return result;
 }
 
 void
@@ -2329,23 +2361,23 @@ isc__nm_stop_reading(isc_nmsocket_t *sock) {
 
 bool
 isc__nm_closing(isc_nmsocket_t *sock) {
-	return (atomic_load(&sock->mgr->closing));
+	return atomic_load(&sock->mgr->closing);
 }
 
 bool
 isc__nmsocket_closing(isc_nmsocket_t *sock) {
-	return (!isc__nmsocket_active(sock) || atomic_load(&sock->closing) ||
-		isc__nm_closing(sock) ||
-		(sock->server != NULL && !isc__nmsocket_active(sock->server)));
+	return !isc__nmsocket_active(sock) || atomic_load(&sock->closing) ||
+	       isc__nm_closing(sock) ||
+	       (sock->server != NULL && !isc__nmsocket_active(sock->server));
 }
 
 static isc_result_t
 processbuffer(isc_nmsocket_t *sock) {
 	switch (sock->type) {
 	case isc_nm_tcpdnssocket:
-		return (isc__nm_tcpdns_processbuffer(sock));
+		return isc__nm_tcpdns_processbuffer(sock);
 	case isc_nm_tlsdnssocket:
-		return (isc__nm_tlsdns_processbuffer(sock));
+		return isc__nm_tlsdns_processbuffer(sock);
 	default:
 		UNREACHABLE();
 	}
@@ -2402,7 +2434,7 @@ isc__nm_process_sock_buffer(isc_nmsocket_t *sock) {
 				}
 				result = isc__nm_start_reading(sock);
 				if (result != ISC_R_SUCCESS) {
-					return (result);
+					return result;
 				}
 			}
 			/*
@@ -2441,7 +2473,7 @@ isc__nm_process_sock_buffer(isc_nmsocket_t *sock) {
 		}
 	}
 done:
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 void
@@ -2542,28 +2574,28 @@ isc_nmhandle_timer_running(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 	REQUIRE(VALID_NMSOCK(handle->sock));
 
-	return (isc__nmsocket_timer_running(handle->sock));
+	return isc__nmsocket_timer_running(handle->sock);
 }
 
 void *
 isc_nmhandle_getextra(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 
-	return (handle->extra);
+	return handle->extra;
 }
 
 isc_sockaddr_t
 isc_nmhandle_peeraddr(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 
-	return (handle->peer);
+	return handle->peer;
 }
 
 isc_sockaddr_t
 isc_nmhandle_localaddr(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 
-	return (handle->local);
+	return handle->local;
 }
 
 isc_nm_t *
@@ -2571,7 +2603,7 @@ isc_nmhandle_netmgr(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 	REQUIRE(VALID_NMSOCK(handle->sock));
 
-	return (handle->sock->mgr);
+	return handle->sock->mgr;
 }
 
 isc__nm_uvreq_t *
@@ -2599,7 +2631,7 @@ isc___nm_uvreq_get(isc_nm_t *mgr, isc_nmsocket_t *sock FLARG) {
 	isc___nmsocket_attach(sock, &req->sock FLARG_PASS);
 	req->magic = UVREQ_MAGIC;
 
-	return (req);
+	return req;
 }
 
 void
@@ -3143,7 +3175,7 @@ isc__nm_async_shutdown(isc__networker_t *worker, isc__netievent_t *ev0) {
 bool
 isc__nm_acquire_interlocked(isc_nm_t *mgr) {
 	if (!isc__nm_in_netthread()) {
-		return (false);
+		return false;
 	}
 
 	LOCK(&mgr->lock);
@@ -3152,7 +3184,7 @@ isc__nm_acquire_interlocked(isc_nm_t *mgr) {
 		isc_nm_tid());
 
 	UNLOCK(&mgr->lock);
-	return (success);
+	return success;
 }
 
 void
@@ -3218,11 +3250,11 @@ isc_result_t
 isc__nm_socket(int domain, int type, int protocol, uv_os_sock_t *sockp) {
 	int sock = socket(domain, type, protocol);
 	if (sock < 0) {
-		return (isc_errno_toresult(errno));
+		return isc_errno_toresult(errno);
 	}
 
 	*sockp = (uv_os_sock_t)sock;
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 void
@@ -3244,41 +3276,41 @@ isc__nm_socket_freebind(uv_os_sock_t fd, sa_family_t sa_family) {
 #ifdef IP_FREEBIND
 	UNUSED(sa_family);
 	if (setsockopt_on(fd, IPPROTO_IP, IP_FREEBIND) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #elif defined(IP_BINDANY) || defined(IPV6_BINDANY)
 	if (sa_family == AF_INET) {
 #if defined(IP_BINDANY)
 		if (setsockopt_on(fd, IPPROTO_IP, IP_BINDANY) == -1) {
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		}
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 #endif
 	} else if (sa_family == AF_INET6) {
 #if defined(IPV6_BINDANY)
 		if (setsockopt_on(fd, IPPROTO_IPV6, IPV6_BINDANY) == -1) {
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		}
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 #endif
 	}
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 #elif defined(SO_BINDANY)
 	UNUSED(sa_family);
 	if (setsockopt_on(fd, SOL_SOCKET, SO_BINDANY) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #else
 	UNUSED(fd);
 	UNUSED(sa_family);
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 #endif
 }
 
 isc_result_t
-isc__nm_socket_reuse(uv_os_sock_t fd) {
+isc__nm_socket_reuse(uv_os_sock_t fd, int val) {
 	/*
 	 * Generally, the SO_REUSEADDR socket option allows reuse of
 	 * local addresses.
@@ -3295,18 +3327,18 @@ isc__nm_socket_reuse(uv_os_sock_t fd) {
 	 */
 
 #if defined(SO_REUSEPORT) && !defined(__linux__)
-	if (setsockopt_on(fd, SOL_SOCKET, SO_REUSEPORT) == -1) {
-		return (ISC_R_FAILURE);
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val)) == -1) {
+		return ISC_R_FAILURE;
 	}
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #elif defined(SO_REUSEADDR)
-	if (setsockopt_on(fd, SOL_SOCKET, SO_REUSEADDR) == -1) {
-		return (ISC_R_FAILURE);
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1) {
+		return ISC_R_FAILURE;
 	}
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #else
 	UNUSED(fd);
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 #endif
 }
 
@@ -3324,34 +3356,20 @@ isc__nm_socket_reuse_lb(uv_os_sock_t fd) {
 	 */
 #if defined(SO_REUSEPORT_LB)
 	if (setsockopt_on(fd, SOL_SOCKET, SO_REUSEPORT_LB) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	} else {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 #elif defined(SO_REUSEPORT) && defined(__linux__)
 	if (setsockopt_on(fd, SOL_SOCKET, SO_REUSEPORT) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	} else {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 #else
 	UNUSED(fd);
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 #endif
-}
-
-isc_result_t
-isc__nm_socket_incoming_cpu(uv_os_sock_t fd) {
-#ifdef SO_INCOMING_CPU
-	if (setsockopt_on(fd, SOL_SOCKET, SO_INCOMING_CPU) == -1) {
-		return (ISC_R_FAILURE);
-	} else {
-		return (ISC_R_SUCCESS);
-	}
-#else
-	UNUSED(fd);
-#endif
-	return (ISC_R_NOTIMPLEMENTED);
 }
 
 isc_result_t
@@ -3362,17 +3380,17 @@ isc__nm_socket_disable_pmtud(uv_os_sock_t fd, sa_family_t sa_family) {
 	if (sa_family == AF_INET6) {
 #if defined(IPV6_DONTFRAG)
 		if (setsockopt_off(fd, IPPROTO_IPV6, IPV6_DONTFRAG) == -1) {
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		} else {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 #elif defined(IPV6_MTU_DISCOVER) && defined(IP_PMTUDISC_OMIT)
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
 			       &(int){ IP_PMTUDISC_OMIT }, sizeof(int)) == -1)
 		{
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		} else {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 #else
 		UNUSED(fd);
@@ -3380,26 +3398,26 @@ isc__nm_socket_disable_pmtud(uv_os_sock_t fd, sa_family_t sa_family) {
 	} else if (sa_family == AF_INET) {
 #if defined(IP_DONTFRAG)
 		if (setsockopt_off(fd, IPPROTO_IP, IP_DONTFRAG) == -1) {
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		} else {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 #elif defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_OMIT)
 		if (setsockopt(fd, IPPROTO_IP, IP_MTU_DISCOVER,
 			       &(int){ IP_PMTUDISC_OMIT }, sizeof(int)) == -1)
 		{
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		} else {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 #else
 		UNUSED(fd);
 #endif
 	} else {
-		return (ISC_R_FAMILYNOSUPPORT);
+		return ISC_R_FAMILYNOSUPPORT;
 	}
 
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 }
 
 isc_result_t
@@ -3410,15 +3428,15 @@ isc__nm_socket_v6only(uv_os_sock_t fd, sa_family_t sa_family) {
 	if (sa_family == AF_INET6) {
 #if defined(IPV6_V6ONLY)
 		if (setsockopt_on(fd, IPPROTO_IPV6, IPV6_V6ONLY) == -1) {
-			return (ISC_R_FAILURE);
+			return ISC_R_FAILURE;
 		} else {
-			return (ISC_R_SUCCESS);
+			return ISC_R_SUCCESS;
 		}
 #else
 		UNUSED(fd);
 #endif
 	}
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 }
 
 isc_result_t
@@ -3435,7 +3453,7 @@ isc_nm_checkaddr(const isc_sockaddr_t *addr, isc_socktype_t type) {
 		proto = SOCK_DGRAM;
 		break;
 	default:
-		return (ISC_R_NOTIMPLEMENTED);
+		return ISC_R_NOTIMPLEMENTED;
 	}
 
 	pf = isc_sockaddr_pf(addr);
@@ -3447,17 +3465,17 @@ isc_nm_checkaddr(const isc_sockaddr_t *addr, isc_socktype_t type) {
 
 	fd = socket(pf, proto, 0);
 	if (fd < 0) {
-		return (isc_errno_toresult(errno));
+		return isc_errno_toresult(errno);
 	}
 
 	r = bind(fd, (const struct sockaddr *)&addr->type.sa, addrlen);
 	if (r < 0) {
 		close(fd);
-		return (isc_errno_toresult(errno));
+		return isc_errno_toresult(errno);
 	}
 
 	close(fd);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 #if defined(TCP_CONNECTIONTIMEOUT)
@@ -3490,15 +3508,15 @@ isc__nm_socket_connectiontimeout(uv_os_sock_t fd, int timeout_ms) {
 	if (setsockopt(fd, IPPROTO_TCP, TIMEOUT_OPTNAME, &timeout,
 		       sizeof(timeout)) == -1)
 	{
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #else
 	UNUSED(fd);
 	UNUSED(timeout_ms);
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #endif
 }
 
@@ -3506,13 +3524,13 @@ isc_result_t
 isc__nm_socket_tcp_nodelay(uv_os_sock_t fd) {
 #ifdef TCP_NODELAY
 	if (setsockopt_on(fd, IPPROTO_TCP, TCP_NODELAY) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	} else {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 #else
 	UNUSED(fd);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #endif
 }
 
@@ -3522,37 +3540,37 @@ isc__nm_socket_tcp_maxseg(uv_os_sock_t fd, int size) {
 	if (setsockopt(fd, IPPROTO_TCP, TCP_MAXSEG, (void *)&size,
 		       sizeof(size)))
 	{
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	} else {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 #else
 	UNUSED(fd);
 	UNUSED(size);
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 #endif
 }
 
 isc_result_t
 isc__nm_socket_min_mtu(uv_os_sock_t fd, sa_family_t sa_family) {
 	if (sa_family != AF_INET6) {
-		return (ISC_R_SUCCESS);
+		return ISC_R_SUCCESS;
 	}
 #ifdef IPV6_USE_MIN_MTU
 	if (setsockopt_on(fd, IPPROTO_IPV6, IPV6_USE_MIN_MTU) == -1) {
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 #elif defined(IPV6_MTU)
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_MTU, &(int){ 1280 },
 		       sizeof(int)) == -1)
 	{
-		return (ISC_R_FAILURE);
+		return ISC_R_FAILURE;
 	}
 #else
 	UNUSED(fd);
 #endif
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 void
@@ -3594,7 +3612,7 @@ isc__nm_work_run(isc_threadarg_t arg) {
 
 	work->cb(work->data);
 
-	return ((isc_threadresult_t)0);
+	return (isc_threadresult_t)0;
 }
 
 static void
@@ -3740,7 +3758,7 @@ isc_nm_xfr_checkperm(isc_nmhandle_t *handle) {
 		break;
 	}
 
-	return (result);
+	return result;
 }
 
 bool
@@ -3748,7 +3766,7 @@ isc_nm_is_http_handle(isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 	REQUIRE(VALID_NMSOCK(handle->sock));
 
-	return (handle->sock->type == isc_nm_httpsocket);
+	return handle->sock->type == isc_nm_httpsocket;
 }
 
 void
@@ -3791,7 +3809,7 @@ isc_nm_socket_type(const isc_nmhandle_t *handle) {
 	REQUIRE(VALID_NMHANDLE(handle));
 	REQUIRE(VALID_NMSOCK(handle->sock));
 
-	return (handle->sock->type);
+	return handle->sock->type;
 }
 
 bool
@@ -3804,16 +3822,16 @@ isc_nm_has_encryption(const isc_nmhandle_t *handle) {
 #if HAVE_LIBNGHTTP2
 	case isc_nm_tlssocket:
 #endif /* HAVE_LIBNGHTTP2 */
-		return (true);
+		return true;
 #if HAVE_LIBNGHTTP2
 	case isc_nm_httpsocket:
-		return (isc__nm_http_has_encryption(handle));
+		return isc__nm_http_has_encryption(handle);
 #endif /* HAVE_LIBNGHTTP2 */
 	default:
-		return (false);
+		return false;
 	};
 
-	return (false);
+	return false;
 }
 
 void
@@ -3891,21 +3909,21 @@ isc_nm_verify_tls_peer_result_string(const isc_nmhandle_t *handle) {
 	sock = handle->sock;
 	switch (sock->type) {
 	case isc_nm_tlsdnssocket:
-		return (isc__nm_tlsdns_verify_tls_peer_result_string(handle));
+		return isc__nm_tlsdns_verify_tls_peer_result_string(handle);
 		break;
 #if HAVE_LIBNGHTTP2
 	case isc_nm_tlssocket:
-		return (isc__nm_tls_verify_tls_peer_result_string(handle));
+		return isc__nm_tls_verify_tls_peer_result_string(handle);
 		break;
 	case isc_nm_httpsocket:
-		return (isc__nm_http_verify_tls_peer_result_string(handle));
+		return isc__nm_http_verify_tls_peer_result_string(handle);
 		break;
 #endif /* HAVE_LIBNGHTTP2 */
 	default:
 		break;
 	}
 
-	return (NULL);
+	return NULL;
 }
 
 void
@@ -3946,6 +3964,52 @@ isc__nmsocket_log_tls_session_reuse(isc_nmsocket_t *sock, isc_tls_t *tls) {
 		      client_sabuf, local_sabuf);
 }
 
+void
+isc__nmhandle_set_manual_timer(isc_nmhandle_t *handle, const bool manual) {
+	REQUIRE(VALID_NMHANDLE(handle));
+	REQUIRE(VALID_NMSOCK(handle->sock));
+
+	isc_nmsocket_t *sock = handle->sock;
+
+	switch (sock->type) {
+	case isc_nm_tcpsocket:
+		isc__nmhandle_tcp_set_manual_timer(handle, manual);
+		return;
+#if HAVE_LIBNGHTTP2
+	case isc_nm_tlssocket:
+		isc__nmhandle_tls_set_manual_timer(handle, manual);
+		return;
+#endif /* HAVE_LIBNGHTTP2 */
+	default:
+		break;
+	};
+
+	UNREACHABLE();
+}
+
+#if HAVE_LIBNGHTTP2
+void
+isc__nm_async_run(isc__networker_t *worker, isc__nm_asyncrun_cb_t cb,
+		  void *cbarg) {
+	isc__netievent__asyncrun_t *ievent = NULL;
+	REQUIRE(worker != NULL);
+	REQUIRE(cb != NULL);
+
+	ievent = isc__nm_get_netievent_asyncrun(worker->mgr, cb, cbarg);
+	isc__nm_enqueue_ievent(worker, (isc__netievent_t *)ievent);
+}
+
+void
+isc__nm_async_asyncrun(isc__networker_t *worker, isc__netievent_t *ev0) {
+	isc__netievent_asyncrun_t *ievent = (isc__netievent_asyncrun_t *)ev0;
+
+	UNUSED(worker);
+
+	ievent->cb(ievent->cbarg);
+}
+
+#endif /* HAVE_LIBNGHTTP2 */
+
 #ifdef NETMGR_TRACE
 /*
  * Dump all active sockets in netmgr. We output to stderr
@@ -3956,29 +4020,29 @@ static const char *
 nmsocket_type_totext(isc_nmsocket_type type) {
 	switch (type) {
 	case isc_nm_udpsocket:
-		return ("isc_nm_udpsocket");
+		return "isc_nm_udpsocket";
 	case isc_nm_udplistener:
-		return ("isc_nm_udplistener");
+		return "isc_nm_udplistener";
 	case isc_nm_tcpsocket:
-		return ("isc_nm_tcpsocket");
+		return "isc_nm_tcpsocket";
 	case isc_nm_tcplistener:
-		return ("isc_nm_tcplistener");
+		return "isc_nm_tcplistener";
 	case isc_nm_tcpdnslistener:
-		return ("isc_nm_tcpdnslistener");
+		return "isc_nm_tcpdnslistener";
 	case isc_nm_tcpdnssocket:
-		return ("isc_nm_tcpdnssocket");
+		return "isc_nm_tcpdnssocket";
 	case isc_nm_tlssocket:
-		return ("isc_nm_tlssocket");
+		return "isc_nm_tlssocket";
 	case isc_nm_tlslistener:
-		return ("isc_nm_tlslistener");
+		return "isc_nm_tlslistener";
 	case isc_nm_tlsdnslistener:
-		return ("isc_nm_tlsdnslistener");
+		return "isc_nm_tlsdnslistener";
 	case isc_nm_tlsdnssocket:
-		return ("isc_nm_tlsdnssocket");
+		return "isc_nm_tlsdnssocket";
 	case isc_nm_httplistener:
-		return ("isc_nm_httplistener");
+		return "isc_nm_httplistener";
 	case isc_nm_httpsocket:
-		return ("isc_nm_httpsocket");
+		return "isc_nm_httpsocket";
 	default:
 		UNREACHABLE();
 	}

@@ -315,7 +315,7 @@ file documentation:
         A quoted string which is used as a DNS name; for example: ``my.test.domain``.
 
     ``duration``
-        A duration in BIND 9 can be written in three ways: as single number
+        A duration in BIND 9 can be written in three ways: as a single number
         representing seconds, as a string of numbers with TTL-style
         time-unit suffixes, or in ISO 6801 duration format.
 
@@ -1028,7 +1028,7 @@ responses such as NXDOMAIN.
 
 :any:`parental-agents` lists allow for a common set of parental agents to be
 easily used by multiple primary and secondary zones. A "parental agent" is a
-trusted DNS server that is queried to check if DS records for a given zones
+trusted DNS server that is queried to check whether DS records for a given zones
 are up-to-date.
 
 :any:`primaries` Block Grammar
@@ -1064,9 +1064,9 @@ where ``tls-configuration-name`` refers to a previously defined
 
 .. warning::
 
-  Please note that this version of BIND 9 does not support dynamic updates
-  forwarding (see :any:`allow-update-forwarding`) in conjuction with zone
-  transfers over TLS (XoT), that is when the :any:`tls` keyword is used with
+  Please note that this version of BIND 9 does not support dynamic update
+  forwarding (see :any:`allow-update-forwarding`) in conjunction with zone
+  transfers over TLS (XoT). This includes when the :any:`tls` keyword is used with
   :any:`primaries`, e.g. ``primaries { 192.0.2.1 tls tls-configuration-name; };``.
 
 ``options`` Block Grammar
@@ -2146,7 +2146,7 @@ Boolean Options
    :tags: server
    :short: Controls whether BIND 9 responds to root key sentinel probes.
 
-   If ``yes``, respond to root key sentinel probes as described in
+   If ``yes``, the server responds to root key sentinel probes as described in
    :rfc:`8509`:. The default is ``yes``.
 
 .. namedconf:statement:: reuseport
@@ -2706,8 +2706,10 @@ Boolean Options
 
    The :any:`querylog` option specifies whether query logging should be active when
    :iscman:`named` first starts. If :any:`querylog` is not specified, then query logging
-   is determined by the presence of the logging category ``queries``.  Query
-   logging can also be activated at runtime using the command ``rndc querylog
+   is determined by the presence of the logging category ``queries``.  Please
+   note that :option:`rndc reconfig` and :option:`rndc reload` have no effect on
+   this option, so it cannot be changed once the server is running. However,
+   query logging can be activated at runtime using the command ``rndc querylog
    on``, or deactivated with :option:`rndc querylog off <rndc querylog>`.
 
 .. namedconf:statement:: check-names
@@ -3374,7 +3376,7 @@ Query Address
    :short: Specifies the range(s) of ports to be excluded from use as sources for UDP/IPv6 messages.
 
    These statements, which are deprecated and will be removed in a future
-   release, specific ranges of port numbers to exclude from those specified
+   release, indicate ranges of port numbers to exclude from those specified
    in the :any:`avoid-v4-udp-ports` and :any:`avoid-v6-udp-ports`
    options, respectively.
 
@@ -3478,11 +3480,11 @@ options apply to zone transfers.
    terminated. The default is 60 minutes (1 hour). The maximum value
    is 28 days (40320 minutes).
 
-   .. note:: The inbound zone transfers are also affected by
-             ``tcp-idle-timeout``, the ``max-transfer-idle-in`` will close the
-             inbound zone transfer if there was no complete AXFR or no complete
-             IXFR chunk. The ``tcp-idle-timeout`` will close the connection if
-             there's no progress on the TCP level.
+   .. note:: Inbound zone transfers are also affected by
+             ``tcp-idle-timeout``; ``max-transfer-idle-in`` closes the
+             inbound zone transfer if there is no complete AXFR or no complete
+             IXFR chunk. ``tcp-idle-timeout`` closes the connection if
+             there is no progress on the TCP level.
 
 .. namedconf:statement:: max-transfer-time-out
    :tags: transfer
@@ -3694,8 +3696,8 @@ amount. ``default`` uses the limit that was in force when the server was
 started. See the description of :term:`size`.
 
 The following options are deprecated in favor of setting the operating system
-resource limits from the operating system and/or process supervisor, should not
-be used, and will be rendered non-operational in a future release.
+resource limits from the operating system and/or process supervisor. They should not
+be used and will be rendered non-operational in a future release.
 
 
 .. namedconf:statement:: coresize
@@ -3768,7 +3770,7 @@ system.
 
 .. namedconf:statement:: max-records-per-type
    :tags: server
-   :short: Sets the maximum number of records that can be stored in an RRset
+   :short: Sets the maximum number of records that can be stored in an RRset.
 
    This sets the maximum number of resource records that can be stored
    in an RRset in a database. When configured in :namedconf:ref:`options`
@@ -3776,14 +3778,14 @@ system.
    the default value for zone databases, which can be overridden by setting
    it at the :namedconf:ref:`zone` level.
 
-   If set to a positive value, any attempt to cache or to add to a zone
-   an RRset with more than the specified number of records will result in
-   a failure.  If set to 0, there is no cap on RRset size.  The default is
+   If set to a positive value, any attempt to cache, or to add to a zone
+   an RRset with more than the specified number of records, will result in
+   a failure. If set to 0, there is no cap on RRset size. The default is
    100.
 
 .. namedconf:statement:: max-types-per-name
    :tags: server
-   :short: Sets the maximum number of RR types that can be stored for an owner name
+   :short: Sets the maximum number of RR types that can be stored for an owner name.
 
    This sets the maximum number of resource record types that can be stored
    for a single owner name in a database. When configured in
@@ -3803,7 +3805,7 @@ system.
 
    In a cache, if :any:`max-types-per-name` is set to a positive number, an
    attempt to add a new resource record set to a name that already has the
-   specified number of types will temporarily succeed so that the query can
+   specified number of types will temporarily succeed, so that the query can
    be answered. However, the newly added RRset will immediately be purged.
 
    Certain high-priority types, including SOA, CNAME, DNSKEY, and their
@@ -4007,7 +4009,7 @@ system.
 
    .. note::
 
-       :any:`max-cache-size` does not work reliably for the maximum
+       :any:`max-cache-size` does not work reliably for a maximum
        amount of memory of 100 MB or lower.
 
    Upon startup and reconfiguration, caches with a limited size
@@ -4091,7 +4093,7 @@ system.
    :short: Specifies the maximum number of concurrent DNS UPDATE messages that can be processed by the server.
 
    This is the maximum number of simultaneous DNS UPDATE messages that
-   the server will accept for updating local authoritiative zones or
+   the server will accept, for updating local authoritative zones or
    forwarding to a primary server. The default is ``100``.
 
 .. _intervals:
@@ -4599,13 +4601,13 @@ Tuning
    dropping patterns, the query is retried over TCP.  Per-server EDNS statistics
    are only retained in memory for the lifetime of a given server's ADB entry.
 
-   According to the measurements done by multiple parties the default value
-   should not be causing the fragmentation as most of the Internet "core" is able to
-   cope with IP message sizes between 1400-1500 bytes, the 1232 size was picked
+   According to measurements taken by multiple parties, the default value
+   should not be causing the fragmentation. As most of the Internet "core" is able to
+   cope with IP message sizes between 1400-1500 bytes, the 1232 size was chosen
    as a conservative minimal number that could be changed by the DNS operator to
-   a estimated path MTU minus the estimated header space. In practice, the
+   a estimated path MTU, minus the estimated header space. In practice, the
    smallest MTU witnessed in the operational DNS community is 1500 octets, the
-   Ethernet maximum payload size, so a a useful default for maximum DNS/UDP
+   Ethernet maximum payload size, so a useful default for the maximum DNS/UDP
    payload size on **reliable** networks would be 1432.
 
    Any server-specific :any:`edns-udp-size` setting has precedence over all
@@ -4673,6 +4675,15 @@ Tuning
    format is more human-readable, and is thus suitable when a zone is to
    be edited by hand. The default is ``relative``.
 
+.. namedconf:statement:: max-query-count
+   :tags: server, query
+   :short: Sets the maximum number of iterative queries while servicing a recursive query.
+
+   This sets the maximum number of iterative queries that may be sent
+   by a resolver while looking up a single name. If more queries than this
+   need to be sent before an answer is reached, then recursion is terminated
+   and a SERVFAIL response is returned to the client. The default is ``200``.
+
 .. namedconf:statement:: max-recursion-depth
    :tags: server
    :short: Sets the maximum number of levels of recursion permitted at any one time while servicing a recursive query.
@@ -4688,9 +4699,20 @@ Tuning
    :tags: server, query
    :short: Sets the maximum number of iterative queries while servicing a recursive query.
 
-   This sets the maximum number of iterative queries that may be sent while
-   servicing a recursive query. If more queries are sent, the recursive
-   query is terminated and returns SERVFAIL. The default is 100.
+   This sets the maximum number of iterative queries that may be sent
+   by a resolver while looking up a single name. If more queries than this
+   need to be sent before an answer is reached, then recursion is terminated
+   and a SERVFAIL response is returned to the client. (Note: if the answer
+   is a CNAME, then the subsequent lookup for the target of the CNAME is
+   counted separately.) The default is 50.
+
+.. namedconf:statement:: max-query-restarts
+   :tags: server, query
+   :short: Sets the maximum number of chained CNAMEs to follow
+
+   This sets the maximum number of successive CNAME targets to follow
+   when resolving a client query, before terminating the query to avoid a
+   CNAME loop. Valid values are 1 to 255. The default is 11.
 
 .. namedconf:statement:: notify-delay
    :tags: transfer, zone
@@ -4722,8 +4744,8 @@ Tuning
    immediately, ensuring that the cache always has an answer available.
 
    :any:`prefetch` specifies the "trigger" TTL value at which prefetch
-   of the current query takes place; when a cache record with a
-   lower or equal TTL value is encountered during query processing, it is
+   of the current query takes place; when a cache record with an
+   equal or lower TTL value is encountered during query processing, it is
    refreshed. Valid trigger TTL values are 1 to 10 seconds. Values
    larger than 10 seconds are silently reduced to 10. Setting a
    trigger TTL to zero causes prefetch to be disabled. The default
@@ -6098,8 +6120,8 @@ The main motivation behind having the ``ephemeral`` configuration is
 to aid in testing, as trusted certificate authorities do not issue the
 certificates associated with this configuration. Thus, these
 certificates will never be trusted by any clients that verify TLS
-certificates. They provide encryption of the traffic but no
-authentification of the transmission channel. That might be enough in
+certificates; they provide encryption of the traffic but no
+authentication of the transmission channel. That might be enough in
 the case of deployment in a controlled environment.
 
 It should be noted that on reconfiguration, the ``ephemeral`` TLS key
@@ -6107,9 +6129,9 @@ and the certificate are recreated, and all TLS certificates and keys,
 as well as associated data, are reloaded from the disk. In that case,
 listening sockets associated with TLS remain intact.
 
-Please keep in mind that doing reconfiguration can cause a short
+Please keep in mind that performing a reconfiguration can cause a short
 interruption in BIND's ability to process inbound client packets. The
-length of interruption is environment and configuration-specific. A
+length of interruption is environment- and configuration-specific. A
 good example of when reconfiguration is necessary is when TLS keys and
 certificates are updated on the disk.
 
@@ -6405,6 +6427,14 @@ zone is generated even if they have the same policy.  If multiple views
 are configured with different versions of the same zone, each separate
 version uses the same set of signing keys.
 
+If the expected key files that were previously observed have gone missing or
+are inaccessible, key management is halted. This will prevent rollovers
+from being started if there is a temporary file access issue. If his problem
+is permanent it will eventually lead to expired signatures in your zone.
+Note that if the key files are missing or inaccessible during :iscman:`named`
+startup, BIND 9 will try to generate new keys according to the DNSSEC policy,
+because it has no cached information about existing keys yet.
+
 The :any:`dnssec-policy` statement requires dynamic DNS to be set up, or
 :any:`inline-signing` to be enabled.
 
@@ -6431,10 +6461,9 @@ propagating DS updates.
 
 .. _dnssec_policy_default:
 
-Policy ``default`` causes the zone to be signed with a single combined-signing
-key (CSK) using algorithm ECDSAP256SHA256; this key has an unlimited
-lifetime.  (A verbose copy of this policy may be found in the source
-tree, in the file ``doc/misc/dnssec-policy.default.conf``.)
+The policy ``default`` causes the zone to be signed with a single combined-signing
+key (CSK) using the algorithm ECDSAP256SHA256; this key has an unlimited
+lifetime. This policy can be displayed using the command :option:`named -C`.
 
 .. note:: The default signing policy may change in future releases.
    This could require changes to a signing policy when upgrading to a
@@ -6462,7 +6491,9 @@ The following options can be specified in a :any:`dnssec-policy` statement:
     This indicates the TTL to use when generating DNSKEY resource
     records. The default is 1 hour (3600 seconds).
 
-:any:`keys`
+.. _dnssec-policy-keys:
+
+keys
     This is a list specifying the algorithms and roles to use when
     generating keys and signing the zone.  Entries in this list do not
     represent specific DNSSEC keys, which may be changed on a regular
@@ -6559,14 +6590,14 @@ The following options can be specified in a :any:`dnssec-policy` statement:
 
 .. namedconf:statement:: signatures-jitter
    :tags: dnssec
-   :short: Specifies a range for signatures expirations.
+   :short: Specifies a range for signature expirations.
 
     To prevent all signatures from expiring at the same moment, BIND 9 may
     vary the validity interval of individual signatures. The validity of a
-    newly generated signatures is in range between :any:`signatures-validity`
-    (maximum) and :any:`signatures-validity` minus :any:`signatures-jitter`
-    (minimum). The default jitter is 12 hours and the configured value must
-    be lower than :any:`signatures-validity` and
+    newly generated signature is in the range between :any:`signatures-validity`
+    (maximum) and :any:`signatures-validity`, minus :any:`signatures-jitter`
+    (minimum). The default jitter is 12 hours, and the configured value must
+    be lower than both :any:`signatures-validity` and
     :any:`signatures-validity-dnskey`.
 
 .. namedconf:statement:: signatures-refresh
@@ -8213,40 +8244,40 @@ Resolver Statistics Counters
     This indicates the number of active fetches.
 
 ``BucketSize``
-    This indicates the number the resolver's internal buckets (a static number).
+    This indicates the number of the resolver's internal buckets (a static number).
 
 ``REFUSED``
     This indicates the number of REFUSED responses received.
 
 ``ClientCookieOut``
-    This indicates the number of COOKIE sent with client cookie only.
+    This indicates the number of COOKIE messages sent to an authoritative server with only a client cookie.
 
 ``ServerCookieOut``
-    This indicates the number of COOKIE sent with client and server cookie.
+    This indicates the number of COOKIE messages sent to an authoritative server with both a client and a cached server cookie.
 
 ``CookieIn``
-    This indicates the number of COOKIE replies received.
+    This indicates the number of COOKIE replies received from an authoritative server.
 
 ``CookieClientOk``
-    This indicates the number of COOKIE client ok.
+    This indicates the number of correctly formed COOKIE client responses received.
 
 ``BadEDNSVersion``
     This indicates the number of bad EDNS version replies received.
 
 ``BadCookieRcode``
-    This indicates the number of bad cookie rcode replies received.
+    This indicates the number of BADCOOKIE response codes received from an authoritative server.
 
 ``ZoneQuota``
-    This indicates the number of queries spilled due to zone quota.
+    This indicates the number of queries spilled for exceeding the :any:`fetches-per-zone` quota.
 
 ``ServerQuota``
-    This indicates the number of queries spilled due to server quota.
+    This indicates the number of queries spilled for exceeding the :any:`fetches-per-server` quota.
 
 ``ClientQuota``
-    This indicates the number of queries spilled due to clients per query quota.
+    This indicates the number of queries spilled for exceeding the :any:`clients-per-query` quota.
 
 ``NextItem``
-    This indicates the number of waits for next item, when an invalid response is received.
+    This indicates the number of times the server waited for the next item after receiving an invalid response.
 
 ``Priming``
     This indicates the number of priming fetches performed by the resolver.

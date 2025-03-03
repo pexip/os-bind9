@@ -46,10 +46,10 @@ can_log_tcpdns_quota(void) {
 	isc_stdtime_get(&now);
 	last = atomic_exchange_relaxed(&last_tcpdnsquota_log, now);
 	if (now != last) {
-		return (true);
+		return true;
 	}
 
-	return (false);
+	return false;
 }
 
 static isc_result_t
@@ -155,7 +155,7 @@ error:
 	INSIST(atomic_load(&sock->active));
 	UNLOCK(&sock->lock);
 
-	return (result);
+	return result;
 }
 
 void
@@ -346,12 +346,11 @@ isc__nm_tcpdns_lb_socket(isc_nm_t *mgr, sa_family_t sa_family) {
 	result = isc__nm_socket(sa_family, SOCK_STREAM, 0, &sock);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
-	(void)isc__nm_socket_incoming_cpu(sock);
 	(void)isc__nm_socket_v6only(sock, sa_family);
 
 	/* FIXME: set mss */
 
-	result = isc__nm_socket_reuse(sock);
+	result = isc__nm_socket_reuse(sock, 1);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	if (mgr->load_balance_sockets) {
@@ -359,7 +358,7 @@ isc__nm_tcpdns_lb_socket(isc_nm_t *mgr, sa_family_t sa_family) {
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	}
 
-	return (sock);
+	return sock;
 }
 
 static void
@@ -397,9 +396,10 @@ start_tcpdns_child(isc_nm_t *mgr, isc_sockaddr_t *iface, isc_nmsocket_t *sock,
 		csock->fd = isc__nm_tcpdns_lb_socket(mgr,
 						     iface->type.sa.sa_family);
 	} else {
+		INSIST(fd >= 0);
 		csock->fd = dup(fd);
 	}
-	REQUIRE(csock->fd >= 0);
+	INSIST(csock->fd >= 0);
 
 	ievent = isc__nm_get_netievent_tcpdnslisten(mgr, csock);
 	isc__nm_maybe_enqueue_ievent(&mgr->workers[tid],
@@ -479,7 +479,7 @@ isc_nm_listentcpdns(isc_nm_t *mgr, isc_sockaddr_t *iface,
 		isc_nmsocket_close(&sock);
 	}
 
-	return (result);
+	return result;
 }
 
 void
@@ -772,7 +772,7 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 	REQUIRE(sock->tid == isc_nm_tid());
 
 	if (isc__nmsocket_closing(sock)) {
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	}
 
 	/*
@@ -780,7 +780,7 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 	 * anything.
 	 */
 	if (sock->buf_len < 2) {
-		return (ISC_R_NOMORE);
+		return ISC_R_NOMORE;
 	}
 
 	/*
@@ -789,7 +789,7 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 	 */
 	len = ntohs(*(uint16_t *)sock->buf);
 	if (len > sock->buf_len - 2) {
-		return (ISC_R_NOMORE);
+		return ISC_R_NOMORE;
 	}
 
 	if (sock->recv_cb == NULL) {
@@ -797,7 +797,7 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 		 * recv_cb has been cleared - there is
 		 * nothing to do
 		 */
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	} else if (sock->statichandle == NULL &&
 		   atomic_load(&sock->connected) &&
 		   !atomic_load(&sock->connecting))
@@ -806,14 +806,14 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 		 * It seems that some unexpected data (a DNS message) has
 		 * arrived while we are wrapping up.
 		 */
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	}
 
 	if (sock->client && !sock->recv_read) {
 		/*
 		 * We are not reading data - stop here.
 		 */
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	}
 
 	req = isc__nm_get_read_req(sock, NULL);
@@ -858,7 +858,7 @@ isc__nm_tcpdns_processbuffer(isc_nmsocket_t *sock) {
 
 	isc_nmhandle_detach(&handle);
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 void
@@ -1001,7 +1001,7 @@ accept_connection(isc_nmsocket_t *ssock, isc_quota_t *quota) {
 		if (quota != NULL) {
 			isc_quota_detach(&quota);
 		}
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	}
 
 	REQUIRE(ssock->accept_cb != NULL);
@@ -1111,7 +1111,7 @@ accept_connection(isc_nmsocket_t *ssock, isc_quota_t *quota) {
 	 */
 	isc__nmsocket_detach(&csock);
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 failure:
 
@@ -1123,7 +1123,7 @@ failure:
 
 	isc__nmsocket_detach(&csock);
 
-	return (result);
+	return result;
 }
 
 void
@@ -1269,12 +1269,18 @@ isc__nm_async_tcpdnssend(isc__networker_t *worker, isc__netievent_t *ev0) {
 		goto fail;
 	}
 
+	if (!sock->client && sock->reading) {
+		sock->reading_throttled = true;
+		isc__nm_stop_reading(sock);
+	}
+
 	isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL, ISC_LOGMODULE_NETMGR,
 		      ISC_LOG_DEBUG(3),
-		      "throttling TCP connection, the other side is not "
-		      "reading the data, switching to uv_write()");
-	sock->reading_throttled = true;
-	isc__nm_stop_reading(sock);
+		      "%sthe other side is not "
+		      "reading the data, switching to uv_write()",
+		      !sock->client && sock->reading
+			      ? "throttling TCP connection, "
+			      : "");
 
 	r = uv_write(&uvreq->uv_req.write, &sock->uv_handle.stream, bufs, nbufs,
 		     tcpdns_send_cb);

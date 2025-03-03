@@ -13,6 +13,7 @@
 
 import os
 from pathlib import Path
+import ssl
 import subprocess
 
 import pytest
@@ -47,6 +48,10 @@ def is_dnsrps_available():
     return True
 
 
+def with_tsan(*args):  # pylint: disable=unused-argument
+    return feature_test("--tsan")
+
+
 have_libxml2 = pytest.mark.skipif(
     not feature_test("--have-libxml2"), reason="libxml2 support disabled in the build"
 )
@@ -57,6 +62,12 @@ have_json_c = pytest.mark.skipif(
 
 dnsrps_enabled = pytest.mark.skipif(
     not is_dnsrps_available(), reason="dnsrps disabled in the build"
+)
+
+supported_openssl_version = pytest.mark.skipif(
+    ssl.OPENSSL_VERSION_NUMBER >= 0x300000C0
+    and ssl.OPENSSL_VERSION_NUMBER < 0x300000E0,
+    reason="unsupported OpenSSL [GL #4814]",
 )
 
 

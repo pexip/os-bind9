@@ -295,7 +295,7 @@ axfr_init(dns_xfrin_ctx_t *xfr) {
 	CHECK(dns_db_beginload(xfr->db, &xfr->axfr));
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -306,7 +306,7 @@ axfr_putdata(dns_xfrin_ctx_t *xfr, dns_diffop_t op, dns_name_t *name,
 	dns_difftuple_t *tuple = NULL;
 
 	if (rdata->rdclass != xfr->rdclass) {
-		return (DNS_R_BADCLASS);
+		return DNS_R_BADCLASS;
 	}
 
 	CHECK(dns_zone_checknames(xfr->zone, name, rdata));
@@ -318,7 +318,7 @@ axfr_putdata(dns_xfrin_ctx_t *xfr, dns_diffop_t op, dns_name_t *name,
 	}
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 /*
@@ -341,7 +341,7 @@ axfr_apply(dns_xfrin_ctx_t *xfr) {
 	}
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -354,7 +354,7 @@ axfr_commit(dns_xfrin_ctx_t *xfr) {
 
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -365,7 +365,7 @@ axfr_finalize(dns_xfrin_ctx_t *xfr) {
 
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 /**************************************************************************/
@@ -381,7 +381,7 @@ ixfr_init(dns_xfrin_ctx_t *xfr) {
 	if (xfr->reqtype != dns_rdatatype_ixfr) {
 		xfrin_log(xfr, ISC_LOG_NOTICE,
 			  "got incremental response to AXFR request");
-		return (DNS_R_FORMERR);
+		return DNS_R_FORMERR;
 	}
 
 	xfr->is_ixfr = true;
@@ -396,7 +396,7 @@ ixfr_init(dns_xfrin_ctx_t *xfr) {
 
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -406,7 +406,7 @@ ixfr_putdata(dns_xfrin_ctx_t *xfr, dns_diffop_t op, dns_name_t *name,
 	dns_difftuple_t *tuple = NULL;
 
 	if (rdata->rdclass != xfr->rdclass) {
-		return (DNS_R_BADCLASS);
+		return DNS_R_BADCLASS;
 	}
 
 	if (op == DNS_DIFFOP_ADD) {
@@ -420,7 +420,7 @@ ixfr_putdata(dns_xfrin_ctx_t *xfr, dns_diffop_t op, dns_name_t *name,
 	}
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 /*
@@ -455,7 +455,7 @@ ixfr_apply(dns_xfrin_ctx_t *xfr) {
 	xfr->difflen = 0;
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -474,7 +474,7 @@ ixfr_commit(dns_xfrin_ctx_t *xfr) {
 	}
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 /**************************************************************************/
@@ -687,7 +687,7 @@ redo:
 	}
 	result = ISC_R_SUCCESS;
 failure:
-	return (result);
+	return result;
 }
 
 isc_result_t
@@ -751,7 +751,7 @@ dns_xfrin_create(dns_zone_t *zone, dns_rdatatype_t xfrtype,
 			   "zone transfer setup failed");
 	}
 
-	return (result);
+	return result;
 }
 
 static void
@@ -859,8 +859,7 @@ xfrin_fail(dns_xfrin_ctx_t *xfr, isc_result_t result, const char *msg) {
 		(void)isc_timer_reset(xfr->max_idle_timer,
 				      isc_timertype_inactive, NULL, NULL, true);
 
-		if (result != DNS_R_UPTODATE && result != DNS_R_TOOMANYRECORDS)
-		{
+		if (result != DNS_R_UPTODATE) {
 			xfrin_log(xfr, ISC_LOG_ERROR, "%s: %s", msg,
 				  isc_result_totext(result));
 			if (xfr->is_ixfr) {
@@ -1170,7 +1169,7 @@ get_create_tlsctx(const dns_xfrin_ctx_t *xfr, isc_tlsctx_t **pctx,
 		*pctx = found;
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 failure:
 	if (tlsctx != NULL) {
@@ -1188,7 +1187,7 @@ failure:
 		isc_tls_cert_store_free(&store);
 	}
 
-	return (result);
+	return result;
 }
 
 static isc_result_t
@@ -1246,12 +1245,12 @@ xfrin_start(dns_xfrin_ctx_t *xfr) {
 		UNREACHABLE();
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 failure:
 	isc_refcount_decrement0(&xfr->connects);
 	dns_xfrin_detach(&connect_xfr);
-	return (result);
+	return result;
 }
 
 /* XXX the resolver could use this, too */
@@ -1275,7 +1274,7 @@ failure:
 	if (cleanup_cctx) {
 		dns_compress_invalidate(&cctx);
 	}
-	return (result);
+	return result;
 }
 
 /*
@@ -1400,7 +1399,7 @@ tuple2msgname(dns_difftuple_t *tuple, dns_message_t *msg, dns_name_t **target) {
 	ISC_LIST_APPEND(name->list, rds, link);
 
 	*target = name;
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 
 failure:
 
@@ -1416,7 +1415,7 @@ failure:
 		dns_message_puttemprdata(msg, &rdata);
 	}
 
-	return (result);
+	return result;
 }
 
 /*
@@ -1519,7 +1518,7 @@ failure:
 		dns_db_closeversion(xfr->db, &ver, false);
 	}
 
-	return (result);
+	return result;
 }
 
 static void

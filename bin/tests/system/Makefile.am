@@ -99,6 +99,7 @@ TESTS =				\
 	autosign		\
 	builtin			\
 	cacheclean		\
+	camp			\
 	case			\
 	catz			\
 	cds			\
@@ -108,6 +109,7 @@ TESTS =				\
 	checknames		\
 	checkzone		\
 	cookie			\
+	cpu			\
 	database		\
 	dialup			\
 	digdelv			\

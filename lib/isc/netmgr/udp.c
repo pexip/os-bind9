@@ -19,6 +19,7 @@
 #include <isc/buffer.h>
 #include <isc/condition.h>
 #include <isc/errno.h>
+#include <isc/log.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/netmgr.h>
@@ -27,6 +28,7 @@
 #include <isc/region.h>
 #include <isc/result.h>
 #include <isc/sockaddr.h>
+#include <isc/stdtime.h>
 #include <isc/thread.h>
 #include <isc/util.h>
 
@@ -92,11 +94,10 @@ isc__nm_udp_lb_socket(isc_nm_t *mgr, sa_family_t sa_family) {
 	result = isc__nm_socket(sa_family, SOCK_DGRAM, 0, &sock);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
-	(void)isc__nm_socket_incoming_cpu(sock);
 	(void)isc__nm_socket_disable_pmtud(sock, sa_family);
 	(void)isc__nm_socket_v6only(sock, sa_family);
 
-	result = isc__nm_socket_reuse(sock);
+	result = isc__nm_socket_reuse(sock, 1);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	if (mgr->load_balance_sockets) {
@@ -104,7 +105,7 @@ isc__nm_udp_lb_socket(isc_nm_t *mgr, sa_family_t sa_family) {
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	}
 
-	return (sock);
+	return sock;
 }
 
 static void
@@ -129,9 +130,10 @@ start_udp_child(isc_nm_t *mgr, isc_sockaddr_t *iface, isc_nmsocket_t *sock,
 		csock->fd = isc__nm_udp_lb_socket(mgr,
 						  iface->type.sa.sa_family);
 	} else {
+		INSIST(fd >= 0);
 		csock->fd = dup(fd);
 	}
-	REQUIRE(csock->fd >= 0);
+	INSIST(csock->fd >= 0);
 
 	ievent = isc__nm_get_netievent_udplisten(mgr, csock);
 	isc__nm_maybe_enqueue_ievent(&mgr->workers[tid],
@@ -217,7 +219,7 @@ isc_nm_listenudp(isc_nm_t *mgr, isc_sockaddr_t *iface, isc_nm_recv_cb_t cb,
 		isc_nmsocket_close(&sock);
 	}
 
-	return (result);
+	return result;
 }
 
 #ifdef USE_ROUTE_SOCKET
@@ -233,7 +235,7 @@ route_socket(uv_os_sock_t *fdp) {
 	result = isc__nm_socket(ROUTE_SOCKET_PF, SOCK_RAW,
 				ROUTE_SOCKET_PROTOCOL, &fd);
 	if (result != ISC_R_SUCCESS) {
-		return (result);
+		return result;
 	}
 
 #ifdef USE_NETLINK
@@ -242,12 +244,12 @@ route_socket(uv_os_sock_t *fdp) {
 	r = bind(fd, (struct sockaddr *)&sa, sizeof(sa));
 	if (r < 0) {
 		isc__nm_closesocket(fd);
-		return (isc_errno_toresult(r));
+		return isc_errno_toresult(r);
 	}
 #endif
 
 	*fdp = fd;
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 static isc_result_t
@@ -299,7 +301,7 @@ error:
 	INSIST(atomic_load(&sock->active));
 	UNLOCK(&sock->lock);
 
-	return (result);
+	return result;
 }
 
 /*
@@ -376,7 +378,7 @@ isc_nm_routeconnect(isc_nm_t *mgr, isc_nm_cb_t cb, void *cbarg,
 		isc__nm_connectcb(sock, req, result, true);
 		atomic_store(&sock->closed, true);
 		isc__nmsocket_detach(&sock);
-		return (result);
+		return result;
 	}
 
 	event = isc__nm_get_netievent_routeconnect(mgr, sock, req);
@@ -401,13 +403,13 @@ isc_nm_routeconnect(isc_nm_t *mgr, isc_nm_cb_t cb, void *cbarg,
 	BROADCAST(&sock->scond);
 	UNLOCK(&sock->lock);
 
-	return (sock->result);
+	return sock->result;
 #else  /* USE_ROUTE_SOCKET */
 	UNUSED(mgr);
 	UNUSED(cb);
 	UNUSED(cbarg);
 	UNUSED(extrahandlesize);
-	return (ISC_R_NOTIMPLEMENTED);
+	return ISC_R_NOTIMPLEMENTED;
 #endif /* USE_ROUTE_SOCKET */
 }
 
@@ -594,7 +596,7 @@ udp_recv_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 	 *   bigger than 'maxudp' bytes for testing purposes.
 	 */
 	maxudp = atomic_load(&sock->mgr->maxudp);
-	if ((maxudp != 0 && (uint32_t)nrecv > maxudp)) {
+	if (maxudp != 0 && (uint32_t)nrecv > maxudp) {
 		/*
 		 * We need to keep the read_cb intact in case, so the
 		 * readtimeout_cb can trigger and not crash because of
@@ -808,6 +810,21 @@ udp_send_cb(uv_udp_send_t *req, int status) {
 	isc__nm_sendcb(sock, uvreq, result, false);
 }
 
+static _Atomic(isc_stdtime_t) last_udpsends_log = 0;
+
+static bool
+can_log_udp_sends(void) {
+	isc_stdtime_t now;
+
+	isc_stdtime_get(&now);
+	isc_stdtime_t last = atomic_exchange_relaxed(&last_udpsends_log, now);
+	if (now != last) {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * udp_send_direct sends buf to a peer on a socket. Sock has to be in
  * the same thread as the callee.
@@ -824,7 +841,7 @@ udp_send_direct(isc_nmsocket_t *sock, isc__nm_uvreq_t *req,
 	REQUIRE(sock->type == isc_nm_udpsocket);
 
 	if (isc__nmsocket_closing(sock)) {
-		return (ISC_R_CANCELED);
+		return ISC_R_CANCELED;
 	}
 
 #if UV_VERSION_HEX >= UV_VERSION(1, 27, 0)
@@ -839,19 +856,44 @@ udp_send_direct(isc_nmsocket_t *sock, isc__nm_uvreq_t *req,
 	}
 #endif
 
-	r = uv_udp_send(&req->uv_req.udp_send, &sock->uv_handle.udp,
-			&req->uvbuf, 1, sa, udp_send_cb);
-	if (r < 0) {
-		return (isc__nm_uverr2result(r));
+	if (uv_udp_get_send_queue_size(&sock->uv_handle.udp) >
+	    ISC_NETMGR_UDP_SENDBUF_SIZE)
+	{
+		/*
+		 * The kernel UDP send queue is full, try sending the UDP
+		 * response synchronously instead of just failing.
+		 */
+		r = uv_udp_try_send(&sock->uv_handle.udp, &req->uvbuf, 1, sa);
+		if (r < 0) {
+			if (can_log_udp_sends()) {
+				isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
+					      ISC_LOGMODULE_NETMGR,
+					      ISC_LOG_ERROR,
+					      "Sending UDP messages failed: %s",
+					      isc_result_totext(
+						      isc__nm_uverr2result(r)));
+			}
+
+			return isc__nm_uverr2result(r);
+		}
+
+		isc__nm_sendcb(sock, req, ISC_R_SUCCESS, true);
+	} else {
+		/* Send the message asynchronously */
+		r = uv_udp_send(&req->uv_req.udp_send, &sock->uv_handle.udp,
+				&req->uvbuf, 1, sa, udp_send_cb);
+		if (r < 0) {
+			return isc__nm_uverr2result(r);
+		}
 	}
 
-	return (ISC_R_SUCCESS);
+	return ISC_R_SUCCESS;
 }
 
 static isc_result_t
 udp_connect_direct(isc_nmsocket_t *sock, isc__nm_uvreq_t *req) {
 	isc__networker_t *worker = NULL;
-	int uv_bind_flags = UV_UDP_REUSEADDR;
+	int uv_bind_flags = 0;
 	isc_result_t result = ISC_R_UNSET;
 	int r;
 
@@ -881,6 +923,12 @@ udp_connect_direct(isc_nmsocket_t *sock, isc__nm_uvreq_t *req) {
 		goto done;
 	}
 	isc__nm_incstats(sock, STATID_OPEN);
+
+	/*
+	 * uv_udp_open() enables REUSE_ADDR, we need to disable it again.
+	 */
+	result = isc__nm_socket_reuse(sock->fd, 0);
+	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 	if (sock->iface.type.sa.sa_family == AF_INET6) {
 		uv_bind_flags |= UV_UDP_IPV6ONLY;
@@ -926,7 +974,7 @@ error:
 	INSIST(atomic_load(&sock->active));
 	UNLOCK(&sock->lock);
 
-	return (result);
+	return result;
 }
 
 /*
@@ -1013,15 +1061,9 @@ isc_nm_udpconnect(isc_nm_t *mgr, isc_sockaddr_t *local, isc_sockaddr_t *peer,
 		return;
 	}
 
-	result = isc__nm_socket_reuse(sock->fd);
-	RUNTIME_CHECK(result == ISC_R_SUCCESS ||
-		      result == ISC_R_NOTIMPLEMENTED);
-
 	result = isc__nm_socket_reuse_lb(sock->fd);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS ||
 		      result == ISC_R_NOTIMPLEMENTED);
-
-	(void)isc__nm_socket_incoming_cpu(sock->fd);
 
 	(void)isc__nm_socket_disable_pmtud(sock->fd, sa_family);
 

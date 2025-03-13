@@ -104,7 +104,6 @@ fromwire_opt(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sregion);
 	if (sregion.length == 0) {
@@ -126,6 +125,12 @@ fromwire_opt(ARGS_FROMWIRE) {
 		switch (opt) {
 		case DNS_OPT_LLQ:
 			if (length != 18U) {
+				return DNS_R_OPTERR;
+			}
+			isc_region_consume(&sregion, length);
+			break;
+		case DNS_OPT_UL:
+			if (length != 4U && length != 8U) {
 				return DNS_R_OPTERR;
 			}
 			isc_region_consume(&sregion, length);
@@ -330,10 +335,6 @@ tostruct_opt(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	opt->length = r.length;
 	opt->options = mem_maybedup(mctx, r.base, r.length);
-	if (opt->options == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	opt->offset = 0;
 	opt->mctx = mctx;
 	return ISC_R_SUCCESS;

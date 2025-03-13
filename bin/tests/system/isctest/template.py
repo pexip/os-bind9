@@ -11,13 +11,13 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import pytest
 
 from .log import debug
+from .vars import ALL
 
 
 class TemplateEngine:
@@ -25,7 +25,7 @@ class TemplateEngine:
     Engine for rendering jinja2 templates in system test directories.
     """
 
-    def __init__(self, directory: Union[str, Path], env_vars=None):
+    def __init__(self, directory: Union[str, Path], env_vars=ALL):
         """
         Initialize the template engine for `directory`, optionally overriding
         the `env_vars` that will be used when rendering the templates (defaults
@@ -33,10 +33,7 @@ class TemplateEngine:
         """
         self.directory = Path(directory)
         self._j2env = None
-        if env_vars is None:
-            self.env_vars = dict(os.environ)
-        else:
-            self.env_vars = dict(env_vars)
+        self.env_vars = dict(env_vars)
 
     @property
     def j2env(self):

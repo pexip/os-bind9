@@ -19,13 +19,8 @@ pytestmark = [
         [
             "dig.out*",
             "dnsrps.cache",
-            "dnsrps*.conf",
+            "dnsrps.conf",
             "dnsrps.zones",
-            "dnsrpzd.conf",
-            "dnsrpzd-license-cur.conf",
-            "dnsrpzd.rpzf",
-            "dnsrpzd.sock",
-            "dnsrpzd.pid",
             "proto.*",
             "trusted.conf",
             "ns2/K*",
@@ -72,5 +67,11 @@ pytestmark = [
 
 def test_rpz_dnsrps(run_tests_sh):
     with open("dnsrps.conf", "w", encoding="utf-8") as conf:
-        conf.writelines(["dnsrps-enable yes;"])
+        conf.writelines(
+            [
+                "dnsrps-options { log-level 3 };"
+                "dnsrps-enable yes;"
+                'dnsrps-library "../../rpz/testlib/.libs/libdummyrpz.so";'
+            ]
+        )
     run_tests_sh()

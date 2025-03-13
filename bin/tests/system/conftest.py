@@ -9,7 +9,6 @@
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-from functools import partial
 import filecmp
 import os
 from pathlib import Path
@@ -18,18 +17,23 @@ import shutil
 import subprocess
 import tempfile
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 
 pytest.register_assert_rewrite("isctest")
 
 import isctest
+from isctest.vars.dirs import SYSTEM_TEST_DIR_GIT_PATH
 
 
 # Silence warnings caused by passing a pytest fixture to another fixture.
 # pylint: disable=redefined-outer-name
 
+
+isctest.log.init_conftest_logger()
+isctest.log.avoid_duplicated_logs()
+isctest.vars.init_vars()
 
 # ----------------- Older pytest / xdist compatibility -------------------
 # As of 2023-01-11, the minimal supported pytest / xdist versions are
@@ -50,12 +54,8 @@ else:
 XDIST_WORKER = os.environ.get("PYTEST_XDIST_WORKER", "")
 FILE_DIR = os.path.abspath(Path(__file__).parent)
 ENV_RE = re.compile(b"([^=]+)=(.*)")
-PORT_MIN = 5001
-PORT_MAX = 32767
-PORTS_PER_TEST = 20
 PRIORITY_TESTS = [
     # Tests that are scheduled first. Speeds up parallel execution.
-    "dupsigs/",
     "rpz/",
     "rpzrecurse/",
     "serve-stale/",
@@ -63,48 +63,13 @@ PRIORITY_TESTS = [
     "upforwd/",
 ]
 PRIORITY_TESTS_RE = re.compile("|".join(PRIORITY_TESTS))
-SYSTEM_TEST_DIR_GIT_PATH = "bin/tests/system"
 SYSTEM_TEST_NAME_RE = re.compile(f"{SYSTEM_TEST_DIR_GIT_PATH}" + r"/([^/]+)")
 SYMLINK_REPLACEMENT_RE = re.compile(r"/tests(_.*)\.py")
 
-# ---------------------- Module initialization ---------------------------
+# ----------------------- Global requirements ----------------------------
 
-
-def parse_env(env_bytes):
-    """Parse the POSIX env format into Python dictionary."""
-    out = {}
-    for line in env_bytes.splitlines():
-        match = ENV_RE.match(line)
-        if match:
-            # EL8+ workaround for https://access.redhat.com/solutions/6994985
-            # FUTURE: can be removed when we no longer need to parse env vars
-            if match.groups()[0] in [b"which_declare", b"BASH_FUNC_which%%"]:
-                continue
-            out[match.groups()[0]] = match.groups()[1]
-    return out
-
-
-def get_env_bytes(cmd):
-    try:
-        proc = subprocess.run(
-            [cmd],
-            shell=True,
-            check=True,
-            cwd=FILE_DIR,
-            stdout=subprocess.PIPE,
-        )
-    except subprocess.CalledProcessError as exc:
-        isctest.log.error("failed to get shell env: %s", exc)
-        raise exc
-    env_bytes = proc.stdout
-    return parse_env(env_bytes)
-
-
-# Read common environment variables for running tests from conf.sh.
-# FUTURE: Remove conf.sh entirely and define all variables in pytest only.
-CONF_ENV = get_env_bytes(". ./conf.sh && env")
-os.environb.update(CONF_ENV)
-isctest.log.debug("variables in env: %s", ", ".join([str(key) for key in CONF_ENV]))
+isctest.check.is_executable(isctest.vars.ALL["PYTHON"], "Python interpreter required")
+isctest.check.is_executable(isctest.vars.ALL["PERL"], "Perl interpreter required")
 
 # --------------------------- pytest hooks -------------------------------
 
@@ -244,8 +209,10 @@ def module_base_ports(modules):
     exactly what happens - every worker thread will call this fixture to
     determine test ports.
     """
-    port_min = PORT_MIN
-    port_max = PORT_MAX - len(modules) * PORTS_PER_TEST
+    port_min = isctest.vars.ports.PORT_MIN
+    port_max = (
+        isctest.vars.ports.PORT_MAX - len(modules) * isctest.vars.ports.PORTS_PER_TEST
+    )
     if port_max < port_min:
         raise RuntimeError("not enough ports to assign unique port set to each module")
 
@@ -257,65 +224,38 @@ def module_base_ports(modules):
     # be misleading.
     base_port = int(time.time() // 3600) % (port_max - port_min) + port_min
 
-    return {mod: base_port + i * PORTS_PER_TEST for i, mod in enumerate(modules)}
+    return {
+        mod: base_port + i * isctest.vars.ports.PORTS_PER_TEST
+        for i, mod in enumerate(modules)
+    }
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(autouse=True, scope="module")
 def base_port(request, module_base_ports):
     """Start of the port range assigned to a particular test module."""
     port = module_base_ports[request.fspath]
+    isctest.vars.ports.set_base_port(port)
     return port
 
 
 @pytest.fixture(scope="module")
-def ports(base_port):
-    """Dictionary containing port names and their assigned values."""
-    return {
-        "PORT": base_port,
-        "TLSPORT": base_port + 1,
-        "HTTPPORT": base_port + 2,
-        "HTTPSPORT": base_port + 3,
-        "EXTRAPORT1": base_port + 4,
-        "EXTRAPORT2": base_port + 5,
-        "EXTRAPORT3": base_port + 6,
-        "EXTRAPORT4": base_port + 7,
-        "EXTRAPORT5": base_port + 8,
-        "EXTRAPORT6": base_port + 9,
-        "EXTRAPORT7": base_port + 10,
-        "EXTRAPORT8": base_port + 11,
-        "CONTROLPORT": base_port + 12,
-    }
+def named_port():
+    return int(os.environ["PORT"])
 
 
 @pytest.fixture(scope="module")
-def named_port(ports):
-    return ports["PORT"]
+def named_tlsport():
+    return int(os.environ["TLSPORT"])
 
 
 @pytest.fixture(scope="module")
-def named_tlsport(ports):
-    return ports["TLSPORT"]
+def named_httpsport():
+    return int(os.environ["HTTPSPORT"])
 
 
 @pytest.fixture(scope="module")
-def named_httpsport(ports):
-    return ports["HTTPSPORT"]
-
-
-@pytest.fixture(scope="module")
-def control_port(ports):
-    return ports["CONTROLPORT"]
-
-
-@pytest.fixture(scope="module")
-def env(ports):
-    """Dictionary containing environment variables for the test."""
-    env = os.environ.copy()
-    for portname, portnum in ports.items():
-        env[portname] = str(portnum)
-    env["builddir"] = f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}"
-    env["srcdir"] = f"{env['TOP_SRCDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}"
-    return env
+def control_port():
+    return int(os.environ["CONTROLPORT"])
 
 
 @pytest.fixture(scope="module")
@@ -346,6 +286,17 @@ def wait_for_zones_loaded(request, servers):
             watcher.wait_for_line("all zones loaded")
 
 
+@pytest.fixture(scope="module", autouse=True)
+def configure_algorithm_set(request):
+    """Configure the algorithm set to use in tests."""
+    mark = _get_marker(request.node, "algorithm_set")
+    if not mark:
+        name = None
+    else:
+        name = mark.args[0]
+    isctest.vars.set_algorithm_set(name)
+
+
 @pytest.fixture(autouse=True)
 def logger(request, system_test_name):
     """Sets up logging facility specific to a particular test."""
@@ -359,7 +310,6 @@ def expected_artifacts(request):
     common_artifacts = [
         ".libs/*",  # possible build artifacts, see GL #5055
         "ns*/named.conf",
-        "ns*/named.lock",
         "ns*/named.memstats",
         "ns*/named.run",
         "ns*/named.run.prev",
@@ -385,7 +335,7 @@ def expected_artifacts(request):
 
 
 @pytest.fixture(scope="module")
-def system_test_dir(request, env, system_test_name, expected_artifacts):
+def system_test_dir(request, system_test_name, expected_artifacts):
     """
     Temporary directory for executing the test.
 
@@ -441,9 +391,15 @@ def system_test_dir(request, env, system_test_name, expected_artifacts):
 
             # test must not remove any Git-tracked file, ignore libtool and gcov artifacts
             for name in dcmp.left_only:
-                path = Path(name)
-                assert path.name.startswith("lt-") or path.suffix == ".gcda"
-            assert not dcmp.diff_files, "test must not modify any Git-tracked file"
+                assert name.startswith("lt-") or name.endswith(".gcda")
+            for name in dcmp.diff_files:
+                # There should be no diff_files. However, due to how the
+                # obsolete dnsrps tests are launched, this workaround is
+                # required to ignore the dnsrps-dnsrps.gcda file which may
+                # get detected here as git-tracked in some circumstances
+                assert name.endswith(
+                    ".gcda"
+                ), "test must not modify any Git-tracked file"
 
             dir_path = Path(dcmp.left).relative_to(source_dir)
             for name in dcmp.right_only:
@@ -465,12 +421,13 @@ def system_test_dir(request, env, system_test_name, expected_artifacts):
         ), f"Unexpected files found in test directory: {unexpected_files}"
 
     # Create a temporary directory with a copy of the original system test dir contents
-    system_test_root = Path(f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}")
+    system_test_root = Path(os.environ["builddir"])
     testdir = Path(
         tempfile.mkdtemp(prefix=f"{system_test_name}_tmp_", dir=system_test_root)
     )
     shutil.rmtree(testdir)
     shutil.copytree(system_test_root / system_test_name, testdir)
+    isctest.vars.dirs.set_system_test_name(testdir.name)
 
     # Create a convenience symlink with a stable and predictable name
     module_name = SYMLINK_REPLACEMENT_RE.sub(r"\1", str(_get_node_path(request.node)))
@@ -528,50 +485,8 @@ def system_test_dir(request, env, system_test_name, expected_artifacts):
 
 
 @pytest.fixture(scope="module")
-def templates(system_test_dir: Path, env):
-    return isctest.template.TemplateEngine(system_test_dir, env)
-
-
-def _run_script(
-    env,
-    system_test_dir: Path,
-    interpreter: str,
-    script: str,
-    args: Optional[List[str]] = None,
-):
-    """Helper function for the shell / perl script invocations (through fixtures below)."""
-    if args is None:
-        args = []
-    path = Path(script)
-    if not path.is_absolute():
-        # make sure relative paths are always relative to system_dir
-        path = system_test_dir.parent / path
-    script = str(path)
-    cwd = os.getcwd()
-    if not path.exists():
-        raise FileNotFoundError(f"script {script} not found in {cwd}")
-    isctest.log.debug("running script: %s %s %s", interpreter, script, " ".join(args))
-    isctest.log.debug("  workdir: %s", cwd)
-    returncode = 1
-
-    cmd = [interpreter, script] + args
-    with subprocess.Popen(
-        cmd,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        universal_newlines=True,
-        errors="backslashreplace",
-    ) as proc:
-        if proc.stdout:
-            for line in proc.stdout:
-                isctest.log.info("    %s", line.rstrip("\n"))
-        proc.communicate()
-        returncode = proc.returncode
-        if returncode:
-            raise subprocess.CalledProcessError(returncode, cmd)
-        isctest.log.debug("  exited with %d", returncode)
+def templates(system_test_dir: Path):
+    return isctest.template.TemplateEngine(system_test_dir)
 
 
 def _get_node_path(node) -> Path:
@@ -584,23 +499,11 @@ def _get_node_path(node) -> Path:
 
 
 @pytest.fixture(scope="module")
-def shell(env, system_test_dir):
-    """Function to call a shell script with arguments."""
-    return partial(_run_script, env, system_test_dir, env["SHELL"])
-
-
-@pytest.fixture(scope="module")
-def perl(env, system_test_dir):
-    """Function to call a perl script with arguments."""
-    return partial(_run_script, env, system_test_dir, env["PERL"])
-
-
-@pytest.fixture(scope="module")
-def run_tests_sh(system_test_dir, shell):
+def run_tests_sh(system_test_dir):
     """Utility function to execute tests.sh as a python test."""
 
     def run_tests():
-        shell(f"{system_test_dir}/tests.sh")
+        isctest.run.shell(f"{system_test_dir}/tests.sh")
 
     return run_tests
 
@@ -608,11 +511,8 @@ def run_tests_sh(system_test_dir, shell):
 @pytest.fixture(scope="module", autouse=True)
 def system_test(
     request,
-    env: Dict[str, str],
     system_test_dir,
     templates,
-    shell,
-    perl,
 ):
     """
     Driver of the test setup/teardown process. Used automatically for every test module.
@@ -638,14 +538,16 @@ def system_test(
 
     def check_net_interfaces():
         try:
-            perl("testsock.pl", ["-p", env["PORT"]])
+            isctest.run.perl(
+                f"{os.environ['srcdir']}/testsock.pl", ["-p", os.environ["PORT"]]
+            )
         except subprocess.CalledProcessError as exc:
             isctest.log.error("testsock.pl: exited with code %d", exc.returncode)
             pytest.skip("Network interface aliases not set up.")
 
     def check_prerequisites():
         try:
-            shell(f"{system_test_dir}/prereq.sh")
+            isctest.run.shell(f"{system_test_dir}/prereq.sh")
         except FileNotFoundError:
             pass  # prereq.sh is optional
         except subprocess.CalledProcessError:
@@ -654,7 +556,7 @@ def system_test(
     def setup_test():
         templates.render_auto()
         try:
-            shell(f"{system_test_dir}/setup.sh")
+            isctest.run.shell(f"{system_test_dir}/setup.sh")
         except FileNotFoundError:
             pass  # setup.sh is optional
         except subprocess.CalledProcessError as exc:
@@ -663,14 +565,17 @@ def system_test(
 
     def start_servers():
         try:
-            perl("start.pl", ["--port", env["PORT"], system_test_dir.name])
+            isctest.run.perl(
+                f"{os.environ['srcdir']}/start.pl",
+                ["--port", os.environ["PORT"], system_test_dir.name],
+            )
         except subprocess.CalledProcessError as exc:
             isctest.log.error("Failed to start servers")
             pytest.fail(f"start.pl exited with {exc.returncode}")
 
     def stop_servers():
         try:
-            perl("stop.pl", [system_test_dir.name])
+            isctest.run.perl(f"{os.environ['srcdir']}/stop.pl", [system_test_dir.name])
         except subprocess.CalledProcessError as exc:
             isctest.log.error("Failed to stop servers")
             get_core_dumps()
@@ -678,15 +583,18 @@ def system_test(
 
     def get_core_dumps():
         try:
-            shell("get_core_dumps.sh", [system_test_dir.name])
+            isctest.run.shell(
+                f"{os.environ['srcdir']}/get_core_dumps.sh", [system_test_dir.name]
+            )
         except subprocess.CalledProcessError as exc:
             isctest.log.error("Found core dumps or sanitizer reports")
             pytest.fail(f"get_core_dumps.sh exited with {exc.returncode}")
 
-    os.environ.update(env)  # Ensure pytests have the same env vars as shell tests.
     isctest.log.info(f"test started: {_get_node_path(request.node)}")
-    port = int(env["PORT"])
-    isctest.log.info("using port range: <%d, %d>", port, port + PORTS_PER_TEST - 1)
+    port = int(os.environ["PORT"])
+    isctest.log.info(
+        "using port range: <%d, %d>", port, port + isctest.vars.ports.PORTS_PER_TEST - 1
+    )
 
     if not hasattr(request.node, "stash"):  # compatibility with pytest<7.0.0
         request.node.stash = {}  # use regular dict instead of pytest.Stash
@@ -713,18 +621,14 @@ def system_test(
         request.node.stash[FIXTURE_OK] = True
 
 
-@pytest.fixture
-def servers(ports, system_test_dir):
+@pytest.fixture(scope="module")
+def servers(system_test_dir):
     instances = {}
     for entry in system_test_dir.rglob("*"):
         if entry.is_dir():
             try:
                 dir_name = entry.name
-                # LATER: Make ports fixture return NamedPorts directly
-                named_ports = isctest.instance.NamedPorts(
-                    dns=int(ports["PORT"]), rndc=int(ports["CONTROLPORT"])
-                )
-                instance = isctest.instance.NamedInstance(dir_name, named_ports)
+                instance = isctest.instance.NamedInstance(dir_name)
                 instances[dir_name] = instance
             except ValueError:
                 continue

@@ -19,7 +19,6 @@ pytestmark = pytest.mark.extra_artifacts(
         "dig.*.bar.*",
         "dig.*.prime.*",
         "nextpart.out.*",
-        "resolve.out.*",
         "ans*/ans.run",
         "ans*/query.log",
         "ns4/tld.db",

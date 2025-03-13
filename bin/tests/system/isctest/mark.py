@@ -13,7 +13,7 @@
 
 import os
 from pathlib import Path
-import ssl
+import shutil
 import subprocess
 
 import pytest
@@ -48,15 +48,27 @@ def is_dnsrps_available():
     return True
 
 
+def with_dnstap(*args):  # pylint: disable=unused-argument
+    return feature_test("--enable-dnstap")
+
+
 def with_tsan(*args):  # pylint: disable=unused-argument
     return feature_test("--tsan")
 
 
-have_libxml2 = pytest.mark.skipif(
+without_fips = pytest.mark.skipif(
+    feature_test("--have-fips-mode"), reason="FIPS support enabled in the build"
+)
+
+with_libxml2 = pytest.mark.skipif(
     not feature_test("--have-libxml2"), reason="libxml2 support disabled in the build"
 )
 
-have_json_c = pytest.mark.skipif(
+with_lmdb = pytest.mark.skipif(
+    not feature_test("--with-lmdb"), reason="LMDB support disabled in the build"
+)
+
+with_json_c = pytest.mark.skipif(
     not feature_test("--have-json-c"), reason="json-c support disabled in the build"
 )
 
@@ -64,12 +76,16 @@ dnsrps_enabled = pytest.mark.skipif(
     not is_dnsrps_available(), reason="dnsrps disabled in the build"
 )
 
-supported_openssl_version = pytest.mark.skipif(
-    ssl.OPENSSL_VERSION_NUMBER >= 0x300000C0
-    and ssl.OPENSSL_VERSION_NUMBER < 0x300000E0,
-    reason="unsupported OpenSSL [GL #4814]",
-)
 
+softhsm2_environment = pytest.mark.skipif(
+    not (
+        os.getenv("SOFTHSM2_CONF")
+        and os.getenv("SOFTHSM2_MODULE")
+        and shutil.which("pkcs11-tool")
+        and shutil.which("softhsm2-util")
+    ),
+    reason="SOFTHSM2_CONF and SOFTHSM2_MODULE environmental variables must be set and pkcs11-tool and softhsm2-util tools present",
+)
 
 try:
     import flaky as flaky_pkg  # type: ignore

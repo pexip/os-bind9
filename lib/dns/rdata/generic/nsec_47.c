@@ -65,7 +65,7 @@ totext_nsec(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	RETERR(dns_name_totext(&name, false, target));
+	RETERR(dns_name_totext(&name, 0, target));
 	/*
 	 * Don't leave a trailing space when there's no typemap present.
 	 */
@@ -85,10 +85,10 @@ fromwire_nsec(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sr);
 	RETERR(typemap_test(&sr, false));
@@ -106,12 +106,12 @@ towire_nsec(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_nsec);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 
 	return mem_tobuffer(target, sr.base, sr.length);
 }
@@ -178,18 +178,8 @@ tostruct_nsec(ARGS_TOSTRUCT) {
 
 	nsec->len = region.length;
 	nsec->typebits = mem_maybedup(mctx, region.base, region.length);
-	if (nsec->typebits == NULL) {
-		goto cleanup;
-	}
-
 	nsec->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&nsec->next, mctx);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void

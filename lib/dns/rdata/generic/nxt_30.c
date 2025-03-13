@@ -91,10 +91,9 @@ fromtext_nxt(ARGS_FROMTEXT) {
 static isc_result_t
 totext_nxt(ARGS_TOTEXT) {
 	isc_region_t sr;
-	unsigned int i, j;
+	unsigned int i, j, opts;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
 
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 	REQUIRE(rdata->length != 0);
@@ -104,8 +103,9 @@ totext_nxt(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	for (i = 0; i < sr.length; i++) {
 		if (sr.base[i] != 0) {
@@ -144,10 +144,10 @@ fromwire_nxt(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sr);
 	if (sr.length > 0 && ((sr.base[0] & 0x80) != 0 || sr.length > 16 ||
@@ -169,12 +169,12 @@ towire_nxt(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 
 	return mem_tobuffer(target, sr.base, sr.length);
 }
@@ -257,18 +257,8 @@ tostruct_nxt(ARGS_TOSTRUCT) {
 
 	nxt->len = region.length;
 	nxt->typebits = mem_maybedup(mctx, region.base, region.length);
-	if (nxt->typebits == NULL) {
-		goto cleanup;
-	}
-
 	nxt->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&nxt->next, mctx);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void

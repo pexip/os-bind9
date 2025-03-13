@@ -187,7 +187,7 @@ totext_ipseckey(ARGS_TOTEXT) {
 
 	case 3:
 		dns_name_fromregion(&name, &region);
-		RETERR(dns_name_totext(&name, false, target));
+		RETERR(dns_name_totext(&name, 0, target));
 		isc_region_consume(&region, name_length(&name));
 		break;
 	}
@@ -221,7 +221,7 @@ fromwire_ipseckey(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -255,7 +255,7 @@ fromwire_ipseckey(ARGS_FROMWIRE) {
 	case 3:
 		RETERR(mem_tobuffer(target, region.base, 3));
 		isc_buffer_forward(source, 3);
-		RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+		RETERR(dns_name_fromwire(&name, source, dctx, target));
 		isc_buffer_activeregion(source, &region);
 		isc_buffer_forward(source, region.length);
 		if (region.length < 1) {
@@ -353,10 +353,6 @@ tostruct_ipseckey(ARGS_TOSTRUCT) {
 	REQUIRE(ipseckey != NULL);
 	REQUIRE(rdata->length >= 3);
 
-	if (rdata->data[1] > 3U) {
-		return ISC_R_NOTIMPLEMENTED;
-	}
-
 	ipseckey->common.rdclass = rdata->rdclass;
 	ipseckey->common.rdtype = rdata->type;
 	ISC_LINK_INIT(&ipseckey->common, link);
@@ -384,6 +380,7 @@ tostruct_ipseckey(ARGS_TOSTRUCT) {
 		break;
 
 	case 2:
+		INSIST(region.length >= 16U);
 		memmove(ipseckey->in6_addr.s6_addr, region.base, 16);
 		isc_region_consume(&region, 16);
 		break;
@@ -400,13 +397,6 @@ tostruct_ipseckey(ARGS_TOSTRUCT) {
 	if (ipseckey->keylength != 0U) {
 		ipseckey->key = mem_maybedup(mctx, region.base,
 					     ipseckey->keylength);
-		if (ipseckey->key == NULL) {
-			if (ipseckey->gateway_type == 3) {
-				dns_name_free(&ipseckey->gateway,
-					      ipseckey->mctx);
-			}
-			return ISC_R_NOMEMORY;
-		}
 	} else {
 		ipseckey->key = NULL;
 	}

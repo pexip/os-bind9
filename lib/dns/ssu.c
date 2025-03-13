@@ -18,7 +18,6 @@
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/refcount.h>
 #include <isc/result.h>
 #include <isc/string.h>
@@ -66,7 +65,7 @@ dns_ssutable_create(isc_mem_t *mctx, dns_ssutable_t **tablep) {
 	REQUIRE(tablep != NULL && *tablep == NULL);
 	REQUIRE(mctx != NULL);
 
-	table = isc_mem_get(mctx, sizeof(dns_ssutable_t));
+	table = isc_mem_get(mctx, sizeof(*table));
 	isc_refcount_init(&table->references, 1);
 	table->mctx = NULL;
 	isc_mem_attach(mctx, &table->mctx);
@@ -94,8 +93,8 @@ destroy(dns_ssutable_t *table) {
 			isc_mem_put(mctx, rule->name, sizeof(*rule->name));
 		}
 		if (rule->types != NULL) {
-			isc_mem_put(mctx, rule->types,
-				    rule->ntypes * sizeof(*rule->types));
+			isc_mem_cput(mctx, rule->types, rule->ntypes,
+				     sizeof(*rule->types));
 		}
 		ISC_LIST_UNLINK(table->rules, rule, link);
 		rule->magic = 0;
@@ -170,7 +169,7 @@ dns_ssutable_addrule(dns_ssutable_t *table, bool grant,
 
 	rule->ntypes = ntypes;
 	if (ntypes > 0) {
-		rule->types = isc_mem_get(mctx, ntypes * sizeof(*rule->types));
+		rule->types = isc_mem_cget(mctx, ntypes, sizeof(*rule->types));
 		memmove(rule->types, types, ntypes * sizeof(*rule->types));
 	} else {
 		rule->types = NULL;
@@ -367,10 +366,11 @@ dns_ssutable_checkrules(dns_ssutable_t *table, const dns_name_t *signer,
 			if (!dns_name_issubdomain(name, rule->name)) {
 				continue;
 			}
-			RWLOCK(&env->rwlock, isc_rwlocktype_read);
-			dns_acl_match(addr, NULL, env->localhost, NULL, &match,
+			rcu_read_lock();
+			dns_acl_t *localhost = rcu_dereference(env->localhost);
+			dns_acl_match(addr, NULL, localhost, NULL, &match,
 				      NULL);
-			RWUNLOCK(&env->rwlock, isc_rwlocktype_read);
+			rcu_read_unlock();
 			if (match == 0) {
 				if (signer != NULL) {
 					isc_log_write(dns_lctx,

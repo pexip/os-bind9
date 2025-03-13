@@ -30,13 +30,6 @@
 
 #include <dst/dst.h>
 
-#define RETERR(x)                            \
-	do {                                 \
-		result = (x);                \
-		if (result != ISC_R_SUCCESS) \
-			goto failure;        \
-	} while (0)
-
 void
 dns_nsec_setbit(unsigned char *array, unsigned int type, unsigned int bit) {
 	unsigned int shift, mask;
@@ -189,14 +182,17 @@ dns_nsec_build(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	dns_rdataset_init(&rdataset);
 	dns_rdata_init(&rdata);
 
-	RETERR(dns_nsec_buildrdata(db, version, node, target, data, &rdata));
+	result = dns_nsec_buildrdata(db, version, node, target, data, &rdata);
+	if (result != ISC_R_SUCCESS) {
+		goto failure;
+	}
 
 	dns_rdatalist_init(&rdatalist);
 	rdatalist.rdclass = dns_db_class(db);
 	rdatalist.type = dns_rdatatype_nsec;
 	rdatalist.ttl = ttl;
 	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
-	RETERR(dns_rdatalist_tordataset(&rdatalist, &rdataset));
+	dns_rdatalist_tordataset(&rdatalist, &rdataset);
 	result = dns_db_addrdataset(db, node, version, 0, &rdataset, 0, NULL);
 	if (result == DNS_R_UNCHANGED) {
 		result = ISC_R_SUCCESS;
@@ -284,7 +280,6 @@ dns_nsec_nseconly(dns_db_t *db, dns_dbversion_t *version, dns_diff_t *diff,
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 		if (dnskey.algorithm == DST_ALG_RSAMD5 ||
-		    dnskey.algorithm == DST_ALG_DH ||
 		    dnskey.algorithm == DST_ALG_DSA ||
 		    dnskey.algorithm == DST_ALG_RSASHA1)
 		{

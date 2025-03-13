@@ -17,7 +17,7 @@
 
 #include <isc/buffer.h>
 #include <isc/result.h>
-#include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/callbacks.h>
@@ -175,12 +175,10 @@ check_hints(dns_db_t *db) {
 	dns_rdataset_t rootns;
 	dns_dbiterator_t *dbiter = NULL;
 	dns_dbnode_t *node = NULL;
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 	dns_fixedname_t fixname;
 	dns_name_t *name;
 	dns_rdatasetiter_t *rdsiter = NULL;
-
-	isc_stdtime_get(&now);
 
 	name = dns_fixedname_initname(&fixname);
 
@@ -240,8 +238,8 @@ dns_rootns_create(isc_mem_t *mctx, dns_rdataclass_t rdclass,
 
 	REQUIRE(target != NULL && *target == NULL);
 
-	result = dns_db_create(mctx, "rbt", dns_rootname, dns_dbtype_zone,
-			       rdclass, 0, NULL, &db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, dns_rootname,
+			       dns_dbtype_zone, rdclass, 0, NULL, &db);
 	if (result != ISC_R_SUCCESS) {
 		goto failure;
 	}
@@ -501,15 +499,13 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 	dns_rdata_ns_t ns;
 	dns_rdataset_t hintns, rootns;
 	const char *viewname = "", *sep = "";
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 	dns_name_t *name;
 	dns_fixedname_t fixed;
 
 	REQUIRE(hints != NULL);
 	REQUIRE(db != NULL);
 	REQUIRE(view != NULL);
-
-	isc_stdtime_get(&now);
 
 	if (strcmp(view->name, "_bind") != 0 &&
 	    strcmp(view->name, "_default") != 0)

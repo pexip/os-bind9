@@ -21,6 +21,7 @@
 #include <time.h>
 
 #include <isc/stdtime.h>
+#include <isc/strerr.h>
 #include <isc/time.h>
 #include <isc/util.h>
 
@@ -32,20 +33,17 @@
 #define CLOCKSOURCE CLOCK_REALTIME
 #endif /* if defined(CLOCK_REALTIME_COARSE) */
 
-void
-isc_stdtime_get(isc_stdtime_t *t) {
-	REQUIRE(t != NULL);
-
+isc_stdtime_t
+isc_stdtime_now(void) {
 	struct timespec ts;
 
 	if (clock_gettime(CLOCKSOURCE, &ts) == -1) {
 		FATAL_SYSERROR(errno, "clock_gettime()");
 	}
+	INSIST(ts.tv_sec > 0 && ts.tv_nsec >= 0 &&
+	       ts.tv_nsec < (long)NS_PER_SEC);
 
-	REQUIRE(ts.tv_sec > 0 && ts.tv_nsec >= 0 &&
-		ts.tv_nsec < (long)NS_PER_SEC);
-
-	*t = (isc_stdtime_t)ts.tv_sec;
+	return (isc_stdtime_t)ts.tv_sec;
 }
 
 void
@@ -54,8 +52,6 @@ isc_stdtime_tostring(isc_stdtime_t t, char *out, size_t outlen) {
 
 	REQUIRE(out != NULL);
 	REQUIRE(outlen >= 26);
-
-	UNUSED(outlen);
 
 	/* time_t and isc_stdtime_t might be different sizes */
 	when = t;

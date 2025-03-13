@@ -54,7 +54,7 @@ totext_in_kx(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -74,8 +74,9 @@ totext_in_kx(ARGS_TOTEXT) {
 	RETERR(str_totext(" ", target));
 
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return dns_name_totext(&prefix, sub, target);
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return dns_name_totext(&prefix, opts, target);
 }
 
 static isc_result_t
@@ -89,7 +90,7 @@ fromwire_in_kx(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -99,7 +100,7 @@ fromwire_in_kx(ARGS_FROMWIRE) {
 	}
 	RETERR(mem_tobuffer(target, sregion.base, 2));
 	isc_buffer_forward(source, 2);
-	return dns_name_fromwire(&name, source, dctx, options, target);
+	return dns_name_fromwire(&name, source, dctx, target);
 }
 
 static isc_result_t
@@ -112,7 +113,7 @@ towire_in_kx(ARGS_TOWIRE) {
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_rdata_toregion(rdata, &region);
 	RETERR(mem_tobuffer(target, region.base, 2));
 	isc_region_consume(&region, 2);
@@ -120,7 +121,7 @@ towire_in_kx(ARGS_TOWIRE) {
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &region);
 
-	return dns_name_towire(&name, cctx, target);
+	return dns_name_towire(&name, cctx, target, NULL);
 }
 
 static int
@@ -237,7 +238,7 @@ additionaldata_in_kx(ARGS_ADDLDATA) {
 	isc_region_consume(&region, 2);
 	dns_name_fromregion(&name, &region);
 
-	return (add)(arg, &name, dns_rdatatype_a, NULL);
+	return (add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE);
 }
 
 static isc_result_t

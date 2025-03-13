@@ -177,7 +177,7 @@ totext_hip(ARGS_TOTEXT) {
 	while (region.length > 0) {
 		dns_name_fromregion(&name, &region);
 
-		RETERR(dns_name_totext(&name, false, target));
+		RETERR(dns_name_totext(&name, 0, target));
 		isc_region_consume(&region, name.length);
 		if (region.length > 0) {
 			RETERR(str_totext(tctx->linebreak, target));
@@ -226,10 +226,10 @@ fromwire_hip(ARGS_FROMWIRE) {
 	RETERR(mem_tobuffer(target, rr.base, 4 + len));
 	isc_buffer_forward(source, 4 + len);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 	while (isc_buffer_activelength(source) > 0) {
 		dns_name_init(&name, NULL);
-		RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+		RETERR(dns_name_fromwire(&name, source, dctx, target));
 	}
 	return ISC_R_SUCCESS;
 }
@@ -324,42 +324,21 @@ tostruct_hip(ARGS_TOSTRUCT) {
 	hip->hit = hip->key = hip->servers = NULL;
 
 	hip->hit = mem_maybedup(mctx, region.base, hip->hit_len);
-	if (hip->hit == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&region, hip->hit_len);
 
 	INSIST(hip->key_len <= region.length);
 
 	hip->key = mem_maybedup(mctx, region.base, hip->key_len);
-	if (hip->key == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&region, hip->key_len);
 
 	hip->servers_len = region.length;
 	if (hip->servers_len != 0) {
 		hip->servers = mem_maybedup(mctx, region.base, region.length);
-		if (hip->servers == NULL) {
-			goto cleanup;
-		}
 	}
 
 	hip->offset = hip->servers_len;
 	hip->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (hip->hit != NULL) {
-		isc_mem_free(mctx, hip->hit);
-	}
-	if (hip->key != NULL) {
-		isc_mem_free(mctx, hip->key);
-	}
-	if (hip->servers != NULL) {
-		isc_mem_free(mctx, hip->servers);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void
@@ -497,8 +476,8 @@ casecompare_hip(ARGS_COMPARE) {
 	isc_region_consume(&r1, 2); /* key length */
 	isc_region_consume(&r2, 4);
 
-	INSIST(r1.length >= (unsigned)(hit_len + key_len));
-	INSIST(r2.length >= (unsigned)(hit_len + key_len));
+	INSIST(r1.length >= (unsigned int)(hit_len + key_len));
+	INSIST(r2.length >= (unsigned int)(hit_len + key_len));
 	order = memcmp(r1.base, r2.base, hit_len + key_len);
 	if (order != 0) {
 		return order;

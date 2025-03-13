@@ -75,7 +75,6 @@ fromwire_openpgpkey(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	/*
 	 * Keyring.
@@ -156,15 +155,8 @@ tostruct_openpgpkey(ARGS_TOSTRUCT) {
 	 */
 	sig->length = sr.length;
 	sig->keyring = mem_maybedup(mctx, sr.base, sig->length);
-	if (sig->keyring == NULL) {
-		goto cleanup;
-	}
-
 	sig->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	return ISC_R_NOMEMORY;
 }
 
 static void

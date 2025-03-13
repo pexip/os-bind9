@@ -13,7 +13,6 @@ import pytest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
-        "*-supported.file",
         "K*.private",
         "K*.key",
         "K*.state",

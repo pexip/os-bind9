@@ -15,6 +15,7 @@ pytestmark = pytest.mark.extra_artifacts(
     [
         "*.created",
         "dig.out.*",
+        "rndc.reload.*",
         "rndc.signing.*",
         "update.out.*",
         "verify.out.*",
@@ -26,6 +27,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns*/*.jnl",
         "ns*/*.signed",
         "ns*/keygen.out.*",
+        "ns3/named-fips.conf",
     ]
 )
 

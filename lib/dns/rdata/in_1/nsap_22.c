@@ -101,7 +101,6 @@ fromwire_in_nsap(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &region);
@@ -176,10 +175,6 @@ tostruct_in_nsap(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	nsap->nsap_len = r.length;
 	nsap->nsap = mem_maybedup(mctx, r.base, r.length);
-	if (nsap->nsap == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	nsap->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

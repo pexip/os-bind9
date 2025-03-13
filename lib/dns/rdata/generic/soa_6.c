@@ -85,7 +85,7 @@ totext_soa(ARGS_TOTEXT) {
 	dns_name_t mname;
 	dns_name_t rname;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	int i;
 	bool multiline;
 	bool comm;
@@ -112,13 +112,17 @@ totext_soa(ARGS_TOTEXT) {
 	dns_name_fromregion(&rname, &dregion);
 	isc_region_consume(&dregion, name_length(&rname));
 
-	sub = name_prefix(&mname, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&mname, tctx->origin, &prefix)
+		       ? DNS_NAME_OMITFINALDOT
+		       : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	RETERR(str_totext(" ", target));
 
-	sub = name_prefix(&rname, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&rname, tctx->origin, &prefix)
+		       ? DNS_NAME_OMITFINALDOT
+		       : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	if (multiline) {
 		RETERR(str_totext(" (", target));
@@ -165,13 +169,13 @@ fromwire_soa(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_GLOBAL14);
+	dctx = dns_decompress_setpermitted(dctx, true);
 
 	dns_name_init(&mname, NULL);
 	dns_name_init(&rname, NULL);
 
-	RETERR(dns_name_fromwire(&mname, source, dctx, options, target));
-	RETERR(dns_name_fromwire(&rname, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&mname, source, dctx, target));
+	RETERR(dns_name_fromwire(&rname, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sregion);
 	isc_buffer_availableregion(target, &tregion);
@@ -202,7 +206,7 @@ towire_soa(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_soa);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_GLOBAL14);
+	dns_compress_setpermitted(cctx, true);
 
 	dns_name_init(&mname, moffsets);
 	dns_name_init(&rname, roffsets);
@@ -211,11 +215,11 @@ towire_soa(ARGS_TOWIRE) {
 
 	dns_name_fromregion(&mname, &sregion);
 	isc_region_consume(&sregion, name_length(&mname));
-	RETERR(dns_name_towire(&mname, cctx, target));
+	RETERR(dns_name_towire(&mname, cctx, target, NULL));
 
 	dns_name_fromregion(&rname, &sregion);
 	isc_region_consume(&sregion, name_length(&rname));
-	RETERR(dns_name_towire(&rname, cctx, target));
+	RETERR(dns_name_towire(&rname, cctx, target, NULL));
 
 	isc_buffer_availableregion(target, &tregion);
 	if (tregion.length < 20) {

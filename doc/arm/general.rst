@@ -39,7 +39,7 @@ The list is non-exhaustive.
 
 .. _Internet Engineering Steering Group: https://www.ietf.org/about/groups/iesg/
 .. _Internet Engineering Task Force: https://www.ietf.org/about/
-.. _Request for Comments: https://www.ietf.org/standards/rfcs/
+.. _Request for Comments: https://www.ietf.org/process/rfcs/
 
 Some of these RFCs, though DNS-related, are not concerned with implementing
 software.
@@ -397,8 +397,10 @@ Notes
 .. [#rfc1035_2] CLASS ANY queries are not supported. This is considered a
    feature.
 
-.. [#rfc2931] Support for SIG(0) message verification was removed
-   as part of the mitigation of CVE-2024-1975.
+.. [#rfc2931] When receiving a query signed with a SIG(0), the server is
+   only able to verify the signature if it has the key in its local
+   authoritative data; it cannot do recursion or validation to
+   retrieve unknown keys.
 
 .. [#rfc2874] Compliance is with loading and serving of A6 records only.
    A6 records were moved to the experimental category by :rfc:`3363`.
@@ -448,7 +450,7 @@ Notes
 
 .. [#rfc4294] Section 5.1 - DNAME records are fully supported.
 
-.. [#rfc7050] RFC 7050 is updated by RFC 8880.
+.. [#rfc7050] :rfc:`7050` is updated by :rfc:`8880`.
 
 .. [#noencryptedfwd] Forwarding DNS queries over encrypted transports is not
    supported yet.

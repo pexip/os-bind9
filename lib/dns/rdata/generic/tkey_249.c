@@ -126,7 +126,7 @@ totext_tkey(ARGS_TOTEXT) {
 	unsigned long n;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_tkey);
 	REQUIRE(rdata->length != 0);
@@ -139,8 +139,9 @@ totext_tkey(ARGS_TOTEXT) {
 	dns_name_init(&name, NULL);
 	dns_name_init(&prefix, NULL);
 	dns_name_fromregion(&name, &sr);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 	RETERR(str_totext(" ", target));
 	isc_region_consume(&sr, name_length(&name));
 
@@ -254,13 +255,13 @@ fromwire_tkey(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	/*
 	 * Algorithm.
 	 */
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	/*
 	 * Inception: 4
@@ -313,14 +314,14 @@ towire_tkey(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_tkey);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	/*
 	 * Algorithm.
 	 */
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 	isc_region_consume(&sr, name_length(&name));
 
 	return mem_tobuffer(target, sr.base, sr.length);
@@ -475,9 +476,6 @@ tostruct_tkey(ARGS_TOSTRUCT) {
 	 */
 	INSIST(tkey->keylen + 2U <= sr.length);
 	tkey->key = mem_maybedup(mctx, sr.base, tkey->keylen);
-	if (tkey->key == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&sr, tkey->keylen);
 
 	/*
@@ -491,21 +489,8 @@ tostruct_tkey(ARGS_TOSTRUCT) {
 	 */
 	INSIST(tkey->otherlen <= sr.length);
 	tkey->other = mem_maybedup(mctx, sr.base, tkey->otherlen);
-	if (tkey->other == NULL) {
-		goto cleanup;
-	}
-
 	tkey->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&tkey->algorithm, mctx);
-	}
-	if (mctx != NULL && tkey->key != NULL) {
-		isc_mem_free(mctx, tkey->key);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void

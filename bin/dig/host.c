@@ -19,13 +19,11 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <isc/app.h>
 #include <isc/attributes.h>
 #include <isc/commandline.h>
+#include <isc/loop.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/util.h>
 
 #include <dns/byaddr.h>
@@ -82,6 +80,7 @@ struct rtype rtypes[] = { { 1, "has address" },
 			  { 25, "has key" },
 			  { 28, "has IPv6 address" },
 			  { 29, "location" },
+			  { dns_rdatatype_https, "has HTTP service bindings" },
 			  { 0, NULL } };
 
 static char *
@@ -139,7 +138,7 @@ show_usage(void) {
 
 static void
 host_shutdown(void) {
-	(void)isc_app_shutdown();
+	isc_loopmgr_shutdown(loopmgr);
 }
 
 static void
@@ -151,9 +150,9 @@ received(unsigned int bytes, isc_sockaddr_t *from, dig_query_t *query) {
 		char fromtext[ISC_SOCKADDR_FORMATSIZE];
 		isc_sockaddr_format(from, fromtext, sizeof(fromtext));
 		if (query->lookup->use_usec) {
-			TIME_NOW_HIRES(&now);
+			now = isc_time_now_hires();
 		} else {
-			TIME_NOW(&now);
+			now = isc_time_now();
 		}
 		diff = (int)isc_time_microdiff(&now, &query->time_sent);
 		printf("Received %u bytes from %s in %d ms\n", bytes, fromtext,
@@ -459,6 +458,16 @@ printmessage(dig_query_t *query, const isc_buffer_t *msgbuf, dns_message_t *msg,
 			lookup->retries = tries;
 			ISC_LIST_APPEND(lookup_list, lookup, link);
 		}
+		lookup = clone_lookup(query->lookup, false);
+		if (lookup != NULL) {
+			strlcpy(lookup->textname, namestr,
+				sizeof(lookup->textname));
+			lookup->rdtype = dns_rdatatype_https;
+			lookup->rdtypeset = true;
+			lookup->origin = NULL;
+			lookup->retries = tries;
+			ISC_LIST_APPEND(lookup_list, lookup, link);
+		}
 	}
 
 	if (!short_form) {
@@ -581,12 +590,6 @@ printmessage(dig_query_t *query, const isc_buffer_t *msgbuf, dns_message_t *msg,
 
 static const char *optstring = "46aAc:dilnm:p:rst:vVwCDN:R:TUW:";
 
-/*% version */
-static void
-version(void) {
-	fprintf(stderr, "host %s\n", PACKAGE_VERSION);
-}
-
 static void
 pre_parse_args(int argc, char **argv) {
 	int c;
@@ -662,7 +665,7 @@ pre_parse_args(int argc, char **argv) {
 		case 'v':
 			break;
 		case 'V':
-			version();
+			printf("host %s\n", PACKAGE_VERSION);
 			exit(EXIT_SUCCESS);
 			break;
 		case 'w':
@@ -893,8 +896,6 @@ parse_args(bool is_batchfile, int argc, char **argv) {
 
 int
 main(int argc, char **argv) {
-	isc_result_t result;
-
 	tries = 2;
 
 	ISC_LIST_INIT(lookup_list);
@@ -912,8 +913,6 @@ main(int argc, char **argv) {
 	debug("main()");
 	progname = argv[0];
 	pre_parse_args(argc, argv);
-	result = isc_app_start();
-	check_result(result, "isc_app_start");
 	setup_libs();
 	setup_system(ipv4only, ipv6only);
 	parse_args(false, argc, argv);
@@ -922,11 +921,12 @@ main(int argc, char **argv) {
 	} else if (keysecret[0] != 0) {
 		setup_text_key();
 	}
-	result = isc_app_onrun(mctx, global_task, onrun_callback, NULL);
-	check_result(result, "isc_app_onrun");
-	isc_app_run();
+
+	isc_loopmgr_setup(loopmgr, run_loop, NULL);
+	isc_loopmgr_run(loopmgr);
+
 	cancel_all();
 	destroy_libs();
-	isc_app_finish();
+
 	return (seen_error == 0) ? 0 : 1;
 }

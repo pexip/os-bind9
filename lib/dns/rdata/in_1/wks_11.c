@@ -15,10 +15,10 @@
 #define RDATA_IN_1_WKS_11_C
 
 #include <limits.h>
-#include <stdlib.h>
+#include <netdb.h>
 
+#include <isc/ascii.h>
 #include <isc/net.h>
-#include <isc/netdb.h>
 #include <isc/once.h>
 
 #define RRTYPE_WKS_ATTRIBUTES (0)
@@ -70,7 +70,6 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 	const char *ps = NULL;
 	unsigned int n;
 	char service[32];
-	int i;
 	isc_result_t result;
 
 	REQUIRE(type == dns_rdatatype_wks);
@@ -82,7 +81,7 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 	UNUSED(rdclass);
 	UNUSED(callbacks);
 
-	RUNTIME_CHECK(isc_once_do(&once, init_lock) == ISC_R_SUCCESS);
+	isc_once_do(&once, init_lock);
 
 	/*
 	 * IPv4 dotted quad.
@@ -136,11 +135,7 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 		 * case sensitive and the database is usually in lowercase.
 		 */
 		strlcpy(service, DNS_AS_STR(token), sizeof(service));
-		for (i = strlen(service) - 1; i >= 0; i--) {
-			if (isupper(service[i] & 0xff)) {
-				service[i] = tolower(service[i] & 0xff);
-			}
-		}
+		isc_ascii_strtolower(service);
 
 		port = strtol(DNS_AS_STR(token), &e, 10);
 		if (*e != 0 && !mygetservbyname(service, ps, &port) &&
@@ -221,7 +216,6 @@ fromwire_in_wks(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &sr);
@@ -323,9 +317,6 @@ tostruct_in_wks(ARGS_TOSTRUCT) {
 	isc_region_consume(&region, 1);
 	wks->map_len = region.length;
 	wks->map = mem_maybedup(mctx, region.base, region.length);
-	if (wks->map == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 	wks->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

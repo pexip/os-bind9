@@ -27,6 +27,8 @@ options {
 	zone-statistics yes;
 };
 
+trust-anchors { };
+
 include "statistics-channels.conf";
 
 key rndc_key {

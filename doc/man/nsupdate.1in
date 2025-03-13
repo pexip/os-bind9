@@ -32,7 +32,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 nsupdate \- dynamic DNS update utility
 .SH SYNOPSIS
 .sp
-\fBnsupdate\fP [\fB\-d\fP] [\fB\-D\fP] [\fB\-i\fP] [\fB\-L\fP level] [ [\fB\-g\fP] | [\fB\-o\fP] | [\fB\-l\fP] | [\fB\-y\fP [hmac:]keyname:secret] | [\fB\-k\fP keyfile] ] [\fB\-t\fP timeout] [\fB\-u\fP udptimeout] [\fB\-r\fP udpretries] [\fB\-v\fP] [\fB\-T\fP] [\fB\-P\fP] [\fB\-V\fP] [ [\fB\-4\fP] | [\fB\-6\fP] ] [filename]
+\fBnsupdate\fP [\fB\-d\fP] [\fB\-D\fP] [\fB\-i\fP] [\fB\-L\fP level] [ [\fB\-g\fP] | [\fB\-o\fP] | [\fB\-l\fP] | [\fB\-y\fP [hmac:]keyname:secret] | [\fB\-k\fP keyfile] ] [ [\fB\-S\fP] [\fB\-K\fP tlskeyfile] [\fB\-E\fP tlscertfile] [\fB\-A\fP tlscafile] [\fB\-H\fP tlshostname] [\-O] ] [\fB\-t\fP timeout] [\fB\-u\fP udptimeout] [\fB\-r\fP udpretries] [\fB\-v\fP] [\fB\-T\fP] [\fB\-P\fP] [\fB\-V\fP] [ [\fB\-4\fP] | [\fB\-6\fP] ] [filename]
 .SH DESCRIPTION
 .sp
 \fBnsupdate\fP is used to submit Dynamic DNS Update requests, as defined in
@@ -83,6 +83,16 @@ This option sets use of IPv6 only.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-A tlscafile
+This option specifies the file of the certificate authorities (CA) certificates
+(in PEM format) in order to verify the remote server TLS certificate when
+using DNS\-over\-TLS (DoT), to achieve Strict or Mutual TLS. When used, it will
+override the certificates from the global certificates store, which are
+otherwise used by default when \fI\%\-S\fP is enabled. This option can not
+be used in conjuction with \fI\%\-O\fP, and it implies \fI\%\-S\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-C
 Overrides the default \fIresolv.conf\fP file. This is only intended for testing.
 .UNINDENT
@@ -99,8 +109,23 @@ This option sets extra debug mode.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-E tlscertfile
+This option sets the certificate(s) file for authentication for the
+DNS\-over\-TLS (DoT) transport to the remote server. The certificate
+chain file is expected to be in PEM format. This option implies \fI\%\-S\fP,
+and can only be used with \fI\%\-K\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-g
 This option enables standard GSS\-TSIG mode.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-H tlshostname
+This option makes \fBnsupdate\fP use the provided hostname during remote
+server TLS certificate verification. Otherwise, the DNS server name
+is used. This option implies \fI\%\-S\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -122,6 +147,14 @@ the key specified is not an HMAC\-MD5 key.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-K tlskeyfile
+This option sets the key file for authenticated encryption for the
+DNS\-over\-TLS (DoT) transport with the remote server. The private key file is
+expected to be in PEM format. This option implies \fI\%\-S\fP, and can only
+be used with \fI\%\-E\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-l
 This option sets local\-host only mode, which sets the server address to localhost
 (disabling the \fBserver\fP so that the server address cannot be
@@ -139,8 +172,19 @@ This option sets the logging debug level. If zero, logging is disabled.
 .INDENT 0.0
 .TP
 .B \-o
-This option enables a non\-standards\-compliant variant of GSS\-TSIG
-used by Windows 2000.
+This option is deprecated. Previously, it enabled a
+non\-standards\-compliant variant of GSS\-TSIG that was used by Windows
+2000. Since that OS is now long past its end of life, this option is
+now treated as a synonym for \fI\%\-g\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-O
+This option enables Opportunistic TLS. When used, the remote peer\(aqs TLS
+certificate will not be verified. This option should be used for debugging
+purposes only, and it is not recommended to use it in production. This
+option can not be used in conjuction with \fI\%\-A\fP, and it implies
+\fI\%\-S\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -159,6 +203,16 @@ format is understood by \fBnsupdate\fP\&. See also the \fI\%\-T\fP option.
 .B \-r udpretries
 This option sets the number of UDP retries. The default is 3. If zero, only one update
 request is made.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-S
+This option indicates whether to use DNS\-over\-TLS (DoT) when querying
+name servers specified by \fBserver servername port\fP syntax in the input
+file, and the primary server discovered through a SOA request. When the
+\fI\%\-K\fP and \fI\%\-E\fP options are used, then the specified TLS
+client certificate and private key pair are used for authentication
+(Mutual TLS). This option implies \fI\%\-v\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -287,8 +341,9 @@ This command uses GSS\-TSIG to sign the updates. This is equivalent to specifyin
 \fI\%\-g\fP on the command line.
 .TP
 .B \fBoldgsstsig\fP
-This command uses the Windows 2000 version of GSS\-TSIG to sign the updates. This is
-equivalent to specifying \fI\%\-o\fP on the command line.
+This command is deprecated and will be removed in a future release.
+Previously, it caused \fBnsupdate\fP to use the Windows 2000 version of
+GSS\-TSIG to sign updates. It is now treated as a synonym for \fBgsstsig\fP\&.
 .TP
 .B \fBrealm [realm_name]\fP
 When using GSS\-TSIG, this command specifies the use of \fBrealm_name\fP rather than the default realm
@@ -300,6 +355,17 @@ This command turns on or off check\-names processing on records to be added.
 Check\-names has no effect on prerequisites or records to be deleted.
 By default check\-names processing is on. If check\-names processing
 fails, the record is not added to the UPDATE message.
+.TP
+.B \fBcheck\-svbc [boolean]\fP
+This command turns on or off check\-svcb processing on records to be added.
+Check\-svcb has no effect on prerequisites or records to be deleted.
+By default check\-svcb processing is on. If check\-svcb processing
+fails, the record is not added to the UPDATE message.
+.TP
+.B \fBlease time [keytime]\fP
+Set the EDNS Update Lease (UL) option to value to \fBtime\fP and
+optionally also set the key lease time to \fBkeytime\fP in seconds.
+If \fBtime\fP is \fBnone\fP the lease times are cleared.
 .TP
 .B \fBprereq nxdomain domain\-name\fP
 This command requires that no resource record of any type exist with the name

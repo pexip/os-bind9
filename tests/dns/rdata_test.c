@@ -23,15 +23,14 @@
 
 #define UNIT_TESTING
 
+#include <cmocka.h>
 #include <openssl_shim.h>
 
 #include <openssl/err.h>
 
-#include <isc/cmocka.h>
 #include <isc/commandline.h>
 #include <isc/hex.h>
 #include <isc/lex.h>
-#include <isc/print.h>
 #include <isc/stdio.h>
 #include <isc/types.h>
 #include <isc/util.h>
@@ -129,7 +128,6 @@ wire_to_rdata(const unsigned char *src, size_t srclen, dns_rdataclass_t rdclass,
 	      dns_rdatatype_t type, unsigned char *dst, size_t dstlen,
 	      dns_rdata_t *rdata) {
 	isc_buffer_t source, target;
-	dns_decompress_t dctx;
 	isc_result_t result;
 
 	/*
@@ -147,10 +145,8 @@ wire_to_rdata(const unsigned char *src, size_t srclen, dns_rdataclass_t rdclass,
 	/*
 	 * Try converting input data into uncompressed wire form.
 	 */
-	dns_decompress_init(&dctx, -1, DNS_DECOMPRESS_ANY);
-	result = dns_rdata_fromwire(rdata, rdclass, type, &source, &dctx, 0,
-				    &target);
-	dns_decompress_invalidate(&dctx);
+	result = dns_rdata_fromwire(rdata, rdclass, type, &source,
+				    DNS_DECOMPRESS_ALWAYS, &target);
 	detect_uncleared_libcrypto_error();
 
 	return result;
@@ -174,7 +170,7 @@ rdata_towire(dns_rdata_t *rdata, unsigned char *dst, size_t dstlen,
 	/*
 	 * Try converting input data into uncompressed wire form.
 	 */
-	dns_compress_init(&cctx, -1, mctx);
+	dns_compress_init(&cctx, mctx, 0);
 	result = dns_rdata_towire(rdata, &cctx, &target);
 	detect_uncleared_libcrypto_error();
 	dns_compress_invalidate(&cctx);
@@ -186,7 +182,7 @@ rdata_towire(dns_rdata_t *rdata, unsigned char *dst, size_t dstlen,
 
 static isc_result_t
 additionaldata_cb(void *arg, const dns_name_t *name, dns_rdatatype_t qtype,
-		  dns_rdataset_t *found) {
+		  dns_rdataset_t *found DNS__DB_FLARG) {
 	UNUSED(arg);
 	UNUSED(name);
 	UNUSED(qtype);
@@ -225,17 +221,19 @@ rdata_checknames(dns_rdata_t *rdata) {
 	(void)dns_rdata_checknames(rdata, dns_rootname, NULL);
 	(void)dns_rdata_checknames(rdata, dns_rootname, bad);
 
-	result = dns_name_fromstring(name, "example.net", 0, NULL);
+	result = dns_name_fromstring(name, "example.net", dns_rootname, 0,
+				     NULL);
 	assert_int_equal(result, ISC_R_SUCCESS);
 	(void)dns_rdata_checknames(rdata, name, NULL);
 	(void)dns_rdata_checknames(rdata, name, bad);
 
-	result = dns_name_fromstring(name, "in-addr.arpa", 0, NULL);
+	result = dns_name_fromstring(name, "in-addr.arpa", dns_rootname, 0,
+				     NULL);
 	assert_int_equal(result, ISC_R_SUCCESS);
 	(void)dns_rdata_checknames(rdata, name, NULL);
 	(void)dns_rdata_checknames(rdata, name, bad);
 
-	result = dns_name_fromstring(name, "ip6.arpa", 0, NULL);
+	result = dns_name_fromstring(name, "ip6.arpa", dns_rootname, 0, NULL);
 	assert_int_equal(result, ISC_R_SUCCESS);
 	(void)dns_rdata_checknames(rdata, name, NULL);
 	(void)dns_rdata_checknames(rdata, name, bad);
@@ -2020,31 +2018,79 @@ ISC_RUN_TEST_IMPL(isdn) {
  * KEY tests.
  */
 ISC_RUN_TEST_IMPL(key) {
-	wire_ok_t wire_ok[] = { /*
-				 * RDATA is comprised of:
-				 *
-				 *   - 2 octets for Flags,
-				 *   - 1 octet for Protocol,
-				 *   - 1 octet for Algorithm,
-				 *   - variable number of octets for Public Key.
-				 *
-				 * RFC 2535 section 3.1.2 states that if bits
-				 * 0-1 of Flags are both set, the RR stops after
-				 * the algorithm octet and thus its length must
-				 * be 4 octets.  In any other case, though, the
-				 * Public Key part must not be empty.
+	wire_ok_t wire_ok[] = {
+		/*
+		 * RDATA is comprised of:
+		 *
+		 *   - 2 octets for Flags,
+		 *   - 1 octet for Protocol,
+		 *   - 1 octet for Algorithm,
+		 *   - variable number of octets for Public Key.
+		 *
+		 * RFC 2535 section 3.1.2 states that if bits
+		 * 0-1 of Flags are both set, the RR stops after
+		 * the algorithm octet and thus its length must
+		 * be 4 octets.  In any other case, though, the
+		 * Public Key part must not be empty.
+		 *
+		 * Algorithms PRIVATEDNS (253) and PRIVATEOID (254)
+		 * have an algorithm identifier embedded and the start
+		 * of the public key.
+		 */
+		WIRE_INVALID(0x00), WIRE_INVALID(0x00, 0x00),
+		WIRE_INVALID(0x00, 0x00, 0x00),
+		WIRE_VALID(0xc0, 0x00, 0x00, 0x00),
+		WIRE_INVALID(0xc0, 0x00, 0x00, 0x00, 0x00),
+		WIRE_INVALID(0x00, 0x00, 0x00, 0x00),
+		WIRE_VALID(0x00, 0x00, 0x00, 0x00, 0x00),
+		/* PRIVATEDNS example. without key data */
+		WIRE_VALID(0x00, 0x00, 0x00, 253, 0x07, 'e', 'x', 'a', 'm', 'p',
+			   'l', 'e', 0x00),
+		/* PRIVATEDNS example. + keydata */
+		WIRE_VALID(0x00, 0x00, 0x00, 253, 0x07, 'e', 'x', 'a', 'm', 'p',
+			   'l', 'e', 0x00, 0x00),
+		/* PRIVATEDNS compression pointer. */
+		WIRE_INVALID(0x00, 0x00, 0x00, 253, 0xc0, 0x00, 0x00),
+		/* PRIVATEOID */
+		WIRE_INVALID(0x00, 0x00, 0x00, 254, 0x00),
+		/* PRIVATEOID 1.3.6.1.4.1.2495 without key data */
+		WIRE_VALID(0x00, 0x00, 0x00, 254, 0x06, 0x07, 0x2b, 0x06, 0x01,
+			   0x04, 0x01, 0x93, 0x3f),
+		/* PRIVATEOID 1.3.6.1.4.1.2495 + keydata */
+		WIRE_VALID(0x00, 0x00, 0x00, 254, 0x06, 0x07, 0x2b, 0x06, 0x01,
+			   0x04, 0x01, 0x93, 0x3f, 0x00),
+		/* PRIVATEOID malformed OID - high-bit set on last octet */
+		WIRE_INVALID(0x00, 0x00, 0x00, 254, 0x06, 0x07, 0x2b, 0x06,
+			     0x01, 0x04, 0x01, 0x93, 0xbf, 0x00),
+		/* PRIVATEOID malformed OID - wrong tag */
+		WIRE_INVALID(0x00, 0x00, 0x00, 254, 0x07, 0x07, 0x2b, 0x06,
+			     0x01, 0x04, 0x01, 0x93, 0x3f, 0x00),
+		WIRE_SENTINEL()
+	};
+	text_ok_t text_ok[] = { /* PRIVATEDNS example. */
+				TEXT_VALID("0 0 253 B2V4YW1wbGUA"),
+				/* PRIVATEDNS example. + keydata */
+				TEXT_VALID("0 0 253 B2V4YW1wbGUAAA=="),
+				/* PRIVATEDNS compression pointer. */
+				TEXT_INVALID("0 0 253 wAAA"),
+				/* PRIVATEOID */
+				TEXT_INVALID("0 0 254 AA=="),
+				/* PRIVATEOID 1.3.6.1.4.1.2495 */
+				TEXT_VALID("0 0 254 BgcrBgEEAZM/"),
+				/* PRIVATEOID 1.3.6.1.4.1.2495 + keydata */
+				TEXT_VALID("0 0 254 BgcrBgEEAZM/AA=="),
+				/* PRIVATEOID malformed OID - high-bit set on
+				   last octet */
+				TEXT_INVALID("0 0 254 BgcrBgEEAZO/AA=="),
+				/* PRIVATEOID malformed OID - wrong tag */
+				TEXT_INVALID("0 0 254 BwcrBgEEAZM/AA=="),
+				/*
+				 * Sentinel.
 				 */
-				WIRE_INVALID(0x00),
-				WIRE_INVALID(0x00, 0x00),
-				WIRE_INVALID(0x00, 0x00, 0x00),
-				WIRE_VALID(0xc0, 0x00, 0x00, 0x00),
-				WIRE_INVALID(0xc0, 0x00, 0x00, 0x00, 0x00),
-				WIRE_INVALID(0x00, 0x00, 0x00, 0x00),
-				WIRE_VALID(0x00, 0x00, 0x00, 0x00, 0x00),
-				WIRE_SENTINEL()
+				TEXT_SENTINEL()
 	};
 
-	check_rdata(NULL, wire_ok, NULL, false, dns_rdataclass_in,
+	check_rdata(text_ok, wire_ok, NULL, false, dns_rdataclass_in,
 		    dns_rdatatype_key, sizeof(dns_rdata_key_t));
 }
 

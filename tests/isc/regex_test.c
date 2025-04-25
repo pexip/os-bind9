@@ -29,7 +29,6 @@
 #include <cmocka.h>
 
 #include <isc/commandline.h>
-#include <isc/print.h>
 #include <isc/regex.h>
 #include <isc/util.h>
 

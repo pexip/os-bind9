@@ -47,7 +47,6 @@ fromwire_null(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 	isc_buffer_forward(source, sr.length);
@@ -108,10 +107,6 @@ tostruct_null(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	null->length = r.length;
 	null->data = mem_maybedup(mctx, r.base, r.length);
-	if (null->data == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	null->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

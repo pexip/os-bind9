@@ -1,3 +1,2 @@
 0001-Disable-treat-warnings-as-errors-in-sphinx-build.patch
-0002-Add-support-for-reporting-status-via-sd_notify.patch
-0003-Disable-RTLD_DEEPBIND-in-Samba-DLZ-module.patch
+0002-Disable-RTLD_DEEPBIND-in-Samba-DLZ-module.patch

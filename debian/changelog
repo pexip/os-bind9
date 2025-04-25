@@ -1,17 +1,312 @@
+bind9 (1:9.20.7-1) unstable; urgency=medium
+
+  * New upstream version 9.20.7
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 13 Mar 2025 11:37:20 +0100
+
+bind9 (1:9.20.6-1) unstable; urgency=medium
+
+  * Add Provides: bind9utils and Provides: dnsutils to the respective
+    packages
+  * New upstream version 9.20.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Feb 2025 16:00:19 +0100
+
+bind9 (1:9.20.5-1) unstable; urgency=medium
+
+  * New upstream version 9.20.5 (Closes: #1094735)
+   - CVE-2024-12705: DNS-over-HTTPS flooding fixes
+   - CVE-2024-11187: Limit additional section processing for large RDATA
+     sets
+  * Drop libltdl-dev from Build-Depends, libuv wrappers are used
+    for dlopen and friends.
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 27 Jan 2025 12:21:49 +0100
+
+bind9 (1:9.20.4-4) unstable; urgency=medium
+
+  * Revert "Temporarily use rbtdb as a zone database to prevent assertion
+    failure"
+  * Add pre-release patch for the NSEC3 encloser assertion failure
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 21 Jan 2025 16:16:07 +0100
+
+bind9 (1:9.20.4-3) unstable; urgency=high
+
+  * Temporarily use rbtdb as a zone database as workaround for an upstream
+    bug.
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 19 Dec 2024 05:56:30 +0100
+
+bind9 (1:9.20.4-2) unstable; urgency=medium
+
+  * Add upstream patch for the new GLUE cache implementation
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 15 Dec 2024 08:02:25 +0100
+
+bind9 (1:9.20.4-1) unstable; urgency=medium
+
+  * New upstream version 9.20.4
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 11 Dec 2024 17:35:53 +0100
+
+bind9 (1:9.20.3-1) unstable; urgency=medium
+
+  * New upstream version 9.20.3
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 10 Oct 2024 10:37:54 +0200
+
+bind9 (1:9.20.2-1) unstable; urgency=medium
+
+  * New upstream version 9.20.2
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Sep 2024 14:35:10 +0200
+
+bind9 (1:9.20.1-1) unstable; urgency=medium
+
+  * New upstream version 9.20.1
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Aug 2024 15:07:52 +0200
+
+bind9 (1:9.20.0-2) unstable; urgency=medium
+
+  * Fix the assertion failure in samba-libs DLZ module. (Closes: #1074378)
+
+ -- Ondřej Surý <ondrej@debian.org>  Sat, 27 Jul 2024 05:02:39 +0200
+
+bind9 (1:9.20.0-1) unstable; urgency=high
+
+  * New upstream version 9.20.0
+   - CVE-2024-0760: A flood of DNS messages over TCP may make the server
+     unstable
+   - CVE-2024-1737: BIND's database will be slow if a very large number of
+     RRs exist at the same name
+   - CVE-2024-1975: SIG(0) can be used to exhaust CPU resources
+   - CVE-2024-4076: Assertion failure when serving both stale cache data
+     and authoritative zone content
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 16 Jul 2024 17:26:47 +0200
+
+bind9 (1:9.19.24-185-g392e7199df2-1) unstable; urgency=medium
+
+  * New upstream version 9.19.24-185-g392e7199df2
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 Jun 2024 15:11:56 +0200
+
+bind9 (1:9.19.24-2) unstable; urgency=medium
+
+  * Add dnssec-ksr tool to bind9-utils package
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 May 2024 20:59:35 +0200
+
+bind9 (1:9.19.24-1) unstable; urgency=medium
+
+  * New upstream version 9.19.24
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 May 2024 19:55:59 +0200
+
+bind9 (1:9.19.23-1) unstable; urgency=medium
+
+  * New upstream version 9.19.23
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 17 Apr 2024 23:48:03 +0200
+
+bind9 (1:9.19.22-1) unstable; urgency=medium
+
+  * New upstream version 9.19.22
+   - A regression caused by CVE-2023-6516 fix could lead into
+     an out-of-memory condition when the server is under heavy
+     load.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Mar 2024 14:17:43 +0100
+
+bind9 (1:9.19.21-1) unstable; urgency=high
+
+  [ Helmut Grohne ]
+  * Drop unused Build-Depends: python3. (Closes: #1063448)
+
+  [ Ondřej Surý ]
+  * New upstream version 9.19.21
+   - CVE-2023-4408: Parsing large DNS messages may cause excessive CPU
+     load
+   - CVE-2023-5517: Querying RFC 1918 reverse zones may cause an assertion
+     failure when "nxdomain-redirect" is enabled
+   - CVE-2023-5679: Enabling both DNS64 and serve-stale may cause an
+     assertion failure during recursive resolution
+   - CVE-2023-6516: Specific recursive query patterns may lead to an
+     out-of-memory condition
+   - CVE-2023-50387: KeyTrap - Extreme CPU consumption in DNSSEC validator
+   - CVE-2023-50868: Preparing an NSEC3 closest encloser proof can exhaust
+     CPU resources
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 12 Feb 2024 17:04:19 +0100
+
+bind9 (1:9.19.19-1) unstable; urgency=medium
+
+  [ Ondřej Surý ]
+  * New upstream version 9.19.19
+
+  [ Bernhard Schmidt ]
+  * Sync 9.18 to 9.19 (Closes: #1056984)
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Dec 2023 17:01:32 +0100
+
+bind9 (1:9.19.18-1) unstable; urgency=medium
+
+  * New upstream version 9.19.18
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Nov 2023 17:51:18 +0100
+
+bind9 (1:9.19.17-1) unstable; urgency=medium
+
+  * New upstream version 9.19.17
+   - CVE-2023-3341: A stack exhaustion flaw in control channel code may
+     cause named to terminate unexpectedly (Closes: #1052416)
+   - CVE-2023-4236: named may terminate unexpectedly under high
+     DNS-over-TLS query load (Closes: #1052417)
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Sep 2023 18:13:07 +0200
+
+bind9 (1:9.19.16-1) experimental; urgency=medium
+
+  * New upstream version 9.19.16
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Aug 2023 17:54:24 +0200
+
+bind9 (1:9.19.15-1) experimental; urgency=medium
+
+  * New upstream version 9.19.15
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Jul 2023 14:16:46 +0200
+
+bind9 (1:9.19.14-1) experimental; urgency=medium
+
+  * New upstream version 9.19.14
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Jun 2023 21:00:01 +0200
+
+bind9 (1:9.19.13-1) experimental; urgency=medium
+
+  * New upstream version 9.19.13
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 17 May 2023 17:50:48 +0200
+
+bind9 (1:9.19.12-2) experimental; urgency=medium
+
+  * Add liburcu-dev to Build-Depends
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 20 Apr 2023 14:24:06 +0200
+
+bind9 (1:9.19.12-1) experimental; urgency=medium
+
+  * New upstream version 9.19.12
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Apr 2023 15:01:59 +0200
+
+bind9 (1:9.19.11-1) experimental; urgency=medium
+
+  * New upstream version 9.19.11
+  * Update the d/bind9-dev.install, d/bind9.install and d/not-installed
+    after library squash
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Mar 2023 18:27:20 +0100
+
+bind9 (1:9.19.10-1) experimental; urgency=medium
+
+  * New upstream version 9.19.10
+  * Drop libtool-bin from B-D (Closes: #1022968)
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 10 Feb 2023 15:16:29 +0100
+
+bind9 (1:9.19.9-2) experimental; urgency=medium
+
+  * Allow the named to use systemd notify service
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 26 Jan 2023 21:18:35 +0100
+
+bind9 (1:9.19.9-1) experimental; urgency=medium
+
+  * New upstream version 9.19.9
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 25 Jan 2023 16:04:03 +0100
+
+bind9 (1:9.19.8-1) experimental; urgency=medium
+
+  * New upstream version 9.19.8
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Dec 2022 18:02:17 +0100
+
+bind9 (1:9.19.7-1) experimental; urgency=medium
+
+  * New upstream version 9.19.7
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Nov 2022 14:05:15 +0100
+
+bind9 (1:9.19.6-2) experimental; urgency=medium
+
+  * Use systemd notify for service readyness check (Closes: #994696)
+
+ -- Bernhard Schmidt <berni@debian.org>  Sun, 30 Oct 2022 00:14:05 +0200
+
+bind9 (1:9.19.6-1) experimental; urgency=medium
+
+  * New upstream version 9.19.6
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Oct 2022 15:06:31 +0200
+
+bind9 (1:9.19.5-1) experimental; urgency=medium
+
+  * New upstream version 9.19.5
+   - CVE-2022-2795: Processing large delegations may severely degrade
+     resolver performance
+   - CVE-2022-2881: Buffer overread in statistics channel code
+   - CVE-2022-2906: Memory leaks in code handling Diffie-Hellman key
+     exchange via TKEY RRs (OpenSSL 3.0.0+ only)
+   - CVE-2022-3080: BIND 9 resolvers configured to answer from stale
+     cache with zero stale-answer-client-timeout may terminate unexpectedly
+   - CVE-2022-38177: Memory leak in ECDSA DNSSEC verification code
+   - CVE-2022-38178: Memory leaks in EdDSA DNSSEC verification code
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Sep 2022 12:55:15 +0200
+
+bind9 (1:9.19.4-1) unstable; urgency=medium
+
+  * Remove doc/misc/options.active from the docs
+  * New upstream version 9.19.4
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Aug 2022 09:48:41 +0200
+
+bind9 (1:9.19.3-1) unstable; urgency=medium
+
+  * New upstream version 9.19.3
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Jul 2022 16:42:00 +0200
+
+bind9 (1:9.19.2-1) unstable; urgency=medium
+
+  * New upstream version 9.19.2
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Jun 2022 14:43:54 +0200
+
+bind9 (1:9.19.1-1) unstable; urgency=medium
+
+  * Disable treat-warnings-as-errors in sphinx-build
+  * New upstream version 9.19.1
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 18 May 2022 17:26:23 +0200
+
+bind9 (1:9.19.0-1) unstable; urgency=medium
+
+  * Update d/ for BIND 9.19 Development
+  * New upstream version 9.19.0
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Apr 2022 09:51:08 +0200
+
 bind9 (1:9.18.33-1+pexip24u1~deb12u2) pexip; urgency=medium
 
   * New upstream release
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 03 Mar 2025 12:04:20 +0000
-
-bind9 (1:9.18.33-1~deb12u2) bookworm-security; urgency=high
-
-  * New upstream version 9.18.33
-   - CVE-2024-12705: DNS-over-HTTPS flooding fixes
-   - CVE-2024-11187: Limit additional section processing for large RDATA
-     sets
-
- -- Ondřej Surý <ondrej@debian.org>  Sat, 25 Jan 2025 11:14:58 +0100
 
 bind9 (1:9.18.28-1+pexip24u1~deb12u2) pexip; urgency=medium
 
@@ -25,47 +320,11 @@ bind9 (1:9.18.28-1+pexip24u1~deb12u1) pexip; urgency=medium
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Wed, 14 Aug 2024 17:11:50 +0000
 
-bind9 (1:9.18.28-1~deb12u2) bookworm-security; urgency=medium
-
-  * Fix the assertion failure in samba-libs DLZ module. (Closes #1074378)
-
- -- Ondřej Surý <ondrej@debian.org>  Sat, 27 Jul 2024 05:13:42 +0200
-
-bind9 (1:9.18.28-1~deb12u1) bookworm-security; urgency=high
-
-  * New upstream version 9.18.28
-   - CVE-2024-0760: A flood of DNS messages over TCP may make the server
-     unstable
-   - CVE-2024-1737: BIND's database will be slow if a very large number of
-     RRs exist at the same name
-   - CVE-2024-1975: SIG(0) can be used to exhaust CPU resources
-   - CVE-2024-4076: Assertion failure when serving both stale cache data
-     and authoritative zone content
-
- -- Ondřej Surý <ondrej@debian.org>  Tue, 16 Jul 2024 17:22:50 +0200
-
 bind9 (1:9.18.24-1+pexip24u1) pexip; urgency=medium
 
   * New upstream release
 
  -- Mark Hymers <mark.hymers@pexip.com>  Sun, 25 Feb 2024 11:45:17 +0000
-
-bind9 (1:9.18.24-1) bookworm-security; urgency=high
-
-  * New upstream version 9.18.24
-   - CVE-2023-4408: Parsing large DNS messages may cause excessive CPU
-     load
-   - CVE-2023-5517: Querying RFC 1918 reverse zones may cause an assertion
-     failure when "nxdomain-redirect" is enabled
-   - CVE-2023-5679: Enabling both DNS64 and serve-stale may cause an
-     assertion failure during recursive resolution
-   - CVE-2023-6516: Specific recursive query patterns may lead to an
-     out-of-memory condition
-   - CVE-2023-50387: KeyTrap - Extreme CPU consumption in DNSSEC validator
-   - CVE-2023-50868: Preparing an NSEC3 closest encloser proof can exhaust
-     CPU resources
-
- -- Ondřej Surý <ondrej@debian.org>  Mon, 12 Feb 2024 17:28:03 +0100
 
 bind9 (1:9.18.19-1~deb12u1+pexip24u4) pexip-bookworm; urgency=medium
 
@@ -91,90 +350,17 @@ bind9 (1:9.18.19-1~deb12u1pexip1) pexip; urgency=medium
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 25 Sep 2023 12:39:11 +0100
 
-bind9 (1:9.18.19-1~deb12u1) bookworm-security; urgency=high
-
-  * New upstream version 9.18.19
-   - CVE-2023-3341: A stack exhaustion flaw in control channel code may
-     cause named to terminate unexpectedly
-   - CVE-2023-4236: named may terminate unexpectedly under high
-     DNS-over-TLS query load
-
- -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Sep 2023 19:33:58 +0200
-
 bind9 (1:9.18.16-1~deb12u1pexip1) pexip; urgency=medium
 
   * New upstream release
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 24 Jul 2023 15:14:04 +0100
 
-bind9 (1:9.18.16-1~deb12u1) bookworm-security; urgency=high
-
-  * New upstream version 9.18.16
-   - CVE-2023-2828: The overmem cleaning process has been improved,
-     to prevent the cache from significantly exceeding the configured
-     max-cache-size limit.
-   - CVE-2023-2911: A query that prioritizes stale data over lookup
-     triggers a fetch to refresh the stale data in cache. If the fetch
-     is aborted for exceeding the recursion quota, it was possible for
-     named to enter an infinite callback loop and crash due to stack
-     overflow. This has been fixed.
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Jun 2023 20:48:44 +0200
-
-bind9 (1:9.18.13-1) unstable; urgency=medium
-
-  * New upstream version 9.18.13
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Mar 2023 18:11:29 +0100
-
 bind9 (1:9.18.12-1pexip1) pexip; urgency=medium
 
   * New upstream release
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 09 May 2023 11:34:31 +0100
-
-bind9 (1:9.18.12-1) unstable; urgency=medium
-
-  * New upstream version 9.18.12
-  * Drop libtool-bin from B-D (Closes: #1022968)
-
- -- Ondřej Surý <ondrej@debian.org>  Fri, 10 Feb 2023 15:15:49 +0100
-
-bind9 (1:9.18.11-2) unstable; urgency=medium
-
-  * Allow the named to use systemd notify service
-
- -- Ondřej Surý <ondrej@debian.org>  Thu, 26 Jan 2023 21:13:55 +0100
-
-bind9 (1:9.18.11-1) unstable; urgency=medium
-
-  * New upstream version 9.18.11
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 25 Jan 2023 15:51:35 +0100
-
-bind9 (1:9.18.10-2) unstable; urgency=medium
-
-  * Backport upstream feature to use sd_notify()
-  * Use systemd notify for service readyness check (Closes: #994696)
-  * apparmor.d: Allow named to read all OpenSSL config files.
-    (Closes: #1025519)
-  * apparmor.d: Allow named to query for hugepages support.
-    (Closes: #1020315)
-  * Fix path to README.Debian (Closes: #1016646)
-
- -- Bernhard Schmidt <berni@debian.org>  Thu, 22 Dec 2022 17:12:17 +0100
-
-bind9 (1:9.18.10-1) unstable; urgency=medium
-
-  * New upstream version 9.18.10
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Dec 2022 18:00:33 +0100
-
-bind9 (1:9.18.9-1) unstable; urgency=medium
-
-  * New upstream version 9.18.9
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Nov 2022 14:00:05 +0100
 
 bind9 (1:9.18.8-1pexip2) pexip; urgency=medium
 
@@ -188,76 +374,12 @@ bind9 (1:9.18.8-1pexip1) pexip-bullseye-openssl3; urgency=medium
 
  -- John-Mark Bell <jmb@pexip.com>  Wed, 09 Nov 2022 15:12:59 +0000
 
-bind9 (1:9.18.8-1) unstable; urgency=medium
-
-  * New upstream version 9.18.8
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 19 Oct 2022 14:58:38 +0200
-
-bind9 (1:9.18.7-1) unstable; urgency=medium
-
-  * New upstream version 9.18.7
-   - CVE-2022-2795: Processing large delegations may severely degrade
-     resolver performance
-   - CVE-2022-2881: Buffer overread in statistics channel code
-   - CVE-2022-2906: Memory leaks in code handling Diffie-Hellman key
-     exchange via TKEY RRs (OpenSSL 3.0.0+ only)
-   - CVE-2022-3080: BIND 9 resolvers configured to answer from stale
-     cache with zero stale-answer-client-timeout may terminate unexpectedly
-   - CVE-2022-38177: Memory leak in ECDSA DNSSEC verification code
-   - CVE-2022-38178: Memory leaks in EdDSA DNSSEC verification code
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 21 Sep 2022 12:48:36 +0200
-
-bind9 (1:9.18.6-2) unstable; urgency=medium
-
-  * No-change source-only upload
-
- -- Bernhard Schmidt <berni@debian.org>  Mon, 05 Sep 2022 21:30:08 +0200
-
-bind9 (1:9.18.6-1) unstable; urgency=medium
-
-  * Disable treat-warnings-as-errors in sphinx-build
-  * New upstream version 9.18.6
-
- -- Ondřej Surý <ondrej@debian.org>  Thu, 18 Aug 2022 09:39:20 +0200
-
-bind9 (1:9.18.5-1) unstable; urgency=medium
-
-  * New upstream version 9.18.5
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 20 Jul 2022 16:40:31 +0200
-
-bind9 (1:9.18.4-2) unstable; urgency=medium
-
-  [ Simon Deziel ]
-  * debian/extras/etc/db.0: correct descriptive comment
-
-  [ Bernhard Schmidt ]
-  * Add sleep workaround in tests/simpletests (Closes: #1012059)
-
- -- Ondřej Surý <ondrej@debian.org>  Tue, 05 Jul 2022 12:58:06 +0200
-
-bind9 (1:9.18.4-1) unstable; urgency=medium
-
-  * Disable treat-warnings-as-errors in sphinx-build
-  * New upstream version 9.18.4
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 15 Jun 2022 14:36:44 +0200
-
-bind9 (1:9.18.3-1) unstable; urgency=medium
-
-  * New upstream version 9.18.3
-
- -- Ondřej Surý <ondrej@debian.org>  Wed, 18 May 2022 16:53:01 +0200
-
 bind9 (1:9.18.2-1) unstable; urgency=medium
 
   * Drop libldap2-dev from Build-Depends (Closes: #1008021)
   * New upstream version 9.18.2
-  * Add runtime dependency on libuv1 >= 1.40.0 (Closes: #1009889)
 
- -- Ondřej Surý <ondrej@debian.org>  Tue, 26 Apr 2022 11:03:35 +0200
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 21 Apr 2022 09:40:25 +0200
 
 bind9 (1:9.18.1-1) unstable; urgency=high
 

@@ -19,7 +19,6 @@
 #include <isc/hash.h>
 #include <isc/log.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/util.h>
 
@@ -63,18 +62,21 @@ loadzone(dns_db_t **db, const char *origin, const char *filename) {
 
 	name = dns_fixedname_initname(&fixed);
 
-	result = dns_name_fromstring(name, origin, 0, NULL);
+	result = dns_name_fromstring(name, origin, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS) {
 		return result;
 	}
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone,
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
 			       dns_rdataclass_in, 0, NULL, db);
 	if (result != ISC_R_SUCCESS) {
 		return result;
 	}
 
 	result = dns_db_load(*db, filename, dns_masterformat_text, 0);
+	if (result == DNS_R_SEENINCLUDE) {
+		result = ISC_R_SUCCESS;
+	}
 	return result;
 }
 

@@ -342,7 +342,8 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 		      cfg_file, cfg_line, parameters != NULL ? "with" : "no");
 
 	inst = isc_mem_get(mctx, sizeof(*inst));
-	memset(inst, 0, sizeof(*inst));
+	*inst = (filter_instance_t){ 0 };
+
 	isc_mem_attach(mctx, &inst->mctx);
 
 	if (parameters != NULL) {
@@ -350,7 +351,7 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 				       cfg_line, mctx, lctx, actx));
 	}
 
-	isc_ht_init(&inst->ht, mctx, 16, ISC_HT_CASE_SENSITIVE);
+	isc_ht_init(&inst->ht, mctx, 1, ISC_HT_CASE_SENSITIVE);
 	isc_mutex_init(&inst->hlock);
 
 	/*

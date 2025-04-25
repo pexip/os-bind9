@@ -16,9 +16,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <isc/ascii.h>
 #include <isc/buffer.h>
 #include <isc/parseint.h>
-#include <isc/print.h>
 #include <isc/region.h>
 #include <isc/result.h>
 #include <isc/stdio.h>
@@ -91,23 +91,24 @@
 
 /* RFC2535 section 7, RFC3110 */
 
-#define SECALGNAMES                                                     \
-	{ DNS_KEYALG_RSAMD5, "RSAMD5", 0 }, { DNS_KEYALG_DH, "DH", 0 }, \
-		{ DNS_KEYALG_DSA, "DSA", 0 },                           \
-		{ DNS_KEYALG_RSASHA1, "RSASHA1", 0 },                   \
-		{ DNS_KEYALG_NSEC3DSA, "NSEC3DSA", 0 },                 \
-		{ DNS_KEYALG_NSEC3RSASHA1, "NSEC3RSASHA1", 0 },         \
-		{ DNS_KEYALG_RSASHA256, "RSASHA256", 0 },               \
-		{ DNS_KEYALG_RSASHA512, "RSASHA512", 0 },               \
-		{ DNS_KEYALG_ECCGOST, "ECCGOST", 0 },                   \
-		{ DNS_KEYALG_ECDSA256, "ECDSAP256SHA256", 0 },          \
-		{ DNS_KEYALG_ECDSA256, "ECDSA256", 0 },                 \
-		{ DNS_KEYALG_ECDSA384, "ECDSAP384SHA384", 0 },          \
-		{ DNS_KEYALG_ECDSA384, "ECDSA384", 0 },                 \
-		{ DNS_KEYALG_ED25519, "ED25519", 0 },                   \
-		{ DNS_KEYALG_ED448, "ED448", 0 },                       \
-		{ DNS_KEYALG_INDIRECT, "INDIRECT", 0 },                 \
-		{ DNS_KEYALG_PRIVATEDNS, "PRIVATEDNS", 0 },             \
+#define SECALGNAMES                                             \
+	{ DNS_KEYALG_RSAMD5, "RSAMD5", 0 },                     \
+		{ DNS_KEYALG_DH_DEPRECATED, "DH", 0 },          \
+		{ DNS_KEYALG_DSA, "DSA", 0 },                   \
+		{ DNS_KEYALG_RSASHA1, "RSASHA1", 0 },           \
+		{ DNS_KEYALG_NSEC3DSA, "NSEC3DSA", 0 },         \
+		{ DNS_KEYALG_NSEC3RSASHA1, "NSEC3RSASHA1", 0 }, \
+		{ DNS_KEYALG_RSASHA256, "RSASHA256", 0 },       \
+		{ DNS_KEYALG_RSASHA512, "RSASHA512", 0 },       \
+		{ DNS_KEYALG_ECCGOST, "ECCGOST", 0 },           \
+		{ DNS_KEYALG_ECDSA256, "ECDSAP256SHA256", 0 },  \
+		{ DNS_KEYALG_ECDSA256, "ECDSA256", 0 },         \
+		{ DNS_KEYALG_ECDSA384, "ECDSAP384SHA384", 0 },  \
+		{ DNS_KEYALG_ECDSA384, "ECDSA384", 0 },         \
+		{ DNS_KEYALG_ED25519, "ED25519", 0 },           \
+		{ DNS_KEYALG_ED448, "ED448", 0 },               \
+		{ DNS_KEYALG_INDIRECT, "INDIRECT", 0 },         \
+		{ DNS_KEYALG_PRIVATEDNS, "PRIVATEDNS", 0 },     \
 		{ DNS_KEYALG_PRIVATEOID, "PRIVATEOID", 0 }, { 0, NULL, 0 }
 
 /* RFC2535 section 7.1 */
@@ -219,7 +220,7 @@ maybe_numeric(unsigned int *valuep, isc_textregion_t *source, unsigned int max,
 	 */
 	v = snprintf(buffer, sizeof(buffer), "%.*s", (int)source->length,
 		     source->base);
-	if (v < 0 || (unsigned)v != source->length) {
+	if (v < 0 || (unsigned int)v != source->length) {
 		return ISC_R_BADNUMBER;
 	}
 	INSIST(buffer[source->length] == '\0');
@@ -463,7 +464,7 @@ dns_rdataclass_fromtext(dns_rdataclass_t *classp, isc_textregion_t *source) {
 		return (ISC_R_SUCCESS);                               \
 	}
 
-	switch (tolower((unsigned char)source->base[0])) {
+	switch (isc_ascii_tolower(source->base[0])) {
 	case 'a':
 		COMPARE("any", dns_rdataclass_any);
 		break;

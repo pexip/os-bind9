@@ -66,7 +66,6 @@ fromwire_in_nimloc(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &region);
@@ -141,10 +140,6 @@ tostruct_in_nimloc(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	nimloc->nimloc_len = r.length;
 	nimloc->nimloc = mem_maybedup(mctx, r.base, r.length);
-	if (nimloc->nimloc == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	nimloc->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

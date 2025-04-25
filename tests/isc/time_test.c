@@ -144,8 +144,7 @@ ISC_RUN_TEST_IMPL(isc_time_parsehttptimestamp_test) {
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	isc_time_formathttptimestamp(&t, buf, sizeof(buf));
 	result = isc_time_parsehttptimestamp(buf, &x);
@@ -156,15 +155,13 @@ ISC_RUN_TEST_IMPL(isc_time_parsehttptimestamp_test) {
 /* print UTC in ISO8601 */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ssZ */
 	memset(buf, 'X', sizeof(buf));
@@ -192,15 +189,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601_test) {
 /* print UTC in ISO8601 with milliseconds */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601ms_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ss.sssZ */
 	memset(buf, 'X', sizeof(buf));
@@ -229,15 +224,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601ms_test) {
 /* print UTC in ISO8601 with microseconds */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601us_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now_hires(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now_hires();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ss.ssssssZ */
 	memset(buf, 'X', sizeof(buf));
@@ -266,15 +259,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601us_test) {
 /* print local time in ISO8601 */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601L_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ss */
 	memset(buf, 'X', sizeof(buf));
@@ -301,15 +292,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601L_test) {
 /* print local time in ISO8601 with milliseconds */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601Lms_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ss.sss */
 	memset(buf, 'X', sizeof(buf));
@@ -337,15 +326,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601Lms_test) {
 /* print local time in ISO8601 with microseconds */
 
 ISC_RUN_TEST_IMPL(isc_time_formatISO8601Lus_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now_hires(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now_hires();
 
 	/* check formatting: yyyy-mm-ddThh:mm:ss.ssssss */
 	memset(buf, 'X', sizeof(buf));
@@ -373,15 +360,13 @@ ISC_RUN_TEST_IMPL(isc_time_formatISO8601Lus_test) {
 /* print UTC time as yyyymmddhhmmsssss */
 
 ISC_RUN_TEST_IMPL(isc_time_formatshorttimestamp_test) {
-	isc_result_t result;
 	isc_time_t t;
 	char buf[64];
 
 	UNUSED(state);
 
 	setenv("TZ", "America/Los_Angeles", 1);
-	result = isc_time_now(&t);
-	assert_int_equal(result, ISC_R_SUCCESS);
+	t = isc_time_now();
 
 	/* check formatting: yyyymmddhhmmsssss */
 	memset(buf, 'X', sizeof(buf));

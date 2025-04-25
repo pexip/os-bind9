@@ -23,10 +23,10 @@
 #include <isc/formatcheck.h>
 #include <isc/lang.h>
 #include <isc/list.h>
+#include <isc/loop.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/netmgr.h>
-#include <isc/print.h>
 #include <isc/refcount.h>
 #include <isc/sockaddr.h>
 #include <isc/time.h>
@@ -187,6 +187,13 @@ struct dig_lookup {
 		char *tls_key_file;
 		isc_tlsctx_cache_t *tls_ctx_cache;
 	};
+	struct {
+		bool proxy_mode;
+		bool proxy_plain;
+		bool proxy_local;
+		isc_sockaddr_t proxy_src_addr;
+		isc_sockaddr_t proxy_dst_addr;
+	};
 	isc_stdtime_t fuzztime;
 };
 
@@ -259,12 +266,12 @@ extern isc_sockaddr_t localaddr;
 extern char keynametext[MXNAME];
 extern char keyfile[MXNAME];
 extern char keysecret[MXNAME];
-extern const dns_name_t *hmacname;
+extern dst_algorithm_t hmac_alg;
 extern unsigned int digestbits;
 extern dns_tsigkey_t *tsigkey;
 extern bool validated;
-extern isc_taskmgr_t *taskmgr;
-extern isc_task_t *global_task;
+extern isc_loopmgr_t *loopmgr;
+extern isc_loop_t *mainloop;
 extern bool free_now;
 extern bool debugging, debugtiming, memdebugging;
 extern bool keep_open;
@@ -317,7 +324,10 @@ void
 start_lookup(void);
 
 void
-onrun_callback(isc_task_t *task, isc_event_t *event);
+onrun_callback(void *arg);
+
+void
+run_loop(void *arg);
 
 int
 dhmain(int argc, char **argv);
@@ -338,7 +348,7 @@ isc_result_t
 parse_netprefix(isc_sockaddr_t **sap, const char *value);
 
 void
-parse_hmac(const char *hmacstr);
+parse_hmac(const char *algname);
 
 dig_lookup_t *
 requeue_lookup(dig_lookup_t *lookold, bool servers);
@@ -441,12 +451,6 @@ dig_query_setup(bool, bool, int argc, char **argv);
  */
 void
 dig_startup(void);
-
-/*%
- * Initiates the next lookup cycle
- */
-void
-dig_query_start(void);
 
 /*%
  * Activate/deactivate IDN filtering of output.

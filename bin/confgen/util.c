@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <isc/print.h>
+#include <isc/tls.h>
 
 #include "util.h"
 

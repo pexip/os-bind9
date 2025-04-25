@@ -27,6 +27,8 @@
 #include <dns/keyvalues.h>
 #include <dns/log.h>
 
+#include <dst/dst.h>
+
 /* Default TTLsig (maximum zone ttl) */
 #define DEFAULT_TTLSIG 604800 /* one week */
 
@@ -35,6 +37,9 @@ dns_kasp_create(isc_mem_t *mctx, const char *name, dns_kasp_t **kaspp) {
 	dns_kasp_t *kasp;
 	dns_kasp_t k = {
 		.magic = DNS_KASP_MAGIC,
+		.digests = ISC_LIST_INITIALIZER,
+		.keys = ISC_LIST_INITIALIZER,
+		.link = ISC_LINK_INITIALIZER,
 	};
 
 	REQUIRE(name != NULL);
@@ -48,9 +53,6 @@ dns_kasp_create(isc_mem_t *mctx, const char *name, dns_kasp_t **kaspp) {
 	kasp->name = isc_mem_strdup(mctx, name);
 	isc_mutex_init(&kasp->lock);
 	isc_refcount_init(&kasp->references, 1);
-
-	ISC_LINK_INIT(kasp, link);
-	ISC_LIST_INIT(kasp->keys);
 
 	*kaspp = kasp;
 	return ISC_R_SUCCESS;
@@ -67,8 +69,8 @@ dns_kasp_attach(dns_kasp_t *source, dns_kasp_t **targetp) {
 
 static void
 destroy(dns_kasp_t *kasp) {
-	dns_kasp_key_t *key;
-	dns_kasp_key_t *key_next;
+	dns_kasp_key_t *key, *key_next;
+	dns_kasp_digest_t *digest, *digest_next;
 
 	REQUIRE(!ISC_LINK_LINKED(kasp, link));
 
@@ -78,6 +80,15 @@ destroy(dns_kasp_t *kasp) {
 		dns_kasp_key_destroy(key);
 	}
 	INSIST(ISC_LIST_EMPTY(kasp->keys));
+
+	for (digest = ISC_LIST_HEAD(kasp->digests); digest != NULL;
+	     digest = digest_next)
+	{
+		digest_next = ISC_LIST_NEXT(digest, link);
+		ISC_LIST_UNLINK(kasp->digests, digest, link);
+		isc_mem_put(kasp->mctx, digest, sizeof(*digest));
+	}
+	INSIST(ISC_LIST_EMPTY(kasp->digests));
 
 	isc_mutex_destroy(&kasp->lock);
 	isc_mem_free(kasp->mctx, kasp->name);
@@ -255,6 +266,22 @@ dns_kasp_setretiresafety(dns_kasp_t *kasp, uint32_t value) {
 	kasp->retire_safety = value;
 }
 
+bool
+dns_kasp_inlinesigning(dns_kasp_t *kasp) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(kasp->frozen);
+
+	return kasp->inline_signing;
+}
+
+void
+dns_kasp_setinlinesigning(dns_kasp_t *kasp, bool value) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(!kasp->frozen);
+
+	kasp->inline_signing = value;
+}
+
 dns_ttl_t
 dns_kasp_zonemaxttl(dns_kasp_t *kasp, bool fallback) {
 	REQUIRE(DNS_KASP_VALID(kasp));
@@ -374,21 +401,20 @@ dns_kasp_addkey(dns_kasp_t *kasp, dns_kasp_key_t *key) {
 
 isc_result_t
 dns_kasp_key_create(dns_kasp_t *kasp, dns_kasp_key_t **keyp) {
-	dns_kasp_key_t *key;
+	dns_kasp_key_t *key = NULL;
+	dns_kasp_key_t k = { .tag_max = 0xffff, .length = -1 };
 
 	REQUIRE(DNS_KASP_VALID(kasp));
 	REQUIRE(keyp != NULL && *keyp == NULL);
 
 	key = isc_mem_get(kasp->mctx, sizeof(*key));
+	*key = k;
+
 	key->mctx = NULL;
 	isc_mem_attach(kasp->mctx, &key->mctx);
 
 	ISC_LINK_INIT(key, link);
 
-	key->lifetime = 0;
-	key->algorithm = 0;
-	key->length = -1;
-	key->role = 0;
 	*keyp = key;
 	return ISC_R_SUCCESS;
 }
@@ -397,6 +423,9 @@ void
 dns_kasp_key_destroy(dns_kasp_key_t *key) {
 	REQUIRE(key != NULL);
 
+	if (key->keystore != NULL) {
+		dns_keystore_detach(&key->keystore);
+	}
 	isc_mem_putanddetach(&key->mctx, key, sizeof(*key));
 }
 
@@ -458,6 +487,13 @@ dns_kasp_key_lifetime(dns_kasp_key_t *key) {
 	return key->lifetime;
 }
 
+dns_keystore_t *
+dns_kasp_key_keystore(dns_kasp_key_t *key) {
+	REQUIRE(key != NULL);
+
+	return key->keystore;
+}
+
 bool
 dns_kasp_key_ksk(dns_kasp_key_t *key) {
 	REQUIRE(key != NULL);
@@ -470,6 +506,57 @@ dns_kasp_key_zsk(dns_kasp_key_t *key) {
 	REQUIRE(key != NULL);
 
 	return key->role & DNS_KASP_KEY_ROLE_ZSK;
+}
+
+uint16_t
+dns_kasp_key_tagmin(dns_kasp_key_t *key) {
+	REQUIRE(key != NULL);
+	return key->tag_min;
+}
+
+uint16_t
+dns_kasp_key_tagmax(dns_kasp_key_t *key) {
+	REQUIRE(key != NULL);
+	return key->tag_min;
+}
+
+bool
+dns_kasp_key_match(dns_kasp_key_t *key, dns_dnsseckey_t *dkey) {
+	isc_result_t ret;
+	bool role = false;
+
+	REQUIRE(key != NULL);
+	REQUIRE(dkey != NULL);
+
+	/* Matching algorithms? */
+	if (dst_key_alg(dkey->key) != dns_kasp_key_algorithm(key)) {
+		return false;
+	}
+	/* Matching length? */
+	if (dst_key_size(dkey->key) != dns_kasp_key_size(key)) {
+		return false;
+	}
+	/* Matching role? */
+	ret = dst_key_getbool(dkey->key, DST_BOOL_KSK, &role);
+	if (ret != ISC_R_SUCCESS || role != dns_kasp_key_ksk(key)) {
+		return false;
+	}
+	ret = dst_key_getbool(dkey->key, DST_BOOL_ZSK, &role);
+	if (ret != ISC_R_SUCCESS || role != dns_kasp_key_zsk(key)) {
+		return false;
+	}
+	/* Valid key tag range? */
+	uint16_t id = dst_key_id(dkey->key);
+	uint16_t rid = dst_key_rid(dkey->key);
+	if (id < key->tag_min || id > key->tag_max) {
+		return false;
+	}
+	if (rid < key->tag_min || rid > key->tag_max) {
+		return false;
+	}
+
+	/* Found a match. */
+	return true;
 }
 
 uint8_t
@@ -528,4 +615,71 @@ dns_kasp_setnsec3param(dns_kasp_t *kasp, uint8_t iter, bool optout,
 	kasp->nsec3param.iterations = iter;
 	kasp->nsec3param.optout = optout;
 	kasp->nsec3param.saltlen = saltlen;
+}
+
+bool
+dns_kasp_offlineksk(dns_kasp_t *kasp) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(kasp->frozen);
+
+	return kasp->offlineksk;
+}
+
+void
+dns_kasp_setofflineksk(dns_kasp_t *kasp, bool offlineksk) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(!kasp->frozen);
+
+	kasp->offlineksk = offlineksk;
+}
+
+bool
+dns_kasp_cdnskey(dns_kasp_t *kasp) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(kasp->frozen);
+
+	return kasp->cdnskey;
+}
+
+void
+dns_kasp_setcdnskey(dns_kasp_t *kasp, bool cdnskey) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(!kasp->frozen);
+
+	kasp->cdnskey = cdnskey;
+}
+
+dns_kasp_digestlist_t
+dns_kasp_digests(dns_kasp_t *kasp) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(kasp->frozen);
+
+	return kasp->digests;
+}
+
+void
+dns_kasp_adddigest(dns_kasp_t *kasp, dns_dsdigest_t alg) {
+	dns_kasp_digest_t *digest;
+
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(!kasp->frozen);
+
+	/* Suppress unsupported algorithms */
+	if (!dst_ds_digest_supported(alg)) {
+		return;
+	}
+
+	/* Suppress duplicates */
+	for (dns_kasp_digest_t *d = ISC_LIST_HEAD(kasp->digests); d != NULL;
+	     d = ISC_LIST_NEXT(d, link))
+	{
+		if (d->digest == alg) {
+			return;
+		}
+	}
+
+	digest = isc_mem_get(kasp->mctx, sizeof(*digest));
+	digest->digest = alg;
+	ISC_LINK_INIT(digest, link);
+	ISC_LIST_APPEND(kasp->digests, digest, link);
 }

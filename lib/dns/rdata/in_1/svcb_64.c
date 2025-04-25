@@ -21,6 +21,7 @@
 #define SVCB_MAN_KEY		 0
 #define SVCB_ALPN_KEY		 1
 #define SVCB_NO_DEFAULT_ALPN_KEY 2
+#define SVCB_DOHPATH_KEY	 7
 #define MAX_CNAMES		 16 /* See ns/query.c MAX_RESTARTS */
 
 /*
@@ -225,9 +226,7 @@ finish:
 		isc_textregion_consume(region, 1);
 	}
 	RETERR(uint16_tobuffer(ul, target));
-	if (value != NULL) {
-		*value = ul;
-	}
+	SET_IF_NOT_NULL(value, ul);
 	return ISC_R_SUCCESS;
 }
 
@@ -389,7 +388,7 @@ svcparamkey(unsigned short value, enum encoding *encoding, char *buf,
 		}
 	}
 	n = snprintf(buf, len, "key%u", value);
-	INSIST(n > 0 && (unsigned)n < len);
+	INSIST(n > 0 && (unsigned int)n < len);
 	*encoding = sbpr_text;
 	return buf;
 }
@@ -636,7 +635,7 @@ generic_totext_in_svcb(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:255.255.255.255")];
 	unsigned short num;
 	int n;
@@ -654,7 +653,7 @@ generic_totext_in_svcb(ARGS_TOTEXT) {
 	num = uint16_fromregion(&region);
 	isc_region_consume(&region, 2);
 	n = snprintf(buf, sizeof(buf), "%u ", num);
-	INSIST(n > 0 && (unsigned)n < sizeof(buf));
+	INSIST(n > 0 && (unsigned int)n < sizeof(buf));
 	RETERR(str_totext(buf, target));
 
 	/*
@@ -662,8 +661,9 @@ generic_totext_in_svcb(ARGS_TOTEXT) {
 	 */
 	dns_name_fromregion(&name, &region);
 	isc_region_consume(&region, name_length(&name));
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	while (region.length > 0) {
 		isc_region_t r;
@@ -699,7 +699,7 @@ generic_totext_in_svcb(ARGS_TOTEXT) {
 			num = uint16_fromregion(&r);
 			isc_region_consume(&r, 2);
 			n = snprintf(buf, sizeof(buf), "%u", num);
-			INSIST(n > 0 && (unsigned)n < sizeof(buf));
+			INSIST(n > 0 && (unsigned int)n < sizeof(buf));
 			RETERR(str_totext(buf, target));
 			INSIST(r.length == 0U);
 			break;
@@ -780,7 +780,7 @@ generic_fromwire_in_svcb(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -797,7 +797,7 @@ generic_fromwire_in_svcb(ARGS_FROMWIRE) {
 	/*
 	 * TargetName.
 	 */
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	/*
 	 * SvcParams.
@@ -923,7 +923,7 @@ generic_towire_in_svcb(ARGS_TOWIRE) {
 
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 
 	/*
 	 * SvcPriority.
@@ -937,7 +937,7 @@ generic_towire_in_svcb(ARGS_TOWIRE) {
 	 */
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &region);
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 	isc_region_consume(&region, name_length(&name));
 
 	/*
@@ -1031,13 +1031,6 @@ generic_tostruct_in_svcb(ARGS_TOSTRUCT) {
 	svcb->svclen = region.length;
 	svcb->svc = mem_maybedup(mctx, region.base, region.length);
 
-	if (svcb->svc == NULL) {
-		if (mctx != NULL) {
-			dns_name_free(&svcb->svcdomain, svcb->mctx);
-		}
-		return ISC_R_NOMEMORY;
-	}
-
 	svcb->offset = 0;
 	svcb->mctx = mctx;
 
@@ -1109,7 +1102,8 @@ generic_additionaldata_in_svcb(ARGS_ADDLDATA) {
 			return ISC_R_SUCCESS;
 		}
 		/* Only lookup address records */
-		return (add)(arg, owner, dns_rdatatype_a, NULL);
+		return (add)(arg, owner, dns_rdatatype_a,
+			     NULL DNS__DB_FILELINE);
 	}
 
 	/*
@@ -1118,7 +1112,8 @@ generic_additionaldata_in_svcb(ARGS_ADDLDATA) {
 	dns_rdataset_init(&rdataset);
 	fname = dns_fixedname_initname(&fixed);
 	do {
-		RETERR((add)(arg, &name, dns_rdatatype_cname, &rdataset));
+		RETERR((add)(arg, &name, dns_rdatatype_cname,
+			     &rdataset DNS__DB_FILELINE));
 		if (dns_rdataset_isassociated(&rdataset)) {
 			isc_result_t result;
 			result = dns_rdataset_first(&rdataset);
@@ -1152,7 +1147,8 @@ generic_additionaldata_in_svcb(ARGS_ADDLDATA) {
 	 * Look up HTTPS/SVCB records when processing the alias form.
 	 */
 	if (alias) {
-		RETERR((add)(arg, &name, rdata->type, &rdataset));
+		RETERR((add)(arg, &name, rdata->type,
+			     &rdataset DNS__DB_FILELINE));
 		/*
 		 * Don't return A or AAAA if this is not the last element
 		 * in the HTTP / SVCB chain.
@@ -1162,7 +1158,7 @@ generic_additionaldata_in_svcb(ARGS_ADDLDATA) {
 			return ISC_R_SUCCESS;
 		}
 	}
-	return (add)(arg, &name, dns_rdatatype_a, NULL);
+	return (add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE);
 }
 
 static isc_result_t

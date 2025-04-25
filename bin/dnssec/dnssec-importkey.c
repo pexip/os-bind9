@@ -21,7 +21,6 @@
 #include <isc/commandline.h>
 #include <isc/hash.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -104,8 +103,8 @@ loadset(const char *filename, dns_rdataset_t *rdataset) {
 
 	dns_name_format(name, setname, sizeof(setname));
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone, rdclass, 0,
-			       NULL, &db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
+			       rdclass, 0, NULL, &db);
 	if (result != ISC_R_SUCCESS) {
 		fatal("can't create database");
 	}
@@ -303,10 +302,9 @@ main(int argc, char **argv) {
 	isc_log_t *log = NULL;
 	dns_rdataset_t rdataset;
 	dns_rdata_t rdata;
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 
 	dns_rdata_init(&rdata);
-	isc_stdtime_get(&now);
 
 	if (argc == 1) {
 		usage();

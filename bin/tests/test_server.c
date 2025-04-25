@@ -33,12 +33,13 @@ typedef enum { UDP, TCP, DOT, HTTPS, HTTP } protocol_t;
 static const char *protocols[] = { "udp", "tcp", "dot", "https", "http-plain" };
 
 static isc_mem_t *mctx = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 static isc_nm_t *netmgr = NULL;
 
 static protocol_t protocol;
 static in_port_t port;
 static isc_netaddr_t netaddr;
-static isc_sockaddr_t sockaddr __attribute__((unused));
+static isc_sockaddr_t sockaddr ISC_ATTR_UNUSED;
 static int workers;
 
 static isc_tlsctx_t *tls_ctx = NULL;
@@ -165,40 +166,17 @@ parse_options(int argc, char **argv) {
 }
 
 static void
-_signal(int sig, void (*handler)(int)) {
-	struct sigaction sa = { .sa_handler = handler };
-
-	RUNTIME_CHECK(sigfillset(&sa.sa_mask) == 0);
-	RUNTIME_CHECK(sigaction(sig, &sa, NULL) >= 0);
-}
-
-static void
 setup(void) {
-	sigset_t sset;
-
-	_signal(SIGPIPE, SIG_IGN);
-	_signal(SIGHUP, SIG_DFL);
-	_signal(SIGTERM, SIG_DFL);
-	_signal(SIGINT, SIG_DFL);
-
-	RUNTIME_CHECK(sigemptyset(&sset) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGHUP) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGINT) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGTERM) == 0);
-	RUNTIME_CHECK(pthread_sigmask(SIG_BLOCK, &sset, NULL) == 0);
-
-	isc_mem_create(&mctx);
-
-	isc_managers_create(mctx, workers, 0, &netmgr, NULL, NULL);
+	isc_managers_create(&mctx, workers, &loopmgr, &netmgr);
 }
 
 static void
 teardown(void) {
-	isc_managers_destroy(&netmgr, NULL, NULL);
-	isc_mem_destroy(&mctx);
 	if (tls_ctx) {
 		isc_tlsctx_free(&tls_ctx);
 	}
+
+	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 }
 
 static void
@@ -266,20 +244,22 @@ run(void) {
 
 	switch (protocol) {
 	case UDP:
-		result = isc_nm_listenudp(netmgr, &sockaddr, read_cb, NULL, 0,
-					  &sock);
+		result = isc_nm_listenudp(netmgr, ISC_NM_LISTEN_ALL, &sockaddr,
+					  read_cb, NULL, &sock);
 		break;
 	case TCP:
-		result = isc_nm_listentcpdns(netmgr, &sockaddr, read_cb, NULL,
-					     accept_cb, NULL, 0, 0, NULL,
-					     &sock);
+		result = isc_nm_listenstreamdns(netmgr, ISC_NM_LISTEN_ALL,
+						&sockaddr, read_cb, NULL,
+						accept_cb, NULL, 0, NULL, NULL,
+						ISC_NM_PROXY_NONE, &sock);
 		break;
 	case DOT: {
 		isc_tlsctx_createserver(NULL, NULL, &tls_ctx);
 
-		result = isc_nm_listentlsdns(netmgr, &sockaddr, read_cb, NULL,
-					     accept_cb, NULL, 0, 0, NULL,
-					     tls_ctx, &sock);
+		result = isc_nm_listenstreamdns(
+			netmgr, ISC_NM_LISTEN_ALL, &sockaddr, read_cb, NULL,
+			accept_cb, NULL, 0, NULL, tls_ctx, ISC_NM_PROXY_NONE,
+			&sock);
 		break;
 	}
 #if HAVE_LIBNGHTTP2
@@ -292,11 +272,12 @@ run(void) {
 		}
 		eps = isc_nm_http_endpoints_new(mctx);
 		result = isc_nm_http_endpoints_add(
-			eps, ISC_NM_HTTP_DEFAULT_PATH, read_cb, NULL, 0);
+			eps, ISC_NM_HTTP_DEFAULT_PATH, read_cb, NULL);
 
 		if (result == ISC_R_SUCCESS) {
-			result = isc_nm_listenhttp(netmgr, &sockaddr, 0, NULL,
-						   tls_ctx, eps, 0, &sock);
+			result = isc_nm_listenhttp(
+				netmgr, ISC_NM_LISTEN_ALL, &sockaddr, 0, NULL,
+				tls_ctx, eps, 0, ISC_NM_PROXY_NONE, &sock);
 		}
 		isc_nm_http_endpoints_detach(&eps);
 	} break;

@@ -69,7 +69,7 @@ totext_ch_a(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("0177777")];
 	uint16_t addr;
 
@@ -85,8 +85,9 @@ totext_ch_a(ARGS_TOTEXT) {
 	isc_region_consume(&region, name_length(&name));
 	addr = uint16_fromregion(&region);
 
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	snprintf(buf, sizeof(buf), "%o", addr); /* note octal */
 	RETERR(str_totext(" ", target));
@@ -105,11 +106,11 @@ fromwire_ch_a(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_GLOBAL14);
+	dctx = dns_decompress_setpermitted(dctx, true);
 
 	dns_name_init(&name, NULL);
 
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sregion);
 	isc_buffer_availableregion(target, &tregion);
@@ -138,7 +139,7 @@ towire_ch_a(ARGS_TOWIRE) {
 	REQUIRE(rdata->rdclass == dns_rdataclass_ch);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_GLOBAL14);
+	dns_compress_setpermitted(cctx, true);
 
 	dns_name_init(&name, offsets);
 
@@ -146,7 +147,7 @@ towire_ch_a(ARGS_TOWIRE) {
 
 	dns_name_fromregion(&name, &sregion);
 	isc_region_consume(&sregion, name_length(&name));
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 
 	isc_buffer_availableregion(target, &tregion);
 	if (tregion.length < 2) {

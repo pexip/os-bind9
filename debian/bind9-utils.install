@@ -2,6 +2,7 @@ usr/bin/dnssec-cds
 usr/bin/dnssec-dsfromkey
 usr/bin/dnssec-keyfromlabel
 usr/bin/dnssec-keygen
+usr/bin/dnssec-ksr
 usr/bin/dnssec-revoke
 usr/bin/dnssec-settime
 usr/bin/dnssec-signzone
@@ -15,6 +16,7 @@ usr/share/man/man1/dnssec-cds.1
 usr/share/man/man1/dnssec-dsfromkey.1
 usr/share/man/man1/dnssec-keyfromlabel.1
 usr/share/man/man1/dnssec-keygen.1
+usr/share/man/man1/dnssec-ksr.1
 usr/share/man/man1/dnssec-revoke.1
 usr/share/man/man1/dnssec-settime.1
 usr/share/man/man1/dnssec-signzone.1

@@ -13,7 +13,6 @@ import pytest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
-        "*-supported.file",
         "dig.out.*",
         "ns*/*.signed",
         "ns*/K*",

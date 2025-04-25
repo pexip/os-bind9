@@ -14,6 +14,7 @@
 /*! \file */
 
 #include <inttypes.h>
+#include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -21,8 +22,6 @@
 #include <isc/log.h>
 #include <isc/mem.h>
 #include <isc/net.h>
-#include <isc/netdb.h>
-#include <isc/print.h>
 #include <isc/region.h>
 #include <isc/result.h>
 #include <isc/stdio.h>
@@ -74,7 +73,7 @@
 #define ERR_IS_MXCNAME	   6
 #define ERR_IS_SRVCNAME	   7
 
-static const char *dbtype[] = { "rbt" };
+static const char *dbtype[] = { ZONEDB_DEFAULT };
 
 int debug = 0;
 const char *journal = NULL;
@@ -89,12 +88,13 @@ bool dochecksrv = false;
 bool docheckns = false;
 #endif /* if CHECK_LOCAL */
 dns_zoneopt_t zone_options = DNS_ZONEOPT_CHECKNS | DNS_ZONEOPT_CHECKMX |
+			     DNS_ZONEOPT_CHECKDUPRR | DNS_ZONEOPT_CHECKSPF |
 			     DNS_ZONEOPT_MANYERRORS | DNS_ZONEOPT_CHECKNAMES |
 			     DNS_ZONEOPT_CHECKINTEGRITY |
 #if CHECK_SIBLING
 			     DNS_ZONEOPT_CHECKSIBLING |
 #endif /* if CHECK_SIBLING */
-			     DNS_ZONEOPT_CHECKWILDCARD |
+			     DNS_ZONEOPT_CHECKSVCB | DNS_ZONEOPT_CHECKWILDCARD |
 			     DNS_ZONEOPT_WARNMXCNAME | DNS_ZONEOPT_WARNSRVCNAME;
 
 /*
@@ -596,7 +596,7 @@ load_zone(isc_mem_t *mctx, const char *zonename, const char *filename,
 			zonename, filename, classname);
 	}
 
-	CHECK(dns_zone_create(&zone, mctx));
+	dns_zone_create(&zone, mctx, 0);
 
 	dns_zone_settype(zone, dns_zone_primary);
 
@@ -617,7 +617,7 @@ load_zone(isc_mem_t *mctx, const char *zonename, const char *filename,
 		CHECK(dns_zone_setjournal(zone, journal));
 	}
 
-	DE_CONST(classname, region.base);
+	region.base = UNCONST(classname);
 	region.length = strlen(classname);
 	CHECK(dns_rdataclass_fromtext(&rdclass, &region));
 

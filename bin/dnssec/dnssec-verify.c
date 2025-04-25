@@ -17,18 +17,15 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <isc/app.h>
 #include <isc/attributes.h>
 #include <isc/base32.h>
 #include <isc/commandline.h>
-#include <isc/event.h>
 #include <isc/file.h>
 #include <isc/hash.h>
 #include <isc/hex.h>
 #include <isc/mem.h>
 #include <isc/mutex.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/result.h>
 #include <isc/rwlock.h>
@@ -70,10 +67,10 @@ const char *program = "dnssec-verify";
 static isc_stdtime_t now;
 static isc_mem_t *mctx = NULL;
 static dns_masterformat_t inputformat = dns_masterformat_text;
-static dns_db_t *gdb;		  /* The database */
-static dns_dbversion_t *gversion; /* The database version */
-static dns_rdataclass_t gclass;	  /* The class */
-static dns_name_t *gorigin;	  /* The database origin */
+static dns_db_t *gdb = NULL;		 /* The database */
+static dns_dbversion_t *gversion = NULL; /* The database version */
+static dns_rdataclass_t gclass;		 /* The class */
+static dns_name_t *gorigin = NULL;	 /* The database origin */
 static bool ignore_kskflag = false;
 static bool keyset_kskonly = false;
 
@@ -112,8 +109,8 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 		      isc_result_totext(result));
 	}
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone, rdclass, 0,
-			       NULL, db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
+			       rdclass, 0, NULL, db);
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_load(*db, file, inputformat, 0);
@@ -180,7 +177,7 @@ main(int argc, char *argv[]) {
 	char *endp;
 	int ch;
 
-#define CMDLINE_FLAGS "c:E:hm:o:I:qv:Vxz"
+#define CMDLINE_FLAGS "c:E:hJ:m:o:I:qv:Vxz"
 
 	/*
 	 * Process memory debugging argument first.
@@ -206,7 +203,6 @@ main(int argc, char *argv[]) {
 		}
 	}
 	isc_commandline_reset = true;
-	check_result(isc_app_start(), "isc_app_start");
 
 	isc_mem_create(&mctx);
 
@@ -224,6 +220,10 @@ main(int argc, char *argv[]) {
 
 		case 'I':
 			inputformatstr = isc_commandline_argument;
+			break;
+
+		case 'J':
+			journal = isc_commandline_argument;
 			break;
 
 		case 'm':
@@ -281,7 +281,7 @@ main(int argc, char *argv[]) {
 		      isc_result_totext(result));
 	}
 
-	isc_stdtime_get(&now);
+	now = isc_stdtime_now();
 
 	rdclass = strtoclass(classname);
 
@@ -319,6 +319,9 @@ main(int argc, char *argv[]) {
 	gdb = NULL;
 	report("Loading zone '%s' from file '%s'\n", origin, file);
 	loadzone(file, origin, rdclass, &gdb);
+	if (journal != NULL) {
+		loadjournal(mctx, gdb, journal);
+	}
 	gorigin = dns_db_origin(gdb);
 	gclass = dns_db_class(gdb);
 
@@ -338,8 +341,6 @@ main(int argc, char *argv[]) {
 		isc_mem_stats(mctx, stdout);
 	}
 	isc_mem_destroy(&mctx);
-
-	(void)isc_app_finish();
 
 	return result == ISC_R_SUCCESS ? 0 : 1;
 }

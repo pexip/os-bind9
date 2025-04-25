@@ -127,8 +127,12 @@ ADDR a.bit.longer.ns.name.good.
 ADDR ns2.good.
 ADDR ns3.good.
 ADDR ns3.good.
+NS bit.longer.ns.name.good.
 NS boing.good.
 NS good.
+NS longer.ns.name.good.
+NS name.good.
+NS ns.name.good.
 NS zoop.boing.good.
 __EOF
 cat <<__EOF | diff ans3/query.log - >/dev/null || ret=1
@@ -161,7 +165,11 @@ ADDR a.bit.longer.ns.name.good.
 ADDR ns2.good.
 ADDR ns3.good.
 ADDR ns3.good.
+NS bit.longer.ns.name.good.
 NS boing.good.
+NS longer.ns.name.good.
+NS name.good.
+NS ns.name.good.
 NS zoop.boing.good.
 __EOF
 cat <<__EOF | diff ans3/query.log - >/dev/null || ret=1
@@ -212,6 +220,7 @@ ADDR ns2.bad.
 ADDR ns3.bad.
 ADDR ns3.bad.
 NS boing.bad.
+NS name.bad.
 __EOF
 cat <<__EOF | diff ans3/query.log - >/dev/null || ret=1
 ADDR icky.icky.icky.ptang.zoop.boing.bad.
@@ -260,6 +269,8 @@ ADDR ns2.ugly.
 ADDR ns3.ugly.
 ADDR ns3.ugly.
 NS boing.ugly.
+NS name.ugly.
+NS name.ugly.
 __EOF
 echo "ADDR icky.icky.icky.ptang.zoop.boing.ugly." | diff ans3/query.log - >/dev/null || ret=1
 echo "ADDR icky.icky.icky.ptang.zoop.boing.ugly." | diff ans4/query.log - >/dev/null || ret=1
@@ -291,7 +302,11 @@ ADDR a.bit.longer.ns.name.slow.
 ADDR ns2.slow.
 ADDR ns3.slow.
 ADDR ns3.slow.
+NS bit.longer.ns.name.slow.
 NS boing.slow.
+NS longer.ns.name.slow.
+NS name.slow.
+NS ns.name.slow.
 NS slow.
 NS zoop.boing.slow.
 __EOF
@@ -318,7 +333,7 @@ $DIG $DIGOPTS -x 2001:4f8::1 @10.53.0.6 >dig.out.test$n || ret=1
 grep "status: NOERROR" dig.out.test$n >/dev/null || ret=1
 grep "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.f.4.0.1.0.0.2.ip6.arpa. 1 IN PTR nee.com." dig.out.test$n >/dev/null || ret=1
 sleep 1
-grep -v ADDR ans2/query.log >ans2/query.log.trimmed
+grep -F "ip6.arpa." ans2/query.log >ans2/query.log.trimmed
 cat <<__EOF | diff ans2/query.log.trimmed - >/dev/null || ret=1
 NS 1.0.0.2.ip6.arpa.
 NS 8.f.4.0.1.0.0.2.ip6.arpa.
@@ -347,8 +362,12 @@ ADDR a.bit.longer.ns.name.good.
 ADDR ns2.good.
 ADDR ns3.good.
 ADDR ns3.good.
+NS bit.longer.ns.name.good.
 NS boing.good.
 NS good.
+NS longer.ns.name.good.
+NS name.good.
+NS ns.name.good.
 NS zoop.boing.good.
 __EOF
 cat <<__EOF | diff ans3/query.log - >/dev/null || ret=1
@@ -493,18 +512,22 @@ n=$((n + 1))
 echo_i "query for .stale is properly minimized when qname-minimization is in strict mode (stale cache) ($n)"
 ret=0
 $CLEANQL
+$RNDCCMD 10.53.0.6 flush
 $DIG $DIGOPTS @10.53.0.6 txt a.b.stale. >dig.out.test$n || ret=1
 grep "status: NOERROR" dig.out.test$n >/dev/null || ret=1
 grep "a\.b\.stale\..*1.*IN.*TXT.*hooray" dig.out.test$n >/dev/null || ret=1
 sleep 1
 sort ans2/query.log >ans2/query.log.sorted
 cat <<__EOF | diff ans2/query.log.sorted - >/dev/null || ret=1
+ADDR ns.b.stale.
+ADDR ns2.stale.
 NS b.stale.
 NS stale.
 __EOF
 test -f ans3/query.log && ret=1
 sort ans4/query.log >ans4/query.log.sorted
 cat <<__EOF | diff ans4/query.log.sorted - >/dev/null || ret=1
+ADDR ns.b.stale.
 NS b.stale.
 TXT a.b.stale.
 __EOF
@@ -516,17 +539,21 @@ n=$((n + 1))
 echo_i "query for .stale is properly minimized when qname-minimization is in relaxed mode (stale cache) ($n)"
 ret=0
 $CLEANQL
+$RNDCCMD 10.53.0.7 flush
 $DIG $DIGOPTS @10.53.0.7 txt a.b.stale. >dig.out.test$n || ret=1
 grep "status: NOERROR" dig.out.test$n >/dev/null || ret=1
 grep "a\.b\.stale\..*1.*IN.*TXT.*hooray" dig.out.test$n >/dev/null || ret=1
 sleep 1
 sort ans2/query.log >ans2/query.log.sorted
 cat <<__EOF | diff ans2/query.log.sorted - >/dev/null || ret=1
+ADDR ns.b.stale.
+ADDR ns2.stale.
 NS b.stale.
 __EOF
 test -f ans3/query.log && ret=1
 sort ans4/query.log >ans4/query.log.sorted
 cat <<__EOF | diff ans4/query.log.sorted - >/dev/null || ret=1
+ADDR ns.b.stale.
 TXT a.b.stale.
 __EOF
 for ans in ans2 ans3 ans4; do mv -f $ans/query.log query-$ans-$n.log 2>/dev/null || true; done

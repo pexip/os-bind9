@@ -89,7 +89,6 @@ fromwire_csync(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(rdclass);
-	UNUSED(options);
 	UNUSED(dctx);
 
 	/*
@@ -183,15 +182,8 @@ tostruct_csync(ARGS_TOSTRUCT) {
 
 	csync->len = region.length;
 	csync->typebits = mem_maybedup(mctx, region.base, region.length);
-	if (csync->typebits == NULL) {
-		goto cleanup;
-	}
-
 	csync->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	return ISC_R_NOMEMORY;
 }
 
 static void

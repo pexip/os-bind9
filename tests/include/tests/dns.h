@@ -21,10 +21,10 @@
 #include <isc/buffer.h>
 #include <isc/hash.h>
 #include <isc/log.h>
+#include <isc/loop.h>
 #include <isc/mem.h>
 #include <isc/result.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/timer.h>
 #include <isc/util.h>
 
@@ -47,7 +47,8 @@ typedef struct {
 #define ZONECHANGE_SENTINEL { 0, NULL, 0, NULL, NULL }
 
 isc_result_t
-dns_test_makeview(const char *name, bool with_cache, dns_view_t **viewp);
+dns_test_makeview(const char *name, bool with_dispatchmgr, bool with_cache,
+		  dns_view_t **viewp);
 
 /*%
  * Create a zone with origin 'name', return a pointer to the zone object in
@@ -69,7 +70,7 @@ isc_result_t
 dns_test_makezone(const char *name, dns_zone_t **zonep, dns_view_t *view,
 		  bool createview);
 
-isc_result_t
+void
 dns_test_setupzonemgr(void);
 
 isc_result_t

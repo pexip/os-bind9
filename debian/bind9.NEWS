@@ -1,0 +1,43 @@
+bind9 (1:9.20.5-1) unstable; urgency=medium
+
+  * The default empty zones, and localhost forward and reverse zones
+    have been removed from the package in favor of BIND 9 native
+    directive `empty-zones yes` (that is on by default).
+
+    This include following configuration files:
+
+    - /etc/bind/db.0
+    - /etc/bind/db.127
+    - /etc/bind/db.255
+    - /etc/bind/db.empty
+    - /etc/bind/db.local
+    - /etc/bind/named.conf.default-zones
+    - /etc/bind/zones.rfc1918
+
+    Please make sure you are not including any of these files in
+    your configuration.
+
+  * Changes in default zone transfer ACL can break existing setups!
+
+    The default for `allow-transfer {}` configuration directive has
+    been changed from "allow by default" to "deny by default".
+
+    Unless you have explicitly configure the ACLs in allow-transfer,
+    your secondaries might not be able to do the zone transfers
+    anymore.
+
+    Please make sure that you explicitly configure your zone transfer
+    ACLs before continuing with the upgrade.
+
+  * Since Debian bookworm, the BIND 9 has support for Type=notify
+    reporting in the systemd unit file.  Because of that, running
+    named in the chroot requires the chroot to have the sd_notify
+    socket available.
+
+    One possible solution is to create the systemd unit override
+    and add ad bind-mount for the notify socket:
+
+    [Service]
+    BindPaths=/run/systemd/notify:<chroot_path>/run/systemd/notify
+
+ -- Ondřej Surý <ondrej@debian.org>  Mon, 27 Jan 2025 12:43:40 +0100

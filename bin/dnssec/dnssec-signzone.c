@@ -33,22 +33,24 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <isc/app.h>
+#include <openssl/opensslv.h>
+
+#include <isc/async.h>
 #include <isc/atomic.h>
 #include <isc/attributes.h>
 #include <isc/base32.h>
 #include <isc/commandline.h>
 #include <isc/dir.h>
-#include <isc/event.h>
 #include <isc/file.h>
+#include <isc/fips.h>
 #include <isc/hash.h>
 #include <isc/hex.h>
+#include <isc/loop.h>
 #include <isc/managers.h>
 #include <isc/md.h>
 #include <isc/mem.h>
 #include <isc/mutex.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/result.h>
 #include <isc/rwlock.h>
@@ -56,7 +58,7 @@
 #include <isc/serial.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
-#include <isc/task.h>
+#include <isc/tid.h>
 #include <isc/time.h>
 #include <isc/util.h>
 
@@ -66,6 +68,7 @@
 #include <dns/dnssec.h>
 #include <dns/ds.h>
 #include <dns/fixedname.h>
+#include <dns/kasp.h>
 #include <dns/keyvalues.h>
 #include <dns/log.h>
 #include <dns/master.h>
@@ -85,6 +88,10 @@
 #include <dns/zoneverify.h>
 
 #include <dst/dst.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#include <openssl/err.h>
+#include <openssl/provider.h>
+#endif
 
 #include "dnssectool.h"
 
@@ -115,13 +122,6 @@ static int nsec_datatype = dns_rdatatype_nsec;
 #define SOA_SERIAL_UNIXTIME  2
 #define SOA_SERIAL_DATE	     3
 
-typedef struct signer_event sevent_t;
-struct signer_event {
-	ISC_EVENT_COMMON(sevent_t);
-	dns_fixedname_t *fname;
-	dns_dbnode_t *node;
-};
-
 static dns_dnsseckeylist_t keylist;
 static unsigned int keycount = 0;
 static isc_rwlock_t keylist_lock;
@@ -145,7 +145,7 @@ static atomic_uint_fast32_t nverified = 0, nverifyfailed = 0;
 static const char *directory = NULL, *dsdir = NULL;
 static isc_mutex_t namelock;
 static isc_nm_t *netmgr = NULL;
-static isc_taskmgr_t *taskmgr = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 static dns_db_t *gdb;		  /* The database */
 static dns_dbversion_t *gversion; /* The database version */
 static dns_dbiterator_t *gdbiter; /* The database iterator */
@@ -156,8 +156,7 @@ static dns_iterations_t nsec3iter = 0U;
 static unsigned char saltbuf[255];
 static unsigned char *gsalt = saltbuf;
 static size_t salt_length = 0;
-static isc_task_t *main_task = NULL;
-static unsigned int ntasks = 0;
+static unsigned int nloops = 0;
 static atomic_bool shuttingdown;
 static atomic_bool finished;
 static bool nokeys = false;
@@ -181,14 +180,12 @@ static bool output_stdout = false;
 static bool set_maxttl = false;
 static dns_ttl_t maxttl = 0;
 static bool no_max_check = false;
+static const char *sync_records = "cdnskey,cds:sha-256";
 
 #define INCSTAT(counter)                               \
 	if (printstats) {                              \
 		atomic_fetch_add_relaxed(&counter, 1); \
 	}
-
-static void
-sign(isc_task_t *task, isc_event_t *event);
 
 /*%
  * Store a copy of 'name' in 'fzonecut' and return a pointer to that copy.
@@ -210,16 +207,9 @@ dumpnode(dns_name_t *name, dns_dbnode_t *node) {
 	isc_buffer_t *buffer = NULL;
 	isc_region_t r;
 	isc_result_t result;
-	unsigned bufsize = 4096;
-
-	if (outputformat != dns_masterformat_text) {
-		return;
-	}
+	unsigned int bufsize = 4096;
 
 	if (!output_dnssec_only) {
-		result = dns_master_dumpnodetostream(mctx, gdb, gversion, node,
-						     name, masterstyle, outfp);
-		check_result(result, "dns_master_dumpnodetostream");
 		return;
 	}
 
@@ -268,6 +258,17 @@ dumpnode(dns_name_t *name, dns_dbnode_t *node) {
 
 	isc_buffer_free(&buffer);
 	dns_rdatasetiter_destroy(&iter);
+}
+
+static void
+lock_and_dumpnode(dns_name_t *name, dns_dbnode_t *node) {
+	if (!output_dnssec_only) {
+		return;
+	}
+
+	LOCK(&namelock);
+	dumpnode(name, node);
+	UNLOCK(&namelock);
 }
 
 /*%
@@ -416,17 +417,14 @@ keythatsigned(dns_rdata_rrsig_t *rrsig) {
 		DST_TYPE_PUBLIC | DST_TYPE_PRIVATE, directory, mctx, &privkey);
 	if (result == ISC_R_SUCCESS) {
 		dst_key_free(&pubkey);
-		result = dns_dnsseckey_create(mctx, &privkey, &key);
+		dns_dnsseckey_create(mctx, &privkey, &key);
 	} else {
-		result = dns_dnsseckey_create(mctx, &pubkey, &key);
+		dns_dnsseckey_create(mctx, &pubkey, &key);
+		key->pubkey = true;
 	}
 
-	if (result == ISC_R_SUCCESS) {
-		key->force_publish = false;
-		key->force_sign = false;
-		key->index = keycount++;
-		ISC_LIST_APPEND(keylist, key, link);
-	}
+	key->index = keycount++;
+	ISC_LIST_APPEND(keylist, key, link);
 
 	isc_rwlock_unlock(&keylist_lock, isc_rwlocktype_write);
 	return key;
@@ -528,8 +526,8 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 	if (!nosigs) {
 		arraysize += dns_rdataset_count(&sigset);
 	}
-	wassignedby = isc_mem_get(mctx, arraysize * sizeof(bool));
-	nowsignedby = isc_mem_get(mctx, arraysize * sizeof(bool));
+	wassignedby = isc_mem_cget(mctx, arraysize, sizeof(bool));
+	nowsignedby = isc_mem_cget(mctx, arraysize, sizeof(bool));
 
 	for (i = 0; i < arraysize; i++) {
 		wassignedby[i] = nowsignedby[i] = false;
@@ -542,7 +540,7 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 	}
 
 	while (result == ISC_R_SUCCESS) {
-		bool expired, future;
+		bool expired, refresh, future, offline;
 		bool keep = false, resign = false;
 
 		dns_rdataset_current(&sigset, &sigrdata);
@@ -553,8 +551,10 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 		future = isc_serial_lt(now, rrsig.timesigned);
 
 		key = keythatsigned(&rrsig);
+		offline = (key != NULL) ? key->pubkey : false;
 		sig_format(&rrsig, sigstr, sizeof(sigstr));
-		expired = isc_serial_gt(now + cycle, rrsig.timeexpire);
+		expired = isc_serial_gt(now, rrsig.timeexpire);
+		refresh = isc_serial_gt(now + cycle, rrsig.timeexpire);
 
 		if (isc_serial_gt(rrsig.timesigned, rrsig.timeexpire)) {
 			/* rrsig is dropped and not replaced */
@@ -583,15 +583,21 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 		} else if (issigningkey(key)) {
 			wassignedby[key->index] = true;
 
-			if (!expired && rrsig.originalttl == set->ttl &&
+			if (!refresh && rrsig.originalttl == set->ttl &&
 			    setverifies(name, set, key->key, &sigrdata))
 			{
 				vbprintf(2, "\trrsig by %s retained\n", sigstr);
 				keep = true;
+			} else if (offline) {
+				vbprintf(2,
+					 "\trrsig by %s retained - private key "
+					 "missing\n",
+					 sigstr);
+				keep = true;
 			} else {
 				vbprintf(2, "\trrsig by %s dropped - %s\n",
 					 sigstr,
-					 expired ? "expired"
+					 refresh ? "refresh"
 					 : rrsig.originalttl != set->ttl
 						 ? "ttl change"
 						 : "failed to "
@@ -604,25 +610,32 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 		} else if (iszonekey(key)) {
 			wassignedby[key->index] = true;
 
-			if (!expired && rrsig.originalttl == set->ttl &&
+			if (!refresh && rrsig.originalttl == set->ttl &&
 			    setverifies(name, set, key->key, &sigrdata))
 			{
 				vbprintf(2, "\trrsig by %s retained\n", sigstr);
 				keep = true;
+			} else if (offline) {
+				vbprintf(2,
+					 "\trrsig by %s retained - private key "
+					 "missing\n",
+					 sigstr);
+				keep = true;
 			} else {
 				vbprintf(2, "\trrsig by %s dropped - %s\n",
 					 sigstr,
-					 expired ? "expired"
+					 refresh ? "refresh"
 					 : rrsig.originalttl != set->ttl
 						 ? "ttl change"
 						 : "failed to "
 						   "verify");
 			}
-		} else if (!expired) {
+		} else if (!refresh) {
 			vbprintf(2, "\trrsig by %s retained\n", sigstr);
 			keep = true;
 		} else {
-			vbprintf(2, "\trrsig by %s expired\n", sigstr);
+			vbprintf(2, "\trrsig by %s %s\n", sigstr,
+				 expired ? "expired" : "needs refresh");
 		}
 
 		if (keep) {
@@ -785,8 +798,8 @@ signset(dns_diff_t *del, dns_diff_t *add, dns_dbnode_t *node, dns_name_t *name,
 		}
 	}
 
-	isc_mem_put(mctx, wassignedby, arraysize * sizeof(bool));
-	isc_mem_put(mctx, nowsignedby, arraysize * sizeof(bool));
+	isc_mem_cput(mctx, wassignedby, arraysize, sizeof(bool));
+	isc_mem_cput(mctx, nowsignedby, arraysize, sizeof(bool));
 }
 
 struct hashlist {
@@ -1001,8 +1014,8 @@ opendb(const char *prefix, dns_name_t *name, dns_rdataclass_t rdclass,
 	}
 	isc_buffer_putuint8(&b, 0);
 
-	result = dns_db_create(mctx, "rbt", dns_rootname, dns_dbtype_zone,
-			       rdclass, 0, NULL, dbp);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, dns_rootname,
+			       dns_dbtype_zone, rdclass, 0, NULL, dbp);
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_load(*dbp, filename, inputformat, DNS_MASTER_HINT);
@@ -1508,47 +1521,6 @@ cleanup:
 }
 
 /*%
- * Delete any RRSIG records at a node.
- */
-static void
-cleannode(dns_db_t *db, dns_dbversion_t *dbversion, dns_dbnode_t *node) {
-	dns_rdatasetiter_t *rdsiter = NULL;
-	dns_rdataset_t set;
-	isc_result_t result, dresult;
-
-	if (outputformat != dns_masterformat_text || !disable_zone_check) {
-		return;
-	}
-
-	dns_rdataset_init(&set);
-	result = dns_db_allrdatasets(db, node, dbversion, 0, 0, &rdsiter);
-	check_result(result, "dns_db_allrdatasets");
-	result = dns_rdatasetiter_first(rdsiter);
-	while (result == ISC_R_SUCCESS) {
-		bool destroy = false;
-		dns_rdatatype_t covers = 0;
-		dns_rdatasetiter_current(rdsiter, &set);
-		if (set.type == dns_rdatatype_rrsig) {
-			covers = set.covers;
-			destroy = true;
-		}
-		dns_rdataset_disassociate(&set);
-		result = dns_rdatasetiter_next(rdsiter);
-		if (destroy) {
-			dresult = dns_db_deleterdataset(db, node, dbversion,
-							dns_rdatatype_rrsig,
-							covers);
-			check_result(dresult, "dns_db_deleterdataset");
-		}
-	}
-	if (result != ISC_R_NOMORE) {
-		fatal("rdataset iteration failed: %s",
-		      isc_result_totext(result));
-	}
-	dns_rdatasetiter_destroy(&rdsiter);
-}
-
-/*%
  * Set up the iterator and global state before starting the tasks.
  */
 static void
@@ -1587,7 +1559,6 @@ signapex(void) {
 	check_dns_dbiterator_current(result);
 	signname(node, true, name);
 	dumpnode(name, node);
-	cleannode(gdb, gversion, node);
 	dns_db_detachnode(gdb, &node);
 	result = dns_dbiterator_first(gdbiter);
 	if (result == ISC_R_NOMORE) {
@@ -1598,22 +1569,30 @@ signapex(void) {
 	}
 }
 
+static void
+abortwork(void *arg) {
+	UNUSED(arg);
+
+	atomic_store(&shuttingdown, true);
+}
+
 /*%
  * Assigns a node to a worker thread.  This is protected by the main task's
  * lock.
  */
 static void
-assignwork(isc_task_t *task, isc_task_t *worker) {
-	dns_fixedname_t *fname;
-	dns_name_t *name;
-	dns_dbnode_t *node;
-	sevent_t *sevent;
+assignwork(void *arg) {
+	dns_fixedname_t fname;
+	dns_name_t *name = NULL;
+	dns_dbnode_t *node = NULL;
 	dns_rdataset_t nsec;
 	bool found;
 	isc_result_t result;
 	static dns_name_t *zonecut = NULL; /* Protected by namelock. */
 	static dns_fixedname_t fzonecut;   /* Protected by namelock. */
 	static unsigned int ended = 0;	   /* Protected by namelock. */
+
+	UNUSED(arg);
 
 	if (atomic_load(&shuttingdown)) {
 		return;
@@ -1622,15 +1601,14 @@ assignwork(isc_task_t *task, isc_task_t *worker) {
 	LOCK(&namelock);
 	if (atomic_load(&finished)) {
 		ended++;
-		if (ended == ntasks) {
-			isc_task_detach(&task);
-			isc_app_shutdown();
+		if (ended == nloops) {
+			isc_loopmgr_shutdown(loopmgr);
 		}
-		goto unlock;
+		UNLOCK(&namelock);
+		return;
 	}
 
-	fname = isc_mem_get(mctx, sizeof(dns_fixedname_t));
-	name = dns_fixedname_initname(fname);
+	name = dns_fixedname_initname(&fname);
 	node = NULL;
 	found = false;
 	while (!found) {
@@ -1699,73 +1677,24 @@ assignwork(isc_task_t *task, isc_task_t *worker) {
 	}
 	if (!found) {
 		ended++;
-		if (ended == ntasks) {
-			isc_task_detach(&task);
-			isc_app_shutdown();
+		if (ended == nloops) {
+			isc_loopmgr_shutdown(loopmgr);
 		}
-		isc_mem_put(mctx, fname, sizeof(dns_fixedname_t));
-		goto unlock;
+		UNLOCK(&namelock);
+		return;
 	}
-	sevent = (sevent_t *)isc_event_allocate(mctx, task, SIGNER_EVENT_WORK,
-						sign, NULL, sizeof(sevent_t));
 
-	sevent->node = node;
-	sevent->fname = fname;
-	isc_task_send(worker, ISC_EVENT_PTR(&sevent));
-unlock:
 	UNLOCK(&namelock);
-}
 
-/*%
- * Start a worker task
- */
-static void
-startworker(isc_task_t *task, isc_event_t *event) {
-	isc_task_t *worker;
+	signname(node, false, dns_fixedname_name(&fname));
 
-	worker = (isc_task_t *)event->ev_arg;
-	assignwork(task, worker);
-	isc_event_free(&event);
-}
+	/*%
+	 * Write a node to the output file, and restart the worker task.
+	 */
+	lock_and_dumpnode(dns_fixedname_name(&fname), node);
+	dns_db_detachnode(gdb, &node);
 
-/*%
- * Write a node to the output file, and restart the worker task.
- */
-static void
-writenode(isc_task_t *task, isc_event_t *event) {
-	isc_task_t *worker;
-	sevent_t *sevent = (sevent_t *)event;
-
-	worker = (isc_task_t *)event->ev_sender;
-	dumpnode(dns_fixedname_name(sevent->fname), sevent->node);
-	cleannode(gdb, gversion, sevent->node);
-	dns_db_detachnode(gdb, &sevent->node);
-	isc_mem_put(mctx, sevent->fname, sizeof(dns_fixedname_t));
-	assignwork(task, worker);
-	isc_event_free(&event);
-}
-
-/*%
- *  Sign a database node.
- */
-static void
-sign(isc_task_t *task, isc_event_t *event) {
-	dns_fixedname_t *fname;
-	dns_dbnode_t *node;
-	sevent_t *sevent, *wevent;
-
-	sevent = (sevent_t *)event;
-	node = sevent->node;
-	fname = sevent->fname;
-	isc_event_free(&event);
-
-	signname(node, false, dns_fixedname_name(fname));
-	wevent = (sevent_t *)isc_event_allocate(mctx, task, SIGNER_EVENT_WRITE,
-						writenode, NULL,
-						sizeof(sevent_t));
-	wevent->node = node;
-	wevent->fname = fname;
-	isc_task_send(main_task, ISC_EVENT_PTR(&wevent));
+	isc_async_current(assignwork, NULL);
 }
 
 /*%
@@ -2054,7 +1983,7 @@ addnsec3param(const unsigned char *salt, size_t salt_len,
 	nsec3param.hash = unknownalg ? DNS_NSEC3_UNKNOWNALG : dns_hash_sha1;
 	nsec3param.iterations = iterations;
 	nsec3param.salt_length = (unsigned char)salt_len;
-	DE_CONST(salt, nsec3param.salt);
+	nsec3param.salt = UNCONST(salt);
 
 	isc_buffer_init(&b, nsec3parambuf, sizeof(nsec3parambuf));
 	result = dns_rdata_fromstruct(&rdata, gclass, dns_rdatatype_nsec3param,
@@ -2064,8 +1993,7 @@ addnsec3param(const unsigned char *salt, size_t salt_len,
 	rdatalist.rdclass = rdata.rdclass;
 	rdatalist.type = rdata.type;
 	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
-	result = dns_rdatalist_tordataset(&rdatalist, &rdataset);
-	check_result(result, "dns_rdatalist_tordataset()");
+	dns_rdatalist_tordataset(&rdatalist, &rdataset);
 
 	result = dns_db_findnode(gdb, gorigin, true, &node);
 	check_result(result, "dns_db_findnode(gorigin)");
@@ -2126,8 +2054,7 @@ addnsec3(dns_name_t *name, dns_dbnode_t *node, const unsigned char *salt,
 	rdatalist.type = rdata.type;
 	rdatalist.ttl = ttl;
 	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
-	result = dns_rdatalist_tordataset(&rdatalist, &rdataset);
-	check_result(result, "dns_rdatalist_tordataset()");
+	dns_rdatalist_tordataset(&rdatalist, &rdataset);
 	result = dns_db_findnsec3node(gdb, dns_fixedname_name(&hashname), true,
 				      &nsec3node);
 	check_result(result, "addnsec3: dns_db_findnode()");
@@ -2228,8 +2155,7 @@ nsec3clean(dns_name_t *name, dns_dbnode_t *node, unsigned int hashalg,
 		dns_rdata_init(&delrdata);
 		dns_rdata_clone(&rdata, &delrdata);
 		ISC_LIST_APPEND(rdatalist.rdata, &delrdata, link);
-		result = dns_rdatalist_tordataset(&rdatalist, &delrdataset);
-		check_result(result, "dns_rdatalist_tordataset()");
+		dns_rdatalist_tordataset(&rdatalist, &delrdataset);
 		result = dns_db_subtractrdataset(gdb, node, gversion,
 						 &delrdataset, 0, NULL);
 		dns_rdataset_disassociate(&delrdataset);
@@ -2666,8 +2592,8 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 		      isc_result_totext(result));
 	}
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone, rdclass, 0,
-			       NULL, db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
+			       rdclass, 0, NULL, db);
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_load(*db, file, inputformat, 0);
@@ -2733,7 +2659,7 @@ loadzonekeys(bool preserve_keys, bool load_public) {
 
 	/* Load keys corresponding to the existing DNSKEY RRset. */
 	result = dns_dnssec_keylistfromrdataset(
-		gorigin, directory, mctx, &rdataset, &keysigs, &soasigs,
+		gorigin, NULL, directory, mctx, &rdataset, &keysigs, &soasigs,
 		preserve_keys, load_public, &keylist);
 	if (result != ISC_R_SUCCESS) {
 		fatal("failed to load the zone keys: %s",
@@ -2835,6 +2761,51 @@ clear_keylist(dns_dnsseckeylist_t *list) {
 }
 
 static void
+add_digest(char *str, size_t dlen, dns_kasp_digestlist_t *digests,
+	   bool *cdnskey) {
+	isc_result_t result;
+	isc_textregion_t r;
+	dns_dsdigest_t alg;
+	dns_kasp_digest_t *digest;
+
+	if (dlen == 7 && strncmp(str, "cdnskey", dlen) == 0) {
+		*cdnskey = true;
+		return;
+	}
+
+	if (dlen < 5 || strncmp(str, "cds:", 4) != 0) {
+		fatal("digest must specify cds:algorithm ('%.*s')", (int)dlen,
+		      str);
+	}
+
+	r.base = str + 4;
+	r.length = dlen - 4;
+	result = dns_dsdigest_fromtext(&alg, &r);
+	if (result == DNS_R_UNKNOWN) {
+		fatal("bad digest '%.*s'", (int)dlen, str);
+	} else if (result != ISC_R_SUCCESS) {
+		fatal("bad digest '%.*s': %s", (int)dlen, str,
+		      isc_result_totext(result));
+	} else if (!dst_ds_digest_supported(alg)) {
+		fatal("unsupported digest '%.*s'", (int)dlen, str);
+	}
+
+	/* Suppress duplicates */
+	for (dns_kasp_digest_t *d = ISC_LIST_HEAD(*digests); d != NULL;
+	     d = ISC_LIST_NEXT(d, link))
+	{
+		if (d->digest == alg) {
+			return;
+		}
+	}
+
+	digest = isc_mem_get(mctx, sizeof(*digest));
+	digest->digest = alg;
+	ISC_LINK_INIT(digest, link);
+	ISC_LIST_APPEND(*digests, digest, link);
+}
+
+static void
 build_final_keylist(void) {
 	isc_result_t result;
 	dns_dbnode_t *node = NULL;
@@ -2843,19 +2814,44 @@ build_final_keylist(void) {
 	dns_dnsseckeylist_t rmkeys, matchkeys;
 	char name[DNS_NAME_FORMATSIZE];
 	dns_rdataset_t cdsset, cdnskeyset, soaset;
+	dns_kasp_digestlist_t digests;
+	dns_kasp_digest_t *d, *d_next;
+	bool cdnskey = false;
 
 	ISC_LIST_INIT(rmkeys);
 	ISC_LIST_INIT(matchkeys);
+	ISC_LIST_INIT(digests);
 
 	dns_rdataset_init(&soaset);
 	dns_rdataset_init(&cdsset);
 	dns_rdataset_init(&cdnskeyset);
 
+	if (strlen(sync_records) > 0) {
+		const char delim = ',';
+		char *digest;
+		char *s;
+		size_t dlen;
+
+		digest = UNCONST(sync_records);
+	next_digest:
+		s = strchr(digest, delim);
+		if (s == NULL) {
+			dlen = strlen(digest);
+			add_digest(digest, dlen, &digests, &cdnskey);
+			goto findkeys;
+		}
+		dlen = s - digest;
+		add_digest(digest, dlen, &digests, &cdnskey);
+		digest = s + 1;
+		goto next_digest;
+	}
+
+findkeys:
 	/*
 	 * Find keys that match this zone in the key repository.
 	 */
-	result = dns_dnssec_findmatchingkeys(gorigin, directory, now, mctx,
-					     &matchkeys);
+	result = dns_dnssec_findmatchingkeys(gorigin, NULL, directory, NULL,
+					     now, mctx, &matchkeys);
 	if (result == ISC_R_NOTFOUND) {
 		result = ISC_R_SUCCESS;
 	}
@@ -2892,8 +2888,9 @@ build_final_keylist(void) {
 	/*
 	 * Update keylist with sync records.
 	 */
+
 	dns_dnssec_syncupdate(&keylist, &rmkeys, &cdsset, &cdnskeyset, now,
-			      keyttl, &diff, mctx);
+			      &digests, cdnskey, keyttl, &diff, mctx);
 
 	dns_name_format(gorigin, name, sizeof(name));
 
@@ -2917,6 +2914,13 @@ build_final_keylist(void) {
 
 	clear_keylist(&rmkeys);
 	clear_keylist(&matchkeys);
+
+	for (d = ISC_LIST_HEAD(digests); d != NULL; d = d_next) {
+		d_next = ISC_LIST_NEXT(d, link);
+		ISC_LIST_UNLINK(digests, d, link);
+		isc_mem_put(mctx, d, sizeof(*d));
+	}
+	INSIST(ISC_LIST_EMPTY(digests));
 }
 
 static void
@@ -3178,8 +3182,8 @@ writeset(const char *prefix, dns_rdatatype_t type) {
 		dns_diff_append(&diff, &tuple);
 	}
 
-	result = dns_db_create(mctx, "rbt", dns_rootname, dns_dbtype_zone,
-			       gclass, 0, NULL, &db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, dns_rootname,
+			       dns_dbtype_zone, gclass, 0, NULL, &db);
 	check_result(result, "dns_db_create");
 
 	result = dns_db_newversion(db, &dbversion);
@@ -3221,7 +3225,7 @@ print_version(FILE *fp) {
 		return;
 	}
 
-	fprintf(fp, "; dnssec_signzone version %s\n", PACKAGE_VERSION);
+	fprintf(fp, "; %s version %s\n", program, PACKAGE_VERSION);
 }
 
 noreturn static void
@@ -3244,9 +3248,12 @@ usage(void) {
 	fprintf(stderr, "\t\tdirectory to find key files (.)\n");
 	fprintf(stderr, "\t-d directory:\n");
 	fprintf(stderr, "\t\tdirectory to find dsset-* files (.)\n");
+	fprintf(stderr, "\t-F:\tFIPS mode\n");
 	fprintf(stderr, "\t-g:\t");
 	fprintf(stderr, "update DS records based on child zones' "
 			"dsset-* files\n");
+	fprintf(stderr, "\t-G sync-records:\t");
+	fprintf(stderr, "what CDNSKEY and CDS to publish\n");
 	fprintf(stderr, "\t-s [YYYYMMDDHHMMSS|+offset]:\n");
 	fprintf(stderr, "\t\tRRSIG start time "
 			"- absolute|offset (now - 1 hour)\n");
@@ -3362,7 +3369,7 @@ print_stats(isc_time_t *timer_start, isc_time_t *timer_finish,
 
 int
 main(int argc, char *argv[]) {
-	int i, ch;
+	int ch;
 	char *startstr = NULL, *endstr = NULL, *classname = NULL;
 	char *dnskey_endstr = NULL;
 	char *origin = NULL, *file = NULL, *output = NULL;
@@ -3380,21 +3387,24 @@ main(int argc, char *argv[]) {
 	bool free_output = false;
 	int tempfilelen = 0;
 	dns_rdataclass_t rdclass;
-	isc_task_t **tasks = NULL;
 	hashlist_t hashlist;
 	bool make_keyset = false;
 	bool set_salt = false;
 	bool set_optout = false;
 	bool set_iter = false;
 	bool nonsecify = false;
+	bool set_fips_mode = false;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+	OSSL_PROVIDER *fips = NULL, *base = NULL;
+#endif
 
 	atomic_init(&shuttingdown, false);
 	atomic_init(&finished, false);
 
 	/* Unused letters: Bb G J q Yy (and F is reserved). */
-#define CMDLINE_FLAGS                                                         \
-	"3:AaCc:Dd:E:e:f:FghH:i:I:j:K:k:L:l:m:M:n:N:o:O:PpQqRr:s:ST:tuUv:VX:" \
-	"xzZ:"
+#define CMDLINE_FLAGS                                                          \
+	"3:AaCc:Dd:E:e:f:FgG:hH:i:I:j:J:K:k:L:l:m:M:n:N:o:O:PpQqRr:s:ST:tuUv:" \
+	"VX:xzZ:"
 
 	/*
 	 * Process memory debugging argument first.
@@ -3423,12 +3433,7 @@ main(int argc, char *argv[]) {
 
 	masterstyle = &dns_master_style_explicitttl;
 
-	check_result(isc_app_start(), "isc_app_start");
-
-	isc_mem_create(&mctx);
-
 	isc_commandline_errprint = false;
-
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 		switch (ch) {
 		case '3':
@@ -3504,11 +3509,15 @@ main(int argc, char *argv[]) {
 			generateds = true;
 			break;
 
+		case 'G':
+			sync_records = isc_commandline_argument;
+			break;
+
 		case 'H':
 			set_iter = true;
 			/* too-many is NOT DOCUMENTED */
 			if (strcmp(isc_commandline_argument, "too-many") == 0) {
-				nsec3iter = 151;
+				nsec3iter = 51;
 				no_max_check = true;
 				break;
 			}
@@ -3540,6 +3549,10 @@ main(int argc, char *argv[]) {
 			if (*endp != '\0' || jitter < 0) {
 				fatal("jitter must be numeric and positive");
 			}
+			break;
+
+		case 'J':
+			journal = isc_commandline_argument;
 			break;
 
 		case 'K':
@@ -3588,8 +3601,8 @@ main(int argc, char *argv[]) {
 
 		case 'n':
 			endp = NULL;
-			ntasks = strtol(isc_commandline_argument, &endp, 0);
-			if (*endp != '\0' || ntasks > INT32_MAX) {
+			nloops = strtol(isc_commandline_argument, &endp, 0);
+			if (*endp != '\0' || nloops > INT32_MAX) {
 				fatal("number of cpus must be numeric");
 			}
 			break;
@@ -3673,8 +3686,9 @@ main(int argc, char *argv[]) {
 			break;
 
 		case 'F':
-			/* Reserved for FIPS mode */
-			FALLTHROUGH;
+			set_fips_mode = true;
+			break;
+
 		case '?':
 			if (isc_commandline_option != '?') {
 				fprintf(stderr, "%s: invalid argument -%c\n",
@@ -3702,13 +3716,7 @@ main(int argc, char *argv[]) {
 		}
 	}
 
-	result = dst_lib_init(mctx, engine);
-	if (result != ISC_R_SUCCESS) {
-		fatal("could not initialize dst: %s",
-		      isc_result_totext(result));
-	}
-
-	isc_stdtime_get(&now);
+	now = isc_stdtime_now();
 
 	if (startstr != NULL) {
 		starttime = strtotime(startstr, now, now, NULL);
@@ -3736,15 +3744,44 @@ main(int argc, char *argv[]) {
 		cycle = (endtime - starttime) / 4;
 	}
 
-	if (ntasks == 0) {
-		ntasks = isc_os_ncpus() * 2;
+	if (nloops == 0) {
+		nloops = isc_os_ncpus();
 	}
-	vbprintf(4, "using %d cpus\n", ntasks);
+	vbprintf(4, "using %d cpus\n", nloops);
 
 	rdclass = strtoclass(classname);
 
 	if (directory == NULL) {
 		directory = ".";
+	}
+
+	isc_managers_create(&mctx, nloops, &loopmgr, &netmgr);
+
+	if (set_fips_mode) {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+		fips = OSSL_PROVIDER_load(NULL, "fips");
+		if (fips == NULL) {
+			ERR_clear_error();
+			fatal("Failed to load FIPS provider");
+		}
+		base = OSSL_PROVIDER_load(NULL, "base");
+		if (base == NULL) {
+			OSSL_PROVIDER_unload(fips);
+			ERR_clear_error();
+			fatal("Failed to load base provider");
+		}
+#endif
+		if (!isc_fips_mode()) {
+			if (isc_fips_set_mode(1) != ISC_R_SUCCESS) {
+				fatal("setting FIPS mode failed");
+			}
+		}
+	}
+
+	result = dst_lib_init(mctx, engine);
+	if (result != ISC_R_SUCCESS) {
+		fatal("could not initialize dst: %s",
+		      isc_result_totext(result));
 	}
 
 	setup_logging(mctx, &log);
@@ -3844,8 +3881,11 @@ main(int argc, char *argv[]) {
 	check_result(result, "dns_master_stylecreate");
 
 	gdb = NULL;
-	TIME_NOW(&timer_start);
+	timer_start = isc_time_now();
 	loadzone(file, origin, rdclass, &gdb);
+	if (journal != NULL) {
+		loadjournal(mctx, gdb, journal);
+	}
 	gorigin = dns_db_origin(gdb);
 	gclass = dns_db_class(gdb);
 	get_soa_ttls();
@@ -3877,7 +3917,7 @@ main(int argc, char *argv[]) {
 	 * of keys rather early.
 	 */
 	ISC_LIST_INIT(keylist);
-	isc_rwlock_init(&keylist_lock, 0, 0);
+	isc_rwlock_init(&keylist_lock);
 
 	/*
 	 * Fill keylist with:
@@ -4012,11 +4052,7 @@ main(int argc, char *argv[]) {
 		result = isc_file_mktemplate(output, tempfile, tempfilelen);
 		check_result(result, "isc_file_mktemplate");
 
-		if (outputformat == dns_masterformat_text) {
-			result = isc_file_openunique(tempfile, &outfp);
-		} else {
-			result = isc_file_bopenunique(tempfile, &outfp);
-		}
+		result = isc_file_openunique(tempfile, &outfp);
 		if (result != ISC_R_SUCCESS) {
 			fatal("failed to open temporary output file: %s",
 			      isc_result_totext(result));
@@ -4028,57 +4064,26 @@ main(int argc, char *argv[]) {
 	print_time(outfp);
 	print_version(outfp);
 
-	isc_managers_create(mctx, ntasks, 0, &netmgr, &taskmgr, NULL);
-
-	main_task = NULL;
-	result = isc_task_create(taskmgr, 0, &main_task);
-	if (result != ISC_R_SUCCESS) {
-		fatal("failed to create task: %s", isc_result_totext(result));
-	}
-
-	tasks = isc_mem_get(mctx, ntasks * sizeof(isc_task_t *));
-	for (i = 0; i < (int)ntasks; i++) {
-		tasks[i] = NULL;
-		result = isc_task_create(taskmgr, 0, &tasks[i]);
-		if (result != ISC_R_SUCCESS) {
-			fatal("failed to create task: %s",
-			      isc_result_totext(result));
-		}
-	}
-
 	isc_mutex_init(&namelock);
 
 	presign();
-	TIME_NOW(&sign_start);
+	sign_start = isc_time_now();
 	signapex();
 	if (!atomic_load(&finished)) {
 		/*
 		 * There is more work to do.  Spread it out over multiple
 		 * processors if possible.
 		 */
-		for (i = 0; i < (int)ntasks; i++) {
-			result = isc_app_onrun(mctx, main_task, startworker,
-					       tasks[i]);
-			if (result != ISC_R_SUCCESS) {
-				fatal("failed to start task: %s",
-				      isc_result_totext(result));
-			}
-		}
-		(void)isc_app_run();
+		isc_loopmgr_setup(loopmgr, assignwork, NULL);
+		isc_loopmgr_teardown(loopmgr, abortwork, NULL);
+		isc_loopmgr_run(loopmgr);
+
 		if (!atomic_load(&finished)) {
 			fatal("process aborted by user");
 		}
-	} else {
-		isc_task_detach(&main_task);
 	}
-	atomic_store(&shuttingdown, true);
-	for (i = 0; i < (int)ntasks; i++) {
-		isc_task_detach(&tasks[i]);
-	}
-	isc_managers_destroy(&netmgr, &taskmgr, NULL);
-	isc_mem_put(mctx, tasks, ntasks * sizeof(isc_task_t *));
 	postsign();
-	TIME_NOW(&sign_finish);
+	sign_finish = isc_time_now();
 
 	if (disable_zone_check) {
 		vresult = ISC_R_SUCCESS;
@@ -4093,7 +4098,7 @@ main(int argc, char *argv[]) {
 		}
 	}
 
-	if (outputformat != dns_masterformat_text) {
+	if (!output_dnssec_only) {
 		dns_masterrawheader_t header;
 		dns_master_initrawheader(&header);
 		if (rawversion == 0U) {
@@ -4105,10 +4110,8 @@ main(int argc, char *argv[]) {
 		result = dns_master_dumptostream(mctx, gdb, gversion,
 						 masterstyle, outputformat,
 						 &header, outfp);
-		check_result(result, "dns_master_dumptostream3");
+		check_result(result, "dns_master_dumptostream");
 	}
-
-	isc_mutex_destroy(&namelock);
 
 	if (!output_stdout) {
 		result = isc_stdio_close(outfp);
@@ -4153,15 +4156,24 @@ main(int argc, char *argv[]) {
 	if (verbose > 10) {
 		isc_mem_stats(mctx, stdout);
 	}
-	isc_mem_destroy(&mctx);
 
-	(void)isc_app_finish();
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+	if (base != NULL) {
+		OSSL_PROVIDER_unload(base);
+	}
+	if (fips != NULL) {
+		OSSL_PROVIDER_unload(fips);
+	}
+#endif
+
+	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 
 	if (printstats) {
-		TIME_NOW(&timer_finish);
+		timer_finish = isc_time_now();
 		print_stats(&timer_start, &timer_finish, &sign_start,
 			    &sign_finish);
 	}
+	isc_mutex_destroy(&namelock);
 
 	return vresult == ISC_R_SUCCESS ? 0 : 1;
 }

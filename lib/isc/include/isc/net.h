@@ -65,16 +65,15 @@
 /***
  *** Imports.
  ***/
-#include <inttypes.h>
-
-#include <isc/lang.h>
-#include <isc/types.h>
-
 #include <arpa/inet.h> /* Contractual promise. */
+#include <inttypes.h>
 #include <net/if.h>
 #include <netinet/in.h> /* Contractual promise. */
 #include <sys/socket.h> /* Contractual promise. */
 #include <sys/types.h>
+
+#include <isc/lang.h>
+#include <isc/types.h>
 
 #ifndef IN6ADDR_LOOPBACK_INIT
 #ifdef s6_addr
@@ -248,12 +247,6 @@ isc_net_enableipv4(void);
 
 void
 isc_net_enableipv6(void);
-
-isc_result_t
-isc_net_probeunix(void);
-/*
- * Returns whether UNIX domain sockets are supported.
- */
 
 isc_result_t
 isc_net_getudpportrange(int af, in_port_t *low, in_port_t *high);

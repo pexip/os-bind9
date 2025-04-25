@@ -47,7 +47,7 @@ totext_dname(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_dname);
 	REQUIRE(rdata->length != 0);
@@ -58,9 +58,9 @@ totext_dname(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	sub = name_prefix(&name, tctx->origin, &prefix);
-
-	return dns_name_totext(&prefix, sub, target);
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return dns_name_totext(&prefix, opts, target);
 }
 
 static isc_result_t
@@ -72,10 +72,10 @@ fromwire_dname(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
-	return dns_name_fromwire(&name, source, dctx, options, target);
+	return dns_name_fromwire(&name, source, dctx, target);
 }
 
 static isc_result_t
@@ -87,12 +87,12 @@ towire_dname(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_dname);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	return dns_name_towire(&name, cctx, target);
+	return dns_name_towire(&name, cctx, target, NULL);
 }
 
 static int

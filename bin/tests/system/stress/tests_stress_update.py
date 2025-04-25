@@ -22,7 +22,6 @@ pytestmark = pytest.mark.extra_artifacts(
     [
         "ns2/zone0*.db",
         "ns2/zone0*.jnl",
-        "ns*/zone0*.bk",
     ]
 )
 

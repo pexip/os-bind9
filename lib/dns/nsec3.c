@@ -271,9 +271,7 @@ dns_nsec3_hashname(dns_fixedname_t *result,
 		return DNS_R_BADALG;
 	}
 
-	if (hash_length != NULL) {
-		*hash_length = len;
-	}
+	SET_IF_NOT_NULL(hash_length, len);
 
 	/* convert the hash to base32hex non-padded */
 	region.base = rethash;
@@ -974,7 +972,6 @@ failure:
 bool
 dns_nsec3param_fromprivate(dns_rdata_t *src, dns_rdata_t *target,
 			   unsigned char *buf, size_t buflen) {
-	dns_decompress_t dctx;
 	isc_result_t result;
 	isc_buffer_t buf1;
 	isc_buffer_t buf2;
@@ -991,11 +988,9 @@ dns_nsec3param_fromprivate(dns_rdata_t *src, dns_rdata_t *target,
 	isc_buffer_add(&buf1, src->length - 1);
 	isc_buffer_setactive(&buf1, src->length - 1);
 	isc_buffer_init(&buf2, buf, (unsigned int)buflen);
-	dns_decompress_init(&dctx, -1, DNS_DECOMPRESS_NONE);
 	result = dns_rdata_fromwire(target, src->rdclass,
-				    dns_rdatatype_nsec3param, &buf1, &dctx, 0,
-				    &buf2);
-	dns_decompress_invalidate(&dctx);
+				    dns_rdatatype_nsec3param, &buf1,
+				    DNS_DECOMPRESS_NEVER, &buf2);
 
 	return result == ISC_R_SUCCESS;
 }
@@ -1004,7 +999,7 @@ void
 dns_nsec3param_toprivate(dns_rdata_t *src, dns_rdata_t *target,
 			 dns_rdatatype_t privatetype, unsigned char *buf,
 			 size_t buflen) {
-	REQUIRE(buflen >= src->length + 1);
+	REQUIRE(buflen >= (unsigned int)src->length + 1);
 
 	REQUIRE(DNS_RDATA_INITIALIZED(target));
 

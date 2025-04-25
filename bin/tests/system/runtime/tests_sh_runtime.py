@@ -13,13 +13,11 @@ import pytest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
-        "kill2.out",
         "rndc.out.*",
         "ns2/named-alt*.conf",
         "ns2/named*.run",
         "ns2/nope",
         "ns2/tmp.*",
-        "ns*/other.lock",
     ]
 )
 

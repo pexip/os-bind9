@@ -132,7 +132,7 @@ def setup(app):
 #
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
-# http://www.sphinx-doc.org/en/master/config
+# https://www.sphinx-doc.org/en/master/config
 
 # -- Path setup --------------------------------------------------------------
 
@@ -214,6 +214,25 @@ latex_documents = [
 
 latex_logo = "isc-logo.pdf"
 
+# -- Options for linkcheck ----------------------------------------------
+linkcheck_timeout = 10
+linkcheck_ignore = [
+    "http://127.0.0.1",
+    "https://gitlab.isc.org",
+    "https://kb.isc.org",
+    "https://simpleicon.com/",
+    "https://www.dnssec-or-not.com/",
+    "https://www.flaticon.com/",
+    "https://www.freepik.com/",
+    "https://www.godaddy.com",
+    "https://www.icann.org",
+]
+# Anchors checking does not work for GitHub, see
+# https://github.com/pypa/packaging.python.org/issues/1272.
+linkcheck_anchors_ignore_for_url = [
+    "https://.*github.*",
+]
+
 #
 # The rst_epilog will be completely overwritten from the Makefile,
 # the definition here is provided purely for situations when
@@ -223,7 +242,6 @@ rst_epilog = """
 .. |rndc_conf| replace:: ``/etc/rndc.conf``
 .. |rndc_key| replace:: ``/etc/rndc.key``
 .. |named_conf| replace:: ``/etc/named.conf``
-.. |bind_keys| replace:: ``/etc/bind.keys``
 .. |named_pid| replace:: ``/run/named.pid``
 .. |session_key| replace:: ``/run/session.key``
 """

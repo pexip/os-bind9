@@ -19,13 +19,14 @@ pytestmark = pytest.mark.extra_artifacts(
         "bad-kasp-keydir3.conf",
         "bad-kasp-keydir4.conf",
         "bad-kasp-keydir5.conf",
+        "bad-tsig.conf",
         "badzero.conf",
         "checkconf.out*",
         "diff.out*",
         "good-kasp.conf.in",
         "good-server-christmas-tree.conf",
-        "good.conf.in",
-        "good.conf.out",
+        "good.conf",
+        "good.conf.raw",
         "keys",
     ]
 )

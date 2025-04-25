@@ -32,6 +32,7 @@
 #include <cmocka.h>
 
 #include <isc/buffer.h>
+#include <isc/fips.h>
 #include <isc/hex.h>
 #include <isc/hmac.h>
 #include <isc/region.h>
@@ -129,16 +130,19 @@ ISC_RUN_TEST_IMPL(isc_hmac_init) {
 	isc_hmac_t *hmac_st = *state;
 	assert_non_null(hmac_st);
 
-	expect_assert_failure(isc_hmac_init(NULL, "", 0, ISC_MD_MD5));
-
 	assert_int_equal(isc_hmac_init(hmac_st, "", 0, NULL),
 			 ISC_R_NOTIMPLEMENTED);
 
-	expect_assert_failure(isc_hmac_init(hmac_st, NULL, 0, ISC_MD_MD5));
+	if (!isc_fips_mode()) {
+		expect_assert_failure(isc_hmac_init(NULL, "", 0, ISC_MD_MD5));
 
-	assert_int_equal(isc_hmac_init(hmac_st, "", 0, ISC_MD_MD5),
-			 ISC_R_SUCCESS);
-	assert_int_equal(isc_hmac_reset(hmac_st), ISC_R_SUCCESS);
+		expect_assert_failure(
+			isc_hmac_init(hmac_st, NULL, 0, ISC_MD_MD5));
+
+		assert_int_equal(isc_hmac_init(hmac_st, "", 0, ISC_MD_MD5),
+				 ISC_R_SUCCESS);
+		assert_int_equal(isc_hmac_reset(hmac_st), ISC_R_SUCCESS);
+	}
 
 	assert_int_equal(isc_hmac_init(hmac_st, "", 0, ISC_MD_SHA1),
 			 ISC_R_SUCCESS);
@@ -176,8 +180,8 @@ ISC_RUN_TEST_IMPL(isc_hmac_update) {
 ISC_RUN_TEST_IMPL(isc_hmac_reset) {
 	isc_hmac_t *hmac_st = *state;
 #if 0
-	unsigned char digest[ISC_MAX_MD_SIZE] __attribute((unused));
-	unsigned int digestlen __attribute((unused));
+	unsigned char digest[ISC_MAX_MD_SIZE] ISC_ATTR_UNUSED;
+	unsigned int digestlen ISC_ATTR_UNUSED;
 #endif /* if 0 */
 
 	assert_non_null(hmac_st);
@@ -223,6 +227,11 @@ ISC_RUN_TEST_IMPL(isc_hmac_final) {
 
 ISC_RUN_TEST_IMPL(isc_hmac_md5) {
 	isc_hmac_t *hmac_st = *state;
+
+	if (isc_fips_mode()) {
+		skip();
+		return;
+	}
 
 	/* Test 0 */
 	isc_hmac_test(hmac_st, TEST_INPUT(""), ISC_MD_MD5, TEST_INPUT(""),

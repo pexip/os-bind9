@@ -13,6 +13,14 @@
 
 #pragma once
 
+/***
+ *** Clang Compatibility Macros
+ ***/
+
+#if !defined(__has_c_attribute)
+#define __has_c_attribute(x) 0
+#endif /* if !defined(__has_c_attribute) */
+
 #ifdef HAVE_STDNORETURN_H
 #include <stdnoreturn.h>
 #elif HAVE_FUNC_ATTRIBUTE_NORETURN
@@ -81,4 +89,24 @@
 #define ISC_ATTR_MALLOC_DEALLOCATOR_IDX(deallocator, idx)
 #endif /* HAVE_FUNC_ATTRIBUTE_MALLOC */
 
+#if __has_c_attribute(fallthrough)
+#define FALLTHROUGH [[fallthrough]]
+#elif __GNUC__ >= 7 && !defined(__clang__)
+#define FALLTHROUGH __attribute__((fallthrough))
+#else
+/* clang-format off */
+#define FALLTHROUGH do {} while (0) /* FALLTHROUGH */
+/* clang-format on */
+#endif
+
+#if __has_c_attribute(maybe_unused)
+#define ISC_ATTR_UNUSED [[maybe_unused]]
+#else
 #define ISC_ATTR_UNUSED __attribute__((__unused__))
+#endif
+
+#if __STDC_VERSION__ >= 202311L
+#define ISC_CONSTEXPR constexpr
+#else
+#define ISC_CONSTEXPR static const
+#endif

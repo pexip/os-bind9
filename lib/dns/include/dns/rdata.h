@@ -110,16 +110,17 @@ ISC_LANG_BEGINDECLS
  */
 struct dns_rdata {
 	unsigned char	*data;
-	unsigned int	 length;
 	dns_rdataclass_t rdclass;
 	dns_rdatatype_t	 type;
-	unsigned int	 flags;
+	uint16_t	 length;
+	uint16_t	 flags;
 	ISC_LINK(dns_rdata_t) link;
 };
 
-#define DNS_RDATA_INIT                                           \
-	{                                                        \
-		NULL, 0, 0, 0, 0, { (void *)(-1), (void *)(-1) } \
+#define DNS_RDATA_INIT                        \
+	{                                     \
+		.data = NULL,                 \
+		.link = ISC_LINK_INITIALIZER, \
 	}
 
 #define DNS_RDATA_CHECKINITIALIZED
@@ -281,17 +282,12 @@ dns_rdata_toregion(const dns_rdata_t *rdata, isc_region_t *r);
 isc_result_t
 dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		   dns_rdatatype_t type, isc_buffer_t *source,
-		   dns_decompress_t *dctx, unsigned int options,
-		   isc_buffer_t *target);
+		   dns_decompress_t dctx, isc_buffer_t *target);
 /*%<
  * Copy the possibly-compressed rdata at source into the target region.
  *
  * Notes:
  *\li	Name decompression policy is controlled by 'dctx'.
- *
- *	'options'
- *\li	DNS_RDATA_DOWNCASE	downcase domain names when they are copied
- *				into target.
  *
  * Requires:
  *
@@ -328,16 +324,14 @@ dns_rdata_towire(dns_rdata_t *rdata, dns_compress_t *cctx,
  * compression context 'cctx', and storing the result in 'target'.
  *
  * Notes:
- *\li	If the compression context allows global compression, then the
- *	global compression table may be updated.
+ *\li	If compression is permitted, then the cctx table may be updated.
  *
  * Requires:
  *\li	'rdata' is a valid, non-empty rdata
  *
  *\li	target is a valid buffer
  *
- *\li	Any offsets specified in a global compression table are valid
- *	for target.
+ *\li	Any offsets in the compression table are valid for target.
  *
  * Ensures,
  *	if the result is success:
@@ -523,7 +517,7 @@ dns_rdata_tostruct(const dns_rdata_t *rdata, void *target, isc_mem_t *mctx);
  *
  * Result:
  *\li	Success
- *\li	Resource Limit: Not enough memory
+ *\li	Not Implemented
  */
 
 void
@@ -812,5 +806,21 @@ dns_rdata_makedelete(dns_rdata_t *rdata);
 
 const char *
 dns_rdata_updateop(dns_rdata_t *rdata, dns_section_t section);
+
+isc_result_t
+dns_rdata_checksvcb(const dns_name_t *owner, const dns_rdata_t *rdata);
+/*%<
+ * Checks that 'rdata' contains a valid SVCB record.
+ *
+ * Requires:
+ *\li	'owner' is a valid name.
+ *\li	'rdata' is a valid, non-empty SVCB rdata.
+ *
+ * Returns:
+ *\li	#ISC_R_SUCCESS		-- success, the data is valid
+ *\li	#DNS_R_HAVEPARMKEYS	-- alias mode record, but SvcParamKeys is found
+ *\li	#DNS_R_NOALPN		-- ALPN required for 'owner', but not found
+ *\li	#DNS_R_NODOHPATH	-- DOHPATH required for 'owner', but not found
+ */
 
 ISC_LANG_ENDDECLS

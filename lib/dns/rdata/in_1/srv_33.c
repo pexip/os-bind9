@@ -91,7 +91,7 @@ totext_in_srv(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -134,8 +134,9 @@ totext_in_srv(ARGS_TOTEXT) {
 	 * Target.
 	 */
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return dns_name_totext(&prefix, sub, target);
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return dns_name_totext(&prefix, opts, target);
 }
 
 static isc_result_t
@@ -149,7 +150,7 @@ fromwire_in_srv(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -166,7 +167,7 @@ fromwire_in_srv(ARGS_FROMWIRE) {
 	/*
 	 * Target.
 	 */
-	return dns_name_fromwire(&name, source, dctx, options, target);
+	return dns_name_fromwire(&name, source, dctx, target);
 }
 
 static isc_result_t
@@ -178,7 +179,7 @@ towire_in_srv(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_srv);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	/*
 	 * Priority, weight, port.
 	 */
@@ -191,7 +192,7 @@ towire_in_srv(ARGS_TOWIRE) {
 	 */
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	return dns_name_towire(&name, cctx, target);
+	return dns_name_towire(&name, cctx, target, NULL);
 }
 
 static int
@@ -328,15 +329,15 @@ additionaldata_in_srv(ARGS_ADDLDATA) {
 		return ISC_R_SUCCESS;
 	}
 
-	result = (add)(arg, &name, dns_rdatatype_a, NULL);
+	result = (add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE);
 	if (result != ISC_R_SUCCESS) {
 		return result;
 	}
 
 	dns_fixedname_init(&fixed);
 	snprintf(buf, sizeof(buf), "_%u._tcp", port);
-	result = dns_name_fromstring2(dns_fixedname_name(&fixed), buf, NULL, 0,
-				      NULL);
+	result = dns_name_fromstring(dns_fixedname_name(&fixed), buf, NULL, 0,
+				     NULL);
 	if (result != ISC_R_SUCCESS) {
 		return ISC_R_SUCCESS;
 	}
@@ -347,7 +348,8 @@ additionaldata_in_srv(ARGS_ADDLDATA) {
 		return ISC_R_SUCCESS;
 	}
 
-	return (add)(arg, dns_fixedname_name(&fixed), dns_rdatatype_tlsa, NULL);
+	return (add)(arg, dns_fixedname_name(&fixed), dns_rdatatype_tlsa,
+		     NULL DNS__DB_FILELINE);
 }
 
 static isc_result_t

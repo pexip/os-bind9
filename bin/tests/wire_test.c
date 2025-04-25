@@ -19,7 +19,6 @@
 #include <isc/commandline.h>
 #include <isc/file.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -57,13 +56,13 @@ fromhex(char c) {
 	}
 
 	fprintf(stderr, "bad input format: %02x\n", c);
-	exit(EXIT_FAILURE);
+	exit(3);
 }
 
 static void
 usage(void) {
 	fprintf(stderr, "wire_test [-b] [-d] [-p] [-r] [-s]\n");
-	fprintf(stderr, "          [-m {usage|trace|record|size|mctx}]\n");
+	fprintf(stderr, "          [-m {usage|trace|record}]\n");
 	fprintf(stderr, "          [filename]\n\n");
 	fprintf(stderr, "\t-b\tBest-effort parsing (ignore some errors)\n");
 	fprintf(stderr, "\t-d\tRead input as raw binary data\n");
@@ -186,7 +185,7 @@ main(int argc, char *argv[]) {
 
 	if (rawdata) {
 		while (fread(&c, 1, 1, f) != 0) {
-			result = isc_buffer_reserve(&input, 1);
+			result = isc_buffer_reserve(input, 1);
 			RUNTIME_CHECK(result == ISC_R_SUCCESS);
 			isc_buffer_putuint8(input, (uint8_t)c);
 		}
@@ -223,7 +222,7 @@ main(int argc, char *argv[]) {
 				c = fromhex(*rp++);
 				c *= 16;
 				c += fromhex(*rp++);
-				result = isc_buffer_reserve(&input, 1);
+				result = isc_buffer_reserve(input, 1);
 				RUNTIME_CHECK(result == ISC_R_SUCCESS);
 				isc_buffer_putuint8(input, (uint8_t)c);
 			}
@@ -271,7 +270,7 @@ process_message(isc_buffer_t *source) {
 	int i;
 
 	message = NULL;
-	dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &message);
+	dns_message_create(mctx, NULL, NULL, DNS_MESSAGE_INTENTPARSE, &message);
 
 	result = dns_message_parse(message, source, parseflags);
 	if (result == DNS_R_RECOVERABLE) {
@@ -304,8 +303,7 @@ process_message(isc_buffer_t *source) {
 			message->counts[i] = 0; /* Another hack XXX */
 		}
 
-		result = dns_compress_init(&cctx, -1, mctx);
-		CHECKRESULT(result, "dns_compress_init() failed");
+		dns_compress_init(&cctx, mctx, 0);
 
 		result = dns_message_renderbegin(message, &cctx, &buffer);
 		CHECKRESULT(result, "dns_message_renderbegin() failed");
@@ -341,7 +339,8 @@ process_message(isc_buffer_t *source) {
 			isc_mem_stats(mctx, stdout);
 		}
 
-		dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &message);
+		dns_message_create(mctx, NULL, NULL, DNS_MESSAGE_INTENTPARSE,
+				   &message);
 
 		result = dns_message_parse(message, &buffer, parseflags);
 		CHECKRESULT(result, "dns_message_parse failed");

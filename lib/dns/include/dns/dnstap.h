@@ -39,6 +39,7 @@ struct fstrm_iothr_options;
 #include <dns/name.h>
 #include <dns/rdataclass.h>
 #include <dns/rdatatype.h>
+#include <dns/transport.h>
 #include <dns/types.h>
 
 /*%
@@ -93,9 +94,9 @@ struct dns_dtdata {
 
 	void *frame;
 
-	bool		query;
-	bool		tcp;
-	dns_dtmsgtype_t type;
+	bool		     query;
+	dns_dtmsgtype_t	     type;
+	dns_transport_type_t transport;
 
 	isc_time_t qtime;
 	isc_time_t rtime;
@@ -117,7 +118,7 @@ struct dns_dtdata {
 
 isc_result_t
 dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
-	      struct fstrm_iothr_options **foptp, isc_task_t *reopen_task,
+	      struct fstrm_iothr_options **foptp, isc_loop_t *loop,
 	      dns_dtenv_t **envp);
 /*%<
  * Create and initialize the dnstap environment.
@@ -138,10 +139,10 @@ dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
  *	should also be set.  Other options may be set if desired.
  *	If dns_dt_create succeeds the *foptp is set to NULL.
  *
- *\li	'reopen_task' needs to be set to the task in the context of which
+ *\li	'loop' needs to be set to the loop in which
  *	dns_dt_reopen() will be called.  This is not an optional parameter:
- *	using dns_dt_create() (which sets 'reopen_task' to NULL) is only
- *	allowed in unit tests.
+ *	using dns_dt_create() with 'loop' set to NULL is only allowed in
+ *	unit tests.
  *
  * Requires:
  *
@@ -262,8 +263,9 @@ dns_dt_getstats(dns_dtenv_t *env, isc_stats_t **statsp);
 
 void
 dns_dt_send(dns_view_t *view, dns_dtmsgtype_t msgtype, isc_sockaddr_t *qaddr,
-	    isc_sockaddr_t *dstaddr, bool tcp, isc_region_t *zone,
-	    isc_time_t *qtime, isc_time_t *rtime, isc_buffer_t *buf);
+	    isc_sockaddr_t *dstaddr, dns_transport_type_t transport,
+	    isc_region_t *zone, isc_time_t *qtime, isc_time_t *rtime,
+	    isc_buffer_t *buf);
 /*%<
  * Sends a dnstap message to the log, if 'msgtype' is one of the message
  * types represented in 'view->dttypes'.

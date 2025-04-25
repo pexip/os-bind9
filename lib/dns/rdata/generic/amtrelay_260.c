@@ -174,7 +174,7 @@ totext_amtrelay(ARGS_TOTEXT) {
 	case 3:
 		dns_name_init(&name, NULL);
 		dns_name_fromregion(&name, &region);
-		return dns_name_totext(&name, false, target);
+		return dns_name_totext(&name, 0, target);
 
 	default:
 		UNREACHABLE();
@@ -192,7 +192,7 @@ fromwire_amtrelay(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	isc_buffer_activeregion(source, &region);
 	if (region.length < 2) {
@@ -225,7 +225,7 @@ fromwire_amtrelay(ARGS_FROMWIRE) {
 		RETERR(mem_tobuffer(target, region.base, 2));
 		isc_buffer_forward(source, 2);
 		dns_name_init(&name, NULL);
-		return dns_name_fromwire(&name, source, dctx, options, target);
+		return dns_name_fromwire(&name, source, dctx, target);
 
 	default:
 		isc_buffer_forward(source, region.length);
@@ -357,9 +357,6 @@ tostruct_amtrelay(ARGS_TOSTRUCT) {
 		if (region.length != 0) {
 			amtrelay->data = mem_maybedup(mctx, region.base,
 						      region.length);
-			if (amtrelay->data == NULL) {
-				return ISC_R_NOMEMORY;
-			}
 		}
 		amtrelay->length = region.length;
 	}

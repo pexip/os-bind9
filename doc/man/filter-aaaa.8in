@@ -40,7 +40,7 @@ filter-aaaa \- filter AAAA in DNS responses when A is present
 .sp
 Until BIND 9.12, this feature was implemented natively in \fI\%named\fP and
 enabled with the \fBfilter\-aaaa\fP ACL and the \fBfilter\-aaaa\-on\-v4\fP and
-\fBfilter\-aaaa\-on\-v6\fP options. These options are now deprecated in
+\fBfilter\-aaaa\-on\-v6\fP options. These options are no longer available in
 \fI\%named.conf\fP but can be passed as parameters to the
 \fBfilter\-aaaa.so\fP plugin, for example:
 .INDENT 0.0

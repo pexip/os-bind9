@@ -139,9 +139,9 @@ totext_any_tsig(ARGS_TOTEXT) {
 	char *bufp;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
 	uint64_t sigtime;
 	unsigned short n;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_tsig);
 	REQUIRE(rdata->rdclass == dns_rdataclass_any);
@@ -154,8 +154,9 @@ totext_any_tsig(ARGS_TOTEXT) {
 	dns_name_init(&name, NULL);
 	dns_name_init(&prefix, NULL);
 	dns_name_fromregion(&name, &sr);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 	RETERR(str_totext(" ", target));
 	isc_region_consume(&sr, name_length(&name));
 
@@ -170,7 +171,7 @@ totext_any_tsig(ARGS_TOTEXT) {
 	*bufp-- = 0;
 	*bufp-- = ' ';
 	do {
-		*bufp-- = decdigits[sigtime % 10];
+		*bufp-- = '0' + sigtime % 10;
 		sigtime /= 10;
 	} while (sigtime != 0);
 	bufp++;
@@ -264,13 +265,13 @@ fromwire_any_tsig(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	/*
 	 * Algorithm Name.
 	 */
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sr);
 	/*
@@ -331,11 +332,11 @@ towire_any_tsig(ARGS_TOWIRE) {
 	REQUIRE(rdata->rdclass == dns_rdataclass_any);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 	isc_region_consume(&sr, name_length(&name));
 	return mem_tobuffer(target, sr.base, sr.length);
 }
@@ -497,9 +498,6 @@ tostruct_any_tsig(ARGS_TOSTRUCT) {
 	 */
 	INSIST(sr.length >= tsig->siglen);
 	tsig->signature = mem_maybedup(mctx, sr.base, tsig->siglen);
-	if (tsig->signature == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&sr, tsig->siglen);
 
 	/*
@@ -525,21 +523,9 @@ tostruct_any_tsig(ARGS_TOSTRUCT) {
 	 */
 	INSIST(sr.length == tsig->otherlen);
 	tsig->other = mem_maybedup(mctx, sr.base, tsig->otherlen);
-	if (tsig->other == NULL) {
-		goto cleanup;
-	}
 
 	tsig->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&tsig->algorithm, tsig->mctx);
-	}
-	if (mctx != NULL && tsig->signature != NULL) {
-		isc_mem_free(mctx, tsig->signature);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void

@@ -16,12 +16,13 @@
 #include <errno.h>
 
 #include <isc/condition.h>
+#include <isc/strerr.h>
 #include <isc/string.h>
 #include <isc/time.h>
 #include <isc/util.h>
 
 isc_result_t
-isc_condition_waituntil(isc_condition_t *c, isc_mutex_t *m, isc_time_t *t) {
+isc__condition_waituntil(pthread_cond_t *c, pthread_mutex_t *m, isc_time_t *t) {
 	int presult;
 	isc_result_t result;
 	struct timespec ts;

@@ -15,8 +15,7 @@ pytestmark = pytest.mark.extra_artifacts(
     [
         "dig.out.*",
         "dnsrps.cache",
-        "dnsrps*.conf",
-        "dnsrpzd*",
+        "dnsrps.conf",
         "ans*/ans.run",
         "ns2/*.queries",
         "ns2/*.local",

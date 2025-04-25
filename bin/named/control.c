@@ -15,8 +15,6 @@
 
 #include <stdbool.h>
 
-#include <isc/app.h>
-#include <isc/event.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
 #include <isc/result.h>
@@ -98,10 +96,7 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		return result;
 	}
 
-	result = isc_lex_create(named_g_mctx, strlen(cmdline), &lex);
-	if (result != ISC_R_SUCCESS) {
-		return result;
-	}
+	isc_lex_create(named_g_mctx, strlen(cmdline), &lex);
 
 	isc_buffer_init(&src, cmdline, strlen(cmdline));
 	isc_buffer_add(&src, strlen(cmdline));
@@ -175,14 +170,14 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 			named_smf_want_disable = 1;
 		}
 		/*
-		 * If named_smf_got_instance = 0, named_smf_chroot
-		 * is not relevant and we fall through to
-		 * isc_app_shutdown below.
+		 * If named_smf_got_instance = 0, named_smf_chroot is
+		 * not relevant and we fall through to shutdown below.
 		 */
 #endif /* ifdef HAVE_LIBSCF */
 		/* Do not flush master files */
 		named_server_flushonshutdown(named_g_server, false);
 		named_os_shutdownmsg(cmdline, *text);
+		isc_loopmgr_shutdown(named_g_loopmgr);
 		result = ISC_R_SHUTTINGDOWN;
 	} else if (command_compare(command, NAMED_COMMAND_STOP)) {
 		/*
@@ -200,6 +195,7 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 #endif /* ifdef HAVE_LIBSCF */
 		named_server_flushonshutdown(named_g_server, true);
 		named_os_shutdownmsg(cmdline, *text);
+		isc_loopmgr_shutdown(named_g_loopmgr);
 		result = ISC_R_SHUTTINGDOWN;
 	} else if (command_compare(command, NAMED_COMMAND_ADDZONE) ||
 		   command_compare(command, NAMED_COMMAND_MODZONE))
@@ -214,10 +210,11 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 	{
 		result = named_server_dnstap(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_DUMPDB)) {
-		named_server_dumpdb(named_g_server, lex, text);
-		result = ISC_R_SUCCESS;
+		result = named_server_dumpdb(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_DUMPSTATS)) {
 		result = named_server_dumpstats(named_g_server);
+	} else if (command_compare(command, NAMED_COMMAND_FETCHLIMIT)) {
+		result = named_server_fetchlimit(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_FLUSH)) {
 		result = named_server_flushcache(named_g_server, lex);
 	} else if (command_compare(command, NAMED_COMMAND_FLUSHNAME)) {
@@ -226,10 +223,14 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		result = named_server_flushnode(named_g_server, lex, true);
 	} else if (command_compare(command, NAMED_COMMAND_FREEZE)) {
 		result = named_server_freeze(named_g_server, true, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_SKR)) {
+		result = named_server_skr(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_LOADKEYS) ||
 		   command_compare(command, NAMED_COMMAND_SIGN))
 	{
 		result = named_server_rekey(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_MEMPROF)) {
+		result = named_server_togglememprof(lex);
 	} else if (command_compare(command, NAMED_COMMAND_MKEYS)) {
 		result = named_server_mkeys(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_NOTIFY)) {
@@ -243,7 +244,9 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 	} else if (command_compare(command, NAMED_COMMAND_NULL)) {
 		result = ISC_R_SUCCESS;
 	} else if (command_compare(command, NAMED_COMMAND_QUERYLOG)) {
-		result = named_server_togglequerylog(named_g_server, lex);
+		result = named_server_setortoggle(named_g_server,
+						  "query logging",
+						  NS_SERVER_LOGQUERIES, lex);
 	} else if (command_compare(command, NAMED_COMMAND_RECONFIG)) {
 		result = named_server_reconfigcommand(named_g_server);
 	} else if (command_compare(command, NAMED_COMMAND_RECURSING)) {
@@ -252,6 +255,10 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		result = named_server_refreshcommand(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_RELOAD)) {
 		result = named_server_reloadcommand(named_g_server, lex, text);
+	} else if (command_compare(command, NAMED_COMMAND_RESPONSELOG)) {
+		result = named_server_setortoggle(named_g_server,
+						  "response logging",
+						  NS_SERVER_LOGRESPONSES, lex);
 	} else if (command_compare(command, NAMED_COMMAND_RETRANSFER)) {
 		result = named_server_retransfercommand(named_g_server, lex,
 							text);
@@ -278,15 +285,8 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		   command_compare(command, NAMED_COMMAND_UNFREEZE))
 	{
 		result = named_server_freeze(named_g_server, false, lex, text);
-	} else if (command_compare(command, NAMED_COMMAND_TIMERPOKE)) {
-		isc_timermgr_poke(named_g_timermgr);
-		result = ISC_R_SUCCESS;
 	} else if (command_compare(command, NAMED_COMMAND_TRACE)) {
 		result = named_server_setdebuglevel(named_g_server, lex);
-	} else if (command_compare(command, NAMED_COMMAND_TSIGDELETE)) {
-		result = named_server_tsigdelete(named_g_server, lex, text);
-	} else if (command_compare(command, NAMED_COMMAND_TSIGLIST)) {
-		result = named_server_tsiglist(named_g_server, text);
 	} else if (command_compare(command, NAMED_COMMAND_VALIDATION)) {
 		result = named_server_validation(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_ZONESTATUS)) {

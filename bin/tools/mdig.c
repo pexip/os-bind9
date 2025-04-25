@@ -17,12 +17,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <isc/app.h>
 #include <isc/attributes.h>
 #include <isc/base64.h>
+#include <isc/getaddresses.h>
 #include <isc/hash.h>
 #include <isc/hex.h>
 #include <isc/log.h>
+#include <isc/loop.h>
 #include <isc/managers.h>
 #include <isc/mem.h>
 #include <isc/net.h>
@@ -30,18 +31,15 @@
 #include <isc/nonce.h>
 #include <isc/parseint.h>
 #include <isc/portset.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/result.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/time.h>
 #include <isc/util.h>
 
 #include <dns/byaddr.h>
 #include <dns/dispatch.h>
-#include <dns/events.h>
 #include <dns/fixedname.h>
 #include <dns/message.h>
 #include <dns/name.h>
@@ -50,11 +48,8 @@
 #include <dns/rdataset.h>
 #include <dns/rdatatype.h>
 #include <dns/request.h>
-#include <dns/resolver.h>
 #include <dns/types.h>
 #include <dns/view.h>
-
-#include <bind9/getaddresses.h>
 
 #define CHECK(str, x)                                                       \
 	{                                                                   \
@@ -86,6 +81,7 @@
 #define MAXTRIES   0xffffffff
 
 static isc_mem_t *mctx = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 static dns_requestmgr_t *requestmgr = NULL;
 static const char *batchname = NULL;
 static FILE *batchfp = NULL;
@@ -119,6 +115,12 @@ static in_port_t port = 53;
 static unsigned char cookie_secret[33];
 static int onfly = 0;
 static char hexcookie[81];
+
+static isc_sockaddr_t bind_any;
+static isc_nm_t *netmgr = NULL;
+static dns_dispatchmgr_t *dispatchmgr = NULL;
+static dns_dispatch_t *dispatchvx = NULL;
+static dns_view_t *view = NULL;
 
 struct query {
 	char textname[MXNAME]; /*% Name we're going to be
@@ -184,10 +186,9 @@ rcode_totext(dns_rcode_t rcode) {
 	return totext.deconsttext;
 }
 
-/* receive response event handler */
 static void
-recvresponse(isc_task_t *task, isc_event_t *event) {
-	dns_requestevent_t *reqev = (dns_requestevent_t *)event;
+recvresponse(void *arg) {
+	dns_request_t *request = (dns_request_t *)arg;
 	isc_result_t result;
 	dns_message_t *query = NULL, *response = NULL;
 	unsigned int parseflags = 0;
@@ -197,14 +198,12 @@ recvresponse(isc_task_t *task, isc_event_t *event) {
 	unsigned int styleflags = 0;
 	dns_messagetextflag_t flags;
 
-	UNUSED(task);
+	query = dns_request_getarg(request);
 
-	REQUIRE(reqev != NULL);
-	query = reqev->ev_arg;
-
-	if (reqev->result != ISC_R_SUCCESS) {
+	result = dns_request_getresult(request);
+	if (result != ISC_R_SUCCESS) {
 		fprintf(stderr, "response failed with %s\n",
-			isc_result_totext(reqev->result));
+			isc_result_totext(result));
 		if (continue_on_error) {
 			goto cleanup;
 		} else {
@@ -212,7 +211,8 @@ recvresponse(isc_task_t *task, isc_event_t *event) {
 		}
 	}
 
-	dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &response);
+	dns_message_create(mctx, NULL, NULL, DNS_MESSAGE_INTENTPARSE,
+			   &response);
 
 	parseflags |= DNS_MESSAGEPARSE_PRESERVEORDER;
 	if (besteffort) {
@@ -220,8 +220,8 @@ recvresponse(isc_task_t *task, isc_event_t *event) {
 		parseflags |= DNS_MESSAGEPARSE_IGNORETRUNCATION;
 	}
 
-	msgbuf = dns_request_getanswer(reqev->request);
-	result = dns_request_getresponse(reqev->request, response, parseflags);
+	msgbuf = dns_request_getanswer(request);
+	result = dns_request_getresponse(request, response, parseflags);
 	CHECK("dns_request_getresponse", result);
 
 	styleflags |= DNS_STYLEFLAG_REL_OWNER;
@@ -540,11 +540,10 @@ cleanup:
 	if (response != NULL) {
 		dns_message_detach(&response);
 	}
-	dns_request_destroy(&reqev->request);
-	isc_event_free(&event);
+	dns_request_destroy(&request);
 
 	if (--onfly == 0) {
-		isc_app_shutdown();
+		isc_loopmgr_shutdown(loopmgr);
 	}
 	return;
 }
@@ -575,7 +574,7 @@ compute_cookie(unsigned char *cookie, size_t len) {
 }
 
 static isc_result_t
-sendquery(struct query *query, isc_task_t *task) {
+sendquery(struct query *query) {
 	dns_request_t *request = NULL;
 	dns_message_t *message = NULL;
 	dns_name_t *qname = NULL;
@@ -583,7 +582,7 @@ sendquery(struct query *query, isc_task_t *task) {
 	isc_result_t result;
 	dns_fixedname_t queryname;
 	isc_buffer_t buf;
-	unsigned int options;
+	unsigned int options = 0;
 
 	onfly++;
 
@@ -594,7 +593,8 @@ sendquery(struct query *query, isc_task_t *task) {
 				   dns_rootname, 0, NULL);
 	CHECK("dns_name_fromtext", result);
 
-	dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &message);
+	dns_message_create(mctx, NULL, NULL, DNS_MESSAGE_INTENTRENDER,
+			   &message);
 
 	message->opcode = dns_opcode_query;
 	if (query->recurse) {
@@ -615,11 +615,9 @@ sendquery(struct query *query, isc_task_t *task) {
 	message->rdclass = query->rdclass;
 	message->id = (unsigned short)(random() & 0xFFFF);
 
-	result = dns_message_gettempname(message, &qname);
-	CHECK("dns_message_gettempname", result);
+	dns_message_gettempname(message, &qname);
 
-	result = dns_message_gettemprdataset(message, &qrdataset);
-	CHECK("dns_message_gettemprdataset", result);
+	dns_message_gettemprdataset(message, &qrdataset);
 
 	dns_name_clone(dns_fixedname_name(&queryname), qname);
 	dns_rdataset_makequestion(qrdataset, query->rdclass, query->rdtype);
@@ -697,7 +695,8 @@ sendquery(struct query *query, isc_task_t *task) {
 			isc_buffer_putuint8(&b, 0);
 			/* address */
 			if (addrl > 0) {
-				isc_buffer_putmem(&b, addr, (unsigned)addrl);
+				isc_buffer_putmem(&b, addr,
+						  (unsigned int)addrl);
 			}
 
 			opts[i].value = (uint8_t *)ecsbuf;
@@ -746,38 +745,34 @@ sendquery(struct query *query, isc_task_t *task) {
 		add_opt(message, query->udpsize, query->edns, flags, opts, i);
 	}
 
-	options = 0;
 	if (tcp_mode) {
 		options |= DNS_REQUESTOPT_TCP;
 	}
 
-	request = NULL;
 	result = dns_request_create(
-		requestmgr, message, have_src ? &srcaddr : NULL, &dstaddr,
-		options, NULL, query->timeout, query->udptimeout,
-		query->udpretries, task, recvresponse, message, &request);
+		requestmgr, message, have_src ? &srcaddr : NULL, &dstaddr, NULL,
+		NULL, options, NULL, query->timeout, query->udptimeout,
+		query->udpretries, isc_loop_main(loopmgr), recvresponse,
+		message, &request);
 	CHECK("dns_request_create", result);
 
 	return ISC_R_SUCCESS;
 }
 
 static void
-sendqueries(isc_task_t *task, isc_event_t *event) {
-	struct query *query = (struct query *)event->ev_arg;
-
-	isc_event_free(&event);
+sendqueries(void *arg) {
+	struct query *query = (struct query *)arg;
 
 	while (query != NULL) {
 		struct query *next = ISC_LIST_NEXT(query, link);
 
-		sendquery(query, task);
+		sendquery(query);
 		query = next;
 	}
 
 	if (onfly == 0) {
-		isc_app_shutdown();
+		isc_loopmgr_shutdown(loopmgr);
 	}
-	return;
 }
 
 noreturn static void
@@ -1092,11 +1087,10 @@ get_reverse(char *reverse, size_t len, const char *value) {
 		/* This is a valid IPv6 address. */
 		dns_fixedname_t fname;
 		dns_name_t *name;
-		unsigned int options = 0;
 
 		name = dns_fixedname_initname(&fname);
-		result = dns_byaddr_createptrname(&addr, options, name);
-		CHECK("dns_byaddr_createptrname2", result);
+		result = dns_byaddr_createptrname(&addr, name);
+		CHECK("dns_byaddr_createptrname", result);
 		dns_name_format(name, reverse, (unsigned int)len);
 		return;
 	} else {
@@ -1314,12 +1308,6 @@ plus_option(char *option, struct query *query, bool global) {
 				query->edns = 0;
 			}
 			query->dnssec = state;
-			break;
-		case 's': /* dscp */
-			/* obsolete */
-			FULLCHECK("dscp");
-			fprintf(stderr, ";; +dscp option is obsolete "
-					"and has no effect");
 			break;
 		default:
 			goto invalid_option;
@@ -1706,15 +1694,14 @@ dash_option(const char *option, char *next, struct query *query, bool global,
 			exit(EXIT_SUCCESS);
 			break;
 		case 'i':
-			/* deprecated */
-			break;
+			fatal("-%c removed", opt);
 		case 'm':
 			/*
 			 * handled by preparse_args()
 			 */
 			break;
 		case 'v':
-			fprintf(stderr, "mDiG %s\n", PACKAGE_VERSION);
+			printf("mDiG %s\n", PACKAGE_VERSION);
 			exit(EXIT_SUCCESS);
 			break;
 		}
@@ -2089,24 +2076,45 @@ set_source_ports(dns_dispatchmgr_t *manager) {
 	isc_portset_destroy(mctx, &v6portset);
 }
 
+static void
+teardown(void *arg ISC_ATTR_UNUSED) {
+	dns_view_detach(&view);
+	dns_requestmgr_shutdown(requestmgr);
+	dns_requestmgr_detach(&requestmgr);
+	dns_dispatch_detach(&dispatchvx);
+	dns_dispatchmgr_detach(&dispatchmgr);
+}
+
+static void
+setup(void *arg ISC_ATTR_UNUSED) {
+	RUNCHECK(dns_dispatchmgr_create(mctx, loopmgr, netmgr, &dispatchmgr));
+
+	set_source_ports(dispatchmgr);
+
+	if (have_ipv4) {
+		isc_sockaddr_any(&bind_any);
+	} else {
+		isc_sockaddr_any6(&bind_any);
+	}
+	RUNCHECK(dns_dispatch_createudp(
+		dispatchmgr, have_src ? &srcaddr : &bind_any, &dispatchvx));
+
+	RUNCHECK(dns_requestmgr_create(
+		mctx, loopmgr, dispatchmgr, have_ipv4 ? dispatchvx : NULL,
+		have_ipv6 ? dispatchvx : NULL, &requestmgr));
+
+	RUNCHECK(dns_view_create(mctx, loopmgr, NULL, 0, "_mdig", &view));
+}
+
 /*% Main processing routine for mdig */
 int
 main(int argc, char *argv[]) {
 	struct query *query = NULL;
 	isc_result_t result;
-	isc_sockaddr_t bind_any;
 	isc_log_t *lctx = NULL;
 	isc_logconfig_t *lcfg = NULL;
-	isc_nm_t *netmgr = NULL;
-	isc_taskmgr_t *taskmgr = NULL;
-	isc_task_t *task = NULL;
-	dns_dispatchmgr_t *dispatchmgr = NULL;
-	dns_dispatch_t *dispatchvx = NULL;
-	dns_view_t *view = NULL;
 	unsigned int i;
 	int ns;
-
-	RUNCHECK(isc_app_start());
 
 	if (isc_net_probeipv4() == ISC_R_SUCCESS) {
 		have_ipv4 = true;
@@ -2120,7 +2128,7 @@ main(int argc, char *argv[]) {
 
 	preparse_args(argc, argv);
 
-	isc_mem_create(&mctx);
+	isc_managers_create(&mctx, 1, &loopmgr, &netmgr);
 	isc_log_create(mctx, &lctx, &lcfg);
 
 	RUNCHECK(dst_lib_init(mctx, NULL));
@@ -2133,7 +2141,7 @@ main(int argc, char *argv[]) {
 	}
 
 	ns = 0;
-	result = bind9_getaddresses(server, port, &dstaddr, 1, &ns);
+	result = isc_getaddresses(server, port, &dstaddr, 1, &ns);
 	if (result != ISC_R_SUCCESS) {
 		fatal("couldn't get address for '%s': %s", server,
 		      isc_result_totext(result));
@@ -2150,41 +2158,23 @@ main(int argc, char *argv[]) {
 		fatal("can't choose between IPv4 and IPv6");
 	}
 
-	isc_managers_create(mctx, 1, 0, &netmgr, &taskmgr, NULL);
-	RUNCHECK(isc_task_create(taskmgr, 0, &task));
-	RUNCHECK(dns_dispatchmgr_create(mctx, netmgr, &dispatchmgr));
-
-	set_source_ports(dispatchmgr);
-
-	if (have_ipv4) {
-		isc_sockaddr_any(&bind_any);
-	} else {
-		isc_sockaddr_any6(&bind_any);
-	}
-	RUNCHECK(dns_dispatch_createudp(
-		dispatchmgr, have_src ? &srcaddr : &bind_any, &dispatchvx));
-
-	RUNCHECK(dns_requestmgr_create(
-		mctx, taskmgr, dispatchmgr, have_ipv4 ? dispatchvx : NULL,
-		have_ipv6 ? dispatchvx : NULL, &requestmgr));
-
-	RUNCHECK(dns_view_create(mctx, 0, "_test", &view));
-
 	query = ISC_LIST_HEAD(queries);
-	RUNCHECK(isc_app_onrun(mctx, task, sendqueries, query));
+	isc_loopmgr_setup(loopmgr, setup, NULL);
+	isc_loopmgr_setup(loopmgr, sendqueries, query);
+	isc_loopmgr_teardown(loopmgr, teardown, NULL);
 
 	/*
 	 * Stall to the start of a new second.
 	 */
 	if (burst) {
 		isc_time_t start, now;
-		RUNCHECK(isc_time_now(&start));
+		start = isc_time_now();
 		/*
 		 * Sleep to 1ms of the end of the second then run a busy loop
 		 * until the second changes.
 		 */
 		do {
-			RUNCHECK(isc_time_now(&now));
+			now = isc_time_now();
 			if (isc_time_seconds(&start) == isc_time_seconds(&now))
 			{
 				unsigned int us = US_PER_SEC -
@@ -2199,20 +2189,7 @@ main(int argc, char *argv[]) {
 		} while (1);
 	}
 
-	(void)isc_app_run();
-
-	dns_view_detach(&view);
-
-	dns_requestmgr_shutdown(requestmgr);
-	dns_requestmgr_detach(&requestmgr);
-
-	dns_dispatch_detach(&dispatchvx);
-	dns_dispatchmgr_detach(&dispatchmgr);
-
-	isc_task_shutdown(task);
-	isc_task_detach(&task);
-
-	isc_managers_destroy(&netmgr, &taskmgr, NULL);
+	isc_loopmgr_run(loopmgr);
 
 	dst_lib_destroy();
 
@@ -2243,9 +2220,6 @@ main(int argc, char *argv[]) {
 		isc_mem_free(mctx, default_query.ecs_addr);
 	}
 
-	isc_mem_destroy(&mctx);
-
-	isc_app_finish();
-
+	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 	return 0;
 }

@@ -33,7 +33,6 @@
 #include <isc/commandline.h>
 #include <isc/mem.h>
 #include <isc/nonce.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/result.h>
 #include <isc/util.h>
@@ -521,7 +520,7 @@ blockfrequency(uint16_t *values, size_t length) {
 	assert_true(numblocks < 100);
 	assert_true(numbits >= (mbits * numblocks));
 
-	pi = isc_mem_get(mctx, numblocks * sizeof(double));
+	pi = isc_mem_cget(mctx, numblocks, sizeof(double));
 	assert_non_null(pi);
 
 	for (i = 0; i < numblocks; i++) {
@@ -544,7 +543,7 @@ blockfrequency(uint16_t *values, size_t length) {
 
 	chi_square *= 4 * mbits;
 
-	isc_mem_put(mctx, pi, numblocks * sizeof(double));
+	isc_mem_cput(mctx, pi, numblocks, sizeof(double));
 
 	p_value = igamc(numblocks * 0.5, chi_square * 0.5);
 
@@ -640,6 +639,13 @@ binarymatrixrank(uint16_t *values, size_t length) {
 /***
  *** Tests for isc_random32() function
  ***/
+
+/* Ensure the RNG has been automatically seeded. */
+ISC_RUN_TEST_IMPL(isc_random32_initialized) {
+	UNUSED(state);
+
+	assert_int_not_equal(isc_random32(), 0);
+}
 
 /* Monobit test for the RANDOM */
 ISC_RUN_TEST_IMPL(isc_random32_monobit) {
@@ -765,6 +771,7 @@ ISC_RUN_TEST_IMPL(isc_nonce_bytes_binarymatrixrank) {
 
 ISC_TEST_LIST_START
 
+ISC_TEST_ENTRY(isc_random32_initialized)
 ISC_TEST_ENTRY(isc_random32_monobit)
 ISC_TEST_ENTRY(isc_random32_runs)
 ISC_TEST_ENTRY(isc_random32_blockfrequency)

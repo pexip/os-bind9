@@ -28,7 +28,6 @@
 #include <isc/lex.h>
 #include <isc/log.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/types.h>
 #include <isc/util.h>
@@ -39,7 +38,6 @@
 
 #include <tests/isc.h>
 
-isc_log_t *lctx = NULL;
 static isc_logcategory_t categories[] = { { "", 0 },
 					  { "client", 0 },
 					  { "network", 0 },

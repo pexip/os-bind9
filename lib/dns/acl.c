@@ -19,6 +19,7 @@
 #include <isc/mem.h>
 #include <isc/once.h>
 #include <isc/string.h>
+#include <isc/urcu.h>
 #include <isc/util.h>
 
 #include <dns/acl.h>
@@ -32,52 +33,24 @@
  * for 'n' ACL elements.  The elements are uninitialized and the
  * length is 0.
  */
-isc_result_t
+void
 dns_acl_create(isc_mem_t *mctx, int n, dns_acl_t **target) {
-	isc_result_t result;
-	dns_acl_t *acl;
+	REQUIRE(target != NULL && *target == NULL);
 
-	/*
-	 * Work around silly limitation of isc_mem_get().
-	 */
-	if (n == 0) {
-		n = 1;
-	}
+	dns_acl_t *acl = isc_mem_get(mctx, sizeof(*acl));
+	*acl = (dns_acl_t){
+		.references = ISC_REFCOUNT_INITIALIZER(1),
+		.nextincache = ISC_LINK_INITIALIZER,
+		.elements = isc_mem_cget(mctx, n, sizeof(acl->elements[0])),
+		.alloc = n,
+		.ports_and_transports = ISC_LIST_INITIALIZER,
+		.magic = DNS_ACL_MAGIC,
+	};
 
-	acl = isc_mem_get(mctx, sizeof(*acl));
-
-	acl->mctx = NULL;
 	isc_mem_attach(mctx, &acl->mctx);
-
-	acl->name = NULL;
-
-	isc_refcount_init(&acl->refcount, 1);
-
-	result = dns_iptable_create(mctx, &acl->iptable);
-	if (result != ISC_R_SUCCESS) {
-		isc_mem_put(mctx, acl, sizeof(*acl));
-		return result;
-	}
-
-	acl->elements = NULL;
-	acl->alloc = 0;
-	acl->length = 0;
-	acl->has_negatives = false;
-
-	ISC_LINK_INIT(acl, nextincache);
-	/*
-	 * Must set magic early because we use dns_acl_detach() to clean up.
-	 */
-	acl->magic = DNS_ACL_MAGIC;
-
-	acl->elements = isc_mem_get(mctx, n * sizeof(dns_aclelement_t));
-	acl->alloc = n;
-	memset(acl->elements, 0, n * sizeof(dns_aclelement_t));
-	ISC_LIST_INIT(acl->ports_and_transports);
-	acl->port_proto_entries = 0;
+	dns_iptable_create(acl->mctx, &acl->iptable);
 
 	*target = acl;
-	return ISC_R_SUCCESS;
 }
 
 /*
@@ -91,10 +64,7 @@ dns_acl_anyornone(isc_mem_t *mctx, bool neg, dns_acl_t **target) {
 	isc_result_t result;
 	dns_acl_t *acl = NULL;
 
-	result = dns_acl_create(mctx, 0, &acl);
-	if (result != ISC_R_SUCCESS) {
-		return result;
-	}
+	dns_acl_create(mctx, 0, &acl);
 
 	result = dns_iptable_addprefix(acl->iptable, NULL, 0, !neg);
 	if (result != ISC_R_SUCCESS) {
@@ -306,32 +276,19 @@ dns_acl_match_port_transport(const isc_netaddr_t *reqaddr,
 isc_result_t
 dns_acl_merge(dns_acl_t *dest, dns_acl_t *source, bool pos) {
 	isc_result_t result;
-	unsigned int newalloc, nelem, i;
+	unsigned int nelem, i;
 	int max_node = 0, nodes;
 
 	/* Resize the element array if needed. */
 	if (dest->length + source->length > dest->alloc) {
-		void *newmem;
-
-		newalloc = dest->alloc + source->alloc;
+		size_t newalloc = dest->alloc + source->alloc;
 		if (newalloc < 4) {
 			newalloc = 4;
 		}
 
-		newmem = isc_mem_get(dest->mctx,
-				     newalloc * sizeof(dns_aclelement_t));
-
-		/* Zero. */
-		memset(newmem, 0, newalloc * sizeof(dns_aclelement_t));
-
-		/* Copy in the original elements */
-		memmove(newmem, dest->elements,
-			dest->length * sizeof(dns_aclelement_t));
-
-		/* Release the memory for the old elements array */
-		isc_mem_put(dest->mctx, dest->elements,
-			    dest->alloc * sizeof(dns_aclelement_t));
-		dest->elements = newmem;
+		dest->elements = isc_mem_creget(dest->mctx, dest->elements,
+						dest->alloc, newalloc,
+						sizeof(dest->elements[0]));
 		dest->alloc = newalloc;
 	}
 
@@ -446,26 +403,18 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr, const dns_name_t *reqsigner,
 		if (env == NULL) {
 			return false;
 		}
-		RWLOCK(&env->rwlock, isc_rwlocktype_read);
-		if (env->localhost == NULL) {
-			RWUNLOCK(&env->rwlock, isc_rwlocktype_read);
-			return false;
-		}
-		dns_acl_attach(env->localhost, &inner);
-		RWUNLOCK(&env->rwlock, isc_rwlocktype_read);
+		rcu_read_lock();
+		dns_acl_attach(rcu_dereference(env->localhost), &inner);
+		rcu_read_unlock();
 		break;
 
 	case dns_aclelementtype_localnets:
 		if (env == NULL) {
 			return false;
 		}
-		RWLOCK(&env->rwlock, isc_rwlocktype_read);
-		if (env->localnets == NULL) {
-			RWUNLOCK(&env->rwlock, isc_rwlocktype_read);
-			return false;
-		}
-		dns_acl_attach(env->localnets, &inner);
-		RWUNLOCK(&env->rwlock, isc_rwlocktype_read);
+		rcu_read_lock();
+		dns_acl_attach(rcu_dereference(env->localnets), &inner);
+		rcu_read_unlock();
 		break;
 
 #if defined(HAVE_GEOIP2)
@@ -509,22 +458,26 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr, const dns_name_t *reqsigner,
 	return false;
 }
 
-void
-dns_acl_attach(dns_acl_t *source, dns_acl_t **target) {
-	REQUIRE(DNS_ACL_VALID(source));
-
-	isc_refcount_increment(&source->refcount);
-	*target = source;
+static void
+dns__acl_destroy_port_transports(dns_acl_t *acl) {
+	dns_acl_port_transports_t *port_proto = NULL;
+	dns_acl_port_transports_t *next = NULL;
+	ISC_LIST_FOREACH_SAFE (acl->ports_and_transports, port_proto, link,
+			       next)
+	{
+		ISC_LIST_DEQUEUE(acl->ports_and_transports, port_proto, link);
+		isc_mem_put(acl->mctx, port_proto, sizeof(*port_proto));
+	}
 }
 
 static void
-destroy(dns_acl_t *dacl) {
-	unsigned int i;
-	dns_acl_port_transports_t *port_proto;
-
+dns__acl_destroy(dns_acl_t *dacl) {
 	INSIST(!ISC_LINK_LINKED(dacl, nextincache));
 
-	for (i = 0; i < dacl->length; i++) {
+	isc_refcount_destroy(&dacl->references);
+	dacl->magic = 0;
+
+	for (size_t i = 0; i < dacl->length; i++) {
 		dns_aclelement_t *de = &dacl->elements[i];
 		if (de->type == dns_aclelementtype_keyname) {
 			dns_name_free(&de->keyname, dacl->mctx);
@@ -533,8 +486,8 @@ destroy(dns_acl_t *dacl) {
 		}
 	}
 	if (dacl->elements != NULL) {
-		isc_mem_put(dacl->mctx, dacl->elements,
-			    dacl->alloc * sizeof(dns_aclelement_t));
+		isc_mem_cput(dacl->mctx, dacl->elements, dacl->alloc,
+			     sizeof(dacl->elements[0]));
 	}
 	if (dacl->name != NULL) {
 		isc_mem_free(dacl->mctx, dacl->name);
@@ -543,31 +496,16 @@ destroy(dns_acl_t *dacl) {
 		dns_iptable_detach(&dacl->iptable);
 	}
 
-	port_proto = ISC_LIST_HEAD(dacl->ports_and_transports);
-	while (port_proto != NULL) {
-		dns_acl_port_transports_t *next = NULL;
+	dns__acl_destroy_port_transports(dacl);
 
-		next = ISC_LIST_NEXT(port_proto, link);
-		ISC_LIST_DEQUEUE(dacl->ports_and_transports, port_proto, link);
-		isc_mem_put(dacl->mctx, port_proto, sizeof(*port_proto));
-		port_proto = next;
-	}
-
-	isc_refcount_destroy(&dacl->refcount);
-	dacl->magic = 0;
 	isc_mem_putanddetach(&dacl->mctx, dacl, sizeof(*dacl));
 }
 
-void
-dns_acl_detach(dns_acl_t **aclp) {
-	REQUIRE(aclp != NULL && DNS_ACL_VALID(*aclp));
-	dns_acl_t *acl = *aclp;
-	*aclp = NULL;
-
-	if (isc_refcount_decrement(&acl->refcount) == 1) {
-		destroy(acl);
-	}
-}
+#if DNS_ACL_TRACE
+ISC_REFCOUNT_TRACE_IMPL(dns_acl, dns__acl_destroy);
+#else
+ISC_REFCOUNT_IMPL(dns_acl, dns__acl_destroy);
+#endif
 
 static isc_once_t insecure_prefix_once = ISC_ONCE_INIT;
 static isc_mutex_t insecure_prefix_lock;
@@ -628,8 +566,7 @@ dns_acl_isinsecure(const dns_acl_t *a) {
 	unsigned int i;
 	bool insecure;
 
-	RUNTIME_CHECK(isc_once_do(&insecure_prefix_once, initialize_action) ==
-		      ISC_R_SUCCESS);
+	isc_once_do(&insecure_prefix_once, initialize_action);
 
 	/*
 	 * Walk radix tree to find out if there are any non-negated,
@@ -701,74 +638,86 @@ dns_acl_allowed(isc_netaddr_t *addr, const dns_name_t *signer, dns_acl_t *acl,
 /*
  * Initialize ACL environment, setting up localhost and localnets ACLs
  */
-isc_result_t
+void
 dns_aclenv_create(isc_mem_t *mctx, dns_aclenv_t **envp) {
-	isc_result_t result;
 	dns_aclenv_t *env = isc_mem_get(mctx, sizeof(*env));
-	*env = (dns_aclenv_t){ 0 };
+	*env = (dns_aclenv_t){
+		.references = ISC_REFCOUNT_INITIALIZER(1),
+		.magic = DNS_ACLENV_MAGIC,
+	};
 
 	isc_mem_attach(mctx, &env->mctx);
 	isc_refcount_init(&env->references, 1);
-	isc_rwlock_init(&env->rwlock, 0, 0);
 
-	result = dns_acl_create(mctx, 0, &env->localhost);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup_rwlock;
-	}
-	result = dns_acl_create(mctx, 0, &env->localnets);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup_localhost;
-	}
-	env->match_mapped = false;
-#if defined(HAVE_GEOIP2)
-	env->geoip = NULL;
-#endif /* if defined(HAVE_GEOIP2) */
-
-	env->magic = DNS_ACLENV_MAGIC;
+	dns_acl_create(mctx, 0, &env->localhost);
+	dns_acl_create(mctx, 0, &env->localnets);
 
 	*envp = env;
-
-	return ISC_R_SUCCESS;
-
-cleanup_localhost:
-	dns_acl_detach(&env->localhost);
-cleanup_rwlock:
-	isc_rwlock_destroy(&env->rwlock);
-	isc_mem_putanddetach(&env->mctx, env, sizeof(*env));
-	return result;
 }
 
 void
 dns_aclenv_set(dns_aclenv_t *env, dns_acl_t *localhost, dns_acl_t *localnets) {
 	REQUIRE(VALID_ACLENV(env));
+	REQUIRE(DNS_ACL_VALID(localhost));
+	REQUIRE(DNS_ACL_VALID(localnets));
 
-	RWLOCK(&env->rwlock, isc_rwlocktype_write);
-	dns_acl_detach(&env->localhost);
-	dns_acl_attach(localhost, &env->localhost);
-	dns_acl_detach(&env->localnets);
-	dns_acl_attach(localnets, &env->localnets);
-	RWUNLOCK(&env->rwlock, isc_rwlocktype_write);
+	localhost = rcu_xchg_pointer(&env->localhost, dns_acl_ref(localhost));
+	localnets = rcu_xchg_pointer(&env->localnets, dns_acl_ref(localnets));
+
+	/*
+	 * This function is called only during interface scanning, so blocking
+	 * a bit is acceptable. Wait until all ongoing attachments to old
+	 * 'localhost' and 'localnets' are finished before we can detach and
+	 * possibly destroy them.
+	 *
+	 * The problem here isn't the memory reclamation per se, but
+	 * the reference counting race - we need to wait for the
+	 * critical section to end before we decrement the value and
+	 * possibly destroy the acl objects.
+	 */
+	synchronize_rcu();
+
+	dns_acl_detach(&localhost);
+	dns_acl_detach(&localnets);
 }
 
 void
-dns_aclenv_copy(dns_aclenv_t *t, dns_aclenv_t *s) {
-	REQUIRE(VALID_ACLENV(s));
-	REQUIRE(VALID_ACLENV(t));
+dns_aclenv_copy(dns_aclenv_t *target, dns_aclenv_t *source) {
+	REQUIRE(VALID_ACLENV(source));
+	REQUIRE(VALID_ACLENV(target));
 
-	RWLOCK(&t->rwlock, isc_rwlocktype_write);
-	RWLOCK(&s->rwlock, isc_rwlocktype_read);
-	dns_acl_detach(&t->localhost);
-	dns_acl_attach(s->localhost, &t->localhost);
-	dns_acl_detach(&t->localnets);
-	dns_acl_attach(s->localnets, &t->localnets);
+	rcu_read_lock();
 
-	t->match_mapped = s->match_mapped;
+	/*
+	 * We need to acquire the reference inside the critical section.
+	 */
+
+	dns_acl_t *localhost = dns_acl_ref(rcu_dereference(source->localhost));
+	INSIST(DNS_ACL_VALID(localhost));
+
+	dns_acl_t *localnets = dns_acl_ref(rcu_dereference(source->localnets));
+	INSIST(DNS_ACL_VALID(localnets));
+
+	rcu_read_unlock();
+
+	localhost = rcu_xchg_pointer(&target->localhost, localhost);
+	localnets = rcu_xchg_pointer(&target->localnets, localnets);
+
+	/*
+	 * This function is called only during (re)configuration, so blocking
+	 * a bit is acceptable.
+	 *
+	 * See the comment above in dns_aclenv_set() for more detail.
+	 */
+	synchronize_rcu();
+
+	target->match_mapped = source->match_mapped;
 #if defined(HAVE_GEOIP2)
-	t->geoip = s->geoip;
+	target->geoip = source->geoip;
 #endif /* if defined(HAVE_GEOIP2) */
 
-	RWUNLOCK(&s->rwlock, isc_rwlocktype_read);
-	RWUNLOCK(&t->rwlock, isc_rwlocktype_write);
+	dns_acl_detach(&localhost);
+	dns_acl_detach(&localnets);
 }
 
 static void
@@ -777,36 +726,23 @@ dns__aclenv_destroy(dns_aclenv_t *aclenv) {
 
 	aclenv->magic = 0;
 
-	isc_refcount_destroy(&aclenv->references);
+	/*
+	 * The last reference to the aclenv has been detached, so nobody should
+	 * be reading from this aclenv.  We can destroy the localhost and
+	 * localnet directly without swapping the pointers.
+	 */
+
 	dns_acl_detach(&aclenv->localhost);
 	dns_acl_detach(&aclenv->localnets);
-	isc_rwlock_destroy(&aclenv->rwlock);
 
 	isc_mem_putanddetach(&aclenv->mctx, aclenv, sizeof(*aclenv));
 }
 
-void
-dns_aclenv_attach(dns_aclenv_t *source, dns_aclenv_t **targetp) {
-	REQUIRE(VALID_ACLENV(source));
-	REQUIRE(targetp != NULL && *targetp == NULL);
-
-	isc_refcount_increment(&source->references);
-	*targetp = source;
-}
-
-void
-dns_aclenv_detach(dns_aclenv_t **aclenvp) {
-	dns_aclenv_t *aclenv = NULL;
-
-	REQUIRE(aclenvp != NULL && VALID_ACLENV(*aclenvp));
-
-	aclenv = *aclenvp;
-	*aclenvp = NULL;
-
-	if (isc_refcount_decrement(&aclenv->references) == 1) {
-		dns__aclenv_destroy(aclenv);
-	}
-}
+#if DNS_ACL_TRACE
+ISC_REFCOUNT_TRACE_IMPL(dns_aclenv, dns__aclenv_destroy);
+#else
+ISC_REFCOUNT_IMPL(dns_aclenv, dns__aclenv_destroy);
+#endif
 
 void
 dns_acl_add_port_transports(dns_acl_t *acl, const in_port_t port,

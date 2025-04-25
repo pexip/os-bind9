@@ -42,12 +42,11 @@ static isc_mem_t *mctx = NULL;
 static isc_lex_t *lex = NULL;
 
 int
-LLVMFuzzerInitialize(int *argc __attribute__((unused)),
-		     char ***argv __attribute__((unused))) {
+LLVMFuzzerInitialize(int *argc ISC_ATTR_UNUSED, char ***argv ISC_ATTR_UNUSED) {
 	isc_lexspecials_t specials;
 
 	isc_mem_create(&mctx);
-	CHECK(isc_lex_create(mctx, 64, &lex));
+	isc_lex_create(mctx, 64, &lex);
 
 	memset(specials, 0, sizeof(specials));
 	specials[0] = 1;
@@ -78,7 +77,6 @@ int
 LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	char totext[64 * 1044 * 4];
 	dns_compress_t cctx;
-	dns_decompress_t dctx;
 	dns_rdatatype_t rdtype;
 	dns_rdataclass_t rdclass;
 	dns_rdatatype_t typelist[256] = { 1000 }; /* unknown */
@@ -135,9 +133,6 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	dns_rdatacallbacks_init(&callbacks);
 	callbacks.warn = callbacks.error = nullmsg;
 
-	/* Disallow decompression as we are reading a packet */
-	dns_decompress_init(&dctx, -1, DNS_DECOMPRESS_NONE);
-
 	isc_buffer_constinit(&source, data, size);
 	isc_buffer_add(&source, size);
 	isc_buffer_setactive(&source, size);
@@ -145,10 +140,11 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	isc_buffer_init(&target, fromwire, sizeof(fromwire));
 
 	/*
-	 * Reject invalid rdata.
+	 * Reject invalid rdata. (Disallow decompression as we are
+	 * reading a packet)
 	 */
-	CHECK(dns_rdata_fromwire(&rdata1, rdclass, rdtype, &source, &dctx, 0,
-				 &target));
+	CHECK(dns_rdata_fromwire(&rdata1, rdclass, rdtype, &source,
+				 DNS_DECOMPRESS_NEVER, &target));
 	assert(rdata1.length == size);
 
 	/*
@@ -206,8 +202,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	/*
 	 * Convert rdata back to wire.
 	 */
-	CHECK(dns_compress_init(&cctx, -1, mctx));
-	dns_compress_disable(&cctx);
+	dns_compress_init(&cctx, mctx, DNS_COMPRESS_DISABLED);
 	isc_buffer_init(&target, towire, sizeof(towire));
 	result = dns_rdata_towire(&rdata1, &cctx, &target);
 	dns_compress_invalidate(&cctx);

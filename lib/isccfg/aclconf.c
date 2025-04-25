@@ -16,8 +16,7 @@
 #include <stdlib.h>
 
 #include <isc/mem.h>
-#include <isc/print.h>
-#include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/acl.h>
@@ -153,7 +152,7 @@ convert_named_acl(const cfg_obj_t *nameobj, const cfg_obj_t *cctx,
 	 */
 	memset(&loop, 0, sizeof(loop));
 	ISC_LINK_INIT(&loop, nextincache);
-	DE_CONST(aclname, loop.name);
+	loop.name = UNCONST(aclname);
 	loop.magic = LOOP_MAGIC;
 	ISC_LIST_APPEND(ctx->named_acl_cache, &loop, nextincache);
 	result = cfg_acl_fromconfig(cacl, cctx, lctx, ctx, mctx, nest_level,
@@ -212,9 +211,7 @@ count_acl_elements(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 
 	REQUIRE(count != NULL);
 
-	if (has_negative != NULL) {
-		*has_negative = false;
-	}
+	SET_IF_NOT_NULL(has_negative, false);
 
 	for (elt = cfg_list_first(caml); elt != NULL; elt = cfg_list_next(elt))
 	{
@@ -621,18 +618,9 @@ parse_geoip_element(const cfg_obj_t *obj, isc_log_t *lctx,
 #endif /* HAVE_GEOIP2 */
 
 isc_result_t
-cfg_acl_fromconfig(const cfg_obj_t *caml, const cfg_obj_t *cctx,
+cfg_acl_fromconfig(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 		   isc_log_t *lctx, cfg_aclconfctx_t *ctx, isc_mem_t *mctx,
 		   unsigned int nest_level, dns_acl_t **target) {
-	return cfg_acl_fromconfig2(caml, cctx, lctx, ctx, mctx, nest_level, 0,
-				   target);
-}
-
-isc_result_t
-cfg_acl_fromconfig2(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
-		    isc_log_t *lctx, cfg_aclconfctx_t *ctx, isc_mem_t *mctx,
-		    unsigned int nest_level, uint16_t family,
-		    dns_acl_t **target) {
 	isc_result_t result;
 	dns_acl_t *dacl = NULL, *inneracl = NULL;
 	dns_aclelement_t *de;
@@ -695,10 +683,7 @@ cfg_acl_fromconfig2(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 			nelem = cfg_list_length(caml, false);
 		}
 
-		result = dns_acl_create(mctx, nelem, &dacl);
-		if (result != ISC_R_SUCCESS) {
-			return result;
-		}
+		dns_acl_create(mctx, nelem, &dacl);
 	}
 
 	if (is_tuple) {
@@ -714,24 +699,26 @@ cfg_acl_fromconfig2(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 			if (strcasecmp(cfg_obj_asstring(obj_transport),
 				       "udp") == 0)
 			{
-				transports = isc_nm_udpsocket;
+				transports = isc_nm_udpsocket |
+					     isc_nm_proxyudpsocket;
 				encrypted = false;
 			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
 					      "tcp") == 0)
 			{
-				transports = isc_nm_tcpdnssocket;
+				transports = isc_nm_streamdnssocket;
 				encrypted = false;
 			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
 					      "udp-tcp") == 0)
 			{
 				/* Good ol' DNS over port 53 */
-				transports = isc_nm_tcpdnssocket |
-					     isc_nm_udpsocket;
+				transports = isc_nm_streamdnssocket |
+					     isc_nm_udpsocket |
+					     isc_nm_proxyudpsocket;
 				encrypted = false;
 			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
 					      "tls") == 0)
 			{
-				transports = isc_nm_tlsdnssocket;
+				transports = isc_nm_streamdnssocket;
 				encrypted = true;
 			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
 					      "http") == 0)
@@ -781,12 +768,8 @@ cfg_acl_fromconfig2(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 		iptab = dacl->iptable;
 
 		if (nest_level != 0) {
-			result = dns_acl_create(mctx,
-						cfg_list_length(ce, false),
-						&de->nestedacl);
-			if (result != ISC_R_SUCCESS) {
-				goto cleanup;
-			}
+			dns_acl_create(mctx, cfg_list_length(ce, false),
+				       &de->nestedacl);
 			iptab = de->nestedacl->iptable;
 		}
 
@@ -796,18 +779,6 @@ cfg_acl_fromconfig2(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 			unsigned int bitlen;
 
 			cfg_obj_asnetprefix(ce, &addr, &bitlen);
-			if (family != 0 && family != addr.family) {
-				char buf[ISC_NETADDR_FORMATSIZE + 1];
-				isc_netaddr_format(&addr, buf, sizeof(buf));
-				cfg_obj_log(ce, lctx, ISC_LOG_WARNING,
-					    "'%s': incorrect address family; "
-					    "ignoring",
-					    buf);
-				if (nest_level != 0) {
-					dns_acl_detach(&de->nestedacl);
-				}
-				continue;
-			}
 			result = isc_netaddr_prefixok(&addr, bitlen);
 			if (result != ISC_R_SUCCESS) {
 				char buf[ISC_NETADDR_FORMATSIZE + 1];

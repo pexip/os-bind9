@@ -33,16 +33,16 @@
 #include <isc/mem.h>
 #include <isc/netmgr.h>
 #include <isc/os.h>
-#include <isc/print.h>
+#include <isc/random.h>
 #include <isc/result.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/timer.h>
 #include <isc/util.h>
 
 #include <dns/callbacks.h>
 #include <dns/db.h>
+#include <dns/dispatch.h>
 #include <dns/fixedname.h>
 #include <dns/log.h>
 #include <dns/name.h>
@@ -57,19 +57,34 @@ dns_zonemgr_t *zonemgr = NULL;
  * Create a view.
  */
 isc_result_t
-dns_test_makeview(const char *name, bool with_cache, dns_view_t **viewp) {
+dns_test_makeview(const char *name, bool with_dispatchmgr, bool with_cache,
+		  dns_view_t **viewp) {
 	isc_result_t result;
 	dns_view_t *view = NULL;
 	dns_cache_t *cache = NULL;
+	dns_dispatchmgr_t *dispatchmgr = NULL;
 
-	result = dns_view_create(mctx, dns_rdataclass_in, name, &view);
+	if (with_dispatchmgr) {
+		result = dns_dispatchmgr_create(mctx, loopmgr, netmgr,
+						&dispatchmgr);
+		if (result != ISC_R_SUCCESS) {
+			return result;
+		}
+	}
+
+	result = dns_view_create(mctx, loopmgr, dispatchmgr, dns_rdataclass_in,
+				 name, &view);
+
+	if (dispatchmgr != NULL) {
+		dns_dispatchmgr_detach(&dispatchmgr);
+	}
+
 	if (result != ISC_R_SUCCESS) {
 		return result;
 	}
 
 	if (with_cache) {
-		result = dns_cache_create(mctx, taskmgr, timermgr,
-					  dns_rdataclass_in, "", "rbt", 0, NULL,
+		result = dns_cache_create(loopmgr, dns_rdataclass_in, "", mctx,
 					  &cache);
 		if (result != ISC_R_SUCCESS) {
 			dns_view_detach(&view);
@@ -103,17 +118,14 @@ dns_test_makezone(const char *name, dns_zone_t **zonep, dns_view_t *view,
 	/*
 	 * Create the zone structure.
 	 */
-	result = dns_zone_create(&zone, mctx);
-	if (result != ISC_R_SUCCESS) {
-		return result;
-	}
+	dns_zone_create(&zone, mctx, 0);
 
 	/*
 	 * Set zone type and origin.
 	 */
 	dns_zone_settype(zone, dns_zone_primary);
 	origin = dns_fixedname_initname(&fixed_origin);
-	result = dns_name_fromstring(origin, name, 0, NULL);
+	result = dns_name_fromstring(origin, name, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS) {
 		goto detach_zone;
 	}
@@ -126,7 +138,7 @@ dns_test_makezone(const char *name, dns_zone_t **zonep, dns_view_t *view,
 	 * If requested, create a view.
 	 */
 	if (createview) {
-		result = dns_test_makeview("view", false, &view);
+		result = dns_test_makeview("view", false, false, &view);
 		if (result != ISC_R_SUCCESS) {
 			goto detach_zone;
 		}
@@ -154,24 +166,17 @@ detach_zone:
 	return result;
 }
 
-isc_result_t
+void
 dns_test_setupzonemgr(void) {
-	isc_result_t result;
 	REQUIRE(zonemgr == NULL);
 
-	result = dns_zonemgr_create(mctx, taskmgr, timermgr, netmgr, &zonemgr);
-	return result;
+	dns_zonemgr_create(mctx, netmgr, &zonemgr);
 }
 
 isc_result_t
 dns_test_managezone(dns_zone_t *zone) {
 	isc_result_t result;
 	REQUIRE(zonemgr != NULL);
-
-	result = dns_zonemgr_setsize(zonemgr, 1);
-	if (result != ISC_R_SUCCESS) {
-		return result;
-	}
 
 	result = dns_zonemgr_managezone(zonemgr, zone);
 	return result;
@@ -208,16 +213,18 @@ dns_test_loaddb(dns_db_t **db, dns_dbtype_t dbtype, const char *origin,
 		const char *testfile) {
 	isc_result_t result;
 	dns_fixedname_t fixed;
-	dns_name_t *name;
+	dns_name_t *name = NULL;
+	const char *dbimp = (dbtype == dns_dbtype_zone) ? ZONEDB_DEFAULT
+							: CACHEDB_DEFAULT;
 
 	name = dns_fixedname_initname(&fixed);
 
-	result = dns_name_fromstring(name, origin, 0, NULL);
+	result = dns_name_fromstring(name, origin, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS) {
 		return result;
 	}
 
-	result = dns_db_create(mctx, "rbt", name, dbtype, dns_rdataclass_in, 0,
+	result = dns_db_create(mctx, dbimp, name, dbtype, dns_rdataclass_in, 0,
 			       NULL, db);
 	if (result != ISC_R_SUCCESS) {
 		return result;
@@ -354,10 +361,7 @@ dns_test_rdatafromstring(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 	/*
 	 * Create a lexer as one is required by dns_rdata_fromtext().
 	 */
-	result = isc_lex_create(mctx, 64, &lex);
-	if (result != ISC_R_SUCCESS) {
-		return result;
-	}
+	isc_lex_create(mctx, 64, &lex);
 
 	/*
 	 * Set characters which will be treated as valid multi-line RDATA
@@ -422,7 +426,7 @@ dns_test_namefromstring(const char *namestr, dns_fixedname_t *fname) {
 	isc_buffer_allocate(mctx, &b, length);
 
 	isc_buffer_putmem(b, (const unsigned char *)namestr, length);
-	result = dns_name_fromtext(name, b, dns_rootname, 0, NULL);
+	result = dns_name_fromtext(name, b, NULL, 0, NULL);
 	INSIST(result == ISC_R_SUCCESS);
 
 	isc_buffer_free(&b);
@@ -451,7 +455,8 @@ dns_test_difffromchanges(dns_diff_t *diff, const zonechange_t *changes,
 		 * Parse owner name.
 		 */
 		name = dns_fixedname_initname(&fixedname);
-		result = dns_name_fromstring(name, changes[i].owner, 0, mctx);
+		result = dns_name_fromstring(name, changes[i].owner,
+					     dns_rootname, 0, mctx);
 		if (result != ISC_R_SUCCESS) {
 			break;
 		}

@@ -20,7 +20,6 @@
 #include <isc/buffer.h>
 #include <isc/net.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -48,11 +47,6 @@ isc_netaddr_equal(const isc_netaddr_t *a, const isc_netaddr_t *b) {
 			    0 ||
 		    a->zone != b->zone)
 		{
-			return false;
-		}
-		break;
-	case AF_UNIX:
-		if (strcmp(a->type.un, b->type.un) != 0) {
 			return false;
 		}
 		break;
@@ -142,15 +136,6 @@ isc_netaddr_totext(const isc_netaddr_t *netaddr, isc_buffer_t *target) {
 	case AF_INET6:
 		type = &netaddr->type.in6;
 		break;
-	case AF_UNIX:
-		alen = strlen(netaddr->type.un);
-		if (alen > isc_buffer_availablelength(target)) {
-			return ISC_R_NOSPACE;
-		}
-		isc_buffer_putmem(target,
-				  (const unsigned char *)(netaddr->type.un),
-				  alen);
-		return ISC_R_SUCCESS;
 	default:
 		return ISC_R_FAILURE;
 	}
@@ -309,19 +294,6 @@ isc_netaddr_fromin6(isc_netaddr_t *netaddr, const struct in6_addr *ina6) {
 	netaddr->type.in6 = *ina6;
 }
 
-isc_result_t
-isc_netaddr_frompath(isc_netaddr_t *netaddr, const char *path) {
-	if (strlen(path) > sizeof(netaddr->type.un) - 1) {
-		return ISC_R_NOSPACE;
-	}
-
-	memset(netaddr, 0, sizeof(*netaddr));
-	netaddr->family = AF_UNIX;
-	strlcpy(netaddr->type.un, path, sizeof(netaddr->type.un));
-	netaddr->zone = 0;
-	return ISC_R_SUCCESS;
-}
-
 void
 isc_netaddr_setzone(isc_netaddr_t *netaddr, uint32_t zone) {
 	/* we currently only support AF_INET6. */
@@ -347,10 +319,6 @@ isc_netaddr_fromsockaddr(isc_netaddr_t *t, const isc_sockaddr_t *s) {
 	case AF_INET6:
 		memmove(&t->type.in6, &s->type.sin6.sin6_addr, 16);
 		t->zone = s->type.sin6.sin6_scope_id;
-		break;
-	case AF_UNIX:
-		memmove(t->type.un, s->type.sunix.sun_path, sizeof(t->type.un));
-		t->zone = 0;
 		break;
 	default:
 		UNREACHABLE();
@@ -440,9 +408,8 @@ isc_netaddr_isnetzero(const isc_netaddr_t *na) {
 
 void
 isc_netaddr_fromv4mapped(isc_netaddr_t *t, const isc_netaddr_t *s) {
-	isc_netaddr_t *src;
-
-	DE_CONST(s, src); /* Must come before IN6_IS_ADDR_V4MAPPED. */
+	isc_netaddr_t *src = UNCONST(s); /* Must come before
+					    IN6_IS_ADDR_V4MAPPED. */
 
 	REQUIRE(s->family == AF_INET6);
 	REQUIRE(IN6_IS_ADDR_V4MAPPED(&src->type.in6));

@@ -31,7 +31,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns*/*.jbk",
         "ns*/*.jnl",
         "ns*/*.signed",
-        "ns3/a-file",
+        "ns3/delayedkeys.conf",
         "ns3/removedkeys",
     ]
 )

@@ -14,7 +14,6 @@ import pytest
 pytestmark = pytest.mark.extra_artifacts(
     [
         "authsock.pid",
-        "authsock.log",
         "nsupdate.out*",
         "ns1/K*",
         "ns1/_default.tsigkeys",

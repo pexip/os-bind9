@@ -71,8 +71,7 @@ totext_afsdb(ARGS_TOTEXT) {
 	dns_name_t prefix;
 	isc_region_t region;
 	char buf[sizeof("64000 ")];
-	bool sub;
-	unsigned int num;
+	unsigned int num, opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_afsdb);
 	REQUIRE(rdata->length != 0);
@@ -86,8 +85,9 @@ totext_afsdb(ARGS_TOTEXT) {
 	snprintf(buf, sizeof(buf), "%u ", num);
 	RETERR(str_totext(buf, target));
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return dns_name_totext(&prefix, sub, target);
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return dns_name_totext(&prefix, opts, target);
 }
 
 static isc_result_t
@@ -101,7 +101,7 @@ fromwire_afsdb(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -116,7 +116,7 @@ fromwire_afsdb(ARGS_FROMWIRE) {
 	memmove(tr.base, sr.base, 2);
 	isc_buffer_forward(source, 2);
 	isc_buffer_add(target, 2);
-	return dns_name_fromwire(&name, source, dctx, options, target);
+	return dns_name_fromwire(&name, source, dctx, target);
 }
 
 static isc_result_t
@@ -129,7 +129,7 @@ towire_afsdb(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_afsdb);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	isc_buffer_availableregion(target, &tr);
 	dns_rdata_toregion(rdata, &sr);
 	if (tr.length < 2) {
@@ -142,7 +142,7 @@ towire_afsdb(ARGS_TOWIRE) {
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
 
-	return dns_name_towire(&name, cctx, target);
+	return dns_name_towire(&name, cctx, target, NULL);
 }
 
 static int
@@ -256,7 +256,7 @@ additionaldata_afsdb(ARGS_ADDLDATA) {
 	isc_region_consume(&region, 2);
 	dns_name_fromregion(&name, &region);
 
-	return (add)(arg, &name, dns_rdatatype_a, NULL);
+	return (add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE);
 }
 
 static isc_result_t

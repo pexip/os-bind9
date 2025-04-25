@@ -11,8 +11,6 @@
 
 import pytest
 
-import isctest.mark
-
 pytestmark = pytest.mark.extra_artifacts(
     [
         "curl.out.*",
@@ -26,6 +24,5 @@ pytestmark = pytest.mark.extra_artifacts(
 )
 
 
-@isctest.mark.flaky(max_runs=2)  # GL#1621
 def test_statistics(run_tests_sh):
     run_tests_sh()

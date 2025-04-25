@@ -40,11 +40,11 @@
 #include <isc/buffer.h>
 #include <isc/dir.h>
 #include <isc/file.h>
+#include <isc/fips.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
 #include <isc/once.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/refcount.h>
 #include <isc/safe.h>
@@ -199,14 +199,14 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	UNUSED(engine);
 
 	memset(dst_t_func, 0, sizeof(dst_t_func));
+	RETERR(dst__openssl_init(engine)); /* Sets FIPS mode. */
 	RETERR(dst__hmacmd5_init(&dst_t_func[DST_ALG_HMACMD5]));
 	RETERR(dst__hmacsha1_init(&dst_t_func[DST_ALG_HMACSHA1]));
 	RETERR(dst__hmacsha224_init(&dst_t_func[DST_ALG_HMACSHA224]));
 	RETERR(dst__hmacsha256_init(&dst_t_func[DST_ALG_HMACSHA256]));
 	RETERR(dst__hmacsha384_init(&dst_t_func[DST_ALG_HMACSHA384]));
 	RETERR(dst__hmacsha512_init(&dst_t_func[DST_ALG_HMACSHA512]));
-	RETERR(dst__openssl_init(engine));
-	RETERR(dst__openssldh_init(&dst_t_func[DST_ALG_DH]));
+	/* RSASHA1 (NSEC3RSASHA1) is verify only in FIPS mode. */
 	RETERR(dst__opensslrsa_init(&dst_t_func[DST_ALG_RSASHA1],
 				    DST_ALG_RSASHA1));
 	RETERR(dst__opensslrsa_init(&dst_t_func[DST_ALG_NSEC3RSASHA1],
@@ -218,10 +218,12 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__opensslecdsa_init(&dst_t_func[DST_ALG_ECDSA256]));
 	RETERR(dst__opensslecdsa_init(&dst_t_func[DST_ALG_ECDSA384]));
 #ifdef HAVE_OPENSSL_ED25519
-	RETERR(dst__openssleddsa_init(&dst_t_func[DST_ALG_ED25519]));
+	RETERR(dst__openssleddsa_init(&dst_t_func[DST_ALG_ED25519],
+				      DST_ALG_ED25519));
 #endif /* ifdef HAVE_OPENSSL_ED25519 */
 #ifdef HAVE_OPENSSL_ED448
-	RETERR(dst__openssleddsa_init(&dst_t_func[DST_ALG_ED448]));
+	RETERR(dst__openssleddsa_init(&dst_t_func[DST_ALG_ED448],
+				      DST_ALG_ED448));
 #endif /* ifdef HAVE_OPENSSL_ED448 */
 
 #if HAVE_GSSAPI
@@ -287,16 +289,14 @@ dst_context_create(dst_key_t *key, isc_mem_t *mctx, isc_logcategory_t *category,
 		return DST_R_NULLKEY;
 	}
 
-	dctx = isc_mem_get(mctx, sizeof(dst_context_t));
-	memset(dctx, 0, sizeof(*dctx));
+	dctx = isc_mem_get(mctx, sizeof(*dctx));
+	*dctx = (dst_context_t){
+		.category = category,
+		.use = (useforsigning) ? DO_SIGN : DO_VERIFY,
+	};
+
 	dst_key_attach(key, &dctx->key);
 	isc_mem_attach(mctx, &dctx->mctx);
-	dctx->category = category;
-	if (useforsigning) {
-		dctx->use = DO_SIGN;
-	} else {
-		dctx->use = DO_VERIFY;
-	}
 	if (key->func->createctx2 != NULL) {
 		result = key->func->createctx2(key, maxbits, dctx);
 	} else {
@@ -652,9 +652,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 			     pubkey->key_flags, pubkey->key_proto,
 			     pubkey->key_size, pubkey->key_class,
 			     pubkey->key_ttl, mctx);
-	if (key == NULL) {
-		RETERR(ISC_R_NOMEMORY);
-	}
 
 	if (key->func->parse == NULL) {
 		RETERR(DST_R_UNSUPPORTEDALG);
@@ -669,7 +666,7 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 			   ".private");
 	INSIST(result == ISC_R_SUCCESS);
 
-	RETERR(isc_lex_create(mctx, 1500, &lex));
+	isc_lex_create(mctx, 1500, &lex);
 	RETERR(isc_lex_openfile(lex, newfilename));
 	isc_mem_put(mctx, newfilename, newfilenamelen);
 
@@ -695,6 +692,10 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	}
 
 	key->modified = false;
+
+	if (dirname != NULL) {
+		key->directory = isc_mem_strdup(mctx, dirname);
+	}
 	*keyp = key;
 	key = NULL;
 
@@ -856,7 +857,7 @@ dst_key_privatefrombuffer(dst_key_t *key, isc_buffer_t *buffer) {
 		RETERR(DST_R_UNSUPPORTEDALG);
 	}
 
-	RETERR(isc_lex_create(key->mctx, 1500, &lex));
+	isc_lex_create(key->mctx, 1500, &lex);
 	RETERR(isc_lex_openbuffer(lex, buffer));
 	RETERR(key->func->parse(key, lex, NULL));
 out:
@@ -884,9 +885,6 @@ dst_key_fromgssapi(const dns_name_t *name, dns_gss_ctx_id_t gssctx,
 
 	key = get_key_struct(name, DST_ALG_GSSAPI, 0, DNS_KEYPROTO_DNSSEC, 0,
 			     dns_rdataclass_in, 0, mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 
 	if (intoken != NULL) {
 		/*
@@ -986,9 +984,6 @@ dst_key_buildinternal(const dns_name_t *name, unsigned int alg,
 
 	key = get_key_struct(name, alg, flags, protocol, bits, rdclass, 0,
 			     mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 
 	key->keydata.generic = data;
 
@@ -1019,9 +1014,6 @@ dst_key_fromlabel(const dns_name_t *name, int alg, unsigned int flags,
 	CHECKALG(alg);
 
 	key = get_key_struct(name, alg, flags, protocol, 0, rdclass, 0, mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 
 	if (key->func->fromlabel == NULL) {
 		dst_key_free(&key);
@@ -1047,8 +1039,8 @@ dst_key_fromlabel(const dns_name_t *name, int alg, unsigned int flags,
 isc_result_t
 dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 		 unsigned int param, unsigned int flags, unsigned int protocol,
-		 dns_rdataclass_t rdclass, isc_mem_t *mctx, dst_key_t **keyp,
-		 void (*callback)(int)) {
+		 dns_rdataclass_t rdclass, const char *label, isc_mem_t *mctx,
+		 dst_key_t **keyp, void (*callback)(int)) {
 	dst_key_t *key;
 	isc_result_t ret;
 
@@ -1061,8 +1053,9 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 
 	key = get_key_struct(name, alg, flags, protocol, bits, rdclass, 0,
 			     mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
+
+	if (label != NULL) {
+		key->label = isc_mem_strdup(mctx, label);
 	}
 
 	if (bits == 0) { /*%< NULL KEY */
@@ -1414,6 +1407,9 @@ dst_key_free(dst_key_t **keyp) {
 			INSIST(key->func->destroy != NULL);
 			key->func->destroy(key);
 		}
+		if (key->directory != NULL) {
+			isc_mem_free(mctx, key->directory);
+		}
 		if (key->engine != NULL) {
 			isc_mem_free(mctx, key->engine);
 		}
@@ -1456,7 +1452,6 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	REQUIRE(VALID_KEY(key));
 	REQUIRE(n != NULL);
 
-	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (key->key_alg) {
 	case DST_ALG_RSASHA1:
 	case DST_ALG_NSEC3RSASHA1:
@@ -1497,24 +1492,10 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	case DST_ALG_GSSAPI:
 		*n = 128; /*%< XXX */
 		break;
-	case DST_ALG_DH:
 	default:
 		return DST_R_UNSUPPORTEDALG;
 	}
 	return ISC_R_SUCCESS;
-}
-
-isc_result_t
-dst_key_secretsize(const dst_key_t *key, unsigned int *n) {
-	REQUIRE(dst_initialized);
-	REQUIRE(VALID_KEY(key));
-	REQUIRE(n != NULL);
-
-	if (key->key_alg == DST_ALG_DH) {
-		*n = (key->key_size + 7) / 8;
-		return ISC_R_SUCCESS;
-	}
-	return DST_R_UNSUPPORTEDALG;
 }
 
 /*%
@@ -1569,9 +1550,6 @@ dst_key_restore(dns_name_t *name, unsigned int alg, unsigned int flags,
 	}
 
 	key = get_key_struct(name, alg, flags, protocol, 0, rdclass, 0, mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 
 	result = (dst_t_func[alg]->restore)(key, keystr);
 	if (result == ISC_R_SUCCESS) {
@@ -1595,35 +1573,27 @@ get_key_struct(const dns_name_t *name, unsigned int alg, unsigned int flags,
 	       unsigned int protocol, unsigned int bits,
 	       dns_rdataclass_t rdclass, dns_ttl_t ttl, isc_mem_t *mctx) {
 	dst_key_t *key;
-	int i;
 
 	key = isc_mem_get(mctx, sizeof(dst_key_t));
-
-	memset(key, 0, sizeof(dst_key_t));
-
-	key->key_name = isc_mem_get(mctx, sizeof(dns_name_t));
+	*key = (dst_key_t){
+		.key_name = isc_mem_get(mctx, sizeof(dns_name_t)),
+		.key_alg = alg,
+		.key_flags = flags,
+		.key_proto = protocol,
+		.key_size = bits,
+		.key_class = rdclass,
+		.key_ttl = ttl,
+		.func = dst_t_func[alg],
+	};
 
 	dns_name_init(key->key_name, NULL);
 	dns_name_dup(name, mctx, key->key_name);
 
 	isc_refcount_init(&key->refs, 1);
 	isc_mem_attach(mctx, &key->mctx);
-	key->key_alg = alg;
-	key->key_flags = flags;
-	key->key_proto = protocol;
-	key->keydata.generic = NULL;
-	key->key_size = bits;
-	key->key_class = rdclass;
-	key->key_ttl = ttl;
-	key->func = dst_t_func[alg];
-	key->fmt_major = 0;
-	key->fmt_minor = 0;
-	for (i = 0; i < (DST_MAX_TIMES + 1); i++) {
-		key->times[i] = 0;
-		key->timeset[i] = false;
-	}
+
 	isc_mutex_init(&key->mdlock);
-	key->inactive = false;
+
 	key->magic = KEY_MAGIC;
 	return key;
 }
@@ -1670,10 +1640,7 @@ dst_key_read_public(const char *filename, int type, isc_mem_t *mctx,
 	 */
 
 	/* 1500 should be large enough for any key */
-	ret = isc_lex_create(mctx, 1500, &lex);
-	if (ret != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
+	isc_lex_create(mctx, 1500, &lex);
 
 	memset(specials, 0, sizeof(specials));
 	specials['('] = 1;
@@ -1823,10 +1790,7 @@ dst_key_read_state(const char *filename, isc_mem_t *mctx, dst_key_t **keyp) {
 	isc_result_t ret;
 	unsigned int opt = ISC_LEXOPT_EOL;
 
-	ret = isc_lex_create(mctx, 1500, &lex);
-	if (ret != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
+	isc_lex_create(mctx, 1500, &lex);
 	isc_lex_setcomments(lex, ISC_LEXCOMMENT_DNSMASTERFILE);
 
 	ret = isc_lex_openfile(lex, filename);
@@ -1986,13 +1950,11 @@ issymmetric(const dst_key_t *key) {
 	REQUIRE(dst_initialized);
 	REQUIRE(VALID_KEY(key));
 
-	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (key->key_alg) {
 	case DST_ALG_RSASHA1:
 	case DST_ALG_NSEC3RSASHA1:
 	case DST_ALG_RSASHA256:
 	case DST_ALG_RSASHA512:
-	case DST_ALG_DH:
 	case DST_ALG_ECDSA256:
 	case DST_ALG_ECDSA384:
 	case DST_ALG_ED25519:
@@ -2276,7 +2238,7 @@ write_public_key(const dst_key_t *key, int type, const char *directory) {
 	}
 
 	isc_buffer_usedregion(&classb, &r);
-	if ((unsigned)fwrite(r.base, 1, r.length, fp) != r.length) {
+	if ((unsigned int)fwrite(r.base, 1, r.length, fp) != r.length) {
 		return dst_key_cleanup(tmpname, fp);
 	}
 
@@ -2287,7 +2249,7 @@ write_public_key(const dst_key_t *key, int type, const char *directory) {
 	}
 
 	isc_buffer_usedregion(&textb, &r);
-	if ((unsigned)fwrite(r.base, 1, r.length, fp) != r.length) {
+	if ((unsigned int)fwrite(r.base, 1, r.length, fp) != r.length) {
 		return dst_key_cleanup(tmpname, fp);
 	}
 
@@ -2370,9 +2332,6 @@ frombuffer(const dns_name_t *name, unsigned int alg, unsigned int flags,
 	REQUIRE(keyp != NULL && *keyp == NULL);
 
 	key = get_key_struct(name, alg, flags, protocol, 0, rdclass, 0, mctx);
-	if (key == NULL) {
-		return ISC_R_NOMEMORY;
-	}
 
 	if (isc_buffer_remaininglength(source) > 0) {
 		ret = algorithm_status(alg);

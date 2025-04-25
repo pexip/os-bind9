@@ -30,7 +30,6 @@
 #include <isc/file.h>
 #include <isc/hash.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/serial.h>
 #include <isc/string.h>
@@ -248,8 +247,8 @@ static void
 load_db(const char *filename, dns_db_t **dbp, dns_dbnode_t **nodep) {
 	isc_result_t result;
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone, rdclass, 0,
-			       NULL, dbp);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
+			       rdclass, 0, NULL, dbp);
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_load(*dbp, filename, dns_masterformat_text,
@@ -346,8 +345,7 @@ load_parent_set(const char *path) {
 	}
 	notbefore = isc_time_seconds(&modtime);
 	if (startstr != NULL) {
-		isc_stdtime_t now;
-		isc_stdtime_get(&now);
+		isc_stdtime_t now = isc_stdtime_now();
 		notbefore = strtotime(startstr, now, notbefore, NULL);
 	}
 	verbose_time(1, "child records must not be signed before", notbefore);
@@ -539,7 +537,7 @@ match_keyset_dsset(dns_rdataset_t *keyset, dns_rdataset_t *dsset,
 
 	nkey = dns_rdataset_count(keyset);
 
-	keytable = isc_mem_get(mctx, sizeof(keyinfo_t) * nkey);
+	keytable = isc_mem_cget(mctx, nkey, sizeof(keytable[0]));
 
 	for (result = dns_rdataset_first(keyset), i = 0, ki = keytable;
 	     result == ISC_R_SUCCESS;
@@ -595,7 +593,7 @@ free_keytable(keyinfo_t **keytable_p) {
 		}
 	}
 
-	isc_mem_put(mctx, keytable, sizeof(keyinfo_t) * nkey);
+	isc_mem_cput(mctx, keytable, nkey, sizeof(keytable[0]));
 }
 
 /*
@@ -616,8 +614,7 @@ matching_sigs(keyinfo_t *keytbl, dns_rdataset_t *rdataset,
 
 	REQUIRE(keytbl != NULL);
 
-	algo = isc_mem_get(mctx, nkey);
-	memset(algo, 0, nkey);
+	algo = isc_mem_cget(mctx, nkey, sizeof(algo[0]));
 
 	for (result = dns_rdataset_first(sigset); result == ISC_R_SUCCESS;
 	     result = dns_rdataset_next(sigset))
@@ -700,7 +697,7 @@ signed_loose(dns_secalg_t *algo) {
 			ok = true;
 		}
 	}
-	isc_mem_put(mctx, algo, nkey);
+	isc_mem_cput(mctx, algo, nkey, sizeof(algo[0]));
 	return ok;
 }
 
@@ -742,7 +739,7 @@ signed_strict(dns_rdataset_t *dsset, dns_secalg_t *algo) {
 		}
 	}
 
-	isc_mem_put(mctx, algo, nkey);
+	isc_mem_cput(mctx, algo, nkey, sizeof(algo[0]));
 	return all_ok;
 }
 
@@ -832,12 +829,13 @@ append_new_ds_set(ds_maker_func_t *ds_from_rdata, isc_buffer_t *buf,
 static void
 make_new_ds_set(ds_maker_func_t *ds_from_rdata, uint32_t ttl,
 		dns_rdataset_t *crdset) {
-	isc_result_t result;
-	dns_rdatalist_t *dslist;
 	unsigned int size = 16;
-	unsigned i, n;
 
 	for (;;) {
+		isc_result_t result = ISC_R_SUCCESS;
+		dns_rdatalist_t *dslist = NULL;
+		size_t n;
+
 		dslist = isc_mem_get(mctx, sizeof(*dslist));
 		dns_rdatalist_init(dslist);
 		dslist->rdclass = rdclass;
@@ -845,13 +843,12 @@ make_new_ds_set(ds_maker_func_t *ds_from_rdata, uint32_t ttl,
 		dslist->ttl = ttl;
 
 		dns_rdataset_init(&new_ds_set);
-		result = dns_rdatalist_tordataset(dslist, &new_ds_set);
-		check_result(result, "dns_rdatalist_tordataset(dslist)");
+		dns_rdatalist_tordataset(dslist, &new_ds_set);
 
 		isc_buffer_allocate(mctx, &new_ds_buf, size);
 
 		n = sizeof(dtype) / sizeof(dtype[0]);
-		for (i = 0; i < n && dtype[i] != 0; i++) {
+		for (size_t i = 0; i < n && dtype[i] != 0; i++) {
 			result = append_new_ds_set(ds_from_rdata, new_ds_buf,
 						   dslist, dtype[i], crdset);
 			if (result != ISC_R_SUCCESS) {
@@ -897,7 +894,7 @@ consistent_digests(dns_rdataset_t *dsset) {
 
 	n = dns_rdataset_count(dsset);
 
-	arrdata = isc_mem_get(mctx, n * sizeof(dns_rdata_t));
+	arrdata = isc_mem_cget(mctx, n, sizeof(dns_rdata_t));
 
 	for (result = dns_rdataset_first(dsset), i = 0; result == ISC_R_SUCCESS;
 	     result = dns_rdataset_next(dsset), i++)
@@ -911,7 +908,7 @@ consistent_digests(dns_rdataset_t *dsset) {
 	/*
 	 * Convert sorted arrdata to more accessible format
 	 */
-	ds = isc_mem_get(mctx, n * sizeof(dns_rdata_ds_t));
+	ds = isc_mem_cget(mctx, n, sizeof(dns_rdata_ds_t));
 
 	for (i = 0; i < n; i++) {
 		result = dns_rdata_tostruct(&arrdata[i], &ds[i], NULL);
@@ -950,8 +947,8 @@ consistent_digests(dns_rdataset_t *dsset) {
 	/*
 	 * Done!
 	 */
-	isc_mem_put(mctx, ds, n * sizeof(dns_rdata_ds_t));
-	isc_mem_put(mctx, arrdata, n * sizeof(dns_rdata_t));
+	isc_mem_cput(mctx, ds, n, sizeof(dns_rdata_ds_t));
+	isc_mem_cput(mctx, arrdata, n, sizeof(dns_rdata_t));
 
 	return match;
 }
@@ -982,8 +979,8 @@ update_diff(const char *cmd, uint32_t ttl, dns_rdataset_t *addset,
 	dns_rdataset_t diffset;
 	uint32_t save;
 
-	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone, rdclass, 0,
-			       NULL, &update_db);
+	result = dns_db_create(mctx, ZONEDB_DEFAULT, name, dns_dbtype_zone,
+			       rdclass, 0, NULL, &update_db);
 	check_result(result, "dns_db_create()");
 
 	result = dns_db_newversion(update_db, &update_version);

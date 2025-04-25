@@ -143,15 +143,14 @@ struct ns_clientmgr {
 	/* Unlocked. */
 	unsigned int magic;
 
-	isc_mem_t      *mctx;
-	ns_server_t    *sctx;
-	isc_taskmgr_t  *taskmgr;
-	isc_timermgr_t *timermgr;
-	isc_refcount_t	references;
-	int		tid;
+	isc_mem_t     *mctx;
+	isc_mempool_t *namepool;
+	isc_mempool_t *rdspool;
 
-	/* Attached by clients, needed for e.g. recursion */
-	isc_task_t *task;
+	ns_server_t   *sctx;
+	isc_refcount_t references;
+	uint32_t       tid;
+	isc_loop_t    *loop;
 
 	dns_aclenv_t *aclenv;
 
@@ -165,31 +164,23 @@ struct ns_clientmgr {
 /*% nameserver client structure */
 struct ns_client {
 	unsigned int	 magic;
-	isc_mem_t	*mctx;
-	int		 tid;
-	bool		 allocated; /* Do we need to free it? */
-	ns_server_t	*sctx;
 	ns_clientmgr_t	*manager;
 	ns_clientstate_t state;
-	int		 nupdates;
-	bool		 nodetach;
-	bool		 shuttingdown;
+	bool		 async;
 	unsigned int	 attributes;
-	isc_task_t	*task;
 	dns_view_t	*view;
 	dns_dispatch_t	*dispatch;
-	isc_nmhandle_t	*handle;	/* Permanent pointer to handle */
-	isc_nmhandle_t	*sendhandle;	/* Waiting for send callback */
-	isc_nmhandle_t	*reqhandle;	/* Waiting for request callback
-					   (query, update, notify) */
-	isc_nmhandle_t *fetchhandle;	/* Waiting for recursive fetch */
-	isc_nmhandle_t *prefetchhandle; /* Waiting for prefetch / rpzfetch */
-	isc_nmhandle_t *updatehandle;	/* Waiting for update callback */
+	isc_nmhandle_t	*handle;       /* Permanent pointer to handle */
+	isc_nmhandle_t	*sendhandle;   /* Waiting for send callback */
+	isc_nmhandle_t	*reqhandle;    /* Waiting for request callback
+					  (query, update, notify) */
+	isc_nmhandle_t *updatehandle;  /* Waiting for update callback */
+	isc_nmhandle_t *restarthandle; /* Waiting for restart callback */
 	unsigned char  *tcpbuf;
 	size_t		tcpbuf_size;
 	dns_message_t  *message;
 	dns_rdataset_t *opt;
-	dns_ednsopt_t  *ede;
+	dns_edectx_t	edectx;
 	uint16_t	udpsize;
 	uint16_t	extflags;
 	int16_t		ednsversion; /* -1 noedns */
@@ -201,8 +192,10 @@ struct ns_client {
 	isc_time_t    tnow;
 	dns_name_t    signername; /*%< [T]SIG key name */
 	dns_name_t   *signer;	  /*%< NULL if not valid sig */
-	bool	      mortal;	  /*%< Die after handling request */
-	isc_quota_t  *recursionquota;
+	isc_result_t  sigresult;
+	isc_result_t  viewmatchresult;
+	isc_buffer_t *buffer;
+	isc_buffer_t  tbuffer;
 
 	isc_sockaddr_t peeraddr;
 	bool	       peeraddr_valid;
@@ -211,7 +204,6 @@ struct ns_client {
 
 	dns_ecs_t ecs; /*%< EDNS client subnet sent by client */
 
-	struct in6_pktinfo pktinfo;
 	/*%
 	 * Information about recent FORMERR response(s), for
 	 * FORMERR loop avoidance.  This is separate for each
@@ -253,7 +245,8 @@ struct ns_client {
 #define NS_CLIENTATTR_MULTICAST	 0x00008 /*%< recv'd from multicast */
 #define NS_CLIENTATTR_WANTDNSSEC 0x00010 /*%< include dnssec records */
 #define NS_CLIENTATTR_WANTNSID	 0x00020 /*%< include nameserver ID */
-/* Obsolete: NS_CLIENTATTR_FILTER_AAAA	0x00040 */
+#define NS_CLIENTATTR_BADCOOKIE \
+	0x00040 /*%< Presented cookie is bad/out-of-date */
 /* Obsolete: NS_CLIENTATTR_FILTER_AAAA_RC 0x00080 */
 #define NS_CLIENTATTR_WANTAD	   0x00100 /*%< want AD in response if possible */
 #define NS_CLIENTATTR_WANTCOOKIE   0x00200 /*%< return a COOKIE */
@@ -310,22 +303,10 @@ ns_client_error(ns_client_t *client, isc_result_t result);
  */
 
 void
-ns_client_extendederror(ns_client_t *client, uint16_t code, const char *text);
-/*%<
- * Set extended error with INFO-CODE <code> and EXTRA-TEXT <text>.
- */
-
-void
 ns_client_drop(ns_client_t *client, isc_result_t result);
 /*%<
  * Log the reason the current client request has failed; no response
  * will be sent.
- */
-
-bool
-ns_client_shuttingdown(ns_client_t *client);
-/*%<
- * Return true iff the client is currently shutting down.
  */
 
 isc_result_t
@@ -343,9 +324,8 @@ ns_client_settimeout(ns_client_t *client, unsigned int seconds);
  */
 
 isc_result_t
-ns_clientmgr_create(ns_server_t *sctx, isc_taskmgr_t *taskmgr,
-		    isc_timermgr_t *timermgr, dns_aclenv_t *aclenv, int tid,
-		    ns_clientmgr_t **managerp);
+ns_clientmgr_create(ns_server_t *sctx, isc_loopmgr_t *loopmgr,
+		    dns_aclenv_t *aclenv, int tid, ns_clientmgr_t **managerp);
 /*%<
  * Create a client manager.
  */
@@ -355,12 +335,6 @@ ns_clientmgr_shutdown(ns_clientmgr_t *manager);
 /*%<
  * Shutdown a client manager and all ns_client_t objects
  * managed by it
- */
-
-void
-ns_clientmgr_detach(ns_clientmgr_t **managerp);
-/*%<
- * Detach from a client manager.
  */
 
 isc_sockaddr_t *
@@ -478,8 +452,8 @@ ns_client_addopt(ns_client_t *client, dns_message_t *message,
  */
 
 void
-ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
-		   isc_region_t *region, void *arg);
+ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
+		  isc_region_t *region, void *arg);
 
 /*%<
  * Handle client requests.
@@ -560,7 +534,9 @@ ns_client_findversion(ns_client_t *client, dns_db_t *db);
  * allocated by ns_client_newdbversion().
  */
 
-isc_result_t
+ISC_REFCOUNT_DECL(ns_clientmgr);
+
+void
 ns__client_setup(ns_client_t *client, ns_clientmgr_t *manager, bool new);
 /*%<
  * Perform initial setup of an allocated client.

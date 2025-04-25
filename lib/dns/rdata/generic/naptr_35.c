@@ -244,7 +244,7 @@ totext_naptr(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -296,8 +296,9 @@ totext_naptr(ARGS_TOTEXT) {
 	 * Replacement.
 	 */
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return dns_name_totext(&prefix, sub, target);
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return dns_name_totext(&prefix, opts, target);
 }
 
 static isc_result_t
@@ -311,7 +312,7 @@ fromwire_naptr(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -345,7 +346,7 @@ fromwire_naptr(ARGS_FROMWIRE) {
 	/*
 	 * Replacement.
 	 */
-	return dns_name_fromwire(&name, source, dctx, options, target);
+	return dns_name_fromwire(&name, source, dctx, target);
 }
 
 static isc_result_t
@@ -357,7 +358,7 @@ towire_naptr(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	/*
 	 * Order, preference.
 	 */
@@ -388,7 +389,7 @@ towire_naptr(ARGS_TOWIRE) {
 	 */
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	return dns_name_towire(&name, cctx, target);
+	return dns_name_towire(&name, cctx, target, NULL);
 }
 
 static int
@@ -521,27 +522,18 @@ tostruct_naptr(ARGS_TOSTRUCT) {
 	isc_region_consume(&r, 1);
 	INSIST(naptr->flags_len <= r.length);
 	naptr->flags = mem_maybedup(mctx, r.base, naptr->flags_len);
-	if (naptr->flags == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->flags_len);
 
 	naptr->service_len = uint8_fromregion(&r);
 	isc_region_consume(&r, 1);
 	INSIST(naptr->service_len <= r.length);
 	naptr->service = mem_maybedup(mctx, r.base, naptr->service_len);
-	if (naptr->service == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->service_len);
 
 	naptr->regexp_len = uint8_fromregion(&r);
 	isc_region_consume(&r, 1);
 	INSIST(naptr->regexp_len <= r.length);
 	naptr->regexp = mem_maybedup(mctx, r.base, naptr->regexp_len);
-	if (naptr->regexp == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->regexp_len);
 
 	dns_name_init(&name, NULL);
@@ -550,18 +542,6 @@ tostruct_naptr(ARGS_TOSTRUCT) {
 	name_duporclone(&name, mctx, &naptr->replacement);
 	naptr->mctx = mctx;
 	return ISC_R_SUCCESS;
-
-cleanup:
-	if (mctx != NULL && naptr->flags != NULL) {
-		isc_mem_free(mctx, naptr->flags);
-	}
-	if (mctx != NULL && naptr->service != NULL) {
-		isc_mem_free(mctx, naptr->service);
-	}
-	if (mctx != NULL && naptr->regexp != NULL) {
-		isc_mem_free(mctx, naptr->regexp);
-	}
-	return ISC_R_NOMEMORY;
 }
 
 static void
@@ -642,7 +622,7 @@ additionaldata_naptr(ARGS_ADDLDATA) {
 	dns_name_fromregion(&name, &sr);
 
 	if (atype != 0) {
-		return (add)(arg, &name, atype, NULL);
+		return (add)(arg, &name, atype, NULL DNS__DB_FILELINE);
 	}
 
 	return ISC_R_SUCCESS;

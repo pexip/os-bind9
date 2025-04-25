@@ -124,7 +124,6 @@ fromwire_cert(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 	if (sr.length < 6) {
@@ -207,10 +206,6 @@ tostruct_cert(ARGS_TOSTRUCT) {
 	cert->length = region.length;
 
 	cert->certificate = mem_maybedup(mctx, region.base, region.length);
-	if (cert->certificate == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	cert->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

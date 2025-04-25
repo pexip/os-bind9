@@ -38,7 +38,6 @@
 
 #include <isc/assertions.h>
 #include <isc/hmac.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/safe.h>
 
@@ -117,14 +116,14 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 	if (isccc_sexpr_binaryp(elt)) {
 		vr = isccc_sexpr_tobinary(elt);
 		len = REGION_SIZE(*vr);
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return ISC_R_NOSPACE;
 		}
 		isc_buffer_putuint8(*buffer, ISCCC_CCMSGTYPE_BINARYDATA);
 		isc_buffer_putuint32(*buffer, len);
 
-		result = isc_buffer_reserve(buffer, len);
+		result = isc_buffer_reserve(*buffer, len);
 		if (result != ISC_R_SUCCESS) {
 			return ISC_R_NOSPACE;
 		}
@@ -133,7 +132,7 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 		unsigned int used;
 		isc_buffer_t b;
 
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return ISC_R_NOSPACE;
 		}
@@ -167,7 +166,7 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 		unsigned int used;
 		isc_buffer_t b;
 
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return ISC_R_NOSPACE;
 		}
@@ -221,7 +220,7 @@ table_towire(isccc_sexpr_t *alist, isc_buffer_t **buffer) {
 		/*
 		 * Emit the key name.
 		 */
-		result = isc_buffer_reserve(buffer, 1 + len);
+		result = isc_buffer_reserve(*buffer, 1 + len);
 		if (result != ISC_R_SUCCESS) {
 			return ISC_R_NOSPACE;
 		}
@@ -317,7 +316,7 @@ isccc_cc_towire(isccc_sexpr_t *alist, isc_buffer_t **buffer, uint32_t algorithm,
 	unsigned int hmac_base, signed_base;
 	isc_result_t result;
 
-	result = isc_buffer_reserve(buffer,
+	result = isc_buffer_reserve(*buffer,
 				    4 + ((algorithm == ISCCC_ALG_HMACMD5)
 						 ? sizeof(auth_hmd5)
 						 : sizeof(auth_hsha)));
@@ -875,7 +874,7 @@ isccc_cc_definestring(isccc_sexpr_t *alist, const char *key, const char *str) {
 	isccc_region_t r;
 
 	len = strlen(str);
-	DE_CONST(str, r.rstart);
+	r.rstart = UNCONST(str);
 	r.rend = r.rstart + len;
 
 	return isccc_alist_definebinary(alist, key, &r);
@@ -1023,12 +1022,14 @@ isccc_cc_checkdup(isccc_symtab_t *symtab, isccc_sexpr_t *message,
 		_frm = "";
 	} else {
 		_frm = tmp;
+		INSIST(_frm != NULL);
 	}
 	tmp = NULL;
 	if (isccc_cc_lookupstring(_ctrl, "_to", &tmp) != ISC_R_SUCCESS) {
 		_to = "";
 	} else {
 		_to = tmp;
+		INSIST(_to != NULL);
 	}
 	/*
 	 * Ensure there is no newline in any of the strings.  This is so

@@ -50,6 +50,7 @@ generic_fromtext_key(ARGS_FROMTEXT) {
 	dns_secalg_t alg;
 	dns_secproto_t proto;
 	dns_keyflags_t flags;
+	unsigned int used;
 
 	UNUSED(rdclass);
 	UNUSED(origin);
@@ -82,7 +83,28 @@ generic_fromtext_key(ARGS_FROMTEXT) {
 		return ISC_R_SUCCESS;
 	}
 
-	return isc_base64_tobuffer(lexer, target, -2);
+	/*
+	 * Save the current used value. It will become the current
+	 * value when we parse the keydata field.
+	 */
+	used = isc_buffer_usedlength(target);
+
+	RETERR(isc_base64_tobuffer(lexer, target, -2));
+
+	if (alg == DNS_KEYALG_PRIVATEDNS || alg == DNS_KEYALG_PRIVATEOID) {
+		isc_buffer_t b;
+
+		/*
+		 * Set up 'b' so that the key data can be parsed.
+		 */
+		b = *target;
+		b.active = b.used;
+		b.current = used;
+
+		RETERR(check_private(&b, alg));
+	}
+
+	return ISC_R_SUCCESS;
 }
 
 static isc_result_t
@@ -139,6 +161,19 @@ generic_totext_key(ARGS_TOTEXT) {
 		dns_name_init(&name, NULL);
 		dns_name_fromregion(&name, &sr);
 		dns_name_format(&name, algbuf, sizeof(algbuf));
+	} else if ((tctx->flags & DNS_STYLEFLAG_RRCOMMENT) != 0 &&
+		   algorithm == DNS_KEYALG_PRIVATEOID)
+	{
+		const unsigned char *in = sr.base;
+		ASN1_OBJECT *obj = d2i_ASN1_OBJECT(NULL, &in, sr.length);
+		int n;
+		INSIST(obj != NULL);
+		n = i2t_ASN1_OBJECT(algbuf, sizeof(buf), obj);
+		ASN1_OBJECT_free(obj);
+		if (n == -1 || (size_t)n >= sizeof(algbuf)) {
+			dns_secalg_format((dns_secalg_t)algorithm, algbuf,
+					  sizeof(algbuf));
+		}
 	} else {
 		dns_secalg_format((dns_secalg_t)algorithm, algbuf,
 				  sizeof(algbuf));
@@ -199,7 +234,6 @@ generic_fromwire_key(ARGS_FROMWIRE) {
 
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 	if (sr.length < 4) {
@@ -223,11 +257,11 @@ generic_fromwire_key(ARGS_FROMWIRE) {
 		return ISC_R_UNEXPECTEDEND;
 	}
 
-	if (algorithm == DNS_KEYALG_PRIVATEDNS) {
-		dns_name_t name;
-		dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
-		dns_name_init(&name, NULL);
-		RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	if (algorithm == DNS_KEYALG_PRIVATEDNS ||
+	    algorithm == DNS_KEYALG_PRIVATEOID)
+	{
+		isc_buffer_t b = *source;
+		RETERR(check_private(&b, algorithm));
 	}
 
 	isc_buffer_activeregion(source, &sr);
@@ -323,7 +357,7 @@ generic_tostruct_key(ARGS_TOSTRUCT) {
 	isc_region_t sr;
 
 	REQUIRE(key != NULL);
-	REQUIRE(rdata->length != 0);
+	REQUIRE(rdata->length >= 4U);
 
 	REQUIRE(key != NULL);
 	REQUIRE(key->common.rdclass == rdata->rdclass);
@@ -333,33 +367,20 @@ generic_tostruct_key(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &sr);
 
 	/* Flags */
-	if (sr.length < 2) {
-		return ISC_R_UNEXPECTEDEND;
-	}
 	key->flags = uint16_fromregion(&sr);
 	isc_region_consume(&sr, 2);
 
 	/* Protocol */
-	if (sr.length < 1) {
-		return ISC_R_UNEXPECTEDEND;
-	}
 	key->protocol = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
 
 	/* Algorithm */
-	if (sr.length < 1) {
-		return ISC_R_UNEXPECTEDEND;
-	}
 	key->algorithm = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
 
 	/* Data */
 	key->datalen = sr.length;
 	key->data = mem_maybedup(mctx, sr.base, key->datalen);
-	if (key->data == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	key->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

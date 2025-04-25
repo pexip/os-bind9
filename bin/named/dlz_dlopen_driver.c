@@ -16,12 +16,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <uv.h>
 
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/util.h>
+#include <isc/uv.h>
 
 #include <dns/dlz_dlopen.h>
 #include <dns/log.h>
@@ -225,12 +224,11 @@ dlopen_dlz_create(const char *dlzname, unsigned int argc, char *argv[],
 
 	isc_mem_create(&mctx);
 	cd = isc_mem_get(mctx, sizeof(*cd));
-	memset(cd, 0, sizeof(*cd));
-
-	cd->mctx = mctx;
-
-	cd->dl_path = isc_mem_strdup(cd->mctx, argv[1]);
-	cd->dlzname = isc_mem_strdup(cd->mctx, dlzname);
+	*cd = (dlopen_data_t){
+		.mctx = mctx,
+		.dl_path = isc_mem_strdup(mctx, argv[1]),
+		.dlzname = isc_mem_strdup(mctx, dlzname),
+	};
 
 	/* Initialize the lock */
 	isc_mutex_init(&cd->lock);

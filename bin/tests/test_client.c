@@ -25,12 +25,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <isc/loop.h>
 #include <isc/managers.h>
 #include <isc/mem.h>
 #include <isc/netaddr.h>
 #include <isc/netmgr.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -51,6 +51,7 @@ static const char *protocols[] = { "udp",	    "tcp",
 				   "http-plain-get" };
 
 static isc_mem_t *mctx = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 static isc_nm_t *netmgr = NULL;
 
 static protocol_t protocol;
@@ -284,31 +285,8 @@ parse_options(int argc, char **argv) {
 }
 
 static void
-_signal(int sig, void (*handler)(int)) {
-	struct sigaction sa = { .sa_handler = handler };
-
-	RUNTIME_CHECK(sigfillset(&sa.sa_mask) == 0);
-	RUNTIME_CHECK(sigaction(sig, &sa, NULL) >= 0);
-}
-
-static void
 setup(void) {
-	sigset_t sset;
-
-	_signal(SIGPIPE, SIG_IGN);
-	_signal(SIGHUP, SIG_DFL);
-	_signal(SIGTERM, SIG_DFL);
-	_signal(SIGINT, SIG_DFL);
-
-	RUNTIME_CHECK(sigemptyset(&sset) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGHUP) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGINT) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGTERM) == 0);
-	RUNTIME_CHECK(pthread_sigmask(SIG_BLOCK, &sset, NULL) == 0);
-
-	isc_mem_create(&mctx);
-
-	isc_managers_create(mctx, workers, 0, &netmgr, NULL, NULL);
+	isc_managers_create(&mctx, workers, &loopmgr, &netmgr);
 }
 
 static void
@@ -317,11 +295,11 @@ teardown(void) {
 		close(out);
 	}
 
-	isc_managers_destroy(&netmgr, NULL, NULL);
-	isc_mem_destroy(&mctx);
 	if (tls_ctx) {
 		isc_tlsctx_free(&tls_ctx);
 	}
+
+	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 }
 
 static void
@@ -397,18 +375,21 @@ run(void) {
 	switch (protocol) {
 	case UDP:
 		isc_nm_udpconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				  connect_cb, NULL, timeout, 0);
+				  connect_cb, NULL, timeout);
 		break;
 	case TCP:
-		isc_nm_tcpdnsconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				     connect_cb, NULL, timeout, 0);
+		isc_nm_streamdnsconnect(netmgr, &sockaddr_local,
+					&sockaddr_remote, connect_cb, NULL,
+					timeout, NULL, NULL, NULL,
+					ISC_NM_PROXY_NONE, NULL);
 		break;
 	case DOT: {
 		isc_tlsctx_createclient(&tls_ctx);
 
-		isc_nm_tlsdnsconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				     connect_cb, NULL, timeout, 0, tls_ctx,
-				     NULL);
+		isc_nm_streamdnsconnect(netmgr, &sockaddr_local,
+					&sockaddr_remote, connect_cb, NULL,
+					timeout, tls_ctx, NULL, NULL,
+					ISC_NM_PROXY_NONE, NULL);
 		break;
 	}
 #if HAVE_LIBNGHTTP2
@@ -429,7 +410,8 @@ run(void) {
 		}
 		isc_nm_httpconnect(netmgr, &sockaddr_local, &sockaddr_remote,
 				   req_url, is_post, connect_cb, NULL, tls_ctx,
-				   NULL, timeout, 0);
+				   NULL, NULL, timeout, ISC_NM_PROXY_NONE,
+				   NULL);
 	} break;
 #endif
 	default:

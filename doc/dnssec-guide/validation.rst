@@ -110,7 +110,7 @@ Configure your client computer to use the newly reconfigured recursive
 server for DNS resolution; then use one of these web-based tests to
 confirm that it is in fact validating DNS responses.
 
--  `Internet.nl <https://en.conn.internet.nl/connection/>`__
+-  `Internet.nl <http://conn.internet.nl/connection/>`__
 
 -  `DNSSEC or Not (VeriSign) <https://www.dnssec-or-not.com/>`__
 
@@ -128,8 +128,7 @@ While :iscman:`nslookup` is popular, partly because it comes pre-installed on
 most systems, it is not DNSSEC-aware. :iscman:`dig`, on the other hand, fully
 supports the DNSSEC standard and comes as a part of BIND. If you do not
 have :iscman:`dig` already installed on your system, install it by downloading
-it from ISC's `website <https://www.isc.org/download>`__. ISC provides pre-compiled
-Windows versions on its website.
+it from ISC's `website <https://www.isc.org/download>`__.
 
 :iscman:`dig` is a flexible tool for interrogating DNS name servers. It
 performs DNS lookups and displays the answers that are returned from the
@@ -406,6 +405,10 @@ When set to *auto*, BIND automatically keeps the keys (also known as
 trust anchors, discussed in :ref:`trust_anchors_description`)
 up-to-date without intervention from the DNS administrator.
 
+When using *yes*, please note that if :any:`trust-anchors` does not include a
+valid root key, then validation does not take place for names which are not
+covered by any of the configured trust anchors.
+
 We recommend using the default *auto* unless there is a good reason to
 require a manual trust anchor. To learn more about trust anchors,
 please refer to :ref:`trusted_keys_and_managed_keys`.
@@ -642,9 +645,8 @@ anchor) configured. How did it get here, and how do we maintain it?
 If you followed the recommendation in
 :ref:`easy_start_guide_for_recursive_servers`, by setting
 :any:`dnssec-validation` to *auto*, there is nothing left to do.
-BIND already includes a copy of the root key (in the file
-``bind.keys``), [#bind_keys]_ and automatically updates it when the root key
-changes. [#root_zone_key_update]_ It looks something like this:
+BIND already includes a copy of the root key, and automatically updates it
+when the root key changes. [#root_zone_key_update]_ It looks something like this:
 
 ::
 
@@ -669,10 +671,8 @@ to *yes* rather than *auto*:
        dnssec-validation yes;
    };
 
-Then, download the root key manually from a trustworthy source, such as
-`<https://www.isc.org/bind-keys>`__. Finally, take the root key you
-manually downloaded and put it into a :any:`trust-anchors` statement as
-shown below:
+Then, download the root key manually from a trustworthy source,
+and put it into a :any:`trust-anchors` statement as shown below:
 
 ::
 
@@ -687,16 +687,15 @@ shown below:
                    R1AkUTV74bU=";
    };
 
-While this :any:`trust-anchors` statement and the one in the ``bind.keys``
-file appear similar, the definition of the key in ``bind.keys`` has the
-``initial-key`` modifier, whereas in the statement in the configuration
-file, that is replaced by ``static-key``. There is an important
-difference between the two: a key defined with ``static-key`` is always
-trusted until it is deleted from the configuration file. With the
-``initial-key`` modified, keys are only trusted once: for as long as it
-takes to load the managed key database and start the key maintenance
-process. Thereafter, BIND uses the managed keys database
-(``managed-keys.bind.jnl``) as the source of key information.
+While this :any:`trust-anchors` statement looks similar to the built-in
+version above, the built-in key has the ``initial-key`` modifier, whereas
+in the statement in the configuration file, that is replaced by
+``static-key``. There is an important difference between the two: a key
+defined with ``static-key`` is always trusted until it is deleted from the
+configuration file. With the ``initial-key`` modifier, keys are only
+trusted once: for as long as it takes to load the managed key database and
+start the key maintenance process. Thereafter, BIND uses the managed keys
+database (``managed-keys.bind.jnl``) as the source of key information.
 
 .. warning::
 
@@ -715,12 +714,6 @@ then, `over 90% <https://ithi.research.icann.org/graph-m7.html>`__ of
 the top-level domains have been signed, including all the largest ones.
 Unless you have a particular need to manage keys yourself, it is best to
 use the BIND defaults and let the software manage the root key.
-
-.. [#bind_keys]
-   BIND technically includes two copies of the root key: one is in
-   ``bind.keys.h`` and is built into the executable, and one is in
-   ``bind.keys`` as a :any:`trust-anchors` statement. The two copies of the
-   key are identical.
 
 .. [#root_zone_key_update]
    The root zone was signed in July 2010 and, as at the time of this writing

@@ -405,11 +405,12 @@ record_nsec3(const vctx_t *vctx, const unsigned char *rawhash,
 	len = sizeof(*element) + nsec3->next_length * 2 + nsec3->salt_length;
 
 	element = isc_mem_get(vctx->mctx, len);
-	memset(element, 0, len);
-	element->hash = nsec3->hash;
-	element->salt_length = nsec3->salt_length;
-	element->next_length = nsec3->next_length;
-	element->iterations = nsec3->iterations;
+	*element = (struct nsec3_chain_fixed){
+		.hash = nsec3->hash,
+		.salt_length = nsec3->salt_length,
+		.next_length = nsec3->next_length,
+		.iterations = nsec3->iterations,
+	};
 	cp = (unsigned char *)(element + 1);
 	memmove(cp, nsec3->salt, nsec3->salt_length);
 	cp += nsec3->salt_length;
@@ -1011,7 +1012,7 @@ verifynode(vctx_t *vctx, const dns_name_t *name, dns_dbnode_t *node,
 }
 
 static isc_result_t
-is_empty(const vctx_t *vctx, dns_dbnode_t *node, bool *empty) {
+is_empty(const vctx_t *vctx, dns_dbnode_t *node) {
 	dns_rdatasetiter_t *rdsiter = NULL;
 	isc_result_t result;
 
@@ -1024,9 +1025,7 @@ is_empty(const vctx_t *vctx, dns_dbnode_t *node, bool *empty) {
 	result = dns_rdatasetiter_first(rdsiter);
 	dns_rdatasetiter_destroy(&rdsiter);
 
-	*empty = (result == ISC_R_NOMORE);
-
-	return ISC_R_SUCCESS;
+	return result;
 }
 
 static isc_result_t
@@ -1085,21 +1084,21 @@ _checknext(const vctx_t *vctx, const struct nsec3_chain_fixed *first,
 		return true;
 	}
 
-	DE_CONST(d1 - first->next_length, sr.base);
+	sr.base = UNCONST(d1 - first->next_length);
 	sr.length = first->next_length;
 	isc_buffer_init(&b, buf, sizeof(buf));
 	isc_base32hex_totext(&sr, 1, "", &b);
 	zoneverify_log_error(vctx, "Break in NSEC3 chain at: %.*s",
 			     (int)isc_buffer_usedlength(&b), buf);
 
-	DE_CONST(d1, sr.base);
+	sr.base = UNCONST(d1);
 	sr.length = first->next_length;
 	isc_buffer_init(&b, buf, sizeof(buf));
 	isc_base32hex_totext(&sr, 1, "", &b);
 	zoneverify_log_error(vctx, "Expected: %.*s",
 			     (int)isc_buffer_usedlength(&b), buf);
 
-	DE_CONST(d2, sr.base);
+	sr.base = UNCONST(d2);
 	sr.length = first->next_length;
 	isc_buffer_init(&b, buf, sizeof(buf));
 	isc_base32hex_totext(&sr, 1, "", &b);
@@ -1560,7 +1559,7 @@ check_dnskey_sigs(vctx_t *vctx, const dns_rdata_dnskey_t *dnskey,
 
 cleanup:
 	if (keynode != NULL) {
-		dns_keytable_detachkeynode(vctx->secroots, &keynode);
+		dns_keynode_detach(&keynode);
 	}
 	if (key != NULL) {
 		dst_key_free(&key);
@@ -1713,7 +1712,7 @@ verify_nodes(vctx_t *vctx, isc_result_t *vresult) {
 	zonecut = NULL;
 
 	count = dns_rdataset_count(&vctx->keyset);
-	dstkeys = isc_mem_get(vctx->mctx, sizeof(*dstkeys) * count);
+	dstkeys = isc_mem_cget(vctx->mctx, count, sizeof(*dstkeys));
 
 	for (result = dns_rdataset_first(&vctx->keyset);
 	     result == ISC_R_SUCCESS; result = dns_rdataset_next(&vctx->keyset))
@@ -1782,7 +1781,6 @@ verify_nodes(vctx_t *vctx, isc_result_t *vresult) {
 		nextnode = NULL;
 		result = dns_dbiterator_next(dbiter);
 		while (result == ISC_R_SUCCESS) {
-			bool empty;
 			result = dns_dbiterator_current(dbiter, &nextnode,
 							nextname);
 			if (result != ISC_R_SUCCESS &&
@@ -1810,15 +1808,16 @@ verify_nodes(vctx_t *vctx, isc_result_t *vresult) {
 				result = dns_dbiterator_next(dbiter);
 				continue;
 			}
-			result = is_empty(vctx, nextnode, &empty);
+			result = is_empty(vctx, nextnode);
 			dns_db_detachnode(vctx->db, &nextnode);
-			if (result != ISC_R_SUCCESS) {
-				dns_db_detachnode(vctx->db, &node);
-				goto done;
-			}
-			if (empty) {
+			switch (result) {
+			case ISC_R_SUCCESS:
+				break;
+			case ISC_R_NOMORE:
 				result = dns_dbiterator_next(dbiter);
 				continue;
+			default:
+				dns_db_detachnode(vctx->db, &node);
 			}
 			break;
 		}
@@ -1904,7 +1903,7 @@ done:
 	while (nkeys-- > 0U) {
 		dst_key_free(&dstkeys[nkeys]);
 	}
-	isc_mem_put(vctx->mctx, dstkeys, sizeof(*dstkeys) * count);
+	isc_mem_cput(vctx->mctx, dstkeys, count, sizeof(*dstkeys));
 	if (dbiter != NULL) {
 		dns_dbiterator_destroy(&dbiter);
 	}

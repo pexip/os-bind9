@@ -19,7 +19,6 @@
 #include <isc/commandline.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -69,7 +68,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	isc_buffer_add(&inbuf, size);
 	isc_buffer_setactive(&inbuf, size);
 
-	RUNTIME_CHECK(isc_lex_create(mctx, 256, &lex) == ISC_R_SUCCESS);
+	isc_lex_create(mctx, 256, &lex);
 
 	/*
 	 * Set up to lex DNS master file.

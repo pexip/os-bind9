@@ -27,9 +27,9 @@ be a part of his or her environment, and understand what it means to deploy it i
 field.
 
 This guide provides basic information on how to configure DNSSEC using
-BIND 9.16.9 or later. Most of the information and examples in this guide also
+BIND 9.16.0 or later. Most of the information and examples in this guide also
 apply to versions of BIND later than 9.9.0, but some of the key features described here
-were only introduced in version 9.16.9. Readers are assumed to have basic
+were only introduced in version 9.16.0. Readers are assumed to have basic
 working knowledge of the Domain Name System (DNS) and related network
 infrastructure, such as concepts of TCP/IP. In-depth knowledge of DNS and
 TCP/IP is not required. The guide assumes no prior knowledge of DNSSEC or
@@ -376,7 +376,7 @@ want to consider deploying DNSSEC:
    requesting all ``.gov`` subdomains to be DNSSEC-signed by December
    2009. This explains why ``.gov`` is the most-deployed DNSSEC domain
    currently, with `around 90% of subdomains
-   signed. <https://fedv6-deployment.antd.nist.gov/cgi-bin/generate-gov>`__
+   signed. <https://usgv6-deploymon.nist.gov/cgi-bin/generate-gov>`__
 
 .. _how_does_dnssec_change_my_job:
 

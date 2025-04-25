@@ -132,7 +132,6 @@ fromwire_sshfp(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 	if (sr.length < 2) {
@@ -218,10 +217,6 @@ tostruct_sshfp(ARGS_TOSTRUCT) {
 	sshfp->length = region.length;
 
 	sshfp->digest = mem_maybedup(mctx, region.base, region.length);
-	if (sshfp->digest == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	sshfp->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

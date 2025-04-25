@@ -193,7 +193,6 @@ fromwire_in_apl(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(dctx);
 	UNUSED(rdclass);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 	isc_buffer_availableregion(target, &tr);
@@ -276,7 +275,8 @@ fromstruct_in_apl(ARGS_FROMSTRUCT) {
 	isc_buffer_init(&b, apl->apl, apl->apl_len);
 	isc_buffer_add(&b, apl->apl_len);
 	isc_buffer_setactive(&b, apl->apl_len);
-	return fromwire_in_apl(rdclass, type, &b, NULL, false, target);
+	return fromwire_in_apl(rdclass, type, &b, DNS_DECOMPRESS_DEFAULT,
+			       target);
 }
 
 static isc_result_t
@@ -295,10 +295,6 @@ tostruct_in_apl(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	apl->apl_len = r.length;
 	apl->apl = mem_maybedup(mctx, r.base, r.length);
-	if (apl->apl == NULL) {
-		return ISC_R_NOMEMORY;
-	}
-
 	apl->offset = 0;
 	apl->mctx = mctx;
 	return ISC_R_SUCCESS;

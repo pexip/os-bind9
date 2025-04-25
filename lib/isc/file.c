@@ -62,7 +62,6 @@
 #include <isc/log.h>
 #include <isc/md.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/string.h>
 #include <isc/time.h>
@@ -384,23 +383,6 @@ isc_file_openuniquemode(char *templet, int mode, FILE **fp) {
 }
 
 isc_result_t
-isc_file_bopenunique(char *templet, FILE **fp) {
-	int mode = S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-	return isc_file_openuniquemode(templet, mode, fp);
-}
-
-isc_result_t
-isc_file_bopenuniqueprivate(char *templet, FILE **fp) {
-	int mode = S_IWUSR | S_IRUSR;
-	return isc_file_openuniquemode(templet, mode, fp);
-}
-
-isc_result_t
-isc_file_bopenuniquemode(char *templet, int mode, FILE **fp) {
-	return isc_file_openuniquemode(templet, mode, fp);
-}
-
-isc_result_t
 isc_file_remove(const char *filename) {
 	int r;
 
@@ -601,7 +583,7 @@ isc_file_absolutepath(const char *filename, char *path, size_t pathlen) {
 }
 
 isc_result_t
-isc_file_truncate(const char *filename, isc_offset_t size) {
+isc_file_truncate(const char *filename, off_t size) {
 	isc_result_t result = ISC_R_SUCCESS;
 
 	if (truncate(filename, size) < 0) {
@@ -735,7 +717,7 @@ isc_file_sanitize(const char *dir, const char *base, const char *ext,
 		l += strlen(ext) + 1;
 	}
 
-	if (l > length || l > (unsigned)PATH_MAX) {
+	if (l > length || l > (unsigned int)PATH_MAX) {
 		return ISC_R_NOSPACE;
 	}
 

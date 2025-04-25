@@ -55,6 +55,14 @@
 
 #include <isc/string.h> /* IWYU pragma: keep */
 
+/*
+ * We undef _GNU_SOURCE above to get the POSIX strerror_r()
+ */
+int
+isc_string_strerror_r(int errnum, char *buf, size_t buflen) {
+	return strerror_r(errnum, buf, buflen);
+}
+
 #if !defined(HAVE_STRLCPY)
 size_t
 strlcpy(char *dst, const char *src, size_t size) {
@@ -125,19 +133,16 @@ strnstr(const char *s, const char *find, size_t slen) {
 		len = strlen(find);
 		do {
 			do {
-				if (slen-- < 1 || (sc = *s++) == '\0')
+				if (slen-- < 1 || (sc = *s++) == '\0') {
 					return NULL;
+				}
 			} while (sc != c);
-			if (len > slen)
+			if (len > slen) {
 				return NULL;
+			}
 		} while (strncmp(s, find, len) != 0);
 		s--;
 	}
 	return (char *)s;
 }
 #endif
-
-int
-isc_string_strerror_r(int errnum, char *buf, size_t buflen) {
-	return strerror_r(errnum, buf, buflen);
-}

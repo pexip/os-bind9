@@ -96,11 +96,10 @@ conv_num(const char **buf, int *dest, int llim, int ulim) {
 	}
 
 	do {
-		result *= 10;
-		result += *(*buf)++ - '0';
+		result = 10 * result + *(*buf)++ - '0';
 		rulim /= 10;
-	} while ((result * 10 <= ulim) && rulim && **buf >= '0' &&
-		 **buf <= '9');
+	} while ((result * 10 <= ulim) && rulim &&
+		 isdigit((unsigned char)**buf));
 
 	if (result < llim || result > ulim) {
 		return 0;
@@ -136,7 +135,7 @@ isc_tm_timegm(struct tm *tm) {
 
 char *
 isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
-	char c, *ret;
+	char c;
 	const char *bp;
 	size_t len = 0;
 	int alt_format, i, split_year = 0;
@@ -464,6 +463,5 @@ isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
 	}
 
 	/* LINTED functional specification */
-	DE_CONST(bp, ret);
-	return ret;
+	return UNCONST(bp);
 }

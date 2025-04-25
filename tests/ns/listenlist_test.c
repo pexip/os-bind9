@@ -25,7 +25,6 @@
 #include <cmocka.h>
 
 #include <isc/list.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/util.h>
 
@@ -34,24 +33,6 @@
 #include <ns/listenlist.h>
 
 #include <tests/ns.h>
-
-static int
-_setup(void **state) {
-	isc__nm_force_tid(0);
-
-	setup_managers(state);
-
-	return 0;
-}
-
-static int
-_teardown(void **state) {
-	isc__nm_force_tid(-1);
-
-	teardown_managers(state);
-
-	return 0;
-}
 
 /* test that ns_listenlist_default() works */
 ISC_RUN_TEST_IMPL(ns_listenlist_default) {
@@ -111,9 +92,7 @@ ISC_RUN_TEST_IMPL(ns_listenlist_default) {
 }
 
 ISC_TEST_LIST_START
-
-ISC_TEST_ENTRY_CUSTOM(ns_listenlist_default, _setup, _teardown)
-
+ISC_TEST_ENTRY(ns_listenlist_default)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN

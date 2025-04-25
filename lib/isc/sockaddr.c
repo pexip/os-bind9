@@ -13,13 +13,13 @@
 
 /*! \file */
 
+#include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/buffer.h>
 #include <isc/hash.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/region.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
@@ -136,25 +136,6 @@ isc_sockaddr_totext(const isc_sockaddr_t *sockaddr, isc_buffer_t *target) {
 		snprintf(pbuf, sizeof(pbuf), "%u",
 			 ntohs(sockaddr->type.sin6.sin6_port));
 		break;
-	case AF_UNIX:
-		plen = strlen(sockaddr->type.sunix.sun_path);
-		if (plen >= isc_buffer_availablelength(target)) {
-			return ISC_R_NOSPACE;
-		}
-
-		isc_buffer_putmem(
-			target,
-			(const unsigned char *)sockaddr->type.sunix.sun_path,
-			plen);
-
-		/*
-		 * Null terminate after used region.
-		 */
-		isc_buffer_availableregion(target, &avail);
-		INSIST(avail.length >= 1);
-		avail.base[0] = '\0';
-
-		return ISC_R_SUCCESS;
 	default:
 		return ISC_R_FAILURE;
 	}
@@ -206,51 +187,56 @@ isc_sockaddr_format(const isc_sockaddr_t *sa, char *array, unsigned int size) {
 	}
 }
 
-unsigned int
-isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, bool address_only) {
-	unsigned int length = 0;
-	const unsigned char *s = NULL;
-	unsigned int h = 0;
+void
+isc_sockaddr_hash_ex(isc_hash32_t *hash, const isc_sockaddr_t *sockaddr,
+		     bool address_only) {
+	REQUIRE(sockaddr != NULL);
+
+	size_t len = 0;
+	const uint8_t *s = NULL;
 	unsigned int p = 0;
 	const struct in6_addr *in6;
 
-	REQUIRE(sockaddr != NULL);
-
 	switch (sockaddr->type.sa.sa_family) {
 	case AF_INET:
-		s = (const unsigned char *)&sockaddr->type.sin.sin_addr;
-		p = ntohs(sockaddr->type.sin.sin_port);
-		length = sizeof(sockaddr->type.sin.sin_addr.s_addr);
+		s = (const uint8_t *)&sockaddr->type.sin.sin_addr;
+		len = sizeof(sockaddr->type.sin.sin_addr.s_addr);
+		if (!address_only) {
+			p = ntohs(sockaddr->type.sin.sin_port);
+		}
 		break;
 	case AF_INET6:
 		in6 = &sockaddr->type.sin6.sin6_addr;
-		s = (const unsigned char *)in6;
+		s = (const uint8_t *)in6;
 		if (IN6_IS_ADDR_V4MAPPED(in6)) {
 			s += 12;
-			length = sizeof(sockaddr->type.sin.sin_addr.s_addr);
+			len = sizeof(sockaddr->type.sin.sin_addr.s_addr);
 		} else {
-			length = sizeof(sockaddr->type.sin6.sin6_addr);
+			len = sizeof(sockaddr->type.sin6.sin6_addr);
 		}
-		p = ntohs(sockaddr->type.sin6.sin6_port);
+		if (!address_only) {
+			p = ntohs(sockaddr->type.sin6.sin6_port);
+		}
 		break;
 	default:
-		UNEXPECTED_ERROR("unknown address family: %d",
-				 (int)sockaddr->type.sa.sa_family);
-		s = (const unsigned char *)&sockaddr->type;
-		length = sockaddr->length;
-		p = 0;
+		UNREACHABLE();
 	}
 
-	uint8_t buf[sizeof(struct sockaddr_storage) + sizeof(p)];
-	memmove(buf, s, length);
+	isc_hash32_hash(hash, s, len, true);
 	if (!address_only) {
-		memmove(buf + length, &p, sizeof(p));
-		h = isc_hash_function(buf, length + sizeof(p), true);
-	} else {
-		h = isc_hash_function(buf, length, true);
+		isc_hash32_hash(hash, &p, sizeof(p), true);
 	}
+}
 
-	return h;
+uint32_t
+isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, bool address_only) {
+	isc_hash32_t hash;
+
+	isc_hash32_init(&hash);
+
+	isc_sockaddr_hash_ex(&hash, sockaddr, address_only);
+
+	return isc_hash32_finalize(&hash);
 }
 
 void
@@ -461,19 +447,6 @@ isc_sockaddr_isnetzero(const isc_sockaddr_t *sockaddr) {
 }
 
 isc_result_t
-isc_sockaddr_frompath(isc_sockaddr_t *sockaddr, const char *path) {
-	if (strlen(path) >= sizeof(sockaddr->type.sunix.sun_path)) {
-		return ISC_R_NOSPACE;
-	}
-	memset(sockaddr, 0, sizeof(*sockaddr));
-	sockaddr->length = sizeof(sockaddr->type.sunix);
-	sockaddr->type.sunix.sun_family = AF_UNIX;
-	strlcpy(sockaddr->type.sunix.sun_path, path,
-		sizeof(sockaddr->type.sunix.sun_path));
-	return ISC_R_SUCCESS;
-}
-
-isc_result_t
 isc_sockaddr_fromsockaddr(isc_sockaddr_t *isa, const struct sockaddr *sa) {
 	unsigned int length = 0;
 
@@ -484,16 +457,13 @@ isc_sockaddr_fromsockaddr(isc_sockaddr_t *isa, const struct sockaddr *sa) {
 	case AF_INET6:
 		length = sizeof(isa->type.sin6);
 		break;
-	case AF_UNIX:
-		length = sizeof(isa->type.sunix);
-		break;
 	default:
 		return ISC_R_NOTIMPLEMENTED;
 	}
 
-	memset(isa, 0, sizeof(isc_sockaddr_t));
+	*isa = (isc_sockaddr_t){ .length = length,
+				 .link = ISC_LINK_INITIALIZER };
 	memmove(isa, sa, length);
-	isa->length = length;
 
 	return ISC_R_SUCCESS;
 }

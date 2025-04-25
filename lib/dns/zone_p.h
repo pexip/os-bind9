@@ -30,17 +30,11 @@ typedef struct {
 } dns__zonediff_t;
 
 isc_result_t
-dns__zone_findkeys(dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *ver,
-		   isc_stdtime_t now, isc_mem_t *mctx, unsigned int maxkeys,
-		   dst_key_t **keys, unsigned int *nkeys);
-
-isc_result_t
 dns__zone_updatesigs(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *version,
 		     dst_key_t *zone_keys[], unsigned int nkeys,
 		     dns_zone_t *zone, isc_stdtime_t inception,
 		     isc_stdtime_t expire, isc_stdtime_t keyxpire,
-		     isc_stdtime_t now, bool check_ksk, bool keyset_kskonly,
-		     dns__zonediff_t *zonediff);
+		     isc_stdtime_t now, dns__zonediff_t *zonediff);
 
 isc_result_t
 dns__zone_lookup_nsec3param(dns_zone_t *zone, dns_rdata_nsec3param_t *lookup,

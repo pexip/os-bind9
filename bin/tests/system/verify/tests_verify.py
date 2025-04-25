@@ -171,3 +171,18 @@ def test_verify_invalid_o_option_soa_not_at_top_error():
     ).stderr.decode("utf-8")
     assert "not at top of zone" in output
     assert "use -o to specify a different zone origin" not in output
+
+
+# checking dnssec-verify -J reads journal file
+def test_verify_j_reads_journal_file():
+    output = isctest.run.cmd(
+        [
+            VERIFY,
+            "-o",
+            "updated",
+            "-J",
+            "zones/updated.other.jnl",
+            "zones/updated.other",
+        ]
+    ).stdout.decode("utf-8")
+    assert "Loading zone 'updated' from file 'zones/updated.other'" in output

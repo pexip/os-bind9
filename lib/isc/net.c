@@ -22,12 +22,12 @@
 #endif /* if defined(HAVE_SYS_SYSCTL_H) && !defined(__linux__) */
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
 #include <isc/log.h>
 #include <isc/net.h>
-#include <isc/netdb.h>
 #include <isc/once.h>
 #include <isc/strerr.h>
 #include <isc/string.h>
@@ -108,7 +108,6 @@ static isc_once_t once = ISC_ONCE_INIT;
 
 static isc_result_t ipv4_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6_result = ISC_R_NOTFOUND;
-static isc_result_t unix_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6only_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6pktinfo_result = ISC_R_NOTFOUND;
 
@@ -184,12 +183,11 @@ static void
 initialize_action(void) {
 	ipv4_result = try_proto(PF_INET);
 	ipv6_result = try_proto(PF_INET6);
-	unix_result = try_proto(PF_UNIX);
 }
 
 static void
 initialize(void) {
-	RUNTIME_CHECK(isc_once_do(&once, initialize_action) == ISC_R_SUCCESS);
+	isc_once_do(&once, initialize_action);
 }
 
 isc_result_t
@@ -202,12 +200,6 @@ isc_result_t
 isc_net_probeipv6(void) {
 	initialize();
 	return ipv6_result;
-}
-
-isc_result_t
-isc_net_probeunix(void) {
-	initialize();
-	return unix_result;
 }
 
 static void
@@ -267,8 +259,7 @@ close:
 
 static void
 initialize_ipv6only(void) {
-	RUNTIME_CHECK(isc_once_do(&once_ipv6only, try_ipv6only) ==
-		      ISC_R_SUCCESS);
+	isc_once_do(&once_ipv6only, try_ipv6only);
 }
 
 #ifdef __notyet__
@@ -312,8 +303,7 @@ close:
 
 static void
 initialize_ipv6pktinfo(void) {
-	RUNTIME_CHECK(isc_once_do(&once_ipv6pktinfo, try_ipv6pktinfo) ==
-		      ISC_R_SUCCESS);
+	isc_once_do(&once_ipv6pktinfo, try_ipv6pktinfo);
 }
 #endif /* ifdef __notyet__ */
 

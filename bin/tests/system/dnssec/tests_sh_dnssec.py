@@ -13,6 +13,7 @@ import pytest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
+        ".hypothesis/examples/*",
         "K*",
         "canonical*",
         "delv.out*",
@@ -56,6 +57,13 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns2/cds-x.secure.db",
         "ns2/cds-x.secure.db",
         "ns2/cds.secure.db",
+        "ns2/dnskey-rrsigs-stripped.db",
+        "ns2/dnskey-rrsigs-stripped.db.next",
+        "ns2/dnskey-rrsigs-stripped.db.stripped",
+        "ns2/child.ds-rrsigs-stripped.db",
+        "ns2/ds-rrsigs-stripped.db",
+        "ns2/ds-rrsigs-stripped.db.next",
+        "ns2/ds-rrsigs-stripped.db.stripped",
         "ns2/example.db",
         "ns2/in-addr.arpa.db",
         "ns2/lazy-ksk.db",
@@ -63,6 +71,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns2/nsec3chain-test.db",
         "ns2/single-nsec3.db",
         "ns2/too-many-iterations.db",
+        "ns2/inconsistent.db",
         "ns2/trusted.db",
         "ns2/updatecheck-kskonly.secure.ksk.id",
         "ns2/updatecheck-kskonly.secure.ksk.key",

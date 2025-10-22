@@ -995,7 +995,7 @@ static dns_rdatasetmethods_t rpsdb_rdataset_methods = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
 };
 
 static dns_rdatasetitermethods_t rpsdb_rdatasetiter_methods = {

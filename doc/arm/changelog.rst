@@ -18,14 +18,17 @@ Changelog
    development. Regular users should refer to :ref:`Release Notes <relnotes>`
    for changes relevant to them.
 
-.. include:: ../changelog/changelog-9.18.33-S1.rst
+.. include:: ../changelog/changelog-9.18.41.rst
+.. include:: ../changelog/changelog-9.18.40.rst
+.. include:: ../changelog/changelog-9.18.39.rst
+.. include:: ../changelog/changelog-9.18.38.rst
+.. include:: ../changelog/changelog-9.18.37.rst
+.. include:: ../changelog/changelog-9.18.36.rst
+.. include:: ../changelog/changelog-9.18.35.rst
+.. include:: ../changelog/changelog-9.18.34.rst
 .. include:: ../changelog/changelog-9.18.33.rst
-.. include:: ../changelog/changelog-9.18.32-S1.rst
 .. include:: ../changelog/changelog-9.18.32.rst
-.. include:: ../changelog/changelog-9.18.31-S1.rst
 .. include:: ../changelog/changelog-9.18.31.rst
-.. include:: ../changelog/changelog-9.18.30-S1.rst
 .. include:: ../changelog/changelog-9.18.30.rst
-.. include:: ../changelog/changelog-9.18.29-S1.rst
 .. include:: ../changelog/changelog-9.18.29.rst
 .. include:: ../changelog/changelog-history.rst

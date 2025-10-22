@@ -184,6 +184,46 @@ n=$((n + 1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status + ret))
 
+echo_i "checking recovery from stripped DNSKEY RRSIG ($n)"
+ret=0
+# prime cache with DNSKEY without RRSIGs
+dig_with_opts +noauth +cd dnskey-rrsigs-stripped. @10.53.0.4 dnskey >dig.out.prime.ns4.test$n || ret=1
+grep ";; flags: qr rd ra cd; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "status: NOERROR" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "RRSIG.DNSKEY" dig.out.prime.ns4.test$n >/dev/null && ret=1
+# reload server with properly signed zone
+cp ns2/dnskey-rrsigs-stripped.db.next ns2/dnskey-rrsigs-stripped.db.signed
+nextpart ns2/named.run >/dev/null
+rndccmd 10.53.0.2 reload dnskey-rrsigs-stripped | sed 's/^/ns2 /' | cat_i
+wait_for_log 5 "zone dnskey-rrsigs-stripped/IN: loaded serial 2000042408" ns2/named.run || ret=1
+dig_with_opts +noauth b.dnskey-rrsigs-stripped. @10.53.0.2 a >dig.out.ns2.test$n || ret=1
+dig_with_opts +noauth b.dnskey-rrsigs-stripped. @10.53.0.4 a >dig.out.ns4.test$n || ret=1
+digcomp dig.out.ns2.test$n dig.out.ns4.test$n || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+test "$ret" -eq 0 || echo_i "failed"
+status=$((status + ret))
+
+echo_i "checking recovery from stripped DS RRSIG ($n)"
+ret=0
+# prime cache with DS without RRSIGs
+dig_with_opts +noauth +cd child.ds-rrsigs-stripped. @10.53.0.4 ds >dig.out.prime.ns4.test$n || ret=1
+grep ";; flags: qr rd ra cd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "status: NOERROR" dig.out.prime.ns4.test$n >/dev/null || ret=1
+grep "RRSIG.DS" dig.out.prime.ns4.test$n >/dev/null && ret=1
+# reload server with properly signed zone
+cp ns2/ds-rrsigs-stripped.db.next ns2/ds-rrsigs-stripped.db.signed
+nextpart ns2/named.run >/dev/null
+rndccmd 10.53.0.2 reload ds-rrsigs-stripped | sed 's/^/ns2 /' | cat_i
+wait_for_log 5 "zone ds-rrsigs-stripped/IN: loaded serial 2000042408" ns2/named.run || ret=1
+dig_with_opts +noauth b.child.ds-rrsigs-stripped. @10.53.0.2 a >dig.out.ns2.test$n || ret=1
+dig_with_opts +noauth b.child.ds-rrsigs-stripped. @10.53.0.4 a >dig.out.ns4.test$n || ret=1
+digcomp dig.out.ns2.test$n dig.out.ns4.test$n || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+test "$ret" -eq 0 || echo_i "failed"
+status=$((status + ret))
+
 echo_i "checking that 'example/DS' from the referral was used in previous validation ($n)"
 ret=0
 grep "query 'example/DS/IN' approved" ns1/named.run >/dev/null && ret=1
@@ -4468,6 +4508,57 @@ n=$((n + 1))
 if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
+echo_i "checking NSEC3 nxdomain response closest encloser with 0 ENT ($n)"
+ret=0
+dig_with_opts @10.53.0.4 b.b.b.b.b.a.nsec3.example. >dig.out.ns4.test$n
+grep "status: NXDOMAIN" dig.out.ns4.test$n >/dev/null || ret=1
+# closest encloser (a.nsec3.example)
+pat1="^6OVDUHTN094ML2PV8AN90U0DPU823GH2\.nsec3\.example\..*NSEC3 1 0 0 - 7AT0S0RIDCJRFF2M5H5AAV22CSFJBUL4 A RRSIG\$"
+grep "$pat1" dig.out.ns4.test$n >/dev/null || ret=1
+# no QNAME proof (b.a.nsec3.example / DSPF4R9UKOEPJ9O34E1H4539LSOTL14E)
+pat2="^CG2DVCNE20EKU1PDRLMI2L4DGC2FO1H3\.nsec3\.example\..*NSEC3 1 0 0 - EF2S05SGK1IR2K5SKMFIRERGQCLMR18M A RRSIG\$"
+grep "$pat2" dig.out.ns4.test$n >/dev/null || ret=1
+# no WILDCARD proof (*.a.nsec3.example / TFGQ60S97BS31IT1EBEDO63ETM0T5JFA)
+pat3="^R8EVDMNIGNOKME4LH2H90OSP2PRSNJ1Q\.nsec3\.example\..*NSEC3 1 0 0 - VH656EQUD4J02OFVSO4GKOK5D02MS1TL NS DS RRSIG\$"
+grep "$pat3" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "checking NSEC3 nxdomain response closest encloser with 1 ENTs ($n)"
+ret=0
+dig_with_opts @10.53.0.4 b.b.b.b.b.a.a.nsec3.example. >dig.out.ns4.test$n
+grep "status: NXDOMAIN" dig.out.ns4.test$n >/dev/null || ret=1
+# closest encloser (a.a.nsec3.example)
+pat1="^NGCJFSOLJUUE27PFNQNJIME4TQ0OU2DH\.nsec3\.example\..*NSEC3 1 0 0 - R8EVDMNIGNOKME4LH2H90OSP2PRSNJ1Q\$"
+grep "$pat1" dig.out.ns4.test$n >/dev/null || ret=1
+# no QNAME proof (b.a.a.nsec3.example / V8I8SAIIVC3HOVMOVENSDRA6ATDCEMJI)
+pat2="^R8EVDMNIGNOKME4LH2H90OSP2PRSNJ1Q\.nsec3\.example\..*NSEC3 1 0 0 - VH656EQUD4J02OFVSO4GKOK5D02MS1TL NS DS RRSIG\$"
+grep "$pat2" dig.out.ns4.test$n >/dev/null || ret=1
+# no WILDCARD proof (*.a.a.nsec3.example / V7JNNDJ4NLRIU195FRB7DLUCSLU4LLFM)
+pat3="^R8EVDMNIGNOKME4LH2H90OSP2PRSNJ1Q\.nsec3\.example\..*NSEC3 1 0 0 - VH656EQUD4J02OFVSO4GKOK5D02MS1TL NS DS RRSIG\$"
+grep "$pat3" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "checking NSEC3 nxdomain response closest encloser with 2 ENTs ($n)"
+ret=0
+dig_with_opts @10.53.0.4 b.b.b.b.b.a.a.a.nsec3.example. >dig.out.ns4.test$n
+grep "status: NXDOMAIN" dig.out.ns4.test$n >/dev/null || ret=1
+# closest encloser (a.a.a.nsec3.example)
+pat1="^H7RHPDCHSVVRAND332F878C8AB6IBJQV\.nsec3\.example\..*NSEC3 1 0 0 - K8IG76R2UPQ13IKFO49L7IB9JRVB6QJI\$"
+grep "$pat1" dig.out.ns4.test$n >/dev/null || ret=1
+# no QNAME proof (b.a.a.a.nsec3.example / 18Q8D89RM8GGRSSOPFRB05QS6VEGB1P4)
+pat2="^VH656EQUD4J02OFVSO4GKOK5D02MS1TL\.nsec3\.example\..*NSEC3 1 0 0 - 1HARMGSKJH0EBU2EI2OJIKTDPIQA6KBI NS DS RRSIG\$"
+grep "$pat2" dig.out.ns4.test$n >/dev/null || ret=1
+# no WILDCARD proof (*.a.a.a.nsec3.example / 8113LDMSEFPUAG4VGFF1C8KLOUT4Q6PH)
+pat3="^7AT0S0RIDCJRFF2M5H5AAV22CSFJBUL4\.nsec3\.example\..*NSEC3 1 0 0 - BEJ5GMQA872JF4DAGQ0R3O5Q7A2O5S9L A RRSIG\$"
+grep "$pat3" dig.out.ns4.test$n >/dev/null || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
 echo_i "checking that records other than DNSKEY are not signed by a revoked key by dnssec-signzone ($n)"
 ret=0
 (
@@ -4493,6 +4584,49 @@ soacount=$(grep -c "RRSIG.SOA ${DEFAULT_ALGORITHM_NUMBER} " signer/revoke.exampl
 [ $keycount -eq 3 ] || ret=1
 [ $cdscount -eq 2 ] || ret=1
 [ $soacount -eq 1 ] || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "checking validator behavior with mismatching NS ($n)"
+ret=0
+rndccmd 10.53.0.4 flush 2>&1 | sed 's/^/ns4 /' | cat_i
+$DIG +tcp +cd -p "$PORT" -t ns inconsistent @10.53.0.4 >dig.out.ns4.test$n.1 || ret=1
+grep "ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 2" dig.out.ns4.test$n.1 >/dev/null || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n.1 >/dev/null && ret=1
+$DIG +tcp +cd +dnssec -p "$PORT" -t ns inconsistent @10.53.0.4 >dig.out.ns4.test$n.2 || ret=1
+grep "ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 2" dig.out.ns4.test$n.2 >/dev/null || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n.2 >/dev/null && ret=1
+$DIG +tcp +dnssec -p "$PORT" -t ns inconsistent @10.53.0.4 >dig.out.ns4.test$n.3 || ret=1
+grep "ANSWER: 3, AUTHORITY: 0, ADDITIONAL: 1" dig.out.ns4.test$n.3 >/dev/null || ret=1
+grep "flags:.*ad.*QUERY" dig.out.ns4.test$n.3 >/dev/null || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "checking that a insecure negative response where there is a NSEC without a RRSIG succeeds ($n)"
+ret=0
+# check server preconditions
+dig_with_opts +notcp @10.53.0.10 nsec-rrsigs-stripped. TXT +dnssec >dig.out.ns10.test$n
+grep "status: NOERROR" dig.out.ns10.test$n >/dev/null || ret=1
+grep "QUERY: 1, ANSWER: 0, AUTHORITY: 2, ADDITIONAL: 1" dig.out.ns10.test$n >/dev/null || ret=1
+grep "IN.RRSIG.NSEC" dig.out.ns10.test$n >/dev/null && ret=1
+# check resolver succeeds
+dig_with_opts @10.53.0.4 nsec-rrsigs-stripped. TXT +dnssec >dig.out.ns4.test$n
+grep "status: NOERROR" dig.out.ns4.test$n >/dev/null || ret=1
+grep "QUERY: 1, ANSWER: 0, AUTHORITY: 2, ADDITIONAL: 1" dig.out.ns4.test$n >/dev/null || ret=1
+grep "IN.RRSIG.NSEC" dig.out.ns4.test$n >/dev/null && ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "test that RRSIGS are returned for glue name with CD=1 ($n)"
+ret=0
+dig_with_opts @10.53.0.4 ns3.secure.example A +cd >dig.out.ns4.test$n
+grep "status: NOERROR" dig.out.ns4.test$n >/dev/null || ret=1
+grep "ANSWER: 2," dig.out.ns4.test$n >/dev/null || ret=1
+grep "ns3\.secure\.example\..[0-9]*.IN.A.10\.53\.0.3" dig.out.ns4.test$n >/dev/null || ret=1
+grep "ns3\.secure\.example\..[0-9]*.IN.RRSIG.A " dig.out.ns4.test$n >/dev/null || ret=1
 n=$((n + 1))
 if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
 status=$((status + ret))

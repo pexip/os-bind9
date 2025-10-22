@@ -234,7 +234,7 @@ sub construct_ns_command {
 		$command = "taskset $taskset $NAMED ";
 	} elsif ($ENV{'USE_RR'}) {
 		$ENV{'_RR_TRACE_DIR'} = ".";
-		$command = "rr record --chaos $NAMED ";
+		$command = "$ENV{'TOP_BUILDDIR'}/libtool --mode=execute rr record --chaos $NAMED ";
 	} else {
 		$command = "$NAMED ";
 	}
@@ -265,7 +265,8 @@ sub construct_ns_command {
 
 		foreach my $t_option(
 			"dropedns", "ednsformerr", "ednsnotimp", "ednsrefused",
-			"noaa", "noedns", "nosoa", "maxudp512", "maxudp1460",
+			"cookiealwaysvalid", "noaa", "noedns", "nosoa",
+			"maxudp512", "maxudp1460",
 		    ) {
 			if (-e "$testdir/$server/named.$t_option") {
 				$command .= "-T $t_option "

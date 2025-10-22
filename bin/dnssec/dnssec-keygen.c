@@ -141,14 +141,17 @@ usage(void) {
 	fprintf(stderr, "    -l <file>: configuration file with dnssec-policy "
 			"statement\n");
 	fprintf(stderr, "    -a <algorithm>:\n");
-	fprintf(stderr, "        RSASHA1 | NSEC3RSASHA1 |\n");
+	fprintf(stderr,
+		"        RSASHA1 (deprecated) | NSEC3RSASHA1 (deprecated) |\n");
 	fprintf(stderr, "        RSASHA256 | RSASHA512 |\n");
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -b <key size in bits>:\n");
-	fprintf(stderr, "        RSASHA1:\t[1024..%d]\n", MAX_RSA);
-	fprintf(stderr, "        NSEC3RSASHA1:\t[1024..%d]\n", MAX_RSA);
+	fprintf(stderr, "        RSASHA1 (deprecated) :\t[1024..%d]\n",
+		MAX_RSA);
+	fprintf(stderr, "        NSEC3RSASHA1 (deprecated) :\t[1024..%d]\n",
+		MAX_RSA);
 	fprintf(stderr, "        RSASHA256:\t[1024..%d]\n", MAX_RSA);
 	fprintf(stderr, "        RSASHA512:\t[1024..%d]\n", MAX_RSA);
 	fprintf(stderr, "        DH:\t\t[128..4096]\n");
@@ -179,7 +182,7 @@ usage(void) {
 			"(default: AUTHCONF)\n");
 	fprintf(stderr, "    -h: print usage and exit\n");
 	fprintf(stderr, "    -m <memory debugging mode>:\n");
-	fprintf(stderr, "       usage | trace | record | size | mctx\n");
+	fprintf(stderr, "       usage | trace | record\n");
 	fprintf(stderr, "    -v <level>: set verbosity level (0 - 10)\n");
 	fprintf(stderr, "    -V: print version information\n");
 	fprintf(stderr, "Timing options:\n");
@@ -453,10 +456,10 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			fatal("-S and -G cannot be used together");
 		}
 
-		ret = dst_key_fromnamedfile(
-			ctx->predecessor, ctx->directory,
-			(DST_TYPE_PUBLIC | DST_TYPE_PRIVATE | DST_TYPE_STATE),
-			mctx, &prevkey);
+		ret = dst_key_fromnamedfile(ctx->predecessor, ctx->directory,
+					    DST_TYPE_PUBLIC | DST_TYPE_PRIVATE |
+						    DST_TYPE_STATE,
+					    mctx, &prevkey);
 		if (ret != ISC_R_SUCCESS) {
 			fatal("Invalid keyfile %s: %s", ctx->predecessor,
 			      isc_result_totext(ret));
@@ -522,21 +525,34 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	}
 
 	switch (ctx->alg) {
-	case DNS_KEYALG_RSASHA1:
-	case DNS_KEYALG_NSEC3RSASHA1:
-	case DNS_KEYALG_RSASHA256:
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+		dns_secalg_format(ctx->alg, algstr, sizeof(algstr));
+		fprintf(stderr,
+			"WARNING: DNSKEY algorithm '%s' is deprecated. Please "
+			"migrate to another algorithm\n",
+			algstr);
+		break;
+	default:
+		break;
+	}
+
+	switch (ctx->alg) {
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1:
+	case DST_ALG_RSASHA256:
 		if (ctx->size != 0 && (ctx->size < 1024 || ctx->size > MAX_RSA))
 		{
 			fatal("RSA key size %d out of range", ctx->size);
 		}
 		break;
-	case DNS_KEYALG_RSASHA512:
+	case DST_ALG_RSASHA512:
 		if (ctx->size != 0 && (ctx->size < 1024 || ctx->size > MAX_RSA))
 		{
 			fatal("RSA key size %d out of range", ctx->size);
 		}
 		break;
-	case DNS_KEYALG_DH:
+	case DST_ALG_DH:
 		if (ctx->size != 0 && (ctx->size < 128 || ctx->size > 4096)) {
 			fatal("DH key size %d out of range", ctx->size);
 		}
@@ -572,7 +588,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		{
 			flags |= DNS_KEYOWNER_ENTITY;
 		} else if (strcasecmp(ctx->nametype, "user") == 0) {
-			flags |= DNS_KEYOWNER_USER;
+			/* no owner flags */
 		} else {
 			fatal("invalid KEY nametype %s", ctx->nametype);
 		}
@@ -603,9 +619,6 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		if (ctx->size > 0) {
 			fatal("specified null key with non-zero size");
 		}
-		if ((flags & DNS_KEYFLAG_SIGNATORYMASK) != 0) {
-			fatal("specified null key with signing authority");
-		}
 	}
 
 	if ((flags & DNS_KEYFLAG_OWNERMASK) == DNS_KEYOWNER_ZONE &&
@@ -634,7 +647,9 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		break;
 	}
 
-	if ((flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY) {
+	if ((flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY &&
+	    (ctx->options & DST_TYPE_KEY) != 0)
+	{
 		null_key = true;
 	}
 

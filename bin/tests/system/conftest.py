@@ -315,6 +315,9 @@ def env(ports):
         env[portname] = str(portnum)
     env["builddir"] = f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}"
     env["srcdir"] = f"{env['TOP_SRCDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}"
+    env["HYPOTHESIS_STORAGE_DIRECTORY"] = (
+        f"{env['TOP_BUILDDIR']}/{SYSTEM_TEST_DIR_GIT_PATH}/.hypothesis"
+    )
     return env
 
 
@@ -381,7 +384,7 @@ def expected_artifacts(request):
     if test_specific_artifacts:
         return common_artifacts + test_specific_artifacts.args[0]
 
-    return common_artifacts
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -410,12 +413,13 @@ def system_test_dir(request, env, system_test_name, expected_artifacts):
             if node.nodeid in all_test_results
         }
         assert len(test_results)
-        messages = []
         for node, result in test_results.items():
-            isctest.log.debug("%s %s", result.outcome.upper(), node)
-            messages.extend(result.messages.values())
-        for message in messages:
-            isctest.log.debug("\n" + message)
+            message = f"{result.outcome.upper()} {node}"
+            nonempty_extra = [msg for msg in result.messages.values() if msg.strip()]
+            if nonempty_extra:
+                message += "\n"
+                message += "\n\n".join(nonempty_extra)
+            isctest.log.debug(message)
         failed = any(res.outcome == "failed" for res in test_results.values())
         skipped = any(res.outcome == "skipped" for res in test_results.values())
         if failed:
@@ -713,7 +717,7 @@ def system_test(
         request.node.stash[FIXTURE_OK] = True
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def servers(ports, system_test_dir):
     instances = {}
     for entry in system_test_dir.rglob("*"):
@@ -729,3 +733,53 @@ def servers(ports, system_test_dir):
             except ValueError:
                 continue
     return instances
+
+
+@pytest.fixture(scope="module")
+def ns1(servers):
+    return servers["ns1"]
+
+
+@pytest.fixture(scope="module")
+def ns2(servers):
+    return servers["ns2"]
+
+
+@pytest.fixture(scope="module")
+def ns3(servers):
+    return servers["ns3"]
+
+
+@pytest.fixture(scope="module")
+def ns4(servers):
+    return servers["ns4"]
+
+
+@pytest.fixture(scope="module")
+def ns5(servers):
+    return servers["ns5"]
+
+
+@pytest.fixture(scope="module")
+def ns6(servers):
+    return servers["ns6"]
+
+
+@pytest.fixture(scope="module")
+def ns7(servers):
+    return servers["ns7"]
+
+
+@pytest.fixture(scope="module")
+def ns8(servers):
+    return servers["ns8"]
+
+
+@pytest.fixture(scope="module")
+def ns9(servers):
+    return servers["ns9"]
+
+
+@pytest.fixture(scope="module")
+def ns10(servers):
+    return servers["ns10"]

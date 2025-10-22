@@ -434,9 +434,7 @@ tostruct_sig(ARGS_TOSTRUCT) {
 	REQUIRE(sig != NULL);
 	REQUIRE(rdata->length != 0);
 
-	sig->common.rdclass = rdata->rdclass;
-	sig->common.rdtype = rdata->type;
-	ISC_LINK_INIT(&sig->common, link);
+	DNS_RDATACOMMON_INIT(sig, rdata->type, rdata->rdclass);
 
 	dns_rdata_toregion(rdata, &sr);
 
@@ -539,13 +537,32 @@ additionaldata_sig(ARGS_ADDLDATA) {
 
 static isc_result_t
 digest_sig(ARGS_DIGEST) {
+	isc_region_t r1, r2;
+	dns_name_t name;
+
 	REQUIRE(rdata->type == dns_rdatatype_sig);
 
-	UNUSED(rdata);
-	UNUSED(digest);
-	UNUSED(arg);
+	dns_rdata_toregion(rdata, &r1);
+	r2 = r1;
 
-	return ISC_R_NOTIMPLEMENTED;
+	/*
+	 * Type covered (2) + Algorithm (1) +
+	 * Labels (1) + Original TTL (4) +
+	 * Expire time (4) +  Time signed (4) +
+	 * Key ID (2).
+	 */
+	isc_region_consume(&r2, 18);
+	r1.length = 18;
+	RETERR((digest)(arg, &r1));
+
+	/* Signer */
+	dns_name_init(&name, NULL);
+	dns_name_fromregion(&name, &r2);
+	RETERR(dns_name_digest(&name, digest, arg));
+	isc_region_consume(&r2, name_length(&name));
+
+	/* Signature */
+	return (digest)(arg, &r2);
 }
 
 static dns_rdatatype_t

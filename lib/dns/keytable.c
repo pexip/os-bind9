@@ -90,7 +90,7 @@ static dns_rdatasetmethods_t methods = {
 	NULL, /* clearprefetch */
 	NULL,
 	NULL,
-	NULL /* addglue */
+	NULL, /* addglue */
 };
 
 static void

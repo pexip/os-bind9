@@ -18,9 +18,9 @@ pytestmark = pytest.mark.extra_artifacts(
 )
 
 
-def test_dig_tcp_keepalive_handling(named_port, servers):
+def test_dig_tcp_keepalive_handling(named_port, ns2):
     def get_keepalive_options_received():
-        servers["ns2"].rndc("stats", log=False)
+        ns2.rndc("stats", log=False)
         options_received = 0
         with open("ns2/named.stats", "r", encoding="utf-8") as ns2_stats_file:
             for line in ns2_stats_file:
@@ -31,34 +31,34 @@ def test_dig_tcp_keepalive_handling(named_port, servers):
     dig = isctest.run.Dig(f"-p {str(named_port)}")
 
     isctest.log.info("check that dig handles TCP keepalive in query")
-    assert "; TCP KEEPALIVE" in dig("+qr +keepalive foo.example. @10.53.0.2")
+    assert "; TCP-KEEPALIVE" in dig("+qr +keepalive foo.example. @10.53.0.2")
 
     isctest.log.info("check that dig added TCP keepalive was received")
     assert get_keepalive_options_received() == 1
 
     isctest.log.info("check that TCP keepalive is added for TCP responses")
-    assert "; TCP KEEPALIVE" in dig("+tcp +keepalive foo.example. @10.53.0.2")
+    assert "; TCP-KEEPALIVE" in dig("+tcp +keepalive foo.example. @10.53.0.2")
 
     isctest.log.info("check that TCP keepalive requires TCP")
-    assert "; TCP KEEPALIVE" not in dig("+keepalive foo.example. @10.53.0.2")
+    assert "; TCP-KEEPALIVE" not in dig("+keepalive foo.example. @10.53.0.2")
 
     isctest.log.info("check the default keepalive value")
-    assert "; TCP KEEPALIVE: 30.0 secs" in dig(
+    assert "; TCP-KEEPALIVE: 30.0 secs" in dig(
         "+tcp +keepalive foo.example. @10.53.0.3"
     )
 
     isctest.log.info("check a keepalive configured value")
-    assert "; TCP KEEPALIVE: 15.0 secs" in dig(
+    assert "; TCP-KEEPALIVE: 15.0 secs" in dig(
         "+tcp +keepalive foo.example. @10.53.0.2"
     )
 
     isctest.log.info("check a re-configured keepalive value")
-    response = servers["ns2"].rndc("tcp-timeouts 300 300 300 200", log=False)
+    response = ns2.rndc("tcp-timeouts 300 300 300 200", log=False)
     assert "tcp-initial-timeout=300" in response
     assert "tcp-idle-timeout=300" in response
     assert "tcp-keepalive-timeout=300" in response
     assert "tcp-advertised-timeout=200" in response
-    assert "; TCP KEEPALIVE: 20.0 secs" in dig(
+    assert "; TCP-KEEPALIVE: 20.0 secs" in dig(
         "+tcp +keepalive foo.example. @10.53.0.2"
     )
 

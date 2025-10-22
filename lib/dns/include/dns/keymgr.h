@@ -24,6 +24,12 @@
 
 ISC_LANG_BEGINDECLS
 
+#define DNS_KEYMGRATTR_NONE	 0x00 /*%< No ordering. */
+#define DNS_KEYMGRATTR_S2I	 0x01 /*%< Secure to insecure. */
+#define DNS_KEYMGRATTR_NOROLL	 0x02 /*%< No rollover allowed. */
+#define DNS_KEYMGRATTR_FORCESTEP 0x04 /*%< Force next step in manual-mode. */
+#define DNS_KEYMGRATTR_FULLSIGN	 0x08 /*%< Full sign was issued. */
+
 void
 dns_keymgr_settime_syncpublish(dst_key_t *key, dns_kasp_t *kasp, bool first);
 /*%<
@@ -35,11 +41,27 @@ dns_keymgr_settime_syncpublish(dst_key_t *key, dns_kasp_t *kasp, bool first);
  *\li           'kasp' is a valid DNSSEC policy.
  */
 
+void
+dns_keymgr_key_init(dns_dnsseckey_t *key, dns_kasp_t *kasp, isc_stdtime_t now,
+		    bool csk);
+/*
+ * Initialize this key's properties if not already present.  A key created
+ * and derived from a dnssec-policy will have the required metadata available,
+ * otherwise these may be missing and need to be initialized.  The key states
+ * will be initialized according to existing timing metadata. If 'csk' is
+ * set to true, the key is considered a combined signing key (CSK).
+ *
+ *      Requires:
+ *\li           'key' is a valid DNSSEC key.
+ *\li           'kasp' is a valid DNSSEC policy.
+ */
+
 isc_result_t
 dns_keymgr_run(const dns_name_t *origin, dns_rdataclass_t rdclass,
 	       isc_mem_t *mctx, dns_dnsseckeylist_t *keyring,
 	       dns_dnsseckeylist_t *dnskeys, const char *keydir,
-	       dns_kasp_t *kasp, isc_stdtime_t now, isc_stdtime_t *nexttime);
+	       dns_kasp_t *kasp, uint8_t options, isc_stdtime_t now,
+	       isc_stdtime_t *nexttime);
 /*%<
  * Manage keys in 'keyring' and update timing data according to 'kasp' policy.
  * Create new keys for 'origin' if necessary.  Append all such keys, along
@@ -47,6 +69,10 @@ dns_keymgr_run(const dns_name_t *origin, dns_rdataclass_t rdclass,
  *
  * Update key states and store changes back to disk. Store when to run next
  * in 'nexttime'.
+ *
+ * If 'options' has DNS_KEYMGRATTR_FORCESTEP set, the next steps in the process
+ * are allowed, even if 'kasp' has 'manual-mode' enabled. Other options should
+ * not be set in 'options'.
  *
  *	Requires:
  *\li		'origin' is a valid FQDN.
@@ -160,6 +186,19 @@ dns_keymgr_status(dns_kasp_t *kasp, dns_dnsseckeylist_t *keyring,
  *\li		ISC_R_FAILURE if other error occurred.
  *\li		Printable status in 'out'.
  *
+ */
+
+bool
+dns_keymgr_key_may_be_purged(const dst_key_t *key, uint32_t after,
+			     isc_stdtime_t now);
+/*%<
+ * Checks if the key files for 'key' may be removed from disk.
+ *
+ *     Requires:
+ *\li          'key' is a valid key.
+ *
+ *     Returns:
+ *\li          true if the key files may be purged, false otherwise.
  */
 
 ISC_LANG_ENDDECLS

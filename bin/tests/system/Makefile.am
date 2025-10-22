@@ -113,7 +113,7 @@ TESTS =				\
 	ednscompliance		\
 	emptyzones		\
 	enginepkcs11		\
-	filter-aaaa		\
+	filters			\
 	fetchlimit		\
 	formerr			\
 	forward			\
@@ -156,6 +156,20 @@ TESTS =				\
 	redirect		\
 	resolver		\
 	rndc			\
+	rollover		\
+	rollover-algo-csk	\
+	rollover-algo-ksk-zsk	\
+	rollover-csk-roll1	\
+	rollover-csk-roll2	\
+	rollover-dynamic2inline	\
+	rollover-enable-dnssec	\
+	rollover-going-insecure	\
+	rollover-ksk-3crowd	\
+	rollover-ksk-doubleksk	\
+	rollover-lifetime	\
+	rollover-multisigner	\
+	rollover-straight2none	\
+	rollover-zsk-prepub	\
 	rootkeysentinel		\
 	rpzextra		\
 	rrchecker		\

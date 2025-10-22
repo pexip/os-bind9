@@ -73,15 +73,15 @@ def has_signed_apex_nsec(zone, response):
             has_rrsig = True
 
     if not has_nsec:
-        print("error: missing apex NSEC record in response")
+        isctest.log.error("missing apex NSEC record in response")
     if not has_rrsig:
-        print("error: missing NSEC signature in response")
+        isctest.log.error("missing NSEC signature in response")
 
     return has_nsec and has_rrsig
 
 
 def do_query(server, qname, qtype, tcp=False):
-    msg = dns.message.make_query(qname, qtype, use_edns=True, want_dnssec=True)
+    msg = isctest.query.create(qname, qtype)
     query_func = isctest.query.tcp if tcp else isctest.query.udp
     response = query_func(msg, server.ip, expected_rcode=dns.rcode.NOERROR)
     return response
@@ -103,8 +103,7 @@ def verify_zone(zone, transfer):
     verifier = isctest.run.cmd(verify_cmd)
 
     if verifier.returncode != 0:
-        print(f"error: dnssec-verify {zone} failed")
-        sys.stderr.buffer.write(verifier.stderr)
+        isctest.log.error(f"dnssec-verify {zone} failed")
 
     return verifier.returncode == 0
 
@@ -132,7 +131,7 @@ def read_statefile(server, zone):
     ), f"expected a single DS in response for {zone} from {server.ip}, got {count}"
 
     filename = f"ns9/K{zone}+013+{keyid:05d}.state"
-    print(f"read state file {filename}")
+    isctest.log.debug(f"read state file {filename}")
 
     try:
         with open(filename, "r", encoding="utf-8") as file:
@@ -212,8 +211,7 @@ def rekey(zone):
     controller = isctest.run.cmd(rndc_cmd)
 
     if controller.returncode != 0:
-        print(f"error: rndc loadkeys {zone} failed")
-        sys.stderr.buffer.write(controller.stderr)
+        isctest.log.error(f"rndc loadkeys {zone} failed")
 
     assert controller.returncode == 0
 
@@ -464,16 +462,16 @@ checkds_tests = (
 
 
 @pytest.mark.parametrize("params", checkds_tests, ids=lambda t: t.zone)
-def test_checkds(servers, params):
+def test_checkds(ns2, ns9, params):
     # Wait until the provided zone is signed and then verify its DNSSEC data.
-    zone_check(servers["ns9"], params.zone)
+    zone_check(ns9, params.zone)
 
     # Wait up to 10 seconds until all the expected log lines are found in the
     # log file for the provided server.  Rekey every second if necessary.
     time_remaining = 10
     for log_string in params.logs_to_wait_for:
         line = f"zone {params.zone}/IN (signed): checkds: {log_string}"
-        while line not in servers["ns9"].log:
+        while line not in ns9.log:
             rekey(params.zone)
             time_remaining -= 1
             assert time_remaining, f'Timed out waiting for "{log_string}" to be logged'
@@ -481,4 +479,4 @@ def test_checkds(servers, params):
 
     # Check whether key states on the parent server provided match
     # expectations.
-    keystate_check(servers["ns2"], params.zone, params.expected_parent_state)
+    keystate_check(ns2, params.zone, params.expected_parent_state)

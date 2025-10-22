@@ -12,7 +12,7 @@ symbol from libc.  This causes assertion failure on BIND 9 startup.
  1 file changed, 19 insertions(+)
 
 diff --git a/bin/named/dlz_dlopen_driver.c b/bin/named/dlz_dlopen_driver.c
-index 5e67555..315e821 100644
+index e2c9f0d..8cc0bde 100644
 --- a/bin/named/dlz_dlopen_driver.c
 +++ b/bin/named/dlz_dlopen_driver.c
 @@ -211,6 +211,7 @@ dlopen_dlz_create(const char *dlzname, unsigned int argc, char *argv[],
@@ -23,7 +23,7 @@ index 5e67555..315e821 100644
  
  	UNUSED(driverarg);
  
-@@ -233,6 +234,24 @@ dlopen_dlz_create(const char *dlzname, unsigned int argc, char *argv[],
+@@ -234,6 +235,24 @@ dlopen_dlz_create(const char *dlzname, unsigned int argc, char *argv[],
  	/* Initialize the lock */
  	isc_mutex_init(&cd->lock);
  

@@ -193,7 +193,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	isc_result_t ret;
 	isc_buffer_t *databuf = NULL;
 	char data[256 + 8];
-	uint32_t flags;
 	unsigned int sigsize;
 	dns_fixedname_t fnewname;
 	dns_fixedname_t fsigner;
@@ -209,17 +208,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 
 	if (*inception >= *expire) {
 		return DNS_R_INVALIDTIME;
-	}
-
-	/*
-	 * Is the key allowed to sign data?
-	 */
-	flags = dst_key_flags(key);
-	if ((flags & DNS_KEYTYPE_NOAUTH) != 0) {
-		return DNS_R_KEYUNAUTHORIZED;
-	}
-	if ((flags & DNS_KEYFLAG_OWNERMASK) != DNS_KEYOWNER_ZONE) {
-		return DNS_R_KEYUNAUTHORIZED;
 	}
 
 	sig.mctx = mctx;
@@ -383,7 +371,6 @@ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	unsigned char data[300];
 	dst_context_t *ctx = NULL;
 	int labels = 0;
-	uint32_t flags;
 	bool downcase = false;
 
 	REQUIRE(name != NULL);
@@ -422,7 +409,7 @@ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	}
 
 	/*
-	 * NS, SOA and DNSSKEY records are signed by their owner.
+	 * NS, SOA and DNSKEY records are signed by their owner.
 	 * DS records are signed by the parent.
 	 */
 	switch (set->type) {
@@ -446,19 +433,6 @@ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 			return DNS_R_SIGINVALID;
 		}
 		break;
-	}
-
-	/*
-	 * Is the key allowed to sign data?
-	 */
-	flags = dst_key_flags(key);
-	if ((flags & DNS_KEYTYPE_NOAUTH) != 0) {
-		inc_stat(dns_dnssecstats_fail);
-		return DNS_R_KEYUNAUTHORIZED;
-	}
-	if ((flags & DNS_KEYFLAG_OWNERMASK) != DNS_KEYOWNER_ZONE) {
-		inc_stat(dns_dnssecstats_fail);
-		return DNS_R_KEYUNAUTHORIZED;
 	}
 
 again:
@@ -1430,29 +1404,35 @@ addkey(dns_dnsseckeylist_t *keylist, dst_key_t **newkey, bool savekeys,
 
 	if (key != NULL) {
 		/*
-		 * Found a match.  If the old key was only public and the
-		 * new key is private, replace the old one; otherwise
-		 * leave it.  But either way, mark the key as having
-		 * been found in the zone.
+		 * Found a match. If we already had a private key, then
+		 * the new key can't be an improvement. If the existing
+		 * key was public-only but the new key is too, then it's
+		 * still not an improvement. Mark the old key as having
+		 * been found in the zone and stop.
 		 */
-		if (dst_key_isprivate(key->key)) {
-			dst_key_free(newkey);
-		} else if (dst_key_isprivate(*newkey)) {
-			dst_key_free(&key->key);
-			key->key = *newkey;
+		if (dst_key_isprivate(key->key) || !dst_key_isprivate(*newkey))
+		{
+			key->source = dns_keysource_zoneapex;
+			return;
 		}
 
-		key->source = dns_keysource_zoneapex;
-		return;
+		/*
+		 * However, if the old key was public-only, and the new key
+		 * is private, then we're throwing away the old key.
+		 */
+		dst_key_free(&key->key);
+		ISC_LIST_UNLINK(*keylist, key, link);
+		dns_dnsseckey_destroy(mctx, &key);
 	}
 
+	/* Store the new key. */
 	dns_dnsseckey_create(mctx, newkey, &key);
+	key->source = dns_keysource_zoneapex;
 	key->pubkey = pubkey_only;
 	if (key->legacy || savekeys) {
 		key->force_publish = true;
 		key->force_sign = dst_key_isprivate(key->key);
 	}
-	key->source = dns_keysource_zoneapex;
 	ISC_LIST_APPEND(*keylist, key, link);
 	*newkey = NULL;
 }
@@ -1576,9 +1556,7 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 		RETERR(dns_dnssec_keyfromrdata(origin, &rdata, mctx, &dnskey));
 		dst_key_setttl(dnskey, keys.ttl);
 
-		if (!is_zone_key(dnskey) ||
-		    (dst_key_flags(dnskey) & DNS_KEYTYPE_NOAUTH) != 0)
-		{
+		if (!is_zone_key(dnskey)) {
 			goto skip;
 		}
 
@@ -1594,7 +1572,7 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 
 		/* Try to read the public key. */
 		result = keyfromfile(kasp, directory, dnskey,
-				     (DST_TYPE_PUBLIC | DST_TYPE_STATE), mctx,
+				     DST_TYPE_PUBLIC | DST_TYPE_STATE, mctx,
 				     &pubkey);
 		if (result == ISC_R_FILENOTFOUND || result == ISC_R_NOPERM) {
 			result = ISC_R_SUCCESS;
@@ -1609,10 +1587,10 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 		}
 
 		/* Now read the private key. */
-		result = keyfromfile(
-			kasp, directory, dnskey,
-			(DST_TYPE_PUBLIC | DST_TYPE_PRIVATE | DST_TYPE_STATE),
-			mctx, &privkey);
+		result = keyfromfile(kasp, directory, dnskey,
+				     DST_TYPE_PUBLIC | DST_TYPE_PRIVATE |
+					     DST_TYPE_STATE,
+				     mctx, &privkey);
 
 		/*
 		 * If the key was revoked and the private file
@@ -1626,9 +1604,9 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 				dst_key_setflags(dnskey,
 						 flags & ~DNS_KEYFLAG_REVOKE);
 				result = keyfromfile(kasp, directory, dnskey,
-						     (DST_TYPE_PUBLIC |
-						      DST_TYPE_PRIVATE |
-						      DST_TYPE_STATE),
+						     DST_TYPE_PUBLIC |
+							     DST_TYPE_PRIVATE |
+							     DST_TYPE_STATE,
 						     mctx, &privkey);
 				if (result == ISC_R_SUCCESS &&
 				    dst_key_pubcompare(dnskey, privkey, false))
@@ -1650,8 +1628,8 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 			result2 = dst_key_getfilename(
 				dst_key_name(dnskey), dst_key_id(dnskey),
 				dst_key_alg(dnskey),
-				(DST_TYPE_PUBLIC | DST_TYPE_PRIVATE |
-				 DST_TYPE_STATE),
+				DST_TYPE_PUBLIC | DST_TYPE_PRIVATE |
+					DST_TYPE_STATE,
 				NULL, mctx, &buf);
 			if (result2 != ISC_R_SUCCESS) {
 				char namebuf[DNS_NAME_FORMATSIZE];
@@ -1683,11 +1661,6 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 			goto skip;
 		}
 		RETERR(result);
-
-		/* This should never happen. */
-		if ((dst_key_flags(privkey) & DNS_KEYTYPE_NOAUTH) != 0) {
-			goto skip;
-		}
 
 		/*
 		 * Whatever the key's default TTL may have

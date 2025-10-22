@@ -608,6 +608,7 @@ make_empty_lookup(void) {
 		.idnout = idnout,
 		.udpsize = -1,
 		.edns = -1,
+		.original_edns = -1,
 		.recurse = true,
 		.retries = tries,
 		.comments = true,
@@ -741,6 +742,7 @@ clone_lookup(dig_lookup_t *lookold, bool servers) {
 	}
 
 	looknew->showbadcookie = lookold->showbadcookie;
+	looknew->showbadvers = lookold->showbadvers;
 	looknew->sendcookie = lookold->sendcookie;
 	looknew->seenbadcookie = lookold->seenbadcookie;
 	looknew->badcookie = lookold->badcookie;
@@ -766,10 +768,12 @@ clone_lookup(dig_lookup_t *lookold, bool servers) {
 	looknew->idnout = lookold->idnout;
 	looknew->udpsize = lookold->udpsize;
 	looknew->edns = lookold->edns;
+	looknew->original_edns = lookold->original_edns;
 	looknew->recurse = lookold->recurse;
 	looknew->aaonly = lookold->aaonly;
 	looknew->adflag = lookold->adflag;
 	looknew->cdflag = lookold->cdflag;
+	looknew->coflag = lookold->coflag;
 	looknew->raflag = lookold->raflag;
 	looknew->tcflag = lookold->tcflag;
 	looknew->print_unknown_format = lookold->print_unknown_format;
@@ -1387,24 +1391,28 @@ typedef struct dig_ednsoptname {
 } dig_ednsoptname_t;
 
 dig_ednsoptname_t optnames[] = {
-	{ 1, "LLQ" },	       /* draft-sekar-dns-llq */
-	{ 2, "UL" },	       /* draft-ietf-dnssd-update-lease */
-	{ 3, "NSID" },	       /* RFC 5001 */
-	{ 5, "DAU" },	       /* RFC 6975 */
-	{ 6, "DHU" },	       /* RFC 6975 */
-	{ 7, "N3U" },	       /* RFC 6975 */
-	{ 8, "ECS" },	       /* RFC 7871 */
-	{ 9, "EXPIRE" },       /* RFC 7314 */
-	{ 10, "COOKIE" },      /* RFC 7873 */
-	{ 11, "KEEPALIVE" },   /* RFC 7828 */
-	{ 12, "PADDING" },     /* RFC 7830 */
-	{ 12, "PAD" },	       /* shorthand */
-	{ 13, "CHAIN" },       /* RFC 7901 */
-	{ 14, "KEY-TAG" },     /* RFC 8145 */
-	{ 15, "EDE" },	       /* ietf-dnsop-extended-error-16 */
-	{ 16, "CLIENT-TAG" },  /* draft-bellis-dnsop-edns-tags */
-	{ 17, "SERVER-TAG" },  /* draft-bellis-dnsop-edns-tags */
-	{ 26946, "DEVICEID" }, /* Brian Hartvigsen */
+	{ 1, "LLQ" },		  /* draft-sekar-dns-llq */
+	{ 2, "UPDATE-LEASE" },	  /* draft-ietf-dnssd-update-lease */
+	{ 2, "UL" },		  /* draft-ietf-dnssd-update-lease */
+	{ 3, "NSID" },		  /* RFC 5001 */
+	{ 5, "DAU" },		  /* RFC 6975 */
+	{ 6, "DHU" },		  /* RFC 6975 */
+	{ 7, "N3U" },		  /* RFC 6975 */
+	{ 8, "ECS" },		  /* RFC 7871 */
+	{ 9, "EXPIRE" },	  /* RFC 7314 */
+	{ 10, "COOKIE" },	  /* RFC 7873 */
+	{ 11, "KEEPALIVE" },	  /* RFC 7828 */
+	{ 12, "PADDING" },	  /* RFC 7830 */
+	{ 12, "PAD" },		  /* shorthand */
+	{ 13, "CHAIN" },	  /* RFC 7901 */
+	{ 14, "KEY-TAG" },	  /* RFC 8145 */
+	{ 15, "EDE" },		  /* ietf-dnsop-extended-error-16 */
+	{ 16, "CLIENT-TAG" },	  /* draft-bellis-dnsop-edns-tags */
+	{ 17, "SERVER-TAG" },	  /* draft-bellis-dnsop-edns-tags */
+	{ 18, "REPORT-CHANNEL" }, /* RFC 9567 */
+	{ 18, "RC" },		  /* shorthand */
+	{ 19, "ZONEVERSION" },	  /* RFC 9660 */
+	{ 26946, "DEVICEID" },	  /* Brian Hartvigsen */
 };
 
 #define N_EDNS_OPTNAMES (sizeof(optnames) / sizeof(optnames[0]))
@@ -1945,6 +1953,7 @@ followup_lookup(dns_message_t *msg, dig_query_t *query, dns_section_t section) {
 				}
 				domain = dns_fixedname_name(&lookup->fdomain);
 				dns_name_copy(name, domain);
+				lookup->edns = lookup->original_edns;
 			}
 			debug("adding server %s", namestr);
 			num = getaddresses(lookup, namestr, &lresult);
@@ -2470,7 +2479,8 @@ setup_lookup(dig_lookup_t *lookup) {
 			lookup->udpsize = DEFAULT_EDNS_BUFSIZE;
 		}
 		if (lookup->edns < 0) {
-			lookup->edns = DEFAULT_EDNS_VERSION;
+			lookup->original_edns = lookup->edns =
+				DEFAULT_EDNS_VERSION;
 		}
 
 		if (lookup->nsid) {
@@ -2623,9 +2633,12 @@ setup_lookup(dig_lookup_t *lookup) {
 		}
 
 		flags = lookup->ednsflags;
-		flags &= ~DNS_MESSAGEEXTFLAG_DO;
+		flags &= ~(DNS_MESSAGEEXTFLAG_DO | DNS_MESSAGEEXTFLAG_CO);
 		if (lookup->dnssec) {
 			flags |= DNS_MESSAGEEXTFLAG_DO;
+		}
+		if (lookup->coflag) {
+			flags |= DNS_MESSAGEEXTFLAG_CO;
 		}
 		add_opt(lookup->sendmsg, lookup->udpsize, lookup->edns, flags,
 			opts, i);
@@ -2741,6 +2754,7 @@ send_done(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 		}
 		query_detach(&query);
 		lookup_detach(&l);
+		check_if_done();
 		return;
 	} else if (eresult != ISC_R_SUCCESS) {
 		debug("send failed: %s", isc_result_totext(eresult));
@@ -2788,8 +2802,19 @@ _cancel_lookup(dig_lookup_t *lookup, const char *file, unsigned int line) {
 
 static inline const char *
 get_tls_sni_hostname(dig_query_t *query) {
-	return query->lookup->tls_hostname_set ? query->lookup->tls_hostname
-					       : query->userarg;
+	const char *hostname = query->lookup->tls_hostname_set
+				       ? query->lookup->tls_hostname
+				       : query->userarg;
+
+	if (query->lookup->tls_hostname_set) {
+		return query->lookup->tls_hostname;
+	}
+
+	if (isc_tls_valid_sni_hostname(hostname)) {
+		return hostname;
+	}
+
+	return NULL;
 }
 
 static isc_tlsctx_t *
@@ -3003,7 +3028,6 @@ start_tcp(dig_query_t *query) {
 	if (keep != NULL && isc_sockaddr_equal(&keepaddr, &query->sockaddr)) {
 		query->handle = keep;
 		launch_next_query(query);
-		query_detach(&query);
 		return;
 	} else if (keep != NULL) {
 		isc_nmhandle_detach(&keep);
@@ -4314,12 +4338,23 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	if (msg->rcode == dns_rcode_badvers && msg->opt != NULL &&
 	    (newedns = ednsvers(msg->opt)) < l->edns && l->ednsneg)
 	{
+		if (l->showbadvers) {
+			dighost_printmessage(query, &b, msg, true);
+			dighost_received(isc_buffer_usedlength(&b), &peer,
+					 query);
+		}
 		/*
 		 * Add minimum EDNS version required checks here if needed.
 		 */
 		dighost_comments(l, "BADVERS, retrying with EDNS version %u.",
 				 (unsigned int)newedns);
 		l->edns = newedns;
+		/*
+		 * Extract the server cookie so it can be sent in the retry.
+		 */
+		if (l->cookie == NULL && l->sendcookie) {
+			process_opt(l, msg);
+		}
 		n = requeue_lookup(l, true);
 		if (l->trace && l->trace_root) {
 			n->rdtype = l->qrdtype;

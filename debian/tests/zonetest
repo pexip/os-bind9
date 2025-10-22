@@ -1,0 +1,62 @@
+#!/bin/sh
+
+set -e
+
+setup() (
+	service named stop
+
+	cat <<EOF >/etc/bind/named.conf.options
+options { directory "/var/cache/bind"; listen-on port 53 { 127.0.0.1; }; allow-query { any; }; recursion no; };
+EOF
+
+	cat <<EOF >/etc/bind/named.conf.local
+zone "localdomain.test" { type primary; file "/etc/bind/zones/forward.localdomain.test"; };
+EOF
+
+	mkdir -p /etc/bind/zones/
+
+	cat <<EOF >/etc/bind/zones/forward.localdomain.test
+\$TTL	604800
+@	IN	SOA	localdomain.test. root.localdomain.test. (
+			      2		; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			 604800 )	; Negative Cache TTL
+;
+@	IN	NS	ns.localdomain.test.
+ns	IN	A	127.0.0.1
+EOF
+
+	named-checkconf
+	named-checkzone localdomain.test /etc/bind/zones/forward.localdomain.test
+
+	service named start
+)
+
+teardown() (
+	service named stop
+)
+trap teardown EXIT
+
+run() (
+	max_attempts=10
+	repeats=${max_attempts}
+	while [ "${repeats}" -gt "0" ]; do
+		echo "Querying IN SOA localdomain.test"
+		out=$(dig +norec -t soa localdomain.test. @127.0.0.1 | grep -E 'flags:.+aa; QUERY' || true)
+		if [ "$out" ]; then
+			break
+		fi
+		repeats=$((repeats - 1))
+		sleep 1
+	done
+	if ! [ "$out" ]; then
+		echo "Querying localdomain.test failed after ${max_attempts} attempts"
+		exit 1
+	fi
+)
+
+setup
+run
+teardown

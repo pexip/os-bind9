@@ -11,6 +11,7 @@
 
 import pytest
 
+
 pytestmark = pytest.mark.extra_artifacts(
     [
         ".digrc",
@@ -21,6 +22,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "nextpart.out.*",
         "ans*/ans.run",
         "ans*/query.log",
+        "ns1/named.stats*",
         "ns4/tld.db",
         "ns5/trusted.conf",
         "ns6/K*",

@@ -39,67 +39,21 @@ Comment:
  and licenses used in the BIND 9 project. You need to look at the
  individual files to get the specific license that covers that file.
 
-Files: lib/isc/hp.c lib/isc/include/isc/hp.h
-Copyright: 2018-2020 Internet Systems Consortium, Inc. ("ISC")
-	   2014-2016, Pedro Ramalhete, Andreia Correia
-License: MPL-2.0 and BSD-3-clause
-Comment:
- This work is based on C++ code available from:
- https://github.com/pramalhe/ConcurrencyFreaks/
-
 Files: lib/isc/random.c
 Copyright: 2018-2020 Internet Systems Consortium, Inc. ("ISC")
 	   1996 David Mazieres
 	   2008 Damien Miller
 License: MPL-2.0 and ISC
 
-Files: lib/isc/siphash.c
-Copyright: 2018-2020 Internet Systems Consortium, Inc. ("ISC")
-	   2012-2016 Jean-Philippe Aumasson
-	   2012-2014 Daniel J. Bernstein
-License: MPL-2.0 and CC0-1.0
-Comment:
- The SipHash in BIND 9 is based on SipHash reference C implementation.
-
-Files: lib/isc/include/pkcs11/pkcs11.h
-Copyright: 2006-2007 g10 Code GmbH
-	   2006 Andreas Jellinghaus
-	   2017 Red Hat, Inc.
-License:
- This file is free software; as a special exception the author gives
- unlimited permission to copy and/or distribute it, with or without
- modifications, as long as this notice is preserved.
- .
- This file is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY, to the extent permitted by law; without even
- the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- PURPOSE.  */
-Comment: The pkcs11.h header was imported from libp11 project
-
-Files: lib/isc/tests/random_test.c
+Files: tests/isc/random_test.c
 Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
            1996-2003 Internet Software Consortium
 	   1985, 1987, 2000 Stephen L. Moshier
 License: MPL-2.0 and public-domain
+ Some code from the Cephes Math Library Release 2.8 is provided, which was
+ released into the public domain as part of netlib.
 
-Files: contrib/dlz/modules/mysqldyn/dlz_mysqldyn_mod.c
-Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
-	   2014 Maui Systems Ltd
-License: MPL-2.0 and ISC
-
-Files: contrib/dlz/modules/perl/
-Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
-	   2009-2012 John Eaglesham
-	   2002 Stichting NLnet
-License: MPL-2.0 and ISC
-
-Files: contrib/dlz/modules/wildcard/
-Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
-	   2012 Vadim Goncharov
-	   2002 Stichting NLnet
-License: MPL-2.0 and ISC
-
-Files: m4/
+Files: m4/*
 Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
 	   2008 Guido U. Draheim
 	   2011 Maarten Bosmans
@@ -112,7 +66,7 @@ Copyright: 2004-2017 Internet Systems Consortium, Inc. ("ISC")
 	   2011 Russ Allbery <rra@stanford.edu>
 	   2013 Bastien ROUCARIES
 	   2004, 2011-2015 Free Software Foundation, Inc.
-License:
+License: FSFAP
  Copying and distribution of this file, with or without modification, are
  permitted in any medium without royalty provided the copyright notice
  and this notice are preserved. This file is offered as-is, without any
@@ -120,7 +74,7 @@ License:
 Comment:
  The files from m4/ directory were imported from autoconf-archive, and libtool.
 
-Files: debian/
+Files: debian/*
 Copyright: 2007-2017 LaMont Jones
 	   2013-2017 Michael Gilbert
            2017-2019 Ondřej Surý
@@ -155,7 +109,7 @@ License: BSD-2-clause
  1. Redistributions of source code must retain the above copyright
  notice, this list of conditions and the following disclaimer.
  .
- 2. Redistributions in binary form must reproduce the above copyright
+ 1. Redistributions in binary form must reproduce the above copyright
  notice, this list of conditions and the following disclaimer in the
  documentation and/or other materials provided with the distribution.
  .

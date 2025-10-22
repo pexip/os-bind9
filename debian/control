@@ -27,7 +27,7 @@ Build-Depends: bison,
                liburcu-dev,
                libuv1-dev,
                libxml2-dev,
-               pkg-config,
+               pkgconf,
                protobuf-c-compiler,
                zlib1g-dev
 Build-Depends-Indep: fonts-freefont-otf,
@@ -40,7 +40,7 @@ Build-Depends-Indep: fonts-freefont-otf,
                      xindy
 Standards-Version: 4.6.2
 Vcs-Browser: https://salsa.debian.org/dns-team/bind9
-Vcs-Git: https://salsa.debian.org/dns-team/bind9.git -b debian/9.19
+Vcs-Git: https://salsa.debian.org/dns-team/bind9.git -b debian/9.20
 Homepage: https://www.isc.org/downloads/bind/
 
 Package: bind9
@@ -52,11 +52,10 @@ Depends: adduser,
          debconf | debconf-2.0,
          dns-root-data,
          iproute2,
-         lsb-base (>= 3.2-14),
          netbase,
          ${misc:Depends},
          ${shlibs:Depends}
-Suggests: bind-doc,
+Suggests: bind9-doc,
           bind9-dnsutils,
           resolvconf,
           ufw
@@ -86,6 +85,7 @@ Section: doc
 Depends: ${misc:Depends}
 Breaks: bind-doc (<< 1:9.13.6~)
 Replaces: bind-doc (<< 1:9.13.6~)
+Multi-Arch: foreign
 Description: Documentation for BIND 9
  This package provides various documents that are useful for maintaining a
  working BIND 9 installation.

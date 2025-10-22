@@ -1,3 +1,125 @@
+bind9 (1:9.20.15-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.15
+   - [CVE-2025-8677]: DNSSEC validation fails if matching but invalid
+     DNSKEY is found
+   - [CVE-2025-40778]: Address various spoofing attacks.
+   - [CVE-2025-40780]: Cache-poisoning due to weak pseudo-random number
+     generator
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 22 Oct 2025 18:00:33 +0200
+
+bind9 (1:9.20.11-4) unstable; urgency=medium
+
+  * Remove named.conf.default-zones.dpkg-dist from /etc/bind
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 27 Jul 2025 12:04:56 +0200
+
+bind9 (1:9.20.11-3) unstable; urgency=medium
+
+  * Remove the /etc/bind/named.conf.default-zones again from the
+    maintainer script as it might have been reinstalled by
+    accident. (Closes: #1108945)
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 27 Jul 2025 07:54:24 +0200
+
+bind9 (1:9.20.11-2) unstable; urgency=high
+
+  * Remove /etc/bind/named.conf.default-zones from the package as
+    the intent was to remove this file.  (Closes: #1108945)
+  * Add new /etc/bind/named.conf.root-hints file that makes 'named'
+    to use root.hints from dns-root-data again.
+
+ -- Ondřej Surý <ondrej@debian.org>  Sun, 27 Jul 2025 06:48:59 +0200
+
+bind9 (1:9.20.11-1) unstable; urgency=high
+
+  * New upstream version 9.20.11
+   + [CVE2025-40777]: Fix a possible assertion failure when
+     stale-answer-client-timeout is set to 0.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Jul 2025 17:08:46 +0200
+
+bind9 (1:9.20.10-1) unstable; urgency=medium
+
+  * New upstream version 9.20.10
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 20 Jun 2025 06:25:07 +0200
+
+bind9 (1:9.20.9-2) unstable; urgency=low
+
+  * Fix the default branch in the Vcs-Git field (Closes: #1106677)
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 28 May 2025 13:39:20 +0200
+
+bind9 (1:9.20.9-1) unstable; urgency=high
+
+  * New upstream version 9.20.9
+   + [CVE-2025-40775] Prevent assertion when processing TSIG algorithm.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 21 May 2025 13:44:48 +0200
+
+bind9 (1:9.20.8-6) unstable; urgency=medium
+
+  * Adjust the autopkg zonetest
+
+ -- Ondřej Surý <ondrej@debian.org>  Fri, 18 Apr 2025 18:40:30 +0200
+
+bind9 (1:9.20.8-5) unstable; urgency=medium
+
+  [ Remus-Gabriel Chelu ]
+  * [INTL:ro] Romanian debconf templates translation of bind9
+
+  [ Ondřej Surý ]
+  * Fix lintian mismatched-override
+  * Use pkgconf instead of pkg-config
+  * Remove superfluous-file-pattern(s) from d/copyright
+  * Remove full path to named-checkconf in d/bind9.postinst
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Apr 2025 21:50:52 +0200
+
+bind9 (1:9.20.8-4) unstable; urgency=medium
+
+  [ Lena Voytek ]
+  * Add zonetest DEP-8 test
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Apr 2025 21:21:42 +0200
+
+bind9 (1:9.20.8-3) unstable; urgency=medium
+
+  [ Lena Voytek ]
+  * Fix German UTF-8 encoding
+  * Clean up debian/copyright file
+  * Remove lsb-base runtime dependency as it is no longer needed
+
+  [ Santiago Ruano Rincón ]
+  * Add debian/salsa-ci.yml
+  * Make d/tests/validation less flaky.
+
+  [ Carles Pina i Estany ]
+  * Added po-debconf Catalan translation
+
+  [ Mitchell Dzurick ]
+  * d/control: Suggest bind9-doc over bind-doc for the bind9 package
+
+  [ Debian Janitor ]
+  * Apply multi-arch hints. + bind9-doc: Add Multi-Arch: foreign.
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Apr 2025 21:07:33 +0200
+
+bind9 (1:9.20.8-2) unstable; urgency=medium
+
+  * Validate configuration file before service restart
+    (Closes: #995310, #1054314)
+
+ -- Ondřej Surý <ondrej@debian.org>  Thu, 17 Apr 2025 18:49:10 +0200
+
+bind9 (1:9.20.8-1) unstable; urgency=medium
+
+  * New upstream version 9.20.8
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Apr 2025 15:05:13 +0200
+
 bind9 (1:9.20.7-1) unstable; urgency=medium
 
   * New upstream version 9.20.7

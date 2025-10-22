@@ -58,8 +58,8 @@ usage(void) {
 	fprintf(stderr, "    name: owner of the key\n");
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "    -a algorithm: \n"
-			"        RSASHA1 |\n"
-			"        NSEC3RSASHA1 |\n"
+			"        RSASHA1 (deprecated) |\n"
+			"        NSEC3RSASHA1 (deprecated) |\n"
 			"        RSASHA256 | RSASHA512 |\n"
 			"        ECDSAP256SHA256 | ECDSAP384SHA384 |\n"
 			"        ED25519 | ED448\n");
@@ -574,12 +574,27 @@ main(int argc, char **argv) {
 		{
 			flags |= DNS_KEYOWNER_ENTITY;
 		} else if (strcasecmp(nametype, "user") == 0) {
-			flags |= DNS_KEYOWNER_USER;
+			/* no owner flags */
 		} else {
 			fatal("invalid KEY nametype %s", nametype);
 		}
 	} else if (strcasecmp(nametype, "other") != 0) { /* DNSKEY */
 		fatal("invalid DNSKEY nametype %s", nametype);
+	}
+
+	switch (alg) {
+	case DST_ALG_RSASHA1:
+	case DST_ALG_NSEC3RSASHA1: {
+		char algstr[DNS_SECALG_FORMATSIZE];
+		dns_secalg_format(alg, algstr, sizeof(algstr));
+		fprintf(stderr,
+			"WARNING: DNSKEY algorithm '%s' is deprecated. Please "
+			"migrate to another algorithm\n",
+			algstr);
+		break;
+	}
+	default:
+		break;
 	}
 
 	rdclass = strtoclass(classname);
@@ -601,12 +616,6 @@ main(int argc, char **argv) {
 		   protocol != DNS_KEYPROTO_DNSSEC)
 	{
 		fatal("invalid DNSKEY protocol: %d", protocol);
-	}
-
-	if ((flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY) {
-		if ((flags & DNS_KEYFLAG_SIGNATORYMASK) != 0) {
-			fatal("specified null key with signing authority");
-		}
 	}
 
 	isc_buffer_init(&buf, filename, sizeof(filename) - 1);

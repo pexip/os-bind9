@@ -30,6 +30,14 @@ if [ "$1" = configure ]; then
 	chmod g+r /etc/bind/rndc.key /etc/bind/named.conf* || true
 	chmod g+rwx /var/cache/bind
     fi
+
+    if [ -e /etc/bind/named.conf.default-zones.dpkg-dist ]; then
+        rm -f /etc/bind/named.conf.default-zones.dpkg-dist
+    fi
+
+    # Configuration file sanity check. This should avoid the upgrade process to
+    # stop a running service when starting it after the upgrade would fail
+    named-checkconf /etc/bind/named.conf
 fi
 
 #DEBHELPER#

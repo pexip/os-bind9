@@ -11,20 +11,26 @@
 
 import pytest
 
-pytestmark = pytest.mark.extra_artifacts(
-    [
-        "dig.out*",
-        "dnstap.hex*",
-        "dnstap.out*",
-        "fstrm_capture.out.*",
-        "nsupdate.out*",
-        "ydump.out*",
-        "ns*/dnstap.out*",
-        "ns2/example.db",
-        "ns2/example.db.jnl",
-    ]
-)
+import isctest.mark
+
+pytestmark = [
+    isctest.mark.with_dnstap,
+    pytest.mark.extra_artifacts(
+        [
+            "dig.out*",
+            "dnstap.hex*",
+            "dnstap.out*",
+            "fstrm_capture.out.*",
+            "nsupdate.out*",
+            "ydump.out*",
+            "ns*/dnstap.out*",
+            "ns2/example.db",
+            "ns2/example.db.jnl",
+        ]
+    ),
+]
 
 
+@pytest.mark.flaky(max_runs=2, rerun_filter=isctest.mark.is_host_freebsd_13)
 def test_dnstap(run_tests_sh):
     run_tests_sh()

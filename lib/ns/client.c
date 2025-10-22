@@ -916,10 +916,10 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 				     sizeof(log_buf));
 		if (rrl_result != DNS_RRL_RESULT_OK) {
 			/*
-			 * Log dropped errors in the query category
+			 * Log dropped errors in the query-errors category
 			 * so that they are not lost in silence.
 			 * Starts of rate-limited bursts are logged in
-			 * NS_LOGCATEGORY_RRL.
+			 * DNS_LOGCATEGORY_RRL.
 			 */
 			if (wouldlog) {
 				ns_client_log(client,
@@ -1278,6 +1278,7 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 	isc_stdtime_t now;
 	uint32_t when;
 	isc_buffer_t db;
+	bool alwaysvalid;
 
 	/*
 	 * If we have already seen a cookie option skip this cookie option.
@@ -1324,12 +1325,23 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 	isc_buffer_forward(buf, 8);
 
 	/*
+	 * For '-T cookiealwaysvalid' still process everything to not skew any
+	 * performance tests involving cookies, but make sure that the cookie
+	 * check passes in the end, given the cookie was structurally correct.
+	 */
+	alwaysvalid = ns_server_getoption(client->manager->sctx,
+					  NS_SERVER_COOKIEALWAYSVALID);
+
+	/*
 	 * Allow for a 5 minute clock skew between servers sharing a secret.
 	 * Only accept COOKIE if we have talked to the client in the last hour.
 	 */
 	now = isc_stdtime_now();
-	if (isc_serial_gt(when, (now + 300)) /* In the future. */ ||
-	    isc_serial_lt(when, (now - 3600)) /* In the past. */)
+	if (alwaysvalid) {
+		now = when;
+	}
+	if (isc_serial_gt(when, now + 300) /* In the future. */ ||
+	    isc_serial_lt(when, now - 3600) /* In the past. */)
 	{
 		client->attributes |= NS_CLIENTATTR_BADCOOKIE;
 		ns_stats_increment(client->manager->sctx->nsstats,
@@ -1340,7 +1352,7 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 	isc_buffer_init(&db, dbuf, sizeof(dbuf));
 	compute_cookie(client, when, client->manager->sctx->secret, &db);
 
-	if (isc_safe_memequal(old, dbuf, COOKIE_SIZE)) {
+	if (isc_safe_memequal(old, dbuf, COOKIE_SIZE) || alwaysvalid) {
 		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_cookiematch);
 		client->attributes |= NS_CLIENTATTR_HAVECOOKIE;
@@ -1538,17 +1550,6 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 	 * XXXRTH need library support for this!
 	 */
 	client->ednsversion = (opt->ttl & 0x00FF0000) >> 16;
-	if (client->ednsversion > DNS_EDNS_VERSION) {
-		ns_stats_increment(client->manager->sctx->nsstats,
-				   ns_statscounter_badednsver);
-		result = ns_client_addopt(client, client->message,
-					  &client->opt);
-		if (result == ISC_R_SUCCESS) {
-			result = DNS_R_BADVERS;
-		}
-		ns_client_error(client, result);
-		return result;
-	}
 
 	/* Check for NSID request */
 	result = dns_rdataset_first(opt);
@@ -1560,6 +1561,20 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 		while (isc_buffer_remaininglength(&optbuf) >= 4) {
 			optcode = isc_buffer_getuint16(&optbuf);
 			optlen = isc_buffer_getuint16(&optbuf);
+
+			INSIST(isc_buffer_remaininglength(&optbuf) >= optlen);
+
+			/*
+			 * When returning BADVERSION, only process
+			 * DNS_OPT_NSID or DNS_OPT_COOKIE options.
+			 */
+			if (client->ednsversion > DNS_EDNS_VERSION &&
+			    optcode != DNS_OPT_NSID &&
+			    optcode != DNS_OPT_COOKIE)
+			{
+				isc_buffer_forward(&optbuf, optlen);
+				continue;
+			}
 			switch (optcode) {
 			case DNS_OPT_NSID:
 				if (!WANTNSID(client)) {
@@ -1629,6 +1644,18 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 				break;
 			}
 		}
+	}
+
+	if (client->ednsversion > DNS_EDNS_VERSION) {
+		ns_stats_increment(client->manager->sctx->nsstats,
+				   ns_statscounter_badednsver);
+		result = ns_client_addopt(client, client->message,
+					  &client->opt);
+		if (result == ISC_R_SUCCESS) {
+			result = DNS_R_BADVERS;
+		}
+		ns_client_error(client, result);
+		return result;
 	}
 
 	ns_stats_increment(client->manager->sctx->nsstats,

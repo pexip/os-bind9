@@ -245,8 +245,8 @@ typedef struct qpcache_bucket {
 
 	/* Padding to prevent false sharing between locks. */
 	uint8_t __padding[ISC_OS_CACHELINE_SIZE -
-			  (sizeof(dns_slabheaderlist_t) + sizeof(isc_heap_t *) +
-			   sizeof(isc_rwlock_t)) %
+			  (sizeof(isc_queue_t) + sizeof(isc_rwlock_t) +
+			   sizeof(dns_slabheaderlist_t) + sizeof(isc_heap_t *)) %
 				  ISC_OS_CACHELINE_SIZE];
 
 } qpcache_bucket_t;
@@ -510,9 +510,10 @@ static atomic_uint_fast16_t init_count = 0;
  */
 static bool
 need_headerupdate(dns_slabheader_t *header, isc_stdtime_t now) {
-	if (DNS_SLABHEADER_GETATTR(header, (DNS_SLABHEADERATTR_NONEXISTENT |
-					    DNS_SLABHEADERATTR_ANCIENT |
-					    DNS_SLABHEADERATTR_ZEROTTL)) != 0)
+	if (DNS_SLABHEADER_GETATTR(header,
+				   DNS_SLABHEADERATTR_NONEXISTENT |
+					   DNS_SLABHEADERATTR_ANCIENT |
+					   DNS_SLABHEADERATTR_ZEROTTL) != 0)
 	{
 		return false;
 	}
@@ -1516,7 +1517,13 @@ find_coveringnsec(qpc_search_t *search, const dns_name_t *name,
 	 */
 	result = dns_qp_lookup(search->qpdb->nsec, name, NULL, &iter, NULL,
 			       (void **)&node, NULL);
-	if (result != DNS_R_PARTIALMATCH) {
+	/*
+	 * When DNS_R_PARTIALMATCH or ISC_R_NOTFOUND is returned from
+	 * dns_qp_lookup there is potentially a covering NSEC present
+	 * in the cache so we need to search for it.  Otherwise we are
+	 * done here.
+	 */
+	if (result != DNS_R_PARTIALMATCH && result != ISC_R_NOTFOUND) {
 		return ISC_R_NOTFOUND;
 	}
 
@@ -2453,7 +2460,7 @@ overmem(qpcache_t *qpdb, dns_slabheader_t *newheader,
 	 */
 	purgesize = 2 * (sizeof(qpcnode_t) +
 			 dns_name_size(&HEADERNODE(newheader)->name)) +
-		    rdataset_size(newheader) + 12288;
+		    rdataset_size(newheader) + QP_SAFETY_MARGIN;
 again:
 	do {
 		isc_rwlocktype_t nlocktype = isc_rwlocktype_none;
@@ -2986,39 +2993,43 @@ find_header:
 		 */
 		if (trust < header->trust && (ACTIVE(header, now) || header_nx))
 		{
-			dns_slabheader_destroy(&newheader);
-			if (addedrdataset != NULL) {
-				bindrdataset(qpdb, qpnode, header, now,
-					     nlocktype, tlocktype,
-					     addedrdataset DNS__DB_FLARG_PASS);
+			isc_result_t result = DNS_R_UNCHANGED;
+			bindrdataset(qpdb, qpnode, header, now, nlocktype,
+				     tlocktype,
+				     addedrdataset DNS__DB_FLARG_PASS);
+			if (ACTIVE(header, now) &&
+			    (options & DNS_DBADD_EQUALOK) != 0 &&
+			    dns_rdataslab_equalx(
+				    (unsigned char *)header,
+				    (unsigned char *)newheader,
+				    (unsigned int)(sizeof(*newheader)),
+				    qpdb->common.rdclass,
+				    (dns_rdatatype_t)header->type))
+			{
+				result = ISC_R_SUCCESS;
 			}
-			return DNS_R_UNCHANGED;
+			dns_slabheader_destroy(&newheader);
+			return result;
 		}
 
 		/*
-		 * Don't replace existing NS, A and AAAA RRsets in the
-		 * cache if they are already exist. This prevents named
-		 * being locked to old servers. Don't lower trust of
-		 * existing record if the update is forced. Nothing
-		 * special to be done w.r.t stale data; it gets replaced
-		 * normally further down.
+		 * Don't replace existing NS in the cache if they already exist
+		 * and replacing the existing one would increase the TTL. This
+		 * prevents named being locked to old servers. Don't lower trust
+		 * of existing record if the update is forced. Nothing special
+		 * to be done w.r.t stale data; it gets replaced normally
+		 * further down.
 		 */
 		if (ACTIVE(header, now) && header->type == dns_rdatatype_ns &&
 		    !header_nx && !newheader_nx &&
 		    header->trust >= newheader->trust &&
+		    header->ttl < newheader->ttl &&
 		    dns_rdataslab_equalx((unsigned char *)header,
 					 (unsigned char *)newheader,
 					 (unsigned int)(sizeof(*newheader)),
 					 qpdb->common.rdclass,
 					 (dns_rdatatype_t)header->type))
 		{
-			/*
-			 * Honour the new ttl if it is less than the
-			 * older one.
-			 */
-			if (header->ttl > newheader->ttl) {
-				setttl(header, newheader->ttl);
-			}
 			if (header->last_used != now) {
 				ISC_LIST_UNLINK(
 					qpdb->buckets[HEADERNODE(header)->locknum]
@@ -3052,7 +3063,7 @@ find_header:
 		}
 
 		/*
-		 * If we have will be replacing a NS RRset force its TTL
+		 * If we will be replacing a NS RRset force its TTL
 		 * to be no more than the current NS RRset's TTL.  This
 		 * ensures the delegations that are withdrawn are honoured.
 		 */
@@ -3061,6 +3072,11 @@ find_header:
 		    header->trust <= newheader->trust)
 		{
 			if (newheader->ttl > header->ttl) {
+				if (ZEROTTL(header)) {
+					DNS_SLABHEADER_SETATTR(
+						newheader,
+						DNS_SLABHEADERATTR_ZEROTTL);
+				}
 				newheader->ttl = header->ttl;
 			}
 		}
@@ -3072,17 +3088,11 @@ find_header:
 		     header->type == DNS_SIGTYPE(dns_rdatatype_ds)) &&
 		    !header_nx && !newheader_nx &&
 		    header->trust >= newheader->trust &&
+		    header->ttl < newheader->ttl &&
 		    dns_rdataslab_equal((unsigned char *)header,
 					(unsigned char *)newheader,
 					(unsigned int)(sizeof(*newheader))))
 		{
-			/*
-			 * Honour the new ttl if it is less than the
-			 * older one.
-			 */
-			if (header->ttl > newheader->ttl) {
-				setttl(header, newheader->ttl);
-			}
 			if (header->last_used != now) {
 				ISC_LIST_UNLINK(
 					qpdb->buckets[HEADERNODE(header)->locknum]

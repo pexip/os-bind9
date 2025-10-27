@@ -42,7 +42,7 @@ static dns_rdatasetmethods_t methods = {
 	NULL, /* clearprefetch */
 	isc__rdatalist_setownercase,
 	isc__rdatalist_getownercase,
-	NULL /* addglue */
+	NULL, /* addglue */
 };
 
 void

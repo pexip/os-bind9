@@ -1177,7 +1177,7 @@ default is used.
    https://github.com/farsightsec/fstrm) to send event payloads which
    are encoded using Protocol Buffers (``libprotobuf-c``, a mechanism
    for serializing structured data developed by Google, Inc.; see
-   https://developers.google.com/protocol-buffers/).
+   https://protobuf.dev).
 
    To enable :any:`dnstap` at compile time, the ``fstrm`` and
    ``protobuf-c`` libraries must be available, and BIND must be
@@ -2903,7 +2903,8 @@ Boolean Options
 Forwarding
 ^^^^^^^^^^
 
-The forwarding facility can be used to create a large site-wide cache on
+The forwarding facility sends queries which cannot be answered using local data
+to different resolvers. This can be used to create a large site-wide cache on
 a few servers, reducing traffic over links to external name servers. It
 can also be used to allow queries by servers that do not have direct
 access to the Internet, but wish to look up exterior names anyway.
@@ -2914,7 +2915,7 @@ authoritative and does not have the answer in its cache.
    :tags: query
    :short: Allows or disallows fallback to recursion if forwarding has failed; it is always used in conjunction with the :any:`forwarders` statement.
 
-   This option is only meaningful if the forwarders list is not empty. A
+   This option is only meaningful if the :any:`forwarders` list is not empty. A
    value of ``first`` is the default and causes the server to query the
    forwarders first; if that does not answer the question, the
    server then looks for the answer itself. If ``only`` is
@@ -2922,9 +2923,10 @@ authoritative and does not have the answer in its cache.
 
 .. namedconf:statement:: forwarders
    :tags: query
-   :short: Defines one or more hosts to which queries are forwarded.
+   :short: Defines one or more resolvers to which queries are forwarded.
 
-   This specifies a list of IP addresses to which queries are forwarded. The
+   This specifies a list of IP addresses of DNS resolvers, to which queries
+   which cannot be answered using locally available data are forwarded. The
    default is the empty list (no forwarding). Each address in the list can be
    associated with an optional port number. A default port number can be set
    for the entire list.
@@ -4117,15 +4119,18 @@ Periodic Task Intervals
    :tags: server
    :short: Sets the interval at which the server scans the network interface list.
 
-   The server scans the network interface list every :any:`interface-interval`
-   minutes. The default is 60 minutes; the maximum value is 28 days (40320
-   minutes). If set to 0, interface scanning only occurs when the configuration
+   The server scans the network interface list on every interval as specified by
+   :any:`interface-interval`.
+
+   If set to 0, interface scanning only occurs when the configuration
    file is loaded, or when :any:`automatic-interface-scan` is enabled and supported
    by the operating system. After the scan, the server begins listening for
    queries on any newly discovered interfaces (provided they are allowed by the
    :any:`listen-on` configuration), and stops listening on interfaces that have
    gone away. For convenience, TTL-style time-unit suffixes may be used to
    specify the value. It also accepts ISO 8601 duration formats.
+
+   The default is 60 minutes (1 hour); the maximum value is 28 days.
 
 The :any:`sortlist` Statement
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -4264,7 +4269,8 @@ RRset Ordering
        ``--enable-fixed-rrset`` at compile time.
 
    ``random``
-       Records are returned in a random order.
+       Records are returned in a non-deterministic order.  The random ordering
+       doesn't guarantee uniform distribution of all permutations.
 
    ``cyclic``
        Records are returned in a cyclic round-robin order, rotating by one
@@ -4417,7 +4423,7 @@ Tuning
    :any:`stale-answer-enable` option or by calling :option:`rndc serve-stale on <rndc serve-stale>`.
 
    When :any:`stale-cache-enable` is set to ``no``, setting the :any:`max-stale-ttl`
-   has no effect, the value of :any:`max-cache-ttl` will be ``0`` in such case.
+   has no effect; the value of :any:`max-stale-ttl` will be ``0`` in such case.
 
 .. namedconf:statement:: resolver-nonbackoff-tries
    :tags: deprecated.
@@ -6052,7 +6058,7 @@ The following options can be specified in a :any:`tls` statement:
     Cipher list which defines allowed ciphers, such as
     ``HIGH:!aNULL:!MD5:!SHA1:!SHA256:!SHA384``. The string must be
     formed according to the rules specified in the OpenSSL documentation
-    (see https://www.openssl.org/docs/man1.1.1/man1/ciphers.html
+    (see https://docs.openssl.org/1.1.1/man1/ciphers/
     for details).
 
 .. namedconf:statement:: prefer-server-ciphers
@@ -6907,33 +6913,68 @@ Zone Types
    :tags: zone
    :short: Contains a duplicate of the data for a zone that has been transferred from a primary server.
 
-    A secondary zone is a replica of a primary zone. Type ``slave`` is a
-    synonym for :any:`secondary <type secondary>`. The :any:`primaries` list specifies one or more IP
-    addresses of primary servers that the secondary contacts to update
-    its copy of the zone. Primaries list elements can
-    also be names of other primaries lists. By default,
-    transfers are made from port 53 on the servers;
-    this can be changed for all servers by specifying
-    a port number before the list of IP addresses,
-    or on a per-server basis after the IP address.
-    Authentication to the primary can also be done with
-    per-server TSIG keys.  If a file is specified, then the
-    replica is written to this file
-    whenever the zone
-    is changed, and reloaded from this file on a server
-    restart. Use of a file is recommended, since it
-    often speeds server startup and eliminates a
-    needless waste of bandwidth. Note that for large
-    numbers (in the tens or hundreds of thousands) of
-    zones per server, it is best to use a two-level
-    naming scheme for zone filenames. For example,
-    a secondary server for the zone
-    ``example.com`` might place
-    the zone contents into a file called
-    ``ex/example.com``, where
-    ``ex/`` is just the first two
-    letters of the zone name. (Most operating systems
-    behave very slowly if there are 100,000 files in a single directory.)
+   A secondary zone is a replica of a primary zone. Type ``slave`` is a
+   synonym for :any:`secondary <type secondary>`. The :any:`primaries` list
+   specifies one or more IP addresses of primary servers that the secondary
+   contacts to update its copy of the zone.
+
+   Primaries list elements can also be names of other primaries lists. By
+   default, transfers are made from port 53 on the servers; this can be
+   changed for all servers by specifying a port number before the list of IP
+   addresses, or on a per-server basis after the IP address. Authentication
+   to the primary can also be done with per-server TSIG keys.
+
+   A secondary zone is a replica of a primary zone. Type ``slave`` is a
+   synonym for :any:`secondary <type secondary>`. The :any:`primaries` list
+   specifies one or more IP addresses of primary servers that the secondary
+   contacts to update its copy of the zone.
+
+   A zone may refresh on timer or on receipt of a notify. If a valid notify is
+   received where the notify carries a serial number larger than the one in the
+   SOA currently served, then the secondary will schedule a zone refresh.
+
+   A notify is considered valid if the sender is one of the servers in the NS
+   RRset for the zone, has been explicitly allowed using an :any:`allow-notify`
+   clause, or is from an address listed in the primary servers clause.
+
+   If no notifies have been received, the server will try to refresh the zone.
+   The REFRESH field in the SOA record determines how long after the last zone
+   update it should query the primaries for the SOA record. Again, if the
+   SOA record contains a serial number larger than the one in the SOA currently
+   served, a zone refresh is scheduled. If a notify is received while a
+   refresh is in progress, the serial number of the notify is checked and if
+   it is larger, another refresh for the zone is queued. There will at most
+   be one zone refresh queued.
+
+   The primary servers are queried in turn, :any:`named` will move on to the
+   next server in the list if either it is unable to get a valid response from
+   the server it is currently querying, or the primary being queried returns
+   the same or smaller SOA than the secondary is currently serving. On the
+   first SOA received that has a serial bigger than the one currently served,
+   :any:`named` will initiate a zone transfer with that server. Once the zone
+   transfer has been received and the zone has been updated, then this zone
+   refresh is complete, and no other servers are tried.
+
+   When receiving a notify, :any:`named` does not first query the sender of
+   the notify. It will continue with the next server in the list that
+   transferred the zone, skipping over unreachable servers. A primary is
+   considered unreachable if the secondary cannot get a response from the
+   server. This state will be cached for 10 minutes, or until a notify is
+   received from that address.
+
+   Furthermore, a zone is refreshed when the secondary server is restarted,
+   or when a :option:`rndc refresh <rndc refresh>` command is received.
+
+   If a file is specified, then the replica is written to this file whenever the zone
+   is changed, and reloaded from this file on a server restart. Use of a file
+   is recommended, since it often speeds server startup and eliminates a
+   needless waste of bandwidth. Note that for large numbers (in the tens or
+   hundreds of thousands) of zones per server, it is best to use a two-level
+   naming scheme for zone filenames. For example, a secondary server for the
+   zone ``example.com`` might place the zone contents into a file called
+   ``ex/example.com``, where ``ex/`` is just the first two letters of the zone
+   name. (Most operating systems behave very slowly if there are 100,000 files
+   in a single directory.)
 
 .. namedconf:statement:: type mirror
    :tags: zone
@@ -7016,20 +7057,24 @@ Zone Types
 
 .. namedconf:statement:: type stub
    :tags: zone
-   :short: Contains a duplicate of the NS records of a primary zone.
+   :short: Contains a duplicate of the NS records of a zone.
 
-   A stub zone is similar to a secondary zone, except that it replicates only
-   the NS records of a primary zone instead of the entire zone. Stub zones
-   are not a standard part of the DNS; they are a feature specific to the
-   BIND implementation.
+   A stub zone specifies a set of name servers to use when contacting the zone
+   for the first time.  A stub zone overrides any NS records (delegations)
+   that might exist in the parent zone.  Once an authoritative server is
+   reached, the NS records from that server are honored.
 
-   Stub zones can be used to eliminate the need for a glue NS record in a parent
-   zone, at the expense of maintaining a stub zone entry and a set of name
-   server addresses in :iscman:`named.conf`. This usage is not recommended for
-   new configurations, and BIND 9 supports it only in a limited way. If a BIND 9
-   primary, serving a parent zone, has child stub
-   zones configured, all the secondary servers for the parent zone also need to
-   have the same child stub zones configured.
+   A stub zone can work around missing or broken delegations, but comes at
+   expense of maintaining a set of name server addresses in
+   :iscman:`named.conf`.
+
+   .. warning:: Use of stub zones is not recommended. Proper delegation
+                with NS records in the parent zone should be used.
+
+
+   :iscman:`named` queries authoritative servers configured as :any:`primaries`
+   to obtain up-to-date NS records. These new NS records are then used
+   to obtain answers from a given zone.
 
    Stub zones can also be used as a way to force the resolution of a given
    domain to use a particular set of authoritative servers. For example, the
@@ -7037,19 +7082,37 @@ Zone Types
    configured with stub zones for ``10.in-addr.arpa`` to use a set of
    internal name servers as the authoritative servers for that domain.
 
+   If a BIND 9 primary, serving a parent zone, has child stub zones configured,
+   all the secondary servers for the parent zone also need to have the same
+   child stub zones configured.
+
+   Stub zones are not a standard part of the DNS; they are a feature specific
+   to the BIND implementation.
+
+
 .. namedconf:statement:: type static-stub
    :tags: zone
-   :short: Contains a duplicate of the NS records of a primary zone, but statically configured rather than transferred from a primary server.
+   :short: Contains statically configured NS records for a zone.
 
-   A static-stub zone is similar to a stub zone, with the following
-   exceptions: the zone data is statically configured, rather than
-   transferred from a primary server; and when recursion is necessary for a query
-   that matches a static-stub zone, the locally configured data (name server
-   names and glue addresses) is always used, even if different authoritative
-   information is cached.
+   A static-stub zone specifies a set of name servers to use to resolve *all*
+   queries for the given zone.  A stub zone overrides any NS records
+   (delegations) that might exist in the parent zone, and also any records
+   received from the otherwise-authoritative server.
 
-   Zone data is configured via the :any:`server-addresses` and :any:`server-names`
-   zone options.
+   Like a :any:`stub <type stub>` zone, this can work around missing or broken
+   delegations at the parent.  Unlike stub, static-stub also overrides any NS
+   records offered by the specified servers.
+
+   When recursion is necessary for a query that matches a static-stub zone,
+   the locally configured data (name server names and glue addresses) is
+   always used, even if different authoritative information is cached.
+
+   The zone data is configured via the :any:`server-addresses` and
+   :any:`server-names` zone statements. These must point to authoritative
+   servers.
+
+   .. warning:: Use of static-stub zones is not recommended. Proper delegation
+                with NS records in the parent zone should be used.
 
    The zone data is maintained in the form of NS and (if necessary) glue A or
    AAAA RRs internally, which can be seen by dumping zone databases with
@@ -7060,7 +7123,7 @@ Zone Types
 
    Since the data is statically configured, no zone maintenance action takes
    place for a static-stub zone. For example, there is no periodic refresh
-   attempt, and an incoming notify message is rejected with an rcode
+   attempt, and an incoming :ref:`NOTIFY <notify>` message is rejected with an rcode
    of NOTAUTH.
 
    Each static-stub zone is configured with internally generated NS and (if
@@ -7341,7 +7404,7 @@ Zone Options
    :tags: query, zone
    :short: Specifies a list of IP addresses to which queries should be sent in recursive resolution for a static-stub zone.
 
-   This option is only meaningful for static-stub zones. This is a list of IP addresses
+   This option is only meaningful for :any:`static-stub <type static-stub>` zones. This is a list of IP addresses
    to which queries should be sent in recursive resolution for the zone.
    A non-empty list for this option internally configures the apex
    NS RR with associated glue A or AAAA RRs.
@@ -7366,7 +7429,7 @@ Zone Options
    :tags: zone
    :short: Specifies a list of domain names of name servers that act as authoritative servers of a static-stub zone.
 
-   This option is only meaningful for static-stub zones. This is a list of domain names
+   This option is only meaningful for :any:`static-stub <type static-stub>` zones. This is a list of domain names
    of name servers that act as authoritative servers of the static-stub
    zone. These names are resolved to IP addresses when :iscman:`named`
    needs to send queries to these servers. For this supplemental

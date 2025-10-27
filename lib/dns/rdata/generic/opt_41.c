@@ -44,7 +44,7 @@ fromtext_opt(ARGS_FROMTEXT) {
 static isc_result_t
 totext_opt(ARGS_TOTEXT) {
 	isc_region_t r;
-	isc_region_t or ;
+	isc_region_t or;
 	uint16_t option;
 	uint16_t length;
 	char buf[sizeof("64000 64000")];
@@ -323,9 +323,7 @@ tostruct_opt(ARGS_TOSTRUCT) {
 	REQUIRE(rdata->type == dns_rdatatype_opt);
 	REQUIRE(opt != NULL);
 
-	opt->common.rdclass = rdata->rdclass;
-	opt->common.rdtype = rdata->type;
-	ISC_LINK_INIT(&opt->common, link);
+	DNS_RDATACOMMON_INIT(opt, rdata->type, rdata->rdclass);
 
 	dns_rdata_toregion(rdata, &r);
 	opt->length = r.length;

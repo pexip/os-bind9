@@ -20,10 +20,11 @@ import pytest
 
 pytest.importorskip("dns")
 import dns.exception
-import dns.message
 import dns.name
 import dns.rdataclass
 import dns.rdatatype
+
+import isctest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
@@ -35,7 +36,7 @@ pytestmark = pytest.mark.extra_artifacts(
 
 def test_gnutls_cli_query(gnutls_cli_executable, named_tlsport):
     # Prepare the example/SOA query which will be sent over TLS.
-    query = dns.message.make_query("example.", dns.rdatatype.SOA)
+    query = isctest.query.create("example.", dns.rdatatype.SOA)
     query_wire = query.to_wire()
     query_with_length = struct.pack(">H", len(query_wire)) + query_wire
 
@@ -72,11 +73,11 @@ def test_gnutls_cli_query(gnutls_cli_executable, named_tlsport):
         # upon receiving a DNS response.
         selector = selectors.DefaultSelector()
         selector.register(gnutls_cli.stdout, selectors.EVENT_READ)
-        deadline = time.time() + 10
+        deadline = time.monotonic() + 10
         gnutls_cli_output = b""
         response = b""
         while not response and not gnutls_cli.poll():
-            if not selector.select(timeout=deadline - time.time()):
+            if not selector.select(timeout=deadline - time.monotonic()):
                 break
             gnutls_cli_output += gnutls_cli.stdout.read(512)
             try:

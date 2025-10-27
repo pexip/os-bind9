@@ -131,7 +131,7 @@ implicit default unless \fBnamed\fP has been compiled with
 .TP
 .B \-m flag
 This option turns on memory usage debugging flags. Possible flags are \fBusage\fP,
-\fBtrace\fP, \fBrecord\fP, \fBsize\fP, and \fBmctx\fP\&. These correspond to the
+\fBtrace\fP and \fBrecord\fP\&. These correspond to the
 \fBISC_MEM_DEBUGXXXX\fP flags described in \fB<isc/mem.h>\fP\&.
 .UNINDENT
 .INDENT 0.0

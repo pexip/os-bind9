@@ -17,7 +17,6 @@ A tool for reproducing ISC SPNEGO vulnerabilities
 """
 
 import argparse
-import datetime
 import struct
 import time
 
@@ -57,7 +56,7 @@ class CraftedTKEYQuery:
         rrset = dns.rrset.from_rdata(dns.name.root, dns.rdatatype.TKEY, rdata)
 
         # Prepare complete TKEY query to send
-        self.msg = dns.message.make_query(
+        self.msg = isctest.query.create(
             dns.name.root, dns.rdatatype.TKEY, dns.rdataclass.ANY
         )
         self.msg.additional.append(rrset)
@@ -177,14 +176,8 @@ def send_crafted_tkey_query(opts: argparse.Namespace) -> None:
     """
 
     query = CraftedTKEYQuery(opts).msg
-    print("# > " + str(datetime.datetime.now()))
-    print(query.to_text())
-    print()
 
-    response = isctest.query.tcp(query, opts.server_ip, timeout=2)
-    print("# < " + str(datetime.datetime.now()))
-    print(response.to_text())
-    print()
+    isctest.query.tcp(query, opts.server_ip, timeout=2)
 
 
 def test_cve_2020_8625():

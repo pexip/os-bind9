@@ -285,6 +285,27 @@ if [ -x "$DIG" ]; then
   status=$((status + ret))
 
   n=$((n + 1))
+  echo_i "checking dig +coflag works ($n)"
+  ret=0
+  dig_with_opts +tcp @10.53.0.3 +coflag +qr example >dig.out.test$n || ret=1
+  grep "^; EDNS: version: 0, flags: co;" <dig.out.test$n >/dev/null || ret=1
+  check_ttl_range dig.out.test$n "SOA" 300 || ret=1
+  if [ $ret -ne 0 ]; then echo_i "failed"; fi
+  status=$((status + ret))
+
+  if [ $HAS_PYYAML -ne 0 ]; then
+    n=$((n + 1))
+    echo_i "checking dig +coflag +yaml works ($n)"
+    ret=0
+    dig_with_opts +yaml +tcp @10.53.0.3 +coflag +qr example >dig.out.test$n || ret=1
+    $PYTHON yamlget.py dig.out.test$n 0 message query_message_data OPT_PSEUDOSECTION EDNS flags >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    [ "$value" = "co" ] || ret=1
+    if [ $ret -ne 0 ]; then echo_i "failed"; fi
+    status=$((status + ret))
+  fi
+
+  n=$((n + 1))
   echo_i "checking dig +raflag works ($n)"
   ret=0
   dig_with_opts +tcp @10.53.0.3 +raflag +qr example >dig.out.test$n || ret=1
@@ -919,7 +940,7 @@ if [ -x "$DIG" ]; then
 
   if [ $HAS_PYYAML -ne 0 ]; then
     n=$((n + 1))
-    echo_i "check dig +yaml output ($n)"
+    echo_i "check dig +yaml ANY output ($n)"
     ret=0
     dig_with_opts +qr +yaml @10.53.0.3 any ns2.example >dig.out.test$n 2>&1 || ret=1
     $PYTHON yamlget.py dig.out.test$n 0 message query_message_data status >yamlget.out.test$n 2>&1 || ret=1
@@ -1397,7 +1418,7 @@ if [ -x "$DELV" ]; then
 
   if [ $HAS_PYYAML -ne 0 ]; then
     n=$((n + 1))
-    echo_i "check delv +yaml output ($n)"
+    echo_i "check delv +yaml ANY output ($n)"
     ret=0
     delv_with_opts +yaml @10.53.0.3 any ns2.example >delv.out.test$n || ret=1
     $PYTHON yamlget.py delv.out.test$n status >yamlget.out.test$n 2>&1 || ret=1
@@ -1407,6 +1428,40 @@ if [ -x "$DELV" ]; then
     read -r value <yamlget.out.test$n
     [ "$value" = "ns2.example" ] || ret=1
     $PYTHON yamlget.py delv.out.test$n records 0 answer_not_validated 0 >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    count=$(echo $value | wc -w)
+    [ ${count:-0} -eq 5 ] || ret=1
+    if [ $ret -ne 0 ]; then echo_i "failed"; fi
+    status=$((status + ret))
+
+    n=$((n + 1))
+    echo_i "check delv +yaml NODATA output ($n)"
+    ret=0
+    delv_with_opts +yaml @10.53.0.3 type500 ns2.example >delv.out.test$n || ret=1
+    $PYTHON yamlget.py delv.out.test$n status >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    [ "$value" = "ncache nxrrset" ] || ret=1
+    $PYTHON yamlget.py delv.out.test$n query_name >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    [ "$value" = "ns2.example" ] || ret=1
+    $PYTHON yamlget.py delv.out.test$n records 0 negative_response_answer_not_validated 0 >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    count=$(echo $value | wc -w)
+    [ ${count:-0} -eq 5 ] || ret=1
+    if [ $ret -ne 0 ]; then echo_i "failed"; fi
+    status=$((status + ret))
+
+    n=$((n + 1))
+    echo_i "check delv +yaml NXDOMAIN output ($n)"
+    ret=0
+    delv_with_opts +yaml @10.53.0.3 a this-does-not-exist.ns2.example >delv.out.test$n || ret=1
+    $PYTHON yamlget.py delv.out.test$n status >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    [ "$value" = "ncache nxdomain" ] || ret=1
+    $PYTHON yamlget.py delv.out.test$n query_name >yamlget.out.test$n 2>&1 || ret=1
+    read -r value <yamlget.out.test$n
+    [ "$value" = "this-does-not-exist.ns2.example" ] || ret=1
+    $PYTHON yamlget.py delv.out.test$n records 0 negative_response_answer_not_validated 0 >yamlget.out.test$n 2>&1 || ret=1
     read -r value <yamlget.out.test$n
     count=$(echo $value | wc -w)
     [ ${count:-0} -eq 5 ] || ret=1

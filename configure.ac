@@ -16,7 +16,7 @@
 #
 m4_define([bind_VERSION_MAJOR], 9)dnl
 m4_define([bind_VERSION_MINOR], 18)dnl
-m4_define([bind_VERSION_PATCH], 33)dnl
+m4_define([bind_VERSION_PATCH], 41)dnl
 m4_define([bind_VERSION_EXTRA], )dnl
 m4_define([bind_DESCRIPTION], [(Extended Support Version)])dnl
 m4_define([bind_SRCID], [m4_esyscmd_s([git rev-parse --short HEAD | cut -b1-7])])dnl
@@ -1314,20 +1314,6 @@ AS_IF([test "$with_jemalloc" = "no"],
 AM_CONDITIONAL([HAVE_JEMALLOC], [test "$with_jemalloc" = "yes"])
 
 #
-# was --with-tuning specified?
-#
-# [pairwise: --with-tuning=small, --without-tuning]
-AC_ARG_WITH([tuning],
-	    AS_HELP_STRING([--with-tuning=ARG],
-			   [Specify server tuning (default or small)]),
-	    [],[with_tuning=no])
-
-AS_CASE([$with_tuning],
-	[small],[AC_MSG_NOTICE(using small system tuning)],
-	[AC_DEFINE(TUNE_LARGE, 1, [Define to use default system tuning.])
-	 AC_MSG_NOTICE(using default system tuning)])
-
-#
 # was --enable-querytrace or --enable-singletrace specified?
 #
 # [pairwise: --enable-singletrace --enable-querytrace, --disable-singletrace --enable-querytrace, --disable-singletrace --disable-querytrace]
@@ -1552,7 +1538,7 @@ AC_CONFIG_FILES([fuzz/Makefile])
 
 # Misc
 
-AC_CONFIG_FILES([util/check-make-install])
+AC_CONFIG_FILES([util/check-make-install.sh])
 
 #
 # Do it
@@ -1576,7 +1562,6 @@ report() {
     if test "yes" = "$enable_full_report" -o "standard" = "$with_locktype"; then
 	echo "    Mutex lock type: $with_locktype"
     fi
-    test "small" = "$with_tuning" && echo "    Small-system tuning (--with-tuning)"
     test "no" = "$enable_dnstap" || \
 	    echo "    Allow 'dnstap' packet logging (--enable-dnstap)"
     test -z "$MAXMINDDB_LIBS" || echo "    GeoIP2 access control (--enable-geoip)"
@@ -1621,7 +1606,6 @@ report() {
       echo "    +------------------------------------------+"
       echo
     fi
-    test "small" = "$with_tuning" || echo "    Small-system tuning (--with-tuning)"
 
     test "no" = "$enable_dnstap" && \
 	    echo "    Allow 'dnstap' packet logging (--enable-dnstap)"

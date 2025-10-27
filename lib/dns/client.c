@@ -60,12 +60,6 @@
 #define UCTX_MAGIC    ISC_MAGIC('U', 'c', 't', 'x')
 #define UCTX_VALID(c) ISC_MAGIC_VALID(c, UCTX_MAGIC)
 
-#ifdef TUNE_LARGE
-#define RESOLVER_NTASKS 523
-#else /* ifdef TUNE_LARGE */
-#define RESOLVER_NTASKS 31
-#endif /* TUNE_LARGE */
-
 #define CHECK(r)                             \
 	do {                                 \
 		result = (r);                \
@@ -332,9 +326,8 @@ dns_client_create(isc_mem_t *mctx, isc_appctx_t *actx, isc_taskmgr_t *taskmgr,
 	isc_refcount_init(&client->references, 1);
 
 	/* Create the default view for class IN */
-	result = createview(mctx, dns_rdataclass_in, taskmgr, RESOLVER_NTASKS,
-			    nm, timermgr, client->dispatchmgr, dispatchv4,
-			    dispatchv6, &view);
+	result = createview(mctx, dns_rdataclass_in, taskmgr, 1, nm, timermgr,
+			    client->dispatchmgr, dispatchv4, dispatchv6, &view);
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup_references;
 	}

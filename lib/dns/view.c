@@ -159,9 +159,9 @@ dns_view_create(isc_mem_t *mctx, dns_rdataclass_t rdclass, const char *name,
 	view->task = NULL;
 	isc_refcount_init(&view->references, 1);
 	isc_refcount_init(&view->weakrefs, 1);
-	atomic_init(&view->attributes,
-		    (DNS_VIEWATTR_RESSHUTDOWN | DNS_VIEWATTR_ADBSHUTDOWN |
-		     DNS_VIEWATTR_REQSHUTDOWN));
+	atomic_init(&view->attributes, DNS_VIEWATTR_RESSHUTDOWN |
+					       DNS_VIEWATTR_ADBSHUTDOWN |
+					       DNS_VIEWATTR_REQSHUTDOWN);
 	view->transports = NULL;
 	view->statickeys = NULL;
 	view->dynamickeys = NULL;
@@ -1010,13 +1010,22 @@ dns_view_thaw(dns_view_t *view) {
 
 isc_result_t
 dns_view_addzone(dns_view_t *view, dns_zone_t *zone) {
-	isc_result_t result;
+	isc_result_t result = ISC_R_SHUTTINGDOWN;
+	dns_zt_t *zt = NULL;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 	REQUIRE(!view->frozen);
-	REQUIRE(view->zonetable != NULL);
 
-	result = dns_zt_mount(view->zonetable, zone);
+	LOCK(&view->lock);
+	if (view->zonetable != NULL) {
+		dns_zt_attach(view->zonetable, &zt);
+	}
+	UNLOCK(&view->lock);
+
+	if (zt != NULL) {
+		result = dns_zt_mount(zt, zone);
+		dns_zt_detach(&zt);
+	}
 
 	return result;
 }

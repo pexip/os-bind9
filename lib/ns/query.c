@@ -4462,7 +4462,7 @@ cleanup:
 #ifdef USE_DNSRPS
 	if (st->popt.dnsrps_enabled && st->m.policy != DNS_RPZ_POLICY_ERROR &&
 	    !dnsrps_set_p(&emsg, client, st, qtype, &rdataset,
-			  (qresult_type != qresult_type_recurse)))
+			  qresult_type != qresult_type_recurse))
 	{
 		rpz_log_fail(client, DNS_RPZ_ERROR_LEVEL, NULL,
 			     DNS_RPZ_TYPE_BAD, emsg.c, DNS_R_SERVFAIL);
@@ -5308,6 +5308,9 @@ qctx_clean(query_ctx_t *qctx) {
 	if (qctx->db != NULL && qctx->node != NULL) {
 		dns_db_detachnode(qctx->db, &qctx->node);
 	}
+	if (qctx->client != NULL && qctx->client->query.gluedb != NULL) {
+		dns_db_detach(&qctx->client->query.gluedb);
+	}
 }
 
 /*%
@@ -5740,6 +5743,13 @@ ns__query_start(query_ctx_t *qctx) {
 		}
 	}
 
+	/*
+	 * If this is a chained query (e.g. CNAME), these bits should be reset
+	 * to not use the settings from the previous query.
+	 */
+	qctx->options &= ~DNS_GETDB_STALEFIRST;
+	qctx->client->query.dboptions &= ~DNS_DBFIND_STALETIMEOUT;
+
 	if (!qctx->is_zone && (qctx->view->staleanswerclienttimeout == 0) &&
 	    dns_view_staleanswerenabled(qctx->view))
 	{
@@ -5759,6 +5769,7 @@ ns__query_start(query_ctx_t *qctx) {
 	 * when it completes, this option is not expected to be set.
 	 */
 	qctx->options &= ~DNS_GETDB_STALEFIRST;
+	qctx->client->query.dboptions &= ~DNS_DBFIND_STALETIMEOUT;
 
 cleanup:
 	return result;
@@ -6798,14 +6809,13 @@ query_resume(query_ctx_t *qctx) {
 		/*
 		 * Has response policy changed out from under us?
 		 */
-		if (qctx->rpz_st->rpz_ver != qctx->view->rpzs->rpz_ver) {
+		if (qctx->view->rpzs == NULL ||
+		    qctx->rpz_st->rpz_ver != qctx->view->rpzs->rpz_ver)
+		{
 			ns_client_log(qctx->client, NS_LOGCATEGORY_CLIENT,
 				      NS_LOGMODULE_QUERY, DNS_RPZ_INFO_LEVEL,
-				      "query_resume: RPZ settings "
-				      "out of date "
-				      "(rpz_ver %d, expected %d)",
-				      qctx->view->rpzs->rpz_ver,
-				      qctx->rpz_st->rpz_ver);
+				      "query_resume: RPZ settings out of date "
+				      "after of a reconfiguration");
 			QUERY_ERROR(qctx, DNS_R_SERVFAIL);
 			return ns_query_done(qctx);
 		}
@@ -7037,6 +7047,9 @@ ns_query_hookasync(query_ctx_t *qctx, ns_query_starthookasync_t runasync,
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup_and_detach_from_quota;
 	}
+
+	/* Record that an asynchronous copy of the qctx has been started */
+	qctx->async = true;
 
 	/*
 	 * Typically the runasync() function will trigger recursion, but
@@ -11973,10 +11986,6 @@ ns_query_done(query_ctx_t *qctx) {
 	qctx_clean(qctx);
 	qctx_freedata(qctx);
 
-	if (qctx->client->query.gluedb != NULL) {
-		dns_db_detach(&qctx->client->query.gluedb);
-	}
-
 	/*
 	 * Clear the AA bit if we're not authoritative.
 	 */
@@ -12113,6 +12122,17 @@ ns_query_done(query_ctx_t *qctx) {
 	return qctx->result;
 
 cleanup:
+	/*
+	 * We'd only get here if one of the hooks above
+	 * (NS_QUERY_DONE_BEGIN or NS_QUERY_DONE_SEND) returned
+	 * NS_HOOK_RETURN. Some housekeeping may be needed.
+	 */
+	qctx_clean(qctx);
+	qctx_freedata(qctx);
+	if (!qctx->async) {
+		qctx->detach_client = true;
+		query_error(qctx->client, DNS_R_SERVFAIL, __LINE__);
+	}
 	return result;
 }
 

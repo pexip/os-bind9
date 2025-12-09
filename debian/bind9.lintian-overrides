@@ -1,1 +1,1 @@
-bind9: systemd-service-file-refers-to-unusual-wantedby-target lib/systemd/system/named-resolvconf.service
+bind9: systemd-service-file-refers-to-unusual-wantedby-target named.service [usr/lib/systemd/system/named-resolvconf.service]

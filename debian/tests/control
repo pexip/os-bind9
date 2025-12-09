@@ -7,3 +7,9 @@ Tests: validation
 Restrictions: isolation-container, needs-internet, needs-root, flaky
 Depends: bind9,
          bind9-dnsutils
+
+Tests: zonetest
+Restrictions: isolation-container, needs-root
+Depends: bind9,
+         bind9-dnsutils,
+         bind9-utils

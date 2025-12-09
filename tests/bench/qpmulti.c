@@ -762,7 +762,7 @@ collect(void *varg) {
 	nloops = zipf ? bctx->nloops : bctx->readers + bctx->mutate;
 	for (uint32_t t = 0; t < nloops; t++) {
 		struct thread_args *tp = &thread[t];
-		elapsed = ISC_MAX(elapsed, (tp->stop - tp->start));
+		elapsed = ISC_MAX(elapsed, tp->stop - tp->start);
 		bool mut = t < bctx->mutate;
 
 		stats[mut].worked += tp->worked;
@@ -770,6 +770,8 @@ collect(void *varg) {
 		stats[mut].ops += tp->transactions * tp->ops_per_tx;
 		stats[mut].compactions += tp->compactions;
 	}
+
+	INSIST(elapsed >= RUNTIME);
 
 	printf("%7.3f\t", RUNTIME / (double)NS_PER_SEC);
 	printf("%7.3f\t", elapsed / (double)NS_PER_SEC);

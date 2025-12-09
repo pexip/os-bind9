@@ -13,19 +13,27 @@
 
 import os
 from pathlib import Path
+import platform
+import socket
 import shutil
 import subprocess
 
 import pytest
 
-
 long_test = pytest.mark.skipif(
-    not os.environ.get("CI_ENABLE_ALL_TESTS"), reason="CI_ENABLE_ALL_TESTS not set"
+    not os.environ.get("CI_ENABLE_LONG_TESTS"), reason="CI_ENABLE_LONG_TESTS not set"
+)
+
+live_internet_test = pytest.mark.skipif(
+    not os.environ.get("CI_ENABLE_LIVE_INTERNET_TESTS"),
+    reason="CI_ENABLE_LIVE_INTERNET_TESTS not set",
 )
 
 
 def feature_test(feature):
-    feature_test_bin = os.environ["FEATURETEST"]
+    feature_test_bin = os.environ.get("FEATURETEST")
+    if not feature_test_bin:  # this can be the case when running doctest
+        return False
     try:
         subprocess.run([feature_test_bin, feature], check=True)
     except subprocess.CalledProcessError as exc:
@@ -48,12 +56,19 @@ def is_dnsrps_available():
     return True
 
 
-def with_dnstap(*args):  # pylint: disable=unused-argument
-    return feature_test("--enable-dnstap")
+def is_host_freebsd_13(*_):
+    return platform.system() == "FreeBSD" and platform.release().startswith("13")
 
 
-def with_tsan(*args):  # pylint: disable=unused-argument
-    return feature_test("--tsan")
+def with_algorithm(name: str):
+    key = f"{name}_SUPPORTED"
+    assert key in os.environ, f"{key} env variable undefined"
+    return pytest.mark.skipif(os.getenv(key) != "1", reason=f"{name} is not supported")
+
+
+with_dnstap = pytest.mark.skipif(
+    not feature_test("--enable-dnstap"), reason="DNSTAP support disabled in the build"
+)
 
 
 without_fips = pytest.mark.skipif(
@@ -87,19 +102,14 @@ softhsm2_environment = pytest.mark.skipif(
     reason="SOFTHSM2_CONF and SOFTHSM2_MODULE environmental variables must be set and pkcs11-tool and softhsm2-util tools present",
 )
 
-try:
-    import flaky as flaky_pkg  # type: ignore
-except ModuleNotFoundError:
-    # In case the flaky package is not installed, run the tests as usual
-    # without any attempts to re-run them.
-    # pylint: disable=unused-argument
-    def flaky(*args, **kwargs):
-        """Mock decorator that doesn't do anything special, just returns the function."""
 
-        def wrapper(wrapped_obj):
-            return wrapped_obj
+def have_ipv6():
+    sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    try:
+        sock.bind(("fd92:7065:b8e:ffff::1", 0))
+    except OSError:
+        return False
+    return True
 
-        return wrapper
 
-else:
-    flaky = flaky_pkg.flaky
+with_ipv6 = pytest.mark.skipif(not have_ipv6(), reason="IPv6 not available")

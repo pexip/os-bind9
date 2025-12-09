@@ -103,6 +103,7 @@ typedef enum {
 	DNS_ZONEOPT_CHECKTTL = 1 << 28,	      /*%< check max-zone-ttl */
 	DNS_ZONEOPT_AUTOEMPTY = 1 << 29,      /*%< automatic empty zone */
 	DNS_ZONEOPT_CHECKSVCB = 1 << 30,      /*%< check SVBC records */
+	DNS_ZONEOPT_FORCEKEYMGR = 1ULL << 31, /*%< force keymgr step */
 	DNS_ZONEOPT___MAX = UINT64_MAX, /* trick to make the ENUM 64-bit wide */
 } dns_zoneopt_t;
 
@@ -849,7 +850,7 @@ dns_zone_setmaxretrytime(dns_zone_t *zone, uint32_t val);
  *	val > 0.
  */
 
-isc_result_t
+void
 dns_zone_setxfrsource4(dns_zone_t *zone, const isc_sockaddr_t *xfrsource);
 /*%<
  * 	Set the source address to be used in IPv4 zone transfers.
@@ -857,22 +858,20 @@ dns_zone_setxfrsource4(dns_zone_t *zone, const isc_sockaddr_t *xfrsource);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'xfrsource' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getxfrsource4(dns_zone_t *zone);
+void
+dns_zone_getxfrsource4(dns_zone_t *zone, isc_sockaddr_t *xfrsource);
 /*%<
  *	Returns the source address set by a previous dns_zone_setxfrsource4
  *	call, or the default of inaddr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'xfrsource' to not be NULL
  */
 
-isc_result_t
+void
 dns_zone_setxfrsource6(dns_zone_t *zone, const isc_sockaddr_t *xfrsource);
 /*%<
  * 	Set the source address to be used in IPv6 zone transfers.
@@ -880,22 +879,20 @@ dns_zone_setxfrsource6(dns_zone_t *zone, const isc_sockaddr_t *xfrsource);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'xfrsource' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getxfrsource6(dns_zone_t *zone);
+void
+dns_zone_getxfrsource6(dns_zone_t *zone, isc_sockaddr_t *xfrsource);
 /*%<
  *	Returns the source address set by a previous dns_zone_setxfrsource6
  *	call, or the default of in6addr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'xfrsource' to not be NULL
  */
 
-isc_result_t
+void
 dns_zone_setparentalsrc4(dns_zone_t *zone, const isc_sockaddr_t *parentalsrc);
 /*%<
  * 	Set the source address to be used with IPv4 parental DS queries.
@@ -903,22 +900,20 @@ dns_zone_setparentalsrc4(dns_zone_t *zone, const isc_sockaddr_t *parentalsrc);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'parentalsrc' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getparentalsrc4(dns_zone_t *zone);
+void
+dns_zone_getparentalsrc4(dns_zone_t *zone, isc_sockaddr_t *parentalsrc);
 /*%<
  *	Returns the source address set by a previous dns_zone_setparentalsrc4
  *	call, or the default of inaddr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'parentalsrc' to be non NULL.
  */
 
-isc_result_t
+void
 dns_zone_setparentalsrc6(dns_zone_t *zone, const isc_sockaddr_t *parentalsrc);
 /*%<
  * 	Set the source address to be used with IPv6 parental DS queries.
@@ -926,22 +921,20 @@ dns_zone_setparentalsrc6(dns_zone_t *zone, const isc_sockaddr_t *parentalsrc);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'parentalsrc' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getparentalsrc6(dns_zone_t *zone);
+void
+dns_zone_getparentalsrc6(dns_zone_t *zone, isc_sockaddr_t *parentalsrc);
 /*%<
  *	Returns the source address set by a previous dns_zone_setparentalsrc6
  *	call, or the default of in6addr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'parentalsrc' to be non NULL.
  */
 
-isc_result_t
+void
 dns_zone_setnotifysrc4(dns_zone_t *zone, const isc_sockaddr_t *notifysrc);
 /*%<
  * 	Set the source address to be used with IPv4 NOTIFY messages.
@@ -949,22 +942,20 @@ dns_zone_setnotifysrc4(dns_zone_t *zone, const isc_sockaddr_t *notifysrc);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'notifysrc' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getnotifysrc4(dns_zone_t *zone);
+void
+dns_zone_getnotifysrc4(dns_zone_t *zone, isc_sockaddr_t *notifysrc);
 /*%<
  *	Returns the source address set by a previous dns_zone_setnotifysrc4
  *	call, or the default of inaddr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'notifysrc' to be non NULL.
  */
 
-isc_result_t
+void
 dns_zone_setnotifysrc6(dns_zone_t *zone, const isc_sockaddr_t *notifysrc);
 /*%<
  * 	Set the source address to be used with IPv6 NOTIFY messages.
@@ -972,19 +963,17 @@ dns_zone_setnotifysrc6(dns_zone_t *zone, const isc_sockaddr_t *notifysrc);
  * Require:
  *\li	'zone' to be a valid zone.
  *\li	'notifysrc' to contain the address.
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
  */
 
-isc_sockaddr_t *
-dns_zone_getnotifysrc6(dns_zone_t *zone);
+void
+dns_zone_getnotifysrc6(dns_zone_t *zone, isc_sockaddr_t *notifysrc);
 /*%<
  *	Returns the source address set by a previous dns_zone_setnotifysrc6
  *	call, or the default of in6addr_any, port 0.
  *
  * Require:
  *\li	'zone' to be a valid zone.
+ *\li	'notifysrc' to be non NULL.
  */
 
 void
@@ -1387,9 +1376,10 @@ dns_zone_getredirecttype(dns_zone_t *zone);
  */
 
 void
-dns_zone_notify(dns_zone_t *zone);
+dns_zone_notify(dns_zone_t *zone, bool nodefer);
 /*%<
- * Generate notify events for this zone.
+ * Generate notify events for this zone. If 'nodefer' is true, the
+ * 'notify-defer' configuration option is ingored.
  *
  * Requires:
  *\li	'zone' to be a valid zone.
@@ -1563,8 +1553,8 @@ dns_zone_getsigresigninginterval(dns_zone_t *zone);
  * \li	'zone' to be a valid zone.
  */
 
-isc_sockaddr_t
-dns_zone_getsourceaddr(dns_zone_t *zone);
+void
+dns_zone_getsourceaddr(dns_zone_t *zone, isc_sockaddr_t *sourceaddr);
 /*%<
  * Get the zone's source address from which it has last contacted the current
  * primary server.
@@ -1572,17 +1562,18 @@ dns_zone_getsourceaddr(dns_zone_t *zone);
  * Requires:
  * \li	'zone' to be a valid zone.
  * \li	'zone' has a non-empty primaries list.
+ * \li	'sourceaddr' to be non-NULL.
  */
 
 isc_result_t
-dns_zone_getprimaryaddr(dns_zone_t *zone, isc_sockaddr_t *dest);
+dns_zone_getprimaryaddr(dns_zone_t *zone, isc_sockaddr_t *primaryaddr);
 /*%<
- * Get the zone's current primary server into '*dest'.
+ * Get the zone's current primary server into '*primaryaddr'.
  *
  * Requires:
  * \li	'zone' to be a valid zone.
  * \li	'zone' has a non-empty primaries list.
- * \li	'dest' != NULL.
+ * \li	'primaryaddr' to be non-NULL.
  *
  * Returns:
  *\li	#ISC_R_SUCCESS if the current primary server was found
@@ -1765,6 +1756,20 @@ dns_zone_findkeys(dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *ver,
  * Returns:
  *\li	#ISC_R_SUCCESS
  *\li	Error
+ */
+
+void
+dns_zone_prepare_shutdown(dns_zone_t *zone);
+/*%<
+ * Prepare a zone for shutdown by setting the DNS_ZONEFLG_EXITING flag even
+ * before the final reference is detached. Useful, because the zone object can
+ * be kept around with a valid reference from the zonetable until qp garbage
+ * collector runs, and we don't want, for example, zone maintenance to happen
+ * while waiting for it. Note that the zone can not be used normally again after
+ * this function is called.
+ *
+ * Requires:
+ *\li	'zone' to be a valid initialised zone.
  */
 
 void
@@ -2245,18 +2250,19 @@ dns_zone_setcheckns(dns_zone_t *zone, dns_checknsfunc_t checkns);
  */
 
 void
-dns_zone_setnotifydelay(dns_zone_t *zone, uint32_t delay);
+dns_zone_setnotifydefer(dns_zone_t *zone, uint32_t defer);
 /*%<
- * Set the minimum delay between sets of notify messages.
+ * Set the wait/defer time (in seconds) before notify messages are sent when
+ * they are ready.
  *
  * Requires:
  *	'zone' to be valid.
  */
 
-uint32_t
-dns_zone_getnotifydelay(dns_zone_t *zone);
+void
+dns_zone_setnotifydelay(dns_zone_t *zone, uint32_t delay);
 /*%<
- * Get the minimum delay between sets of notify messages.
+ * Set the minimum delay (in seconds) between sets of notify messages.
  *
  * Requires:
  *	'zone' to be valid.
@@ -2296,14 +2302,6 @@ dns_zone_getsignatures(dns_zone_t *zone);
  */
 
 isc_result_t
-dns_zone_signwithkey(dns_zone_t *zone, dns_secalg_t algorithm, uint16_t keyid,
-		     bool deleteit);
-/*%<
- * Initiate/resume signing of the entire zone with the zone DNSKEY(s)
- * that match the given algorithm and keyid.
- */
-
-isc_result_t
 dns_zone_addnsec3chain(dns_zone_t *zone, dns_rdata_nsec3param_t *nsec3param);
 /*%<
  * Incrementally add a NSEC3 chain that corresponds to 'nsec3param'.
@@ -2319,7 +2317,7 @@ dns_zone_getprivatetype(dns_zone_t *zone);
  */
 
 void
-dns_zone_rekey(dns_zone_t *zone, bool fullsign);
+dns_zone_rekey(dns_zone_t *zone, bool fullsign, bool forcekeymgr);
 /*%<
  * Update the zone's DNSKEY set from the key repository.
  *
@@ -2327,6 +2325,9 @@ dns_zone_rekey(dns_zone_t *zone, bool fullsign);
  * the zone with the new key.  Otherwise, if there are no keys or
  * if the new keys are for algorithms that have already signed the
  * zone, then the zone can be re-signed incrementally.
+ *
+ * If 'forcekeymgr' is true, trigger a rekey event and allow the
+ * next steps in the run to happen.
  */
 
 isc_result_t

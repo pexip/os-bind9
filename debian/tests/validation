@@ -3,26 +3,39 @@
 set -e
 
 setup() (
-	service bind9 stop
-	service bind9 start
-)
-
-run() (
-	repeats=10
-	while [ "${repeats}" -gt "0" ]; do
-		# Make a query against an external nameserver and check for DNSSEC validation
-		echo "Checking for DNSSEC validation status of internetsociety.org"
-		dig -t a internetsociety.org @127.0.0.1 | grep -E 'flags:.+ad; QUERY' && break
-		repeats=$((repeats-1))
-		sleep 1
-	done
-	[ "$repeats" -eq "0" ] && exit 1
+	service named stop
+	service named start
 )
 
 teardown() (
-	service bind9 stop
+	service named stop
+)
+trap teardown EXIT
+
+run() (
+	max_attempts=10
+	repeats=${max_attempts}
+	while [ "${repeats}" -gt "0" ]; do
+		# Make a query against an external nameserver and check for DNSSEC validation
+		echo "Checking for DNSSEC validation status of internetsociety.org"
+		out=$(dig -t a internetsociety.org @127.0.0.1 | grep -E 'flags:.+ad; QUERY' || true)
+		if [ "$out" ]; then
+			break
+		fi
+		# As a fallback in case of failure in internetsociety.org, check against ripe.net
+		echo "Checking for DNSSEC validation status of ripe.net"
+		out=$(dig -t a ripe.net @127.0.0.1 | grep -E 'flags:.+ad; QUERY' || true)
+		if [ "$out" ]; then
+			break
+		fi
+		repeats=$((repeats - 1))
+		sleep 1
+	done
+	if ! [ "$out" ]; then
+		echo "DNSSEC validation check failed after ${max_attempts} attempts"
+		exit 1
+	fi
 )
 
 setup
 run
-teardown

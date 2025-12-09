@@ -90,6 +90,12 @@
 #include <dns/types.h>
 
 /*%
+ * How many bytes a qp-trie might allocate as part of an insert. Needed for
+ * overmem checks.
+ */
+#define QP_SAFETY_MARGIN ((1ul << 12ul) * 12)
+
+/*%
  * A `dns_qp_t` supports single-threaded read/write access.
  */
 typedef struct dns_qp dns_qp_t;
@@ -306,7 +312,6 @@ typedef struct dns_qp_memusage {
 	size_t hold;	    /*%< nodes retained for readers */
 	size_t free;	    /*%< nodes to be reclaimed */
 	size_t node_size;   /*%< in bytes */
-	size_t chunk_size;  /*%< nodes per chunk */
 	size_t chunk_count; /*%< allocated chunks */
 	size_t bytes;	    /*%< total memory in chunks and metadata */
 	bool   fragmented;  /*%< trie needs compaction */
@@ -732,23 +737,6 @@ dns_qpmulti_query(dns_qpmulti_t *multi, dns_qpread_t *qpr);
  *
  * The `dns_qpmulti_query()` function must be called from an isc_loop
  * thread and its 'qpr' argument must be allocated on the stack.
- *
- * Requires:
- * \li  `multi` is a pointer to a valid multi-threaded qp-trie
- * \li  `qpr != NULL`
- *
- * Returns:
- * \li  `qpr` is a valid read-only qp-trie handle
- */
-
-void
-dns_qpmulti_lockedread(dns_qpmulti_t *multi, dns_qpread_t *qpr);
-/*%<
- * Start a read-only transaction that takes the `dns_qpmulti_t` mutex.
- *
- * The `dns_qpmulti_lockedread()` function must NOT be called from an
- * isc_loop thread. We keep query and read transactions separate to
- * avoid accidentally taking or failing to take the mutex.
  *
  * Requires:
  * \li  `multi` is a pointer to a valid multi-threaded qp-trie

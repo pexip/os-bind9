@@ -1450,8 +1450,9 @@ static cfg_clausedef_t options_clauses[] = {
 	{ "tcp-receive-buffer", &cfg_type_uint32, 0 },
 	{ "tcp-send-buffer", &cfg_type_uint32, 0 },
 	{ "tkey-dhkey", NULL, CFG_CLAUSEFLAG_ANCIENT },
-	{ "tkey-domain", &cfg_type_qstring, 0 },
-	{ "tkey-gssapi-credential", &cfg_type_qstring, 0 },
+	{ "tkey-domain", &cfg_type_qstring, CFG_CLAUSEFLAG_OBSOLETE },
+	{ "tkey-gssapi-credential", &cfg_type_qstring,
+	  CFG_CLAUSEFLAG_DEPRECATED },
 	{ "tkey-gssapi-keytab", &cfg_type_qstring, 0 },
 	{ "transfer-message-size", &cfg_type_uint32, 0 },
 	{ "transfers-in", &cfg_type_uint32, 0 },
@@ -1756,7 +1757,7 @@ static cfg_type_t cfg_type_dnstapoutput = { "dnstapoutput", parse_dtout,
  *  } [ recursive-only yes|no ] [ max-policy-ttl number ]
  *	 [ min-update-interval number ]
  *	 [ break-dnssec yes|no ] [ min-ns-dots number ]
- *	 [ qname-wait-recurse yes|no ]
+ *	 [ qname-wait-recurse yes|no ] [ servfail-until-ready yes|no ]
  *	 [ nsip-enable yes|no ] [ nsdname-enable yes|no ]
  *	 [ dnsrps-enable yes|no ]
  *	 [ dnsrps-options { DNSRPS configuration string } ];
@@ -1979,6 +1980,7 @@ static cfg_tuplefielddef_t rpz_fields[] = {
 	{ "nsdname-wait-recurse", &cfg_type_boolean, 0 },
 	{ "qname-wait-recurse", &cfg_type_boolean, 0 },
 	{ "recursive-only", &cfg_type_boolean, 0 },
+	{ "servfail-until-ready", &cfg_type_boolean, 0 },
 	{ "nsip-enable", &cfg_type_boolean, 0 },
 	{ "nsdname-enable", &cfg_type_boolean, 0 },
 #ifdef USE_DNSRPS
@@ -2351,6 +2353,7 @@ static cfg_clausedef_t dnssecpolicy_clauses[] = {
 	{ "dnskey-ttl", &cfg_type_duration, 0 },
 	{ "inline-signing", &cfg_type_boolean, 0 },
 	{ "keys", &cfg_type_kaspkeys, 0 },
+	{ "manual-mode", &cfg_type_boolean, 0 },
 	{ "max-zone-ttl", &cfg_type_duration, 0 },
 	{ "nsec3param", &cfg_type_nsec3, 0 },
 	{ "offline-ksk", &cfg_type_boolean, 0 },
@@ -2495,6 +2498,8 @@ static cfg_clausedef_t zone_clauses[] = {
 	{ "multi-master", &cfg_type_boolean,
 	  CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR | CFG_ZONE_STUB },
 	{ "notify", &cfg_type_notifytype,
+	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR },
+	{ "notify-defer", &cfg_type_uint32,
 	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR },
 	{ "notify-delay", &cfg_type_uint32,
 	  CFG_ZONE_PRIMARY | CFG_ZONE_SECONDARY | CFG_ZONE_MIRROR },

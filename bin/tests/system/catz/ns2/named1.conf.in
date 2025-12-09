@@ -43,6 +43,9 @@ options {
 view "default" {
 
 	catalog-zones {
+		zone "catalog0.example"
+			/* unset default-primaries, see GL#5494 */
+			in-memory yes;
 		zone "catalog1.example"
 			default-masters { 10.53.0.1; }
 			min-update-interval 1s
@@ -62,6 +65,9 @@ view "default" {
 #T2		zone "catalog5.example"
 #T2			min-update-interval 1s
 #T2			default-primaries { 10.53.0.1; };
+		zone "catalog6.example"
+			min-update-interval 1s
+			default-primaries { 10.53.0.1; };
 		zone "catalog-bad1.example"
 			default-masters { 10.53.0.1; }
 			min-update-interval 1s
@@ -105,6 +111,12 @@ view "default" {
 	    forwarders { };
 	};
 
+	zone "catalog0.example" {
+		type secondary;
+		file "catalog0.example.db";
+		primaries { 10.53.0.1; };
+	};
+
 	zone "catalog1.example" {
 		type secondary;
 		file "catalog1.example.db";
@@ -126,6 +138,12 @@ view "default" {
 	zone "catalog4.example" {
 		type secondary;
 		file "catalog4.example.db";
+		primaries { 10.53.0.1; };
+	};
+
+	zone "catalog6.example" {
+		type secondary;
+		file "catalog6.example.db";
 		primaries { 10.53.0.1; };
 	};
 

@@ -13,6 +13,7 @@ import pytest
 
 pytestmark = pytest.mark.extra_artifacts(
     [
+        ".hypothesis/examples/*",
         "K*",
         "canonical*",
         "delv.out*",
@@ -78,6 +79,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns3/NSEC3",
         "ns3/auto-nsec.example.db",
         "ns3/auto-nsec3.example.db",
+        "ns3/badalg.secure.example.db",
         "ns3/badds.example.db",
         "ns3/bogus.example.db",
         "ns3/disabled.managed.db",
@@ -90,6 +92,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns3/dnskey-unsupported-2.example.db",
         "ns3/dnskey-unsupported.example.db",
         "ns3/dnskey-unsupported.example.db.tmp",
+        "ns3/ds-unsupported.example.db",
         "ns3/dynamic.example.db",
         "ns3/digest-alg-unsupported.example.db",
         "ns3/enabled.managed.db",
@@ -140,7 +143,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns3/update-nsec3.example.db.signed",
         "ns3/upper.example.db",
         "ns3/upper.example.db.lower",
-        "ns3/ds-unsupported.example.db",
+        "ns3/zonecut.ent.secure.example.db",
         "ns4/managed.conf",
         "ns4/managed-keys.bind",
         "ns4/named.secroots",

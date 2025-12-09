@@ -105,11 +105,10 @@ typedef struct dig_searchlist dig_searchlist_t;
 struct dig_lookup {
 	unsigned int magic;
 	isc_refcount_t references;
-	bool aaonly, adflag, badcookie, besteffort, cdflag, cleared, comments,
-		dns64prefix, dnssec, doing_xfr, done_as_is, ednsneg, expandaaaa,
-		expire, fuzzing, header_only, identify, /*%< Append an "on
-							   server <foo>" message
-							 */
+	bool aaonly, adflag, badcookie, besteffort, cdflag, cleared, coflag,
+		comments, dns64prefix, dnssec, doing_xfr, done_as_is, ednsneg,
+		expandaaaa, expire, fuzzing, header_only,
+		identify, /*%< Append an "on server <foo>" message */
 		identify_previous_line, /*% Prepend a "Nameserver <foo>:"
 					   message, with newline and tab */
 		idnin, idnout, ignore, multiline, need_search, new_search,
@@ -121,9 +120,9 @@ struct dig_lookup {
 		section_answer, section_authority, section_question,
 		seenbadcookie, sendcookie, servfail_stops,
 		setqid, /*% use a speciied query ID */
-		showbadcookie, stats, tcflag, tcp_keepalive, tcp_mode,
-		tcp_mode_set, tls_mode, /*% connect using TLS */
-		trace,			/*% dig +trace */
+		showbadcookie, showbadvers, stats, tcflag, tcp_keepalive,
+		tcp_mode, tcp_mode_set, tls_mode, /*% connect using TLS */
+		trace,				  /*% dig +trace */
 		trace_root, /*% initial query for either +trace or +nssearch */
 		ttlunits, use_usec, waiting_connect, zflag;
 	char textname[MXNAME]; /*% Name we're going to be looking up */
@@ -154,6 +153,7 @@ struct dig_lookup {
 	int nsfound;
 	int16_t udpsize;
 	int16_t edns;
+	int16_t original_edns;
 	int16_t padding;
 	uint32_t ixfr_serial;
 	isc_buffer_t rdatabuf;

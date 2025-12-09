@@ -29,7 +29,7 @@ options {
 	notify yes;
 	minimal-responses no;
 	recursion yes;
-	dnssec-validation yes;
+	dnssec-validation no;
 	min-refresh-time 1;
 	min-retry-time 1;
 
@@ -51,6 +51,9 @@ options {
 	    zone "bl.tld2";
 	    zone "manual-update-rpz"	ede forged;
 	    zone "mixed-case-rpz";
+	    zone "evil-cname"  policy cname a12.tld2. ede blocked;
+	    zone "wild-cname"  ede blocked;
+	    zone "slow-rpz";
 	}
 	add-soa yes
 	min-ns-dots 0
@@ -58,6 +61,7 @@ options {
 	min-update-interval 0
 	nsdname-enable yes
 	nsip-enable yes
+	servfail-until-ready yes
 	;
 
 	include "../dnsrps.conf";
@@ -65,7 +69,6 @@ options {
 	notify-delay 0;
 };
 
-trust-anchors { };
 
 logging { category rpz { default_debug; }; };
 
@@ -125,6 +128,12 @@ zone "mixed-case-rpz." {
 	notify no;
 };
 
+zone "slow-rpz." {
+    type primary;
+    file "slow-rpz.db";
+    notify no;
+};
+
 zone "fast-expire." {
 	type secondary;
 	file "fast-expire.db";
@@ -150,6 +159,16 @@ zone "stub-nomatch." {
 zone "static-stub-nomatch." {
 	type static-stub;
 	server-addresses { 10.53.0.10; };
+};
+
+zone "evil-cname" {
+	type primary;
+	file "evil-cname.db";
+};
+
+zone "wild-cname" {
+	type primary;
+	file "wild-cname.db";
 };
 
 # A faulty dlz configuration to check if named with response policy zones

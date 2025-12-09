@@ -389,7 +389,16 @@ svcb1			SVCB	1 . port=60
 https0			HTTPS	0 example.net.
 https1			HTTPS	1 . port=60
 
-; type 66 -- 98 (unassigned)
+; type 66
+dsync01			DSYNC	CDS NOTIFY 53 .
+
+; type 67
+hhit			HHIT	abcd
+
+; type 68
+brid			BRID	abcd
+
+; type 69 -- 98 (unassigned)
 
 ; type 99
 spf01			SPF	"v=spf1 -all"

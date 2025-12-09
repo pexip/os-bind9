@@ -64,7 +64,7 @@ options {\n\
 #endif /* if defined(HAVE_GEOIP2) */
 			    "\
 	heartbeat-interval 60;\n\
-	interface-interval 60;\n\
+	interface-interval 60m;\n					\
 	listen-on {any;};\n\
 	listen-on-v6 {any;};\n\
 	match-mapped-addresses no;\n\
@@ -123,7 +123,6 @@ options {\n\
 	tcp-listen-queue 10;\n\
 	tcp-receive-buffer 0;\n\
 	tcp-send-buffer 0;\n\
-#	tkey-domain <none>\n\
 #	tkey-gssapi-credential <none>\n\
 	transfer-message-size 20480;\n\
 	transfers-in 10;\n\
@@ -242,6 +241,7 @@ options {\n\
 	min-transfer-rate-in 10240 5;\n\
 	multi-master no;\n\
 	notify yes;\n\
+	notify-defer 0;\n\
 	notify-delay 5;\n\
 	notify-to-soa no;\n\
 	serial-update-method increment;\n\
@@ -305,6 +305,7 @@ dnssec-policy \"default\" {\n\
 	cds-digest-types { 2; };\n\
 	dnskey-ttl " DNS_KASP_KEY_TTL ";\n\
 	inline-signing yes;\n\
+	manual-mode no;\n\
 	offline-ksk no;\n\
 	publish-safety " DNS_KASP_PUBLISH_SAFETY "; \n\
 	retire-safety " DNS_KASP_RETIRE_SAFETY "; \n\
@@ -323,6 +324,7 @@ dnssec-policy \"insecure\" {\n\
 	max-zone-ttl 0; \n\
 	keys { };\n\
 	inline-signing yes;\n\
+	manual-mode no;\n\
 };\n\
 \n\
 "

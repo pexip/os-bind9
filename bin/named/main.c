@@ -131,6 +131,7 @@ static int maxudp = 0;
 /*
  * -T options:
  */
+static bool cookiealwaysvalid = false;
 static bool dropedns = false;
 static bool ednsformerr = false;
 static bool ednsnotimp = false;
@@ -141,6 +142,7 @@ static bool noedns = false;
 static bool nonearest = false;
 static bool nosoa = false;
 static bool notcp = false;
+static bool rpzslow = false;
 static bool sigvalinsecs = false;
 static bool transferinsecs = false;
 static bool transferslowly = false;
@@ -640,6 +642,7 @@ printversion(bool verbose) {
 	printf("threads support is enabled\n");
 
 	isc_mem_create(&mctx);
+	isc_mem_setname(mctx, "main");
 	result = dst_lib_init(mctx, named_g_engine);
 	if (result == ISC_R_SUCCESS) {
 		isc_buffer_init(&b, buf, sizeof(buf));
@@ -717,7 +720,9 @@ parse_T_opt(char *option) {
 	 * force the server to behave (or misbehave) in
 	 * specified ways for testing purposes.
 	 */
-	if (!strcmp(option, "dropedns")) {
+	if (!strcmp(option, "cookiealwaysvalid")) {
+		cookiealwaysvalid = true;
+	} else if (!strcmp(option, "dropedns")) {
 		dropedns = true;
 	} else if (!strcmp(option, "ednsformerr")) {
 		ednsformerr = true;
@@ -785,6 +790,8 @@ parse_T_opt(char *option) {
 		if (dns_zone_mkey_month < dns_zone_mkey_day) {
 			named_main_earlyfatal("bad mkeytimer");
 		}
+	} else if (!strcmp(option, "rpzslow")) {
+		rpzslow = true;
 	} else if (!strcmp(option, "sigvalinsecs")) {
 		sigvalinsecs = true;
 	} else if (!strcmp(option, "transferinsecs")) {
@@ -1325,6 +1332,9 @@ setup(void) {
 	/*
 	 * Modify server context according to command line options
 	 */
+	if (cookiealwaysvalid) {
+		ns_server_setoption(sctx, NS_SERVER_COOKIEALWAYSVALID, true);
+	}
 	if (disable4) {
 		ns_server_setoption(sctx, NS_SERVER_DISABLE4, true);
 	}
@@ -1360,6 +1370,9 @@ setup(void) {
 	}
 	if (notcp) {
 		ns_server_setoption(sctx, NS_SERVER_NOTCP, true);
+	}
+	if (rpzslow) {
+		ns_server_setoption(sctx, NS_SERVER_RPZSLOW, true);
 	}
 	if (sigvalinsecs) {
 		ns_server_setoption(sctx, NS_SERVER_SIGVALINSECS, true);

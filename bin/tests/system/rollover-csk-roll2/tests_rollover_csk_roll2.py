@@ -24,7 +24,11 @@ from rollover.common import (
     size,
     TIMEDELTA,
 )
-
+from rollover.setup import (
+    configure_root,
+    configure_tld,
+    configure_cskroll2,
+)
 
 CDSS = ["CDNSKEY", "CDS (SHA-256)", "CDS (SHA-384)"]
 CONFIG = {
@@ -66,6 +70,30 @@ OFFSETS["step6-p"] = OFFSETS["step5-p"] - int(KEYTTLPROP.total_seconds())
 OFFSETS["step6-s"] = OFFSETS["step5-s"] - int(KEYTTLPROP.total_seconds())
 OFFSETS["step7-p"] = OFFSETS["step6-p"] - int(timedelta(days=90).total_seconds())
 OFFSETS["step7-s"] = OFFSETS["step6-s"] - int(timedelta(days=90).total_seconds())
+
+
+def bootstrap():
+    data = {
+        "tlds": [],
+        "trust_anchors": [],
+    }
+
+    tlds = []
+    for tld_name in [
+        "autosign",
+        "manual",
+    ]:
+        delegations = configure_cskroll2(tld_name, f"{POLICY}-{tld_name}")
+
+        tld = configure_tld(tld_name, delegations)
+        tlds.append(tld)
+
+        data["tlds"].append(tld_name)
+
+    ta = configure_root(tlds)
+    data["trust_anchors"].append(ta)
+
+    return data
 
 
 @pytest.mark.parametrize(
@@ -128,7 +156,7 @@ def test_csk_roll2_step2(tld, alg, size, ns3):
         # Check logs.
         tag = keys[0].key.tag
         msg = f"keymgr-manual-mode: block CSK rollover for key {zone}/ECDSAP256SHA256/{tag} (policy {policy})"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -188,7 +216,7 @@ def test_csk_roll2_step3(tld, alg, size, ns3):
         # Check logs.
         tag = keys[1].key.tag
         msg = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type ZRRSIG state HIDDEN to state RUMOURED"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -315,8 +343,8 @@ def test_csk_roll2_step5(tld, alg, size, ns3):
         tag = keys[0].key.tag
         msg1 = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type DNSKEY state OMNIPRESENT to state UNRETENTIVE"
         msg2 = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type KRRSIG state OMNIPRESENT to state UNRETENTIVE"
-        ns3.log.expect(msg1)
-        ns3.log.expect(msg2)
+        assert msg1 in ns3.log
+        assert msg2 in ns3.log
 
         # Force step.
         tag = keys[1].key.tag

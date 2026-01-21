@@ -21,11 +21,76 @@ import dns.update
 
 import isctest
 from isctest.kasp import Iret
+from isctest.run import EnvCmd
 from rollover.common import (
     pytestmark,
     alg,
     size,
 )
+from rollover.setup import fake_lifetime, render_and_sign_zone
+
+
+def bootstrap():
+    templates = isctest.template.TemplateEngine(".")
+
+    # Multi-signer zones.
+    keygen = EnvCmd("KEYGEN", "-a ECDSA256 -L 3600")
+    settime = EnvCmd("SETTIME", "-s")
+
+    # Model 2.
+    zonename = "multisigner-model2.kasp"
+    isctest.log.info(f"setup {zonename}")
+    # Key generation.
+    ksk_name = keygen(f"-M 32768:65535 -f KSK {zonename}", cwd="ns3").out.strip()
+    zsk_name = keygen(f"-M 32768:65535 {zonename}", cwd="ns3").out.strip()
+    # Signing.
+    dnskeys = []
+    for key_name in [ksk_name, zsk_name]:
+        key = isctest.kasp.Key(key_name, keydir="ns3")
+        dnskeys.append(key.dnskey)
+    # Import a ZSK of another provider into the DNSKEY RRset.
+    zsk_extra = keygen(f"-M 0:32767 {zonename}").out.strip()
+    key = isctest.kasp.Key(zsk_extra)
+    dnskeys.append(key.dnskey)
+    # Render zone file.
+    outfile = f"{zonename}.db"
+    templates = isctest.template.TemplateEngine(".")
+    template = "template.db.j2.manual"
+    tdata = {
+        "fqdn": f"{zonename}.",
+        "dnskeys": dnskeys,
+        "privaterrs": [],
+    }
+    templates.render(f"ns3/{outfile}", tdata, template=f"ns3/{template}")
+
+    # We are changing an existing single-signed zone to multi-signed
+    # zone where the key tags do not match the dnssec-policy key tag range
+    zonename = "single-to-multisigner.kasp"
+    isctest.log.info(f"setup {zonename}")
+    # Timing metadata.
+    TpubN = "now-7d"
+    TsbmN = "now-8635mi"  # T - 1d5m
+    keytimes = f"-P {TpubN} -A {TpubN}"
+    cdstimes = f"-P sync {TsbmN}"
+    # Key generation.
+    ksk_name = keygen(
+        f"-M 0:32767 -f KSK {keytimes} {cdstimes} {zonename}", cwd="ns3"
+    ).out.strip()
+    zsk_name = keygen(f"-M 0:32767 {keytimes} {zonename}", cwd="ns3").out.strip()
+    settime(
+        f"-g OMNIPRESENT -d OMNIPRESENT {TpubN} -k OMNIPRESENT {TpubN} -r OMNIPRESENT {TpubN} {ksk_name}",
+        cwd="ns3",
+    )
+    settime(
+        f"-g OMNIPRESENT -k OMNIPRESENT {TpubN} -z OMNIPRESENT {TpubN} {zsk_name}",
+        cwd="ns3",
+    )
+    # Signing.
+    fake_lifetime(ksk_name, 0)
+    fake_lifetime(zsk_name, 0)
+    render_and_sign_zone(zonename, [ksk_name, zsk_name])
+
+    return {}
 
 
 def test_rollover_multisigner(ns3, alg, size):
@@ -58,7 +123,7 @@ def test_rollover_multisigner(ns3, alg, size):
             zone,
         ]
 
-        return isctest.run.cmd(keygen_command).stdout.decode("utf-8")
+        return isctest.run.cmd(keygen_command).out
 
     zone = "multisigner-model2.kasp"
 
@@ -74,8 +139,8 @@ def test_rollover_multisigner(ns3, alg, size):
 
     newprops = [f"zsk unlimited {alg} {size} tag-range:0-32767"]
     expected2 = isctest.kasp.policy_to_properties(ttl, newprops)
-    expected2[0].properties["private"] = False
-    expected2[0].properties["legacy"] = True
+    expected2[0].private = False  # noqa
+    expected2[0].legacy = True  # noqa
     expected = expected + expected2
 
     ownkeys = isctest.kasp.keydir_to_keylist(zone, ns3.identifier)
@@ -98,15 +163,14 @@ def test_rollover_multisigner(ns3, alg, size):
     newkeys = isctest.kasp.keystr_to_keylist(out)
     newprops = [f"zsk unlimited {alg} {size} tag-range:0-32767"]
     expected2 = isctest.kasp.policy_to_properties(ttl, newprops)
-    expected2[0].properties["private"] = False
-    expected2[0].properties["legacy"] = True
+    expected2[0].private = False  # noqa
+    expected2[0].legacy = True  # noqa
     expected = expected + expected2
 
-    dnskey = newkeys[0].dnskey().split()
-    rdata = " ".join(dnskey[4:])
+    dnskey = newkeys[0].dnskey
 
     update_msg = dns.update.UpdateMessage(zone)
-    update_msg.add(f"{dnskey[0]}", 3600, "DNSKEY", rdata)
+    update_msg.add(dnskey.name, dnskey.ttl, dnskey[0])
     ns3.nsupdate(update_msg)
 
     isctest.kasp.check_dnssec_verify(ns3, zone)
@@ -118,11 +182,10 @@ def test_rollover_multisigner(ns3, alg, size):
     isctest.kasp.check_subdomain(ns3, zone, ksks, zsks)
 
     # Remove ZSKs from the other providers for zone.
-    dnskey2 = extkeys[0].dnskey().split()
-    rdata2 = " ".join(dnskey2[4:])
+    dnskey2 = extkeys[0].dnskey
     update_msg = dns.update.UpdateMessage(zone)
-    update_msg.delete(f"{dnskey[0]}", "DNSKEY", rdata)
-    update_msg.delete(f"{dnskey2[0]}", "DNSKEY", rdata2)
+    update_msg.delete(dnskey.name, dnskey[0])
+    update_msg.delete(dnskey2.name, dnskey2[0])
     ns3.nsupdate(update_msg)
 
     isctest.kasp.check_dnssec_verify(ns3, zone)

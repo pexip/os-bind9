@@ -11,6 +11,9 @@
 
 import pytest
 
+# isctest.asyncserver requires dnspython >= 2.0.0
+pytest.importorskip("dns", minversion="2.0.0")
+
 pytestmark = pytest.mark.extra_artifacts(
     [
         ".hypothesis/examples/*",
@@ -100,6 +103,7 @@ pytestmark = pytest.mark.extra_artifacts(
         "ns3/example.bk",
         "ns3/expired.example.db",
         "ns3/expiring.example.db",
+        "ns3/extrabadkey.example.db",
         "ns3/future.example.db",
         "ns3/keyless.example.db",
         "ns3/kskonly.example.db",

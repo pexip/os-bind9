@@ -2852,7 +2852,7 @@ findkeys:
 	 * Find keys that match this zone in the key repository.
 	 */
 	result = dns_dnssec_findmatchingkeys(gorigin, NULL, directory, NULL,
-					     now, mctx, &matchkeys);
+					     now, false, mctx, &matchkeys);
 	if (result == ISC_R_NOTFOUND) {
 		result = ISC_R_SUCCESS;
 	}
@@ -3234,10 +3234,10 @@ print_version(FILE *fp) {
 }
 
 noreturn static void
-usage(void);
+usage(int ret);
 
 static void
-usage(void) {
+usage(int ret) {
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, "\t%s [options] zonefile [keys]\n", program);
 
@@ -3325,7 +3325,7 @@ usage(void) {
 	fprintf(stderr, "(default: all zone keys that have private keys)\n");
 	fprintf(stderr, "\tkeyfile (Kname+alg+tag)\n");
 
-	exit(EXIT_FAILURE);
+	exit(ret);
 }
 
 static void
@@ -3699,10 +3699,12 @@ main(int argc, char *argv[]) {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-			FALLTHROUGH;
+			/* Does not return. */
+			usage(EXIT_FAILURE);
+
 		case 'h':
 			/* Does not return. */
-			usage();
+			usage(EXIT_SUCCESS);
 
 		case 'V':
 			/* Does not return. */
@@ -3795,7 +3797,7 @@ main(int argc, char *argv[]) {
 	argv += isc_commandline_index;
 
 	if (argc < 1) {
-		usage();
+		usage(EXIT_FAILURE);
 	}
 
 	file = argv[0];

@@ -62,6 +62,16 @@ teardown_managers(void **state);
 #define TESTS_DIR "./"
 #endif
 
+/* cmocka<2.0.0 compatibility */
+#ifndef assert_int_in_range
+#define assert_int_in_range(value, min, max) \
+	assert_in_range((value), (min), (max))
+#endif
+#ifndef assert_uint_in_range
+#define assert_uint_in_range(value, min, max) \
+	assert_in_range((value), (min), (max))
+#endif
+
 /* clang-format off */
 /* Copied from cmocka */
 #define ISC_TEST_ENTRY(name)				\
@@ -117,8 +127,8 @@ teardown_managers(void **state);
 		isc_mem_debugging |= ISC_MEM_DEBUGRECORD;                               \
 		isc_mem_create(&mctx);                                                  \
                                                                                         \
-		while ((c = isc_commandline_parse(argc, argv, "dlt:")) != -1)           \
-		{                                                                       \
+		while ((c = isc_commandline_parse(argc, argv, "dlt:")) !=               \
+		       -1) {                                                            \
 			switch (c) {                                                    \
 			case 'd':                                                       \
 				debug = true;                                           \

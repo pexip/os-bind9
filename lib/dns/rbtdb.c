@@ -65,13 +65,6 @@
 
 #define RBTDB_MAGIC ISC_MAGIC('R', 'B', 'D', '4')
 
-#define CHECK(op)                            \
-	do {                                 \
-		result = (op);               \
-		if (result != ISC_R_SUCCESS) \
-			goto failure;        \
-	} while (0)
-
 /*%
  * Note that "impmagic" is not the first four bytes of the struct, so
  * ISC_MAGIC_VALID cannot be used.
@@ -9589,11 +9582,12 @@ dbiterator_prev(dns_dbiterator_t *iterator) {
 		resume_iteration(rbtdbiter);
 	}
 
-	dereference_iter_node(rbtdbiter);
-
 	name = dns_fixedname_name(&rbtdbiter->name);
 	origin = dns_fixedname_name(&rbtdbiter->origin);
 	result = dns_rbtnodechain_prev(rbtdbiter->current, name, origin);
+
+	dereference_iter_node(rbtdbiter);
+
 	if (rbtdbiter->current == &rbtdbiter->nsec3chain &&
 	    (result == ISC_R_SUCCESS || result == DNS_R_NEWORIGIN))
 	{

@@ -105,12 +105,11 @@ check_PROGRAMS = aes_test$(EXEEXT) buffer_test$(EXEEXT) \
 	hmac_test$(EXEEXT) ht_test$(EXEEXT) lex_test$(EXEEXT) \
 	md_test$(EXEEXT) mem_test$(EXEEXT) netaddr_test$(EXEEXT) \
 	netmgr_test$(EXEEXT) parse_test$(EXEEXT) pool_test$(EXEEXT) \
-	quota_test$(EXEEXT) radix_test$(EXEEXT) random_test$(EXEEXT) \
-	regex_test$(EXEEXT) result_test$(EXEEXT) safe_test$(EXEEXT) \
-	siphash_test$(EXEEXT) sockaddr_test$(EXEEXT) \
-	stats_test$(EXEEXT) symtab_test$(EXEEXT) task_test$(EXEEXT) \
-	taskpool_test$(EXEEXT) time_test$(EXEEXT) timer_test$(EXEEXT) \
-	$(am__EXEEXT_1)
+	quota_test$(EXEEXT) radix_test$(EXEEXT) regex_test$(EXEEXT) \
+	result_test$(EXEEXT) safe_test$(EXEEXT) siphash_test$(EXEEXT) \
+	sockaddr_test$(EXEEXT) stats_test$(EXEEXT) \
+	symtab_test$(EXEEXT) task_test$(EXEEXT) taskpool_test$(EXEEXT) \
+	time_test$(EXEEXT) timer_test$(EXEEXT) $(am__EXEEXT_1)
 @HAVE_LIBNGHTTP2_TRUE@am__append_2 = \
 @HAVE_LIBNGHTTP2_TRUE@	doh_test
 
@@ -268,9 +267,6 @@ radix_test_LDADD = $(LDADD)
 radix_test_DEPENDENCIES = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1) \
 	$(top_builddir)/tests/libtest/libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_3)
-random_test_SOURCES = random_test.c
-random_test_OBJECTS = random_test.$(OBJEXT)
-random_test_DEPENDENCIES = $(am__DEPENDENCIES_4)
 regex_test_SOURCES = regex_test.c
 regex_test_OBJECTS = regex_test.$(OBJEXT)
 regex_test_LDADD = $(LDADD)
@@ -363,11 +359,10 @@ am__depfiles_remade = ./$(DEPDIR)/aes_test.Po \
 	./$(DEPDIR)/netmgr_test-netmgr_test.Po \
 	./$(DEPDIR)/parse_test.Po ./$(DEPDIR)/pool_test.Po \
 	./$(DEPDIR)/quota_test.Po ./$(DEPDIR)/radix_test.Po \
-	./$(DEPDIR)/random_test.Po ./$(DEPDIR)/regex_test.Po \
-	./$(DEPDIR)/result_test.Po ./$(DEPDIR)/safe_test.Po \
-	./$(DEPDIR)/siphash_test.Po ./$(DEPDIR)/sockaddr_test.Po \
-	./$(DEPDIR)/stats_test.Po ./$(DEPDIR)/symtab_test.Po \
-	./$(DEPDIR)/task_test-task_test.Po \
+	./$(DEPDIR)/regex_test.Po ./$(DEPDIR)/result_test.Po \
+	./$(DEPDIR)/safe_test.Po ./$(DEPDIR)/siphash_test.Po \
+	./$(DEPDIR)/sockaddr_test.Po ./$(DEPDIR)/stats_test.Po \
+	./$(DEPDIR)/symtab_test.Po ./$(DEPDIR)/task_test-task_test.Po \
 	./$(DEPDIR)/taskpool_test.Po ./$(DEPDIR)/time_test.Po \
 	./$(DEPDIR)/timer_test.Po
 am__mv = mv -f
@@ -393,18 +388,18 @@ SOURCES = aes_test.c buffer_test.c counter_test.c crc64_test.c \
 	$(doh_test_SOURCES) errno_test.c file_test.c hash_test.c \
 	heap_test.c hmac_test.c ht_test.c lex_test.c md_test.c \
 	mem_test.c netaddr_test.c $(netmgr_test_SOURCES) parse_test.c \
-	pool_test.c quota_test.c radix_test.c random_test.c \
-	regex_test.c result_test.c safe_test.c siphash_test.c \
-	sockaddr_test.c stats_test.c symtab_test.c task_test.c \
-	taskpool_test.c time_test.c timer_test.c
+	pool_test.c quota_test.c radix_test.c regex_test.c \
+	result_test.c safe_test.c siphash_test.c sockaddr_test.c \
+	stats_test.c symtab_test.c task_test.c taskpool_test.c \
+	time_test.c timer_test.c
 DIST_SOURCES = aes_test.c buffer_test.c counter_test.c crc64_test.c \
 	$(am__doh_test_SOURCES_DIST) errno_test.c file_test.c \
 	hash_test.c heap_test.c hmac_test.c ht_test.c lex_test.c \
 	md_test.c mem_test.c netaddr_test.c $(netmgr_test_SOURCES) \
 	parse_test.c pool_test.c quota_test.c radix_test.c \
-	random_test.c regex_test.c result_test.c safe_test.c \
-	siphash_test.c sockaddr_test.c stats_test.c symtab_test.c \
-	task_test.c taskpool_test.c time_test.c timer_test.c
+	regex_test.c result_test.c safe_test.c siphash_test.c \
+	sockaddr_test.c stats_test.c symtab_test.c task_test.c \
+	taskpool_test.c time_test.c timer_test.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -948,10 +943,6 @@ netmgr_test_SOURCES = \
 	netmgr_test.c	\
 	uv_wrap.h
 
-random_test_LDADD = \
-	$(LDADD)	\
-	-lm
-
 task_test_CPPFLAGS = $(AM_CPPFLAGS) $(am__append_3) $(am__append_5)
 task_test_LDADD = $(LDADD) $(am__append_4) $(am__append_6)
 EXTRA_DIST = testdata
@@ -1076,10 +1067,6 @@ radix_test$(EXEEXT): $(radix_test_OBJECTS) $(radix_test_DEPENDENCIES) $(EXTRA_ra
 	@rm -f radix_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(radix_test_OBJECTS) $(radix_test_LDADD) $(LIBS)
 
-random_test$(EXEEXT): $(random_test_OBJECTS) $(random_test_DEPENDENCIES) $(EXTRA_random_test_DEPENDENCIES) 
-	@rm -f random_test$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(random_test_OBJECTS) $(random_test_LDADD) $(LIBS)
-
 regex_test$(EXEEXT): $(regex_test_OBJECTS) $(regex_test_DEPENDENCIES) $(EXTRA_regex_test_DEPENDENCIES) 
 	@rm -f regex_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(regex_test_OBJECTS) $(regex_test_LDADD) $(LIBS)
@@ -1150,7 +1137,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pool_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quota_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/radix_test.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/random_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regex_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/result_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/safe_test.Po@am__quote@ # am--include-marker
@@ -1623,13 +1609,6 @@ radix_test.log: radix_test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-random_test.log: random_test$(EXEEXT)
-	@p='random_test$(EXEEXT)'; \
-	b='random_test'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
 regex_test.log: regex_test$(EXEEXT)
 	@p='regex_test$(EXEEXT)'; \
 	b='regex_test'; \
@@ -1826,7 +1805,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/pool_test.Po
 	-rm -f ./$(DEPDIR)/quota_test.Po
 	-rm -f ./$(DEPDIR)/radix_test.Po
-	-rm -f ./$(DEPDIR)/random_test.Po
 	-rm -f ./$(DEPDIR)/regex_test.Po
 	-rm -f ./$(DEPDIR)/result_test.Po
 	-rm -f ./$(DEPDIR)/safe_test.Po
@@ -1907,7 +1885,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/pool_test.Po
 	-rm -f ./$(DEPDIR)/quota_test.Po
 	-rm -f ./$(DEPDIR)/radix_test.Po
-	-rm -f ./$(DEPDIR)/random_test.Po
 	-rm -f ./$(DEPDIR)/regex_test.Po
 	-rm -f ./$(DEPDIR)/result_test.Po
 	-rm -f ./$(DEPDIR)/safe_test.Po

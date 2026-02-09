@@ -15,17 +15,24 @@ import glob
 import os
 from pathlib import Path
 import re
-import subprocess
+from re import compile as Re
 import time
 from typing import Dict, List, Optional, Tuple, Union
 
 import dns
+import dns.dnssec
+import dns.rdatatype
+import dns.rrset
 import dns.tsig
+
+import pytest
 
 import isctest.log
 import isctest.query
 import isctest.util
+from isctest.compat import DSDigest
 from isctest.instance import NamedInstance
+from isctest.template import TrustAnchor
 from isctest.vars.algorithms import Algorithm, ALL_ALGORITHMS_BY_NUM
 
 DEFAULT_TTL = 300
@@ -171,15 +178,30 @@ class KeyProperties:
     def __init__(
         self,
         name: str,
-        properties: dict,
         metadata: dict,
         timing: Dict[str, KeyTimingMetadata],
+        private: bool = True,
+        legacy: bool = False,
+        role: str = "csk",
+        ttl: int = 3600,
+        flags: int = 257,
+        keytag_min: int = 0,
+        keytag_max: int = 65535,
+        offset: Union[timedelta, int] = 0,
     ):
         self.name = name
         self.key = None
-        self.properties = properties
         self.metadata = metadata
         self.timing = timing
+        # Properties
+        self.private = private
+        self.legacy = legacy
+        self.role = role
+        self.ttl = ttl
+        self.flags = flags
+        self.keytag_min = keytag_min
+        self.keytag_max = keytag_max
+        self.offset = offset
 
     def __repr__(self):
         return self.name
@@ -189,15 +211,6 @@ class KeyProperties:
 
     @staticmethod
     def default(with_state=True) -> "KeyProperties":
-        properties = {
-            "expect": True,
-            "private": True,
-            "legacy": False,
-            "role": "csk",
-            "role_full": "key-signing",
-            "dnskey_ttl": 3600,
-            "flags": 257,
-        }
         metadata = {
             "Algorithm": isctest.vars.algorithms.ECDSAP256SHA256.number,
             "Length": 256,
@@ -207,9 +220,7 @@ class KeyProperties:
         }
         timing: Dict[str, KeyTimingMetadata] = {}
 
-        result = KeyProperties(
-            name="DEFAULT", properties=properties, metadata=metadata, timing=timing
-        )
+        result = KeyProperties(name="DEFAULT", metadata=metadata, timing=timing)
         result.name = "DEFAULT"
         result.key = None
         if with_state:
@@ -220,6 +231,11 @@ class KeyProperties:
             result.metadata["DSState"] = "hidden"
 
         return result
+
+    def role_full(self) -> str:
+        if self.flags == 256:
+            return "zone-signing"
+        return "key-signing"
 
     def Ipub(self, config):
         ipub = timedelta(0)
@@ -258,11 +274,11 @@ class KeyProperties:
         if self.key is None:
             raise ValueError("KeyProperties must be attached to a Key")
 
-        if self.properties["legacy"]:
+        if self.legacy:
             return
 
         if offset is None:
-            offset = self.properties["offset"]
+            offset = self.offset
 
         self.timing["Generated"] = self.key.get_timing("Created")
         self.timing["Published"] = self.key.get_timing("Created")
@@ -426,12 +442,35 @@ class Key:
                 return int(line.split()[1])
         return 0
 
-    def dnskey(self):
+    @property
+    def dnskey(self) -> dns.rrset.RRset:
+        pytest.importorskip("dns", minversion="2.2.0")  # dns.zonefile.read_rrsets
         with open(self.keyfile, "r", encoding="utf-8") as file:
-            for line in file:
-                if "DNSKEY" in line:
-                    return line.strip()
-        return "undefined"
+            rrsets = dns.zonefile.read_rrsets(
+                file.read(),
+                rdclass=None,  # read rdclass from the file
+                default_ttl=DEFAULT_TTL,  # use this TTL if not present
+            )
+        assert len(rrsets) == 1, f"{self.keyfile} has multiple RRsets"
+        dnskey_rr = rrsets[0]
+        assert len(dnskey_rr) == 1, f"{self.keyfile} has multiple RRs"
+        assert (
+            dnskey_rr.rdtype == dns.rdatatype.DNSKEY
+        ), f"DNSKEY not found in {self.keyfile}"
+        return dnskey_rr
+
+    def into_ta(self, ta_type: str, dsdigest=DSDigest.SHA256) -> TrustAnchor:
+        dnskey = self.dnskey
+        if ta_type in ["static-ds", "initial-ds"]:
+            ds = dns.dnssec.make_ds(dnskey.name, dnskey[0], dsdigest)
+            parts = str(ds).split()
+            contents = " ".join(parts[:3]) + f' "{parts[3]}"'
+        elif ta_type in ["static-key", "initial-key"]:
+            parts = str(dnskey).split()
+            contents = " ".join(parts[4:7]) + f' "{"".join(parts[7:])}"'
+        else:
+            raise ValueError(f"invalid trust anchor type: {ta_type}")
+        return TrustAnchor(str(dnskey.name), ta_type, contents)
 
     def is_ksk(self) -> bool:
         return self.get_metadata("KSK") == "yes"
@@ -479,8 +518,8 @@ class Key:
             str(self.keyfile),
         ]
 
-        out = isctest.run.cmd(dsfromkey_command)
-        dsfromkey = out.stdout.decode("utf-8").split()
+        cmd = isctest.run.cmd(dsfromkey_command)
+        dsfromkey = cmd.out.split()
 
         rdata_fromfile = " ".join(dsfromkey[:7])
         rdata_fromwire = " ".join(cds[:7])
@@ -544,21 +583,18 @@ class Key:
         """
         Check the key with given properties.
         """
-        if not properties.properties["expect"]:
-            return False
-
         # Check file existence.
         # Noop. If file is missing then the get_metadata calls will fail.
 
         # Check the public key file.
-        role = properties.properties["role_full"]
+        role = properties.role_full()
         comment = f"This is a {role} key, keyid {self.tag}, for {zone}."
         if not isctest.util.file_contents_contain(self.keyfile, comment):
             isctest.log.debug(f"{self.name} COMMENT MISMATCH: expected '{comment}'")
             return False
 
-        ttl = properties.properties["dnskey_ttl"]
-        flags = properties.properties["flags"]
+        ttl = properties.ttl
+        flags = properties.flags
         alg = properties.metadata["Algorithm"]
         dnskey = f"{zone}. {ttl} IN DNSKEY {flags} 3 {alg}"
         if not isctest.util.file_contents_contain(self.keyfile, dnskey):
@@ -566,7 +602,7 @@ class Key:
             return False
 
         # Now check the private key file.
-        if properties.properties["private"]:
+        if properties.private:
             # Retrieve creation date.
             created = self.get_metadata("Generated")
 
@@ -590,7 +626,7 @@ class Key:
                 return False
 
         # Now check the key state file.
-        if properties.properties["legacy"]:
+        if properties.legacy:
             return True
 
         comment = f"This is the state of key {self.tag}, for {zone}."
@@ -615,12 +651,10 @@ class Key:
                 return False
 
         # Check tag range.
-        if "keytag-min" in properties.properties:
-            if self.tag < properties.properties["keytag-min"]:
-                return False
-        if "keytag-max" in properties.properties:
-            if self.tag > properties.properties["keytag-max"]:
-                return False
+        if self.tag < properties.keytag_min:
+            return False
+        if self.tag > properties.keytag_max:
+            return False
 
         # A match is found.
         return True
@@ -688,7 +722,7 @@ def check_keys(zone, keys, expected):
                 if expected[i].key is None:
                     found = key.match_properties(zone, expected[i])
                     if found:
-                        key.external = expected[i].properties["legacy"]
+                        key.external = expected[i].legacy
                         expected[i].key = key
                 i += 1
             if not found:
@@ -710,7 +744,7 @@ def check_keytimes(keys, expected):
 
     for key in keys:
         for expect in expected:
-            if expect.properties["legacy"]:
+            if expect.legacy:
                 continue
 
             if not key is expect.key:
@@ -735,9 +769,9 @@ def check_keytimes(keys, expected):
                 synonyms["Delete"] = expect.timing["Removed"]
 
             assert key.match_timingmetadata(synonyms, file=key.keyfile, comment=True)
-            if expect.properties["private"]:
+            if expect.private:
                 assert key.match_timingmetadata(synonyms, file=key.privatefile)
-            if not expect.properties["legacy"]:
+            if not expect.legacy:
                 assert key.match_timingmetadata(expect.timing)
 
                 state_changes = [
@@ -758,7 +792,7 @@ def check_keyrelationships(keys, expected):
     """
     for key in keys:
         for expect in expected:
-            if expect.properties["legacy"]:
+            if expect.legacy:
                 continue
 
             if not key is expect.key:
@@ -788,18 +822,14 @@ def check_dnssec_verify(server, zone, tsig=None):
                     file.write(rr.to_text())
                     file.write("\n")
 
-            try:
-                verify_command = [os.environ.get("VERIFY"), "-z", "-o", zone, zonefile]
-                verified = isctest.run.cmd(verify_command)
-            except subprocess.CalledProcessError:
-                pass
-
-        if verified:
-            break
+            verify_command = [os.environ.get("VERIFY"), "-z", "-o", zone, zonefile]
+            verified = isctest.run.cmd(verify_command, raise_on_exception=False)
+            if verified.rc == 0:
+                return
 
         time.sleep(1)
 
-    assert verified
+    assert False, "zone not verified"
 
 
 def check_dnssecstatus(server, zone, keys, policy=None, view=None):
@@ -808,19 +838,19 @@ def check_dnssecstatus(server, zone, keys, policy=None, view=None):
     # policy name is returned, and if all expected keys are listed.
     response = ""
     if view is None:
-        response = server.rndc(f"dnssec -status {zone}", log=False)
+        response = server.rndc(f"dnssec -status {zone}")
     else:
-        response = server.rndc(f"dnssec -status {zone} in {view}", log=False)
+        response = server.rndc(f"dnssec -status {zone} in {view}")
 
     if policy is None:
-        assert "Zone does not have dnssec-policy" in response
+        assert "Zone does not have dnssec-policy" in response.out
         return
 
-    assert f"dnssec-policy: {policy}" in response
+    assert f"dnssec-policy: {policy}" in response.out
 
     for key in keys:
         if not key.external:
-            assert f"key: {key.tag}" in response
+            assert f"key: {key.tag}" in response.out
 
 
 def _check_signatures(
@@ -1048,9 +1078,8 @@ def check_cdslog(server, zone, key, substr):
 
 
 def check_cdslog_prohibit(server, zone, key, substr):
-    server.log.prohibit(
-        f"{substr} for key {zone}/{key.algorithm.name}/{key.tag} is now published"
-    )
+    msg = f"{substr} for key {zone}/{key.algorithm.name}/{key.tag} is now published"
+    assert msg not in server.log
 
 
 def check_cdsdelete(rrset, expected):
@@ -1424,7 +1453,7 @@ def next_key_event_equals(server, zone, next_event):
         waitfor = rf".*zone {zone}.*: next key event in (?!3600$)(.*) seconds"
 
     with server.watch_log_from_start() as watcher:
-        watcher.wait_for_line(re.compile(waitfor))
+        watcher.wait_for_line(Re(waitfor))
 
     # WMM: The with code below is extracting the line the watcher was
     # waiting for. If WatchLog.wait_for_line()` returned the matched string,
@@ -1514,60 +1543,75 @@ def policy_to_properties(ttl, keys: List[str]) -> List[KeyProperties]:
     for key in keys:
         count += 1
         line = key.split()
-        keyprop = KeyProperties(f"KEY{count}", {}, {}, {})
-        keyprop.properties["expect"] = True
-        keyprop.properties["private"] = True
-        keyprop.properties["legacy"] = False
-        keyprop.properties["offset"] = timedelta(0)
-        keyprop.properties["role"] = line[0]
-        if line[0] == "zsk":
-            keyprop.properties["role_full"] = "zone-signing"
-            keyprop.properties["flags"] = 256
-            keyprop.metadata["ZSK"] = "yes"
-            keyprop.metadata["KSK"] = "no"
-        else:
-            keyprop.properties["role_full"] = "key-signing"
-            keyprop.properties["flags"] = 257
-            keyprop.metadata["ZSK"] = "yes" if line[0] == "csk" else "no"
-            keyprop.metadata["KSK"] = "yes"
 
-        keyprop.properties["dnskey_ttl"] = ttl
-        keyprop.metadata["Algorithm"] = line[2]
-        keyprop.metadata["Length"] = line[3]
+        # defaults
+        metadata: Dict[str, Union[str, int]] = {}
+        timing: Dict[str, KeyTimingMetadata] = {}
+        private = True
+        legacy = False
+        keytag_min = 0
+        keytag_max = 65535
+        offset = timedelta(0)
+
+        role = line[0]
+        if role == "zsk":
+            flags = 256
+            metadata["ZSK"] = "yes"
+            metadata["KSK"] = "no"
+        else:
+            flags = 257
+            metadata["ZSK"] = "yes" if role == "csk" else "no"
+            metadata["KSK"] = "yes"
+
+        metadata["Algorithm"] = line[2]
+        metadata["Length"] = line[3]
         if line[1] == "unlimited":
-            keyprop.metadata["Lifetime"] = 0
+            metadata["Lifetime"] = 0
         elif line[1] != "-":
-            keyprop.metadata["Lifetime"] = int(line[1])
+            metadata["Lifetime"] = int(line[1])
 
         for i in range(4, len(line)):
             if line[i].startswith("goal:"):
                 keyval = line[i].split(":")
-                keyprop.metadata["GoalState"] = keyval[1]
+                metadata["GoalState"] = keyval[1]
             elif line[i].startswith("dnskey:"):
                 keyval = line[i].split(":")
-                keyprop.metadata["DNSKEYState"] = keyval[1]
+                metadata["DNSKEYState"] = keyval[1]
             elif line[i].startswith("krrsig:"):
                 keyval = line[i].split(":")
-                keyprop.metadata["KRRSIGState"] = keyval[1]
+                metadata["KRRSIGState"] = keyval[1]
             elif line[i].startswith("zrrsig:"):
                 keyval = line[i].split(":")
-                keyprop.metadata["ZRRSIGState"] = keyval[1]
+                metadata["ZRRSIGState"] = keyval[1]
             elif line[i].startswith("ds:"):
                 keyval = line[i].split(":")
-                keyprop.metadata["DSState"] = keyval[1]
+                metadata["DSState"] = keyval[1]
             elif line[i].startswith("offset:"):
                 keyval = line[i].split(":")
-                keyprop.properties["offset"] = timedelta(seconds=int(keyval[1]))
+                offset = timedelta(seconds=int(keyval[1]))
             elif line[i].startswith("tag-range:"):
                 keyval = line[i].split(":")
                 tagrange = keyval[1].split("-")
-                keyprop.properties["keytag-min"] = int(tagrange[0])
-                keyprop.properties["keytag-max"] = int(tagrange[1])
+                keytag_min = int(tagrange[0])
+                keytag_max = int(tagrange[1])
             elif line[i] == "missing":
-                keyprop.properties["private"] = False
+                private = False
             else:
                 assert False, f"undefined optional data {line[i]}"
 
+        keyprop = KeyProperties(
+            name=f"KEY{count}",
+            metadata=metadata,
+            timing=timing,
+            private=private,
+            legacy=legacy,
+            role=role,
+            ttl=ttl,
+            flags=flags,
+            keytag_min=keytag_min,
+            keytag_max=keytag_max,
+            offset=offset,
+        )
         proplist.append(keyprop)
 
     return proplist
@@ -1581,5 +1625,16 @@ def wait_keymgr_done(server: NamedInstance, zone: str, reconfig: bool = False) -
     if reconfig:
         messages.append("received control channel command 'reconfig'")
     messages.append(f"keymgr: {zone} done")
-    with server.watch_log_from_start() as watcher:
+    with server.watch_log_from_start(timeout=60) as watcher:
         watcher.wait_for_sequence(messages)
+
+
+def private_type_record(zone: str, key: Key, rrtype: int = 65534) -> str:
+    """
+    Write a private type record recording the state of the signing process for
+    a given zone and key, print the private type record with given RRtype,
+    indicating that the signing process for this key is completed.
+    """
+    keyid = key.tag
+    secalg = int(key.get_metadata("Algorithm"))
+    return f"{zone}. 0 IN TYPE{rrtype} \\# 5 {secalg:02x}{keyid:04x}0000"

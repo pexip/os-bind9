@@ -23,6 +23,11 @@ from rollover.common import (
     CDSS,
     TIMEDELTA,
 )
+from rollover.setup import (
+    configure_root,
+    configure_tld,
+    configure_enable_dnssec,
+)
 
 CONFIG = {
     "dnskey-ttl": TIMEDELTA["PT5M"],
@@ -45,6 +50,30 @@ OFFSETS["step1"] = 0
 OFFSETS["step2"] = -int(IPUB.total_seconds())
 OFFSETS["step3"] = -int(IRETZSK.total_seconds())
 OFFSETS["step4"] = -int(IPUBC.total_seconds() + IRETKSK.total_seconds())
+
+
+def bootstrap():
+    data = {
+        "tlds": [],
+        "trust_anchors": [],
+    }
+
+    tlds = []
+    for tld_name in [
+        "autosign",
+        "manual",
+    ]:
+        delegations = configure_enable_dnssec(tld_name, f"{POLICY}-{tld_name}")
+
+        tld = configure_tld(tld_name, delegations)
+        tlds.append(tld)
+
+        data["tlds"].append(tld_name)
+
+    ta = configure_root(tlds)
+    data["trust_anchors"].append(ta)
+
+    return data
 
 
 @pytest.mark.parametrize(
@@ -74,7 +103,7 @@ def test_rollover_enable_dnssec_step1(tld, alg, size, ns3):
 
         # Check logs.
         msg = f"keymgr-manual-mode: block new key generation for zone {zone} (policy {policy})"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -155,7 +184,7 @@ def test_rollover_enable_dnssec_step3(tld, alg, size, ns3):
         # Check logs.
         tag = keys[0].key.tag
         msg = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type DS state HIDDEN to state RUMOURED"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:

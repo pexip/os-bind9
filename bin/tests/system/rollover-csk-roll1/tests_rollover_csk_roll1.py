@@ -24,7 +24,11 @@ from rollover.common import (
     size,
     TIMEDELTA,
 )
-
+from rollover.setup import (
+    configure_root,
+    configure_tld,
+    configure_cskroll1,
+)
 
 CDSS = ["CDNSKEY", "CDS (SHA-384)"]
 CONFIG = {
@@ -65,6 +69,30 @@ OFFSETS["step8-p"] = OFFSETS["step7-p"] - int(CONFIG["purge-keys"].total_seconds
 OFFSETS["step8-s"] = OFFSETS["step7-s"] - int(CONFIG["purge-keys"].total_seconds())
 
 
+def bootstrap():
+    data = {
+        "tlds": [],
+        "trust_anchors": [],
+    }
+
+    tlds = []
+    for tld_name in [
+        "autosign",
+        "manual",
+    ]:
+        delegations = configure_cskroll1(tld_name, f"{POLICY}-{tld_name}")
+
+        tld = configure_tld(tld_name, delegations)
+        tlds.append(tld)
+
+        data["tlds"].append(tld_name)
+
+    ta = configure_root(tlds)
+    data["trust_anchors"].append(ta)
+
+    return data
+
+
 @pytest.mark.parametrize(
     "tld",
     [
@@ -72,7 +100,7 @@ OFFSETS["step8-s"] = OFFSETS["step7-s"] - int(CONFIG["purge-keys"].total_seconds
         param("manual"),
     ],
 )
-def test_csk_roll1_step1(tld, alg, size, ns3):
+def test_csk_roll1_step1(tld, ns3, alg, size):
     zone = f"step1.csk-roll1.{tld}"
     policy = f"{POLICY}-{tld}"
 
@@ -125,7 +153,7 @@ def test_csk_roll1_step2(tld, alg, size, ns3):
         # Check logs.
         tag = keys[0].key.tag
         msg = f"keymgr-manual-mode: block CSK rollover for key {zone}/ECDSAP256SHA256/{tag} (policy {policy})"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -185,7 +213,7 @@ def test_csk_roll1_step3(tld, alg, size, ns3):
         # Check logs.
         tag = keys[1].key.tag
         msg = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type ZRRSIG state HIDDEN to state RUMOURED"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -274,8 +302,7 @@ def test_csk_roll1_step4(tld, alg, size, ns3):
         # Check logs.
         tag = keys[0].key.tag
         msg = f"keymgr-manual-mode: block transition CSK {zone}/ECDSAP256SHA256/{tag} type KRRSIG state OMNIPRESENT to state UNRETENTIVE"
-
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         tag = keys[1].key.tag

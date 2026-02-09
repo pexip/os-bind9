@@ -30,7 +30,11 @@ from rollover.common import (
     KSK_KEYTTLPROP,
     TIMEDELTA,
 )
-
+from rollover.setup import (
+    configure_root,
+    configure_tld,
+    configure_ksk_doubleksk,
+)
 
 CDSS = ["CDS (SHA-256)"]
 POLICY = "ksk-doubleksk"
@@ -46,6 +50,30 @@ OFFSETS["step5-p"] = OFFSETS["step4-p"] - int(KSK_KEYTTLPROP.total_seconds())
 OFFSETS["step5-s"] = OFFSETS["step4-s"] - int(KSK_KEYTTLPROP.total_seconds())
 OFFSETS["step6-p"] = OFFSETS["step5-p"] - int(KSK_CONFIG["purge-keys"].total_seconds())
 OFFSETS["step6-s"] = OFFSETS["step5-s"] - int(KSK_CONFIG["purge-keys"].total_seconds())
+
+
+def bootstrap():
+    data = {
+        "tlds": [],
+        "trust_anchors": [],
+    }
+
+    tlds = []
+    for tld_name in [
+        "autosign",
+        "manual",
+    ]:
+        delegations = configure_ksk_doubleksk(tld_name)
+
+        tld = configure_tld(tld_name, delegations)
+        tlds.append(tld)
+
+        data["tlds"].append(tld_name)
+
+    ta = configure_root(tlds)
+    data["trust_anchors"].append(ta)
+
+    return data
 
 
 @pytest.mark.parametrize(
@@ -110,7 +138,7 @@ def test_ksk_doubleksk_step2(tld, alg, size, ns3):
         # Check logs.
         tag = keys[1].key.tag
         msg = f"keymgr-manual-mode: block KSK rollover for key {zone}/ECDSAP256SHA256/{tag} (policy {policy})"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -171,7 +199,7 @@ def test_ksk_doubleksk_step3(tld, alg, size, ns3):
         # Check logs.
         tag = keys[2].key.tag
         msg = f"keymgr-manual-mode: block transition KSK {zone}/ECDSAP256SHA256/{tag} type DS state HIDDEN to state RUMOURED"
-        ns3.log.expect(msg)
+        assert msg in ns3.log
 
         # Force step.
         with ns3.watch_log_from_here() as watcher:
@@ -252,8 +280,8 @@ def test_ksk_doubleksk_step4(tld, alg, size, ns3):
         tag = keys[1].key.tag
         msg1 = f"keymgr-manual-mode: block transition KSK {zone}/ECDSAP256SHA256/{tag} type DNSKEY state OMNIPRESENT to state UNRETENTIVE"
         msg2 = f"keymgr-manual-mode: block transition KSK {zone}/ECDSAP256SHA256/{tag} type KRRSIG state OMNIPRESENT to state UNRETENTIVE"
-        ns3.log.expect(msg1)
-        ns3.log.expect(msg2)
+        assert msg1 in ns3.log
+        assert msg2 in ns3.log
 
         # Force step.
         tag = keys[2].key.tag

@@ -181,13 +181,6 @@
  * Check an operation for failure.  Assumes that the function
  * using it has a 'result' variable and a 'cleanup' label.
  */
-#define CHECK(op)                            \
-	do {                                 \
-		result = (op);               \
-		if (result != ISC_R_SUCCESS) \
-			goto cleanup;        \
-	} while (0)
-
 #define TCHECK(op)                               \
 	do {                                     \
 		tresult = (op);                  \
@@ -2860,20 +2853,26 @@ catz_addmodzone_cb(void *arg) {
 		cfg_parser_reset(cfg->add_parser);
 		result = cfg_parse_buffer(cfg->add_parser, confbuf, "catz", 0,
 					  &cfg_type_addzoneconf, 0, &zoneconf);
-		isc_buffer_free(&confbuf);
 	}
 	/*
 	 * Fail if either dns_catz_generate_zonecfg() or cfg_parse_buffer()
 	 * failed.
 	 */
 	if (result != ISC_R_SUCCESS) {
-		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-			      NAMED_LOGMODULE_SERVER, ISC_LOG_ERROR,
-			      "catz: error \"%s\" while trying to generate "
-			      "config for zone '%s'",
-			      isc_result_totext(result), nameb);
+		isc_log_write(
+			named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+			NAMED_LOGMODULE_SERVER, ISC_LOG_ERROR,
+			"catz: error \"%s\" while trying to generate "
+			"config for zone '%s'%s%.*s%s",
+			isc_result_totext(result), nameb,
+			confbuf != NULL ? " buffer '" : "",
+			confbuf != NULL ? (int)isc_buffer_usedlength(confbuf)
+					: 0,
+			confbuf != NULL ? (char *)isc_buffer_base(confbuf) : "",
+			confbuf != NULL ? "'" : "");
 		goto cleanup;
 	}
+	isc_buffer_free(&confbuf);
 	CHECK(cfg_map_get(zoneconf, "zone", &zlist));
 	if (!cfg_obj_islist(zlist)) {
 		CHECK(ISC_R_FAILURE);
@@ -2933,6 +2932,9 @@ catz_addmodzone_cb(void *arg) {
 	dns_zone_set_parentcatz(zone, cz->origin);
 
 cleanup:
+	if (confbuf != NULL) {
+		isc_buffer_free(&confbuf);
+	}
 	if (zone != NULL) {
 		dns_zone_detach(&zone);
 	}
@@ -3229,6 +3231,15 @@ configure_catz_zone(dns_view_t *view, dns_view_t *pview,
 	}
 
 	result = dns_catz_zone_add(view->catzs, &origin, &zone);
+	if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+		cfg_obj_log(catz_obj, named_g_lctx, DNS_CATZ_ERROR_LEVEL,
+			    "catz: dns_catz_zone_add failed: %s",
+			    isc_result_totext(result));
+		goto cleanup;
+	}
+
+	dns_catz_zone_prereconfig(zone);
+
 	if (result == ISC_R_EXISTS) {
 		catz_reconfig_data_t data = {
 			.catz = zone,
@@ -3247,11 +3258,6 @@ configure_catz_zone(dns_view_t *view, dns_view_t *pview,
 					      &data);
 
 		result = ISC_R_SUCCESS;
-	} else if (result != ISC_R_SUCCESS) {
-		cfg_obj_log(catz_obj, named_g_lctx, DNS_CATZ_ERROR_LEVEL,
-			    "catz: dns_catz_zone_add failed: %s",
-			    isc_result_totext(result));
-		goto cleanup;
 	}
 
 	dns_catz_zone_resetdefoptions(zone);
@@ -3288,6 +3294,8 @@ configure_catz_zone(dns_view_t *view, dns_view_t *pview,
 	if (obj != NULL && cfg_obj_isduration(obj)) {
 		opts->min_update_interval = cfg_obj_asduration(obj);
 	}
+
+	dns_catz_zone_postreconfig(zone);
 
 cleanup:
 	dns_name_free(&origin, view->mctx);
@@ -4148,42 +4156,6 @@ register_one_plugin(const cfg_obj_t *config, const cfg_obj_t *obj,
 	return result;
 }
 
-/*
- * Determine if a minimal-sized cache can be used for a given view, according
- * to 'maps' (implicit defaults, global options, view options) and 'optionmaps'
- * (global options, view options).  This is only allowed for views which have
- * recursion disabled and do not have "max-cache-size" set explicitly.  Using
- * minimal-sized caches prevents a situation in which all explicitly configured
- * and built-in views inherit the default "max-cache-size 90%;" setting, which
- * could lead to memory exhaustion with multiple views configured.
- */
-static bool
-minimal_cache_allowed(const cfg_obj_t *maps[4],
-		      const cfg_obj_t *optionmaps[3]) {
-	const cfg_obj_t *obj;
-
-	/*
-	 * Do not use a minimal-sized cache for a view with recursion enabled.
-	 */
-	obj = NULL;
-	(void)named_config_get(maps, "recursion", &obj);
-	INSIST(obj != NULL);
-	if (cfg_obj_asboolean(obj)) {
-		return false;
-	}
-
-	/*
-	 * Do not use a minimal-sized cache if a specific size was requested.
-	 */
-	obj = NULL;
-	(void)named_config_get(optionmaps, "max-cache-size", &obj);
-	if (obj != NULL) {
-		return false;
-	}
-
-	return true;
-}
-
 static const char *const response_synonyms[] = { "response", NULL };
 
 /*
@@ -4200,9 +4172,8 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	       dns_keystorelist_t *keystores, const cfg_obj_t *bindkeys,
 	       isc_mem_t *mctx, cfg_aclconfctx_t *actx, bool need_hints,
 	       bool first_time) {
-	const cfg_obj_t *maps[4];
-	const cfg_obj_t *cfgmaps[3];
-	const cfg_obj_t *optionmaps[3];
+	const cfg_obj_t *maps[4] = { 0 };
+	const cfg_obj_t *cfgmaps[3] = { 0 };
 	const cfg_obj_t *options = NULL;
 	const cfg_obj_t *voptions = NULL;
 	const cfg_obj_t *forwardtype;
@@ -4237,8 +4208,8 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	bool rpz_configured = false;
 	bool catz_configured = false;
 	bool shared_cache = false;
-	int i = 0, j = 0, k = 0;
-	const char *str;
+	int i = 0, j = 0;
+	const char *str = NULL;
 	const char *cachename = NULL;
 	dns_order_t *order = NULL;
 	uint32_t udpsize;
@@ -4261,6 +4232,7 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	const char *qminmode = NULL;
 	dns_adb_t *adb = NULL;
 	bool oldcache = false;
+	uint32_t padding;
 
 	REQUIRE(DNS_VIEW_VALID(view));
 
@@ -4270,27 +4242,21 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 
 	/*
 	 * maps: view options, options, defaults
-	 * cfgmaps: view options, config
-	 * optionmaps: view options, options
+	 * cfgmaps: view options, top-level config
 	 */
 	if (vconfig != NULL) {
 		voptions = cfg_tuple_get(vconfig, "options");
 		maps[i++] = voptions;
-		optionmaps[j++] = voptions;
-		cfgmaps[k++] = voptions;
+		cfgmaps[j++] = voptions;
 	}
 	if (options != NULL) {
 		maps[i++] = options;
-		optionmaps[j++] = options;
 	}
-
 	maps[i++] = named_g_defaults;
-	maps[i] = NULL;
-	optionmaps[j] = NULL;
+
 	if (config != NULL) {
-		cfgmaps[k++] = config;
+		cfgmaps[j++] = config;
 	}
-	cfgmaps[k] = NULL;
 
 	/*
 	 * Set the view's port number for outgoing queries.
@@ -4458,42 +4424,60 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	 * we can reuse/share an existing cache.
 	 */
 	obj = NULL;
-	result = named_config_get(maps, "max-cache-size", &obj);
+	result = named_config_get(maps, "recursion", &obj);
 	INSIST(result == ISC_R_SUCCESS);
-	/*
-	 * If "-T maxcachesize=..." is in effect, it overrides any other
-	 * "max-cache-size" setting found in configuration, either implicit or
-	 * explicit.  For simplicity, the value passed to that command line
-	 * option is always treated as the number of bytes to set
-	 * "max-cache-size" to.
-	 */
+	view->recursion = cfg_obj_asboolean(obj);
+
 	if (named_g_maxcachesize != 0) {
-		max_cache_size = named_g_maxcachesize;
-	} else if (minimal_cache_allowed(maps, optionmaps)) {
 		/*
-		 * dns_cache_setcachesize() will adjust this to the smallest
-		 * allowed value.
+		 * If "-T maxcachesize=..." is in effect, it overrides any
+		 * other "max-cache-size" setting found in configuration,
+		 * either implicit or explicit.  For simplicity, the value
+		 * passed to that command line option is always treated as
+		 * the number of bytes to set "max-cache-size" to.
 		 */
-		max_cache_size = 1;
-	} else if (cfg_obj_isstring(obj)) {
-		str = cfg_obj_asstring(obj);
-		INSIST(strcasecmp(str, "unlimited") == 0);
-		max_cache_size = 0;
-	} else if (cfg_obj_ispercentage(obj)) {
-		max_cache_size = SIZE_AS_PERCENT;
-		max_cache_size_percent = cfg_obj_aspercentage(obj);
+		max_cache_size = named_g_maxcachesize;
 	} else {
-		uint64_t value = cfg_obj_asuint64(obj);
-		if (value > SIZE_MAX) {
-			cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,
-				    "'max-cache-size "
-				    "%" PRIu64 "' "
-				    "is too large for this "
-				    "system; reducing to %lu",
-				    value, (unsigned long)SIZE_MAX);
-			value = SIZE_MAX;
+		obj = NULL;
+		result = named_config_get(maps, "max-cache-size", &obj);
+		INSIST(result == ISC_R_SUCCESS);
+		if (cfg_obj_isstring(obj) &&
+		    strcasecmp(cfg_obj_asstring(obj), "default") == 0)
+		{
+			/*
+			 * The default for a view with recursion
+			 * is 90% of memory. With no recursion,
+			 * it's the minimum cache size allowed by
+			 * dns_cache_setcachesize().
+			 */
+			if (view->recursion) {
+				max_cache_size = SIZE_AS_PERCENT;
+				max_cache_size_percent = 90;
+			} else {
+				max_cache_size = 1;
+			}
+		} else if (cfg_obj_isstring(obj)) {
+			str = cfg_obj_asstring(obj);
+			INSIST(strcasecmp(str, "unlimited") == 0);
+			max_cache_size = 0;
+		} else if (cfg_obj_ispercentage(obj)) {
+			max_cache_size = SIZE_AS_PERCENT;
+			max_cache_size_percent = cfg_obj_aspercentage(obj);
+		} else if (cfg_obj_isuint64(obj)) {
+			uint64_t value = cfg_obj_asuint64(obj);
+			if (value > SIZE_MAX) {
+				cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,
+					    "'max-cache-size "
+					    "%" PRIu64 "' "
+					    "is too large for this "
+					    "system; reducing to %lu",
+					    value, (unsigned long)SIZE_MAX);
+				value = SIZE_MAX;
+			}
+			max_cache_size = (size_t)value;
+		} else {
+			UNREACHABLE();
 		}
-		max_cache_size = (size_t)value;
 	}
 
 	if (max_cache_size == SIZE_AS_PERCENT) {
@@ -4675,26 +4659,17 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	view->acceptexpired = cfg_obj_asboolean(obj);
 
 	obj = NULL;
-	/* 'optionmaps', not 'maps': don't check named_g_defaults yet */
-	(void)named_config_get(optionmaps, "dnssec-validation", &obj);
-	if (obj == NULL) {
+	result = named_config_get(maps, "dnssec-validation", &obj);
+	INSIST(result == ISC_R_SUCCESS);
+	if (cfg_obj_isboolean(obj)) {
+		view->enablevalidation = cfg_obj_asboolean(obj);
+	} else {
 		/*
-		 * Default to VALIDATION_DEFAULT as set in config.c.
+		 * If dnssec-validation is set but not boolean,
+		 * then it must be "auto"
 		 */
-		(void)cfg_map_get(named_g_defaults, "dnssec-validation", &obj);
-		INSIST(obj != NULL);
-	}
-	if (obj != NULL) {
-		if (cfg_obj_isboolean(obj)) {
-			view->enablevalidation = cfg_obj_asboolean(obj);
-		} else {
-			/*
-			 * If dnssec-validation is set but not boolean,
-			 * then it must be "auto"
-			 */
-			view->enablevalidation = true;
-			auto_root = true;
-		}
+		view->enablevalidation = true;
+		auto_root = true;
 	}
 
 	obj = NULL;
@@ -5333,11 +5308,6 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	 * Configure other configurable data.
 	 */
 	obj = NULL;
-	result = named_config_get(maps, "recursion", &obj);
-	INSIST(result == ISC_R_SUCCESS);
-	view->recursion = cfg_obj_asboolean(obj);
-
-	obj = NULL;
 	result = named_config_get(maps, "qname-minimization", &obj);
 	INSIST(result == ISC_R_SUCCESS);
 	qminmode = cfg_obj_asstring(obj);
@@ -5649,22 +5619,19 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	if (view->pad_acl != NULL) {
 		dns_acl_detach(&view->pad_acl);
 	}
-	result = named_config_get(optionmaps, "response-padding", &obj);
-	if (result == ISC_R_SUCCESS) {
-		const cfg_obj_t *padobj = cfg_tuple_get(obj, "block-size");
-		const cfg_obj_t *aclobj = cfg_tuple_get(obj, "acl");
-		uint32_t padding = cfg_obj_asuint32(padobj);
-
-		if (padding > 512U) {
-			cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,
-				    "response-padding block-size cannot "
-				    "exceed 512: lowering");
-			padding = 512U;
-		}
-		view->padding = (uint16_t)padding;
-		CHECK(cfg_acl_fromconfig(aclobj, config, named_g_lctx, actx,
-					 named_g_mctx, 0, &view->pad_acl));
+	result = named_config_get(maps, "response-padding", &obj);
+	INSIST(result == ISC_R_SUCCESS);
+	padding = cfg_obj_asuint32(cfg_tuple_get(obj, "block-size"));
+	if (padding > 512U) {
+		cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,
+			    "response-padding block-size cannot "
+			    "exceed 512: lowering");
+		padding = 512U;
 	}
+	view->padding = (uint16_t)padding;
+	CHECK(cfg_acl_fromconfig(cfg_tuple_get(obj, "acl"), config,
+				 named_g_lctx, actx, named_g_mctx, 0,
+				 &view->pad_acl));
 
 	obj = NULL;
 	result = named_config_get(maps, "require-server-cookie", &obj);
@@ -7499,7 +7466,7 @@ tat_send(void *arg) {
 		result = dns_resolver_createfetch(
 			tat->view->resolver, tatname, dns_rdatatype_null,
 			domain, &nameservers, NULL, NULL, 0, 0, 0, NULL, NULL,
-			tat->loop, tat_done, tat, NULL, &tat->rdataset,
+			NULL, tat->loop, tat_done, tat, NULL, &tat->rdataset,
 			&tat->sigrdataset, &tat->fetch);
 	}
 

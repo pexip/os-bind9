@@ -109,14 +109,14 @@ check_PROGRAMS = ascii_test$(EXEEXT) async_test$(EXEEXT) \
 	mutex_test$(EXEEXT) netaddr_test$(EXEEXT) parse_test$(EXEEXT) \
 	proxyheader_test$(EXEEXT) proxystream_test$(EXEEXT) \
 	proxyudp_test$(EXEEXT) quota_test$(EXEEXT) radix_test$(EXEEXT) \
-	random_test$(EXEEXT) ratelimiter_test$(EXEEXT) \
-	regex_test$(EXEEXT) result_test$(EXEEXT) rwlock_test$(EXEEXT) \
-	safe_test$(EXEEXT) siphash_test$(EXEEXT) \
-	sockaddr_test$(EXEEXT) spinlock_test$(EXEEXT) \
-	stats_test$(EXEEXT) symtab_test$(EXEEXT) tcp_test$(EXEEXT) \
-	tcpdns_test$(EXEEXT) time_test$(EXEEXT) timer_test$(EXEEXT) \
-	tls_test$(EXEEXT) tlsdns_test$(EXEEXT) udp_test$(EXEEXT) \
-	work_test$(EXEEXT) $(am__EXEEXT_1)
+	ratelimiter_test$(EXEEXT) regex_test$(EXEEXT) \
+	result_test$(EXEEXT) rwlock_test$(EXEEXT) safe_test$(EXEEXT) \
+	siphash_test$(EXEEXT) sockaddr_test$(EXEEXT) \
+	spinlock_test$(EXEEXT) stats_test$(EXEEXT) \
+	symtab_test$(EXEEXT) tcp_test$(EXEEXT) tcpdns_test$(EXEEXT) \
+	time_test$(EXEEXT) timer_test$(EXEEXT) tls_test$(EXEEXT) \
+	tlsdns_test$(EXEEXT) udp_test$(EXEEXT) work_test$(EXEEXT) \
+	$(am__EXEEXT_1)
 @HAVE_LIBNGHTTP2_TRUE@am__append_2 = \
 @HAVE_LIBNGHTTP2_TRUE@	doh_test
 
@@ -320,9 +320,6 @@ radix_test_LDADD = $(LDADD)
 radix_test_DEPENDENCIES = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(top_builddir)/tests/libtest/libtest.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_3)
-random_test_SOURCES = random_test.c
-random_test_OBJECTS = random_test.$(OBJEXT)
-random_test_DEPENDENCIES = $(am__DEPENDENCIES_4)
 ratelimiter_test_SOURCES = ratelimiter_test.c
 ratelimiter_test_OBJECTS = ratelimiter_test.$(OBJEXT)
 ratelimiter_test_LDADD = $(LDADD)
@@ -462,12 +459,11 @@ am__depfiles_remade = ./$(DEPDIR)/ascii_test.Po \
 	./$(DEPDIR)/proxyudp_test-netmgr_common.Po \
 	./$(DEPDIR)/proxyudp_test-proxyudp_test.Po \
 	./$(DEPDIR)/quota_test.Po ./$(DEPDIR)/radix_test.Po \
-	./$(DEPDIR)/random_test.Po ./$(DEPDIR)/ratelimiter_test.Po \
-	./$(DEPDIR)/regex_test.Po ./$(DEPDIR)/result_test.Po \
-	./$(DEPDIR)/rwlock_test.Po ./$(DEPDIR)/safe_test.Po \
-	./$(DEPDIR)/siphash_test.Po ./$(DEPDIR)/sockaddr_test.Po \
-	./$(DEPDIR)/spinlock_test.Po ./$(DEPDIR)/stats_test.Po \
-	./$(DEPDIR)/symtab_test.Po \
+	./$(DEPDIR)/ratelimiter_test.Po ./$(DEPDIR)/regex_test.Po \
+	./$(DEPDIR)/result_test.Po ./$(DEPDIR)/rwlock_test.Po \
+	./$(DEPDIR)/safe_test.Po ./$(DEPDIR)/siphash_test.Po \
+	./$(DEPDIR)/sockaddr_test.Po ./$(DEPDIR)/spinlock_test.Po \
+	./$(DEPDIR)/stats_test.Po ./$(DEPDIR)/symtab_test.Po \
 	./$(DEPDIR)/tcp_test-netmgr_common.Po \
 	./$(DEPDIR)/tcp_test-stream_shutdown.Po \
 	./$(DEPDIR)/tcp_test-tcp_test.Po \
@@ -508,9 +504,9 @@ SOURCES = ascii_test.c async_test.c buffer_test.c counter_test.c \
 	mem_test.c mutex_test.c netaddr_test.c parse_test.c \
 	$(proxyheader_test_SOURCES) $(proxystream_test_SOURCES) \
 	$(proxyudp_test_SOURCES) quota_test.c radix_test.c \
-	random_test.c ratelimiter_test.c regex_test.c result_test.c \
-	rwlock_test.c safe_test.c siphash_test.c sockaddr_test.c \
-	spinlock_test.c stats_test.c symtab_test.c $(tcp_test_SOURCES) \
+	ratelimiter_test.c regex_test.c result_test.c rwlock_test.c \
+	safe_test.c siphash_test.c sockaddr_test.c spinlock_test.c \
+	stats_test.c symtab_test.c $(tcp_test_SOURCES) \
 	$(tcpdns_test_SOURCES) time_test.c timer_test.c \
 	$(tls_test_SOURCES) $(tlsdns_test_SOURCES) $(udp_test_SOURCES) \
 	work_test.c
@@ -522,9 +518,9 @@ DIST_SOURCES = ascii_test.c async_test.c buffer_test.c counter_test.c \
 	md_test.c mem_test.c mutex_test.c netaddr_test.c parse_test.c \
 	$(proxyheader_test_SOURCES) $(proxystream_test_SOURCES) \
 	$(proxyudp_test_SOURCES) quota_test.c radix_test.c \
-	random_test.c ratelimiter_test.c regex_test.c result_test.c \
-	rwlock_test.c safe_test.c siphash_test.c sockaddr_test.c \
-	spinlock_test.c stats_test.c symtab_test.c $(tcp_test_SOURCES) \
+	ratelimiter_test.c regex_test.c result_test.c rwlock_test.c \
+	safe_test.c siphash_test.c sockaddr_test.c spinlock_test.c \
+	stats_test.c symtab_test.c $(tcp_test_SOURCES) \
 	$(tcpdns_test_SOURCES) time_test.c timer_test.c \
 	$(tls_test_SOURCES) $(tlsdns_test_SOURCES) $(udp_test_SOURCES) \
 	work_test.c
@@ -824,6 +820,7 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 JEMALLOC_CFLAGS = @JEMALLOC_CFLAGS@
 JEMALLOC_LIBS = @JEMALLOC_LIBS@
 JEMALLOC_VERSION = @JEMALLOC_VERSION@
+JQ = @JQ@
 JSON_C_CFLAGS = @JSON_C_CFLAGS@
 JSON_C_LIBS = @JSON_C_LIBS@
 KRB5_CFLAGS = @KRB5_CFLAGS@
@@ -910,6 +907,7 @@ STD_LDFLAGS = @STD_LDFLAGS@
 STRIP = @STRIP@
 TEST_CFLAGS = @TEST_CFLAGS@
 VERSION = @VERSION@
+XMLLINT = @XMLLINT@
 XSLTPROC = @XSLTPROC@
 ZLIB_CFLAGS = @ZLIB_CFLAGS@
 ZLIB_LIBS = @ZLIB_LIBS@
@@ -1110,10 +1108,6 @@ proxyudp_test_SOURCES = \
 	netmgr_common.h \
 	netmgr_common.c \
 	uv_wrap.h
-
-random_test_LDADD = \
-	$(LDADD)	\
-	-lm
 
 tcp_test_CPPFLAGS = \
 	$(AM_CPPFLAGS)	\
@@ -1342,10 +1336,6 @@ radix_test$(EXEEXT): $(radix_test_OBJECTS) $(radix_test_DEPENDENCIES) $(EXTRA_ra
 	@rm -f radix_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(radix_test_OBJECTS) $(radix_test_LDADD) $(LIBS)
 
-random_test$(EXEEXT): $(random_test_OBJECTS) $(random_test_DEPENDENCIES) $(EXTRA_random_test_DEPENDENCIES) 
-	@rm -f random_test$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(random_test_OBJECTS) $(random_test_LDADD) $(LIBS)
-
 ratelimiter_test$(EXEEXT): $(ratelimiter_test_OBJECTS) $(ratelimiter_test_DEPENDENCIES) $(EXTRA_ratelimiter_test_DEPENDENCIES) 
 	@rm -f ratelimiter_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(ratelimiter_test_OBJECTS) $(ratelimiter_test_LDADD) $(LIBS)
@@ -1455,7 +1445,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxyudp_test-proxyudp_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quota_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/radix_test.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/random_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ratelimiter_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regex_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/result_test.Po@am__quote@ # am--include-marker
@@ -2236,13 +2225,6 @@ radix_test.log: radix_test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-random_test.log: random_test$(EXEEXT)
-	@p='random_test$(EXEEXT)'; \
-	b='random_test'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
 ratelimiter_test.log: ratelimiter_test$(EXEEXT)
 	@p='ratelimiter_test$(EXEEXT)'; \
 	b='ratelimiter_test'; \
@@ -2504,7 +2486,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/proxyudp_test-proxyudp_test.Po
 	-rm -f ./$(DEPDIR)/quota_test.Po
 	-rm -f ./$(DEPDIR)/radix_test.Po
-	-rm -f ./$(DEPDIR)/random_test.Po
 	-rm -f ./$(DEPDIR)/ratelimiter_test.Po
 	-rm -f ./$(DEPDIR)/regex_test.Po
 	-rm -f ./$(DEPDIR)/result_test.Po
@@ -2610,7 +2591,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/proxyudp_test-proxyudp_test.Po
 	-rm -f ./$(DEPDIR)/quota_test.Po
 	-rm -f ./$(DEPDIR)/radix_test.Po
-	-rm -f ./$(DEPDIR)/random_test.Po
 	-rm -f ./$(DEPDIR)/ratelimiter_test.Po
 	-rm -f ./$(DEPDIR)/regex_test.Po
 	-rm -f ./$(DEPDIR)/result_test.Po

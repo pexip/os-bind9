@@ -1,3 +1,9 @@
+bind9 (1:9.20.18-1~deb13u1+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Huw Jones <huw@pexip.com>  Mon, 09 Feb 2026 12:27:45 +0000
+
 bind9 (1:9.20.18-1~deb13u1) trixie-security; urgency=high
 
   * New upstream version 9.20.18

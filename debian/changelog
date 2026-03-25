@@ -1,3 +1,17 @@
+bind9 (1:9.20.21-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.21
+   - [CVE-2026-1519]: Fix unbounded NSEC3 iterations when validating
+     referrals to unsigned delegations.
+   - [CVE-2026-3104]: Fix memory leaks in code preparing DNSSEC proofs of
+     non-existence.
+   - [CVE-2026-3119]: Prevent a crash in code processing queries
+     containing a TKEY record.
+   - [CVE-2026-3591]: Fix a stack use-after-return flaw in SIG(0) handling
+     code.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 25 Mar 2026 17:08:59 +0100
+
 bind9 (1:9.20.18-1~deb13u1) trixie-security; urgency=high
 
   * New upstream version 9.20.18

@@ -29,7 +29,7 @@ fromtext_in_dhcid(ARGS_FROMTEXT) {
 	UNUSED(options);
 	UNUSED(callbacks);
 
-	return isc_base64_tobuffer(lexer, target, -2);
+	return isc_base64_tobuffer(lexer, target, isc_one_or_more);
 }
 
 static isc_result_t
@@ -149,6 +149,7 @@ tostruct_in_dhcid(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &region);
 
 	dhcid->dhcid = mem_maybedup(mctx, region.base, region.length);
+	dhcid->length = region.length;
 	dhcid->mctx = mctx;
 	return ISC_R_SUCCESS;
 }

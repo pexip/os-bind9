@@ -11,15 +11,11 @@
 
 from re import compile as Re
 
+import dns.rcode
 import pytest
-
-pytest.importorskip("dns", minversion="2.5.0")
-
-import dns.message
 
 import isctest
 import isctest.mark
-
 
 pytestmark = pytest.mark.extra_artifacts(
     [

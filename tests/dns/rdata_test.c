@@ -1099,10 +1099,14 @@ ISC_RUN_TEST_IMPL(amtrelay) {
 		    dns_rdatatype_amtrelay, sizeof(dns_rdata_amtrelay_t));
 }
 
-/* BRIB RDATA - base64 encoded opaque */
-ISC_RUN_TEST_IMPL(brib) {
+/* BRID RDATA - base64 encoded opaque */
+ISC_RUN_TEST_IMPL(brid) {
 	text_ok_t text_ok[] = { /* empty  */
 				TEXT_INVALID(""),
+				/* zero length */
+				TEXT_INVALID("\\# 0"),
+				/* valid base64 string - minimum size */
+				TEXT_VALID("AA=="),
 				/* valid base64 string */
 				TEXT_VALID("aaaa"),
 				/* invalid base64 string */
@@ -1788,43 +1792,43 @@ ISC_RUN_TEST_IMPL(dsync) {
 		/*
 		 * Known type and known scheme.
 		 */
-		TEXT_VALID("CDS NOTIFY 0 example.com"),
+		TEXT_VALID("CDS NOTIFY 0 example.com."),
 		/*
 		 * Known type and unknown scheme.
 		 */
-		TEXT_VALID("CDS 3 0 example.com"),
+		TEXT_VALID("CDS 3 0 example.com."),
 		/*
 		 * Unknown type and known scheme.
 		 */
-		TEXT_VALID("TYPE1000 NOTIFY 0 example.com"),
+		TEXT_VALID("TYPE1000 NOTIFY 0 example.com."),
 		/*
 		 * Unknown type and unknown scheme.
 		 */
-		TEXT_VALID("TYPE1000 3 0 example.com"),
+		TEXT_VALID("TYPE1000 3 0 example.com."),
 		/*
 		 * Unknown type and unknown scheme, max port.
 		 */
-		TEXT_VALID("TYPE1000 3 65535 example.com"),
+		TEXT_VALID("TYPE1000 3 65535 example.com."),
 		/*
 		 * Unknown type and max scheme, max port.
 		 */
-		TEXT_VALID("TYPE64000 255 65535 example.com"),
+		TEXT_VALID("TYPE64000 255 65535 example.com."),
 		/*
 		 * Invalid type and max scheme, max port.
 		 */
-		TEXT_INVALID("INVALID 255 65536 example.com"),
+		TEXT_INVALID("INVALID 255 65536 example.com."),
 		/*
 		 * Unknown type and too big scheme, max port.
 		 */
-		TEXT_INVALID("TYPE1000 256 65536 example.com"),
+		TEXT_INVALID("TYPE1000 256 65536 example.com."),
 		/*
 		 * Unknown type and unknown scheme, port too big.
 		 */
-		TEXT_INVALID("TYPE1000 3 65536 example.com"),
+		TEXT_INVALID("TYPE1000 3 65536 example.com."),
 		/*
 		 * Unknown type and bad scheme, max port.
 		 */
-		TEXT_INVALID("TYPE1000 UNKNOWN 65535 example.com"),
+		TEXT_INVALID("TYPE1000 UNKNOWN 65535 example.com."),
 		/*
 		 * Sentinel.
 		 */
@@ -2057,6 +2061,10 @@ ISC_RUN_TEST_IMPL(hip) {
 ISC_RUN_TEST_IMPL(hhit) {
 	text_ok_t text_ok[] = { /* empty  */
 				TEXT_INVALID(""),
+				/* zero length */
+				TEXT_INVALID("\\# 0"),
+				/* valid base64 string - minimum size */
+				TEXT_VALID("AA=="),
 				/* valid base64 string */
 				TEXT_VALID("aaaa"),
 				/* invalid base64 string */
@@ -2412,8 +2420,7 @@ ISC_RUN_TEST_IMPL(nsec) {
  * RFC 5155.
  */
 ISC_RUN_TEST_IMPL(nsec3) {
-	text_ok_t text_ok[] = { TEXT_INVALID(""),
-				TEXT_INVALID("."),
+	text_ok_t text_ok[] = { TEXT_INVALID(""), TEXT_INVALID("."),
 				TEXT_INVALID(". RRSIG"),
 				TEXT_INVALID("1 0 10 76931F"),
 				TEXT_INVALID("1 0 10 76931F "
@@ -2429,9 +2436,38 @@ ISC_RUN_TEST_IMPL(nsec3) {
 					   "AJHVGTICN6K0VDA53GCHFMT219SRRQLM"),
 				TEXT_VALID("1 0 10 - "
 					   "AJHVGTICN6K0VDA53GCHFMT219SRRQLM"),
+				/* 123456789012345678901234567890123456789 */
+				TEXT_VALID("2 0 10 - "
+					   "64P36D1L6ORJGE9G64P36D1L6ORJGE9G64P"
+					   "36D1L6ORJGE9G64P36D1L6ORJGE8"),
+				/* 1234567890123456789012345678901234567890 */
+				TEXT_INVALID("2 0 10 - "
+					     "64P36D1L6ORJGE9G64P36D1L6ORJGE9G6"
+					     "4P36D1L6ORJGE9G64P36D1L6ORJGE9G"),
 				TEXT_SENTINEL() };
+	wire_ok_t wire_ok[] = {
+		WIRE_VALID(0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00),
+		/* maximal hash */
+		WIRE_VALID(0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x01, 0x02, 0x03,
+			   0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02,
+			   0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01,
+			   0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00,
+			   0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+			   0x09),
+		/* Too big hash */
+		WIRE_INVALID(0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x01, 0x02,
+			     0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00,
+			     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+			     0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+			     0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04,
+			     0x05, 0x06, 0x07, 0x08, 0x09, 0x00),
+		/*
+		 * Sentinel.
+		 */
+		WIRE_SENTINEL()
+	};
 
-	check_rdata(text_ok, NULL, NULL, false, dns_rdataclass_in,
+	check_rdata(text_ok, wire_ok, NULL, false, dns_rdataclass_in,
 		    dns_rdatatype_nsec3, sizeof(dns_rdata_nsec3_t));
 }
 
@@ -3326,12 +3362,15 @@ ISC_TEST_LIST_START
 ISC_TEST_ENTRY(amtrelay)
 ISC_TEST_ENTRY(apl)
 ISC_TEST_ENTRY(atma)
+ISC_TEST_ENTRY(brid)
 ISC_TEST_ENTRY(cdnskey)
 ISC_TEST_ENTRY(csync)
 ISC_TEST_ENTRY(dnskey)
 ISC_TEST_ENTRY(doa)
 ISC_TEST_ENTRY(ds)
+ISC_TEST_ENTRY(dsync)
 ISC_TEST_ENTRY(eid)
+ISC_TEST_ENTRY(hhit)
 ISC_TEST_ENTRY(hip)
 ISC_TEST_ENTRY(https_svcb)
 ISC_TEST_ENTRY(isdn)
@@ -3341,8 +3380,8 @@ ISC_TEST_ENTRY(nimloc)
 ISC_TEST_ENTRY(nsec)
 ISC_TEST_ENTRY(nsec3)
 ISC_TEST_ENTRY(nxt)
-ISC_TEST_ENTRY(rkey)
 ISC_TEST_ENTRY(resinfo)
+ISC_TEST_ENTRY(rkey)
 ISC_TEST_ENTRY(sshfp)
 ISC_TEST_ENTRY(wallet)
 ISC_TEST_ENTRY(wks)

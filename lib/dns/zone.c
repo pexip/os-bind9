@@ -571,7 +571,7 @@ typedef enum {
 	DNS_ZONEFLG___MAX = UINT64_MAX, /* trick to make the ENUM 64-bit wide */
 } dns_zoneflg_t;
 
-#define DNS_ZONE_OPTION(z, o)	 ((atomic_load_relaxed(&(z)->options) & (o)) != 0)
+#define DNS_ZONE_OPTION(z, o) ((atomic_load_relaxed(&(z)->options) & (o)) != 0)
 #define DNS_ZONE_SETOPTION(z, o) atomic_fetch_or(&(z)->options, (o))
 #define DNS_ZONE_CLROPTION(z, o) atomic_fetch_and(&(z)->options, ~(o))
 
@@ -12747,7 +12747,8 @@ again:
 
 	isc_tlsctx_cache_detach(&zmgr_tlsctx_cache);
 
-	if (result == ISC_R_SUCCESS) {
+	switch (result) {
+	case ISC_R_SUCCESS:
 		if (isc_sockaddr_pf(&notify->dst) == AF_INET) {
 			inc_stats(notify->zone,
 				  dns_zonestatscounter_notifyoutv4);
@@ -12755,14 +12756,24 @@ again:
 			inc_stats(notify->zone,
 				  dns_zonestatscounter_notifyoutv6);
 		}
-	} else if (result == ISC_R_SHUTTINGDOWN || result == ISC_R_CANCELED) {
-		goto cleanup_key;
-	} else if ((notify->flags & DNS_NOTIFY_TCP) == 0) {
+		break;
+	case ISC_R_SHUTTINGDOWN:
+	case ISC_R_CANCELED:
+	case ISC_R_ADDRNOTAVAIL:
+	case DNS_R_BLACKHOLED:
+	case ISC_R_FAMILYNOSUPPORT:
 		notify_log(notify->zone, ISC_LOG_NOTICE,
-			   "notify to %s failed: %s: retrying over TCP",
-			   addrbuf, isc_result_totext(result));
-		notify->flags |= DNS_NOTIFY_TCP;
-		goto again;
+			   "notify to %s failed: %s", addrbuf,
+			   isc_result_totext(result));
+		break;
+	default:
+		if ((notify->flags & DNS_NOTIFY_TCP) == 0) {
+			notify_log(notify->zone, ISC_LOG_NOTICE,
+				   "notify to %s failed: %s: retrying over TCP",
+				   addrbuf, isc_result_totext(result));
+			notify->flags |= DNS_NOTIFY_TCP;
+			goto again;
+		}
 	}
 
 cleanup_key:
@@ -18274,7 +18285,7 @@ zone_loaddone(void *arg, isc_result_t result) {
 	 * If zone loading failed, remove the update db callbacks prior
 	 * to calling the list of callbacks in the zone load structure.
 	 */
-	if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS && result != DNS_R_SEENINCLUDE) {
 		dns_zone_rpz_disable_db(zone, load->db);
 		dns_zone_catz_disable_db(zone, load->db);
 	}

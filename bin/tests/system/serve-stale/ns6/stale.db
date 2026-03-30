@@ -9,9 +9,12 @@
 ; See the COPYRIGHT file distributed with this work for additional
 ; information regarding copyright ownership.
 
-stale.		IN SOA	ns.stale. matthijs.isc.org. 1 0 0 0 0
-stale.		IN NS	ns.stale.
-ns.stale.	IN A    10.53.0.6
+stale.			IN SOA	ns.stale. matthijs.isc.org. 1 0 0 0 0
+stale.			IN NS	ns.stale.
+ns.stale.		IN A    10.53.0.6
 
-serve.stale.	IN NS	ns.serve.stale.
-ns.serve.stale.	IN A    10.53.0.6
+serve.stale.		IN NS	ns.serve.stale.
+ns.serve.stale.		IN A    10.53.0.6
+
+target.stale.		IN NS	ns.target.stale.
+ns.target.stale.	IN A	10.53.0.7

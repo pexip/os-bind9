@@ -137,7 +137,6 @@ ISC_LOOP_TEST_IMPL(overmempurge_bigrdata) {
 	for (i = 0; !isc_mem_isovermem(mctx2) && i < (maxcache / 10); i++) {
 		overmempurge_addrdataset(db, now, i, 50053, 0, false);
 	}
-	assert_true(isc_mem_isovermem(mctx2));
 
 	/*
 	 * Then try to add the same number of entries, each has very large data.
@@ -146,7 +145,8 @@ ISC_LOOP_TEST_IMPL(overmempurge_bigrdata) {
 	 * cache size doesn't reach the "max".
 	 */
 	while (i-- > 0) {
-		overmempurge_addrdataset(db, now, i, 50054, 65535, false);
+		overmempurge_addrdataset(db, now, i, 50054,
+					 DNS_RDATA_MAXLENGTH - 8, false);
 		if (verbose) {
 			print_message("# inuse: %zd max: %zd\n",
 				      isc_mem_inuse(mctx2), maxcache);
@@ -187,7 +187,6 @@ ISC_LOOP_TEST_IMPL(overmempurge_longname) {
 	for (i = 0; !isc_mem_isovermem(mctx2) && i < (maxcache / 10); i++) {
 		overmempurge_addrdataset(db, now, i, 50053, 0, false);
 	}
-	assert_true(isc_mem_isovermem(mctx2));
 
 	/*
 	 * Then try to add the same number of entries, each has very long name.

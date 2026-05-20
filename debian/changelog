@@ -1,3 +1,18 @@
+bind9 (1:9.20.23-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.23
+   + [CVE-2026-3592]: Limit resolver server list size.
+   + [CVE-2026-3039]: Fix GSS-API resource leak.
+   + [CVE-2026-5946]: Disable recursion, UPDATE, and NOTIFY for non-IN
+     views.
+   + [CVE-2026-5950]: Avoid unbounded recursion loop.
+   + [CVE-2026-5947]: Fix crash in resolver when SIG(0)-signed responses
+     are received under load.
+   + [CVE-2026-3593]: Fix use-after-free error in DNS-over-HTTPS when
+     processing HTTP/2 SETTINGS frames.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 20 May 2026 12:21:44 +0200
+
 bind9 (1:9.20.21-1~deb13u1) trixie-security; urgency=high
 
   * New upstream version 9.20.21

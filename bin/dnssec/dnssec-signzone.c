@@ -2575,7 +2575,8 @@ nsec3ify(unsigned int hashalg, dns_iterations_t iterations,
  * Load the zone file from disk
  */
 static void
-loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
+loadzone(char *file, const char *origin, dns_rdataclass_t rdclass,
+	 dns_db_t **db) {
 	isc_buffer_t b;
 	int len;
 	dns_fixedname_t fname;
@@ -2583,7 +2584,7 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 	isc_result_t result;
 
 	len = strlen(origin);
-	isc_buffer_init(&b, origin, len);
+	isc_buffer_constinit(&b, origin, len);
 	isc_buffer_add(&b, len);
 
 	name = dns_fixedname_initname(&fname);
@@ -3316,7 +3317,7 @@ usage(int ret) {
 	fprintf(stderr, "\t-n ncpus (number of cpus present)\n");
 	fprintf(stderr, "\t-k key_signing_key\n");
 	fprintf(stderr, "\t-3 NSEC3 salt\n");
-	fprintf(stderr, "\t-H NSEC3 iterations (10)\n");
+	fprintf(stderr, "\t-H NSEC3 additional iterations (%d)\n", nsec3iter);
 	fprintf(stderr, "\t-A NSEC3 optout\n");
 
 	fprintf(stderr, "\n");
@@ -3377,7 +3378,8 @@ main(int argc, char *argv[]) {
 	int ch;
 	char *startstr = NULL, *endstr = NULL, *classname = NULL;
 	char *dnskey_endstr = NULL;
-	char *origin = NULL, *file = NULL, *output = NULL;
+	const char *origin = NULL;
+	char *file = NULL, *output = NULL;
 	char *inputformatstr = NULL, *outputformatstr = NULL;
 	char *serialformatstr = NULL;
 	char *dskeyfile[MAXDSKEYS];
@@ -3806,7 +3808,7 @@ main(int argc, char *argv[]) {
 	argv += 1;
 
 	if (origin == NULL) {
-		origin = file;
+		origin = isc_file_basename(file);
 	}
 
 	if (output == NULL) {
@@ -4182,6 +4184,7 @@ main(int argc, char *argv[]) {
 			    &sign_finish);
 	}
 	isc_mutex_destroy(&namelock);
+	isc_rwlock_destroy(&keylist_lock);
 
 	rcu_barrier();
 

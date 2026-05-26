@@ -78,6 +78,15 @@
 
 #define DNS_ADB_MINADBSIZE (1024U * 1024U) /*%< 1 Megabyte */
 
+/*
+ * Default and override for the per-find address limit, the sum of the number of
+ * A and AAAA RR from an ADB NS name resolution.  When non-zero, this value is
+ * used instead of the default.  Can be set via 'named -T adbaddrslimit=N' for
+ * testing.
+ */
+#define DEFAULT_ADDRSLIMIT 6
+size_t dns_adb_addrslimit = 0;
+
 typedef ISC_LIST(dns_adbname_t) dns_adbnamelist_t;
 typedef struct dns_adbnamehook dns_adbnamehook_t;
 typedef ISC_LIST(dns_adbnamehook_t) dns_adbnamehooklist_t;
@@ -558,6 +567,9 @@ import_rdataset(dns_adbname_t *adbname, dns_rdataset_t *rdataset,
 
 	rdtype = rdataset->type;
 
+	REQUIRE(rdataset->rdclass == dns_rdataclass_in);
+	REQUIRE(rdtype == dns_rdatatype_a || rdtype == dns_rdatatype_aaaa);
+
 	switch (rdataset->trust) {
 	case dns_trust_glue:
 	case dns_trust_additional:
@@ -569,8 +581,6 @@ import_rdataset(dns_adbname_t *adbname, dns_rdataset_t *rdataset,
 	default:
 		rdataset->ttl = ttlclamp(rdataset->ttl);
 	}
-
-	REQUIRE(rdtype == dns_rdatatype_a || rdtype == dns_rdatatype_aaaa);
 
 	for (result = dns_rdataset_first(rdataset); result == ISC_R_SUCCESS;
 	     result = dns_rdataset_next(rdataset))
@@ -1473,6 +1483,9 @@ static void
 copy_namehook_lists(dns_adb_t *adb, dns_adbfind_t *find, dns_adbname_t *name) {
 	dns_adbnamehook_t *namehook = NULL;
 	dns_adbentry_t *entry = NULL;
+	size_t count = 0;
+	size_t limit = dns_adb_addrslimit != 0 ? dns_adb_addrslimit
+					       : DEFAULT_ADDRSLIMIT;
 
 	if ((find->options & DNS_ADBFIND_INET) != 0) {
 		namehook = ISC_LIST_HEAD(name->v4);
@@ -1493,6 +1506,12 @@ copy_namehook_lists(dns_adb_t *adb, dns_adbfind_t *find, dns_adbname_t *name) {
 			 * Found a valid entry.  Add it to the find's list.
 			 */
 			ISC_LIST_APPEND(find->list, addrinfo, publink);
+
+			if (++count >= limit) {
+				DP(ISC_LOG_DEBUG(3), "skipping addresses");
+				return;
+			}
+
 		nextv4:
 			namehook = ISC_LIST_NEXT(namehook, name_link);
 		}
@@ -1517,6 +1536,12 @@ copy_namehook_lists(dns_adb_t *adb, dns_adbfind_t *find, dns_adbname_t *name) {
 			 * Found a valid entry.  Add it to the find's list.
 			 */
 			ISC_LIST_APPEND(find->list, addrinfo, publink);
+
+			if (++count >= limit) {
+				DP(ISC_LOG_DEBUG(3), "skipping addresses");
+				return;
+			}
+
 		nextv6:
 			namehook = ISC_LIST_NEXT(namehook, name_link);
 		}
@@ -3029,22 +3054,35 @@ static void
 adjustsrtt(dns_adbaddrinfo_t *addr, unsigned int rtt, unsigned int factor,
 	   isc_stdtime_t now) {
 	unsigned int new_srtt;
+	unsigned int old_srtt;
 
 	if (factor == DNS_ADB_RTTADJAGE) {
-		if (atomic_load(&addr->entry->lastage) != now) {
-			new_srtt = (uint64_t)atomic_load(&addr->entry->srtt) *
-				   98 / 100;
-			atomic_store(&addr->entry->lastage, now);
-			atomic_store(&addr->entry->srtt, new_srtt);
-			addr->srtt = new_srtt;
+		isc_stdtime_t lastage =
+			atomic_load_acquire(&addr->entry->lastage);
+
+		/* prevent double aging */
+		if (lastage == now ||
+		    !atomic_compare_exchange_strong_acq_rel(
+			    &addr->entry->lastage, &lastage, now))
+		{
+			return;
 		}
-	} else {
-		new_srtt = ((uint64_t)atomic_load(&addr->entry->srtt) / 10 *
-			    factor) +
-			   ((uint64_t)rtt / 10 * (10 - factor));
-		atomic_store(&addr->entry->srtt, new_srtt);
-		addr->srtt = new_srtt;
 	}
+
+	/*
+	 * Correct CAS aging...
+	 */
+	old_srtt = atomic_load_acquire(&addr->entry->srtt);
+	do {
+		if (factor == DNS_ADB_RTTADJAGE) {
+			new_srtt = (uint64_t)old_srtt * 98 / 100;
+		} else {
+			new_srtt = ((uint64_t)old_srtt / 10 * factor) +
+				   ((uint64_t)rtt / 10 * (10 - factor));
+		}
+	} while (!atomic_compare_exchange_weak_acq_rel(&addr->entry->srtt,
+						       &old_srtt, new_srtt));
+	addr->srtt = new_srtt;
 }
 
 void

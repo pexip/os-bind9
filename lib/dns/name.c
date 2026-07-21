@@ -1415,7 +1415,7 @@ dns_name_fromwire(dns_name_t *const name, isc_buffer_t *const source,
 	 *
 	 * > In this scheme, an entire domain name or a list of labels at the
 	 * > end of a domain name is replaced with a pointer to a prior
-	 * > occurance of the same name.
+	 * > occurrence of the same name.
 	 *
 	 * The key word is "prior". This says that compression pointers must
 	 * point strictly earlier in the message (before our "marker" variable),
@@ -1492,7 +1492,7 @@ dns_name_fromwire(dns_name_t *const name, isc_buffer_t *const source,
 	 * The amount of the source we consumed is set once.
 	 */
 	const uint8_t *const source_buf = isc_buffer_base(source);
-	const uint8_t *const source_max = isc_buffer_used(source);
+	const uint8_t *const source_max = isc_buffer_active(source);
 	const uint8_t *const start = isc_buffer_current(source);
 	const uint8_t *marker = start;
 	const uint8_t *cursor = start;

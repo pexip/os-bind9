@@ -497,6 +497,7 @@ struct dns_zone {
 	dns_db_t *rss_db;
 	dns_zone_t *rss_raw;
 	struct rss *rss;
+	struct rss *rss_next;
 	dns_update_state_t *rss_state;
 
 	isc_stats_t *gluecachestats;
@@ -1278,6 +1279,10 @@ zone_free(dns_zone_t *zone) {
 		ISC_LIST_UNLINK(zone->newincludes, include, link);
 		isc_mem_free(zone->mctx, include->name);
 		isc_mem_put(zone->mctx, include, sizeof *include);
+	}
+
+	if (zone->rss_state != NULL) {
+		dns_update_state_clear(&zone->rss_state, true);
 	}
 	if (zone->masterfile != NULL) {
 		isc_mem_free(zone->mctx, zone->masterfile);
@@ -4269,15 +4274,15 @@ compute_tag(dns_name_t *name, dns_rdata_dnskey_t *dnskey, isc_mem_t *mctx,
 	dst_key_t *dstkey = NULL;
 
 	isc_buffer_init(&buffer, data, sizeof(data));
-	dns_rdata_fromstruct(&rdata, dnskey->common.rdclass,
-			     dns_rdatatype_dnskey, dnskey, &buffer);
 
-	result = dns_dnssec_keyfromrdata(name, &rdata, mctx, &dstkey);
-	if (result == ISC_R_SUCCESS) {
-		*tag = dst_key_id(dstkey);
-		dst_key_free(&dstkey);
-	}
+	CHECK(dns_rdata_fromstruct(&rdata, dnskey->common.rdclass,
+				   dns_rdatatype_dnskey, dnskey, &buffer));
+	CHECK(dns_dnssec_keyfromrdata(name, &rdata, mctx, &dstkey));
 
+	*tag = dst_key_id(dstkey);
+	dst_key_free(&dstkey);
+
+cleanup:
 	return result;
 }
 
@@ -4311,15 +4316,12 @@ trust_key(dns_zone_t *zone, dns_name_t *keyname, dns_rdata_dnskey_t *dnskey,
 	dns_keytable_t *sr = NULL;
 	dns_rdata_ds_t ds;
 
-	result = dns_view_getsecroots(zone->view, &sr);
-	if (result != ISC_R_SUCCESS) {
-		return;
-	}
+	CHECK(dns_view_getsecroots(zone->view, &sr));
 
 	/* Build DS record for key. */
 	isc_buffer_init(&buffer, data, sizeof(data));
-	dns_rdata_fromstruct(&rdata, dnskey->common.rdclass,
-			     dns_rdatatype_dnskey, dnskey, &buffer);
+	CHECK(dns_rdata_fromstruct(&rdata, dnskey->common.rdclass,
+				   dns_rdatatype_dnskey, dnskey, &buffer));
 	CHECK(dns_ds_fromkeyrdata(keyname, &rdata, DNS_DSDIGEST_SHA256, digest,
 				  &ds));
 	CHECK(dns_keytable_add(sr, true, initial, keyname, &ds, sfd_add,
@@ -10034,7 +10036,7 @@ normalize_key(dns_rdata_t *rr, dns_rdata_t *target, unsigned char *data,
 	dns_rdata_dnskey_t dnskey;
 	dns_rdata_keydata_t keydata;
 	isc_buffer_t buf;
-	isc_result_t result;
+	isc_result_t result = ISC_R_SUCCESS;
 
 	dns_rdata_reset(target);
 	isc_buffer_init(&buf, data, size);
@@ -10044,8 +10046,9 @@ normalize_key(dns_rdata_t *rr, dns_rdata_t *target, unsigned char *data,
 		result = dns_rdata_tostruct(rr, &dnskey, NULL);
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 		dnskey.flags &= ~DNS_KEYFLAG_REVOKE;
-		dns_rdata_fromstruct(target, rr->rdclass, dns_rdatatype_dnskey,
-				     &dnskey, &buf);
+		result = dns_rdata_fromstruct(target, rr->rdclass,
+					      dns_rdatatype_dnskey, &dnskey,
+					      &buf);
 		break;
 	case dns_rdatatype_keydata:
 		result = dns_rdata_tostruct(rr, &keydata, NULL);
@@ -10054,13 +10057,15 @@ normalize_key(dns_rdata_t *rr, dns_rdata_t *target, unsigned char *data,
 		}
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 		dns_keydata_todnskey(&keydata, &dnskey, NULL);
-		dns_rdata_fromstruct(target, rr->rdclass, dns_rdatatype_dnskey,
-				     &dnskey, &buf);
+		result = dns_rdata_fromstruct(target, rr->rdclass,
+					      dns_rdatatype_dnskey, &dnskey,
+					      &buf);
 		break;
 	default:
 		UNREACHABLE();
 	}
-	return ISC_R_SUCCESS;
+
+	return result;
 }
 
 /*
@@ -10242,7 +10247,6 @@ revocable(dns_keyfetch_t *kfetch, dns_rdata_keydata_t *keydata) {
 	isc_result_t result;
 	dns_name_t *keyname;
 	isc_mem_t *mctx;
-	dns_rdata_t sigrr = DNS_RDATA_INIT;
 	dns_rdata_t rr = DNS_RDATA_INIT;
 	dns_rdata_rrsig_t sig;
 	dns_rdata_dnskey_t dnskey;
@@ -10260,8 +10264,13 @@ revocable(dns_keyfetch_t *kfetch, dns_rdata_keydata_t *keydata) {
 	/* Generate a key from keydata */
 	isc_buffer_init(&keyb, key_buf, sizeof(key_buf));
 	dns_keydata_todnskey(keydata, &dnskey, NULL);
-	dns_rdata_fromstruct(&rr, keydata->common.rdclass, dns_rdatatype_dnskey,
-			     &dnskey, &keyb);
+
+	result = dns_rdata_fromstruct(&rr, keydata->common.rdclass,
+				      dns_rdatatype_dnskey, &dnskey, &keyb);
+	if (result != ISC_R_SUCCESS) {
+		return false;
+	}
+
 	result = dns_dnssec_keyfromrdata(keyname, &rr, mctx, &dstkey);
 	if (result != ISC_R_SUCCESS) {
 		return false;
@@ -10272,10 +10281,7 @@ revocable(dns_keyfetch_t *kfetch, dns_rdata_keydata_t *keydata) {
 	     result == ISC_R_SUCCESS;
 	     result = dns_rdataset_next(&kfetch->dnskeysigset))
 	{
-		dns_fixedname_t fixed;
-		dns_fixedname_init(&fixed);
-
-		dns_rdata_reset(&sigrr);
+		dns_rdata_t sigrr = DNS_RDATA_INIT;
 		dns_rdataset_current(&kfetch->dnskeysigset, &sigrr);
 		result = dns_rdata_tostruct(&sigrr, &sig, NULL);
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
@@ -10283,9 +10289,9 @@ revocable(dns_keyfetch_t *kfetch, dns_rdata_keydata_t *keydata) {
 		if (dst_key_alg(dstkey) == sig.algorithm &&
 		    dst_key_rid(dstkey) == sig.keyid)
 		{
-			result = dns_dnssec_verify(
-				keyname, &kfetch->dnskeyset, dstkey, false, 0,
-				mctx, &sigrr, dns_fixedname_name(&fixed));
+			result = dns_dnssec_verify(keyname, &kfetch->dnskeyset,
+						   dstkey, false, 0, mctx,
+						   &sigrr, NULL, NULL);
 
 			dnssec_log(kfetch->zone, ISC_LOG_DEBUG(3),
 				   "Confirm revoked DNSKEY is self-signed: %s",
@@ -10474,7 +10480,7 @@ keyfetch_done(void *arg) {
 			}
 
 			result = dns_dnssec_verify(keyname, dnskeys, dstkey,
-						   false, 0, mctx, &sigrr,
+						   false, 0, mctx, &sigrr, NULL,
 						   NULL);
 			dst_key_free(&dstkey);
 
@@ -10615,9 +10621,16 @@ anchors_done:
 
 			dns_rdata_reset(&keydatarr);
 			isc_buffer_init(&keyb, key_buf, sizeof(key_buf));
-			dns_rdata_fromstruct(&keydatarr, zone->rdclass,
-					     dns_rdatatype_keydata, &keydata,
-					     &keyb);
+			result = dns_rdata_fromstruct(&keydatarr, zone->rdclass,
+						      dns_rdatatype_keydata,
+						      &keydata, &keyb);
+			if (result != ISC_R_SUCCESS) {
+				dnssec_log(zone, ISC_LOG_WARNING,
+					   "dns_rdata_fromstruct failed: "
+					   "KEYDATA %d: %s",
+					   keytag, isc_result_totext(result));
+				continue;
+			}
 
 			/* Insert updated version */
 			CHECK(update_one_rr(kfetch->db, ver, &diff,
@@ -10846,9 +10859,16 @@ anchors_done:
 			keydata.refresh = refresh_time(kfetch, false);
 			dns_rdata_reset(&keydatarr);
 			isc_buffer_init(&keyb, key_buf, sizeof(key_buf));
-			dns_rdata_fromstruct(&keydatarr, zone->rdclass,
-					     dns_rdatatype_keydata, &keydata,
-					     &keyb);
+			result = dns_rdata_fromstruct(&keydatarr, zone->rdclass,
+						      dns_rdatatype_keydata,
+						      &keydata, &keyb);
+			if (result != ISC_R_SUCCESS) {
+				dnssec_log(zone, ISC_LOG_WARNING,
+					   "dns_rdata_fromstruct failed: "
+					   "KEYDATA %d: %s",
+					   keytag, isc_result_totext(result));
+				continue;
+			}
 
 			/* Insert updated version */
 			CHECK(update_one_rr(kfetch->db, ver, &diff,
@@ -10866,9 +10886,9 @@ anchors_done:
 			keydata.refresh = refresh_time(kfetch, false);
 			dns_rdata_reset(&keydatarr);
 			isc_buffer_init(&keyb, key_buf, sizeof(key_buf));
-			dns_rdata_fromstruct(&keydatarr, zone->rdclass,
-					     dns_rdatatype_keydata, &keydata,
-					     &keyb);
+			CHECK(dns_rdata_fromstruct(&keydatarr, zone->rdclass,
+						   dns_rdatatype_keydata,
+						   &keydata, &keyb));
 
 			/* Insert into key zone */
 			CHECK(update_one_rr(kfetch->db, ver, &diff,
@@ -16420,7 +16440,6 @@ struct rss {
 	dns_zone_t *zone;
 	dns_db_t *db;
 	uint32_t serial;
-	ISC_LINK(struct rss) link;
 };
 
 static void
@@ -16576,6 +16595,10 @@ dns_zone_dnskey_inuse(dns_zone_t *zone, dns_rdata_t *rdata, bool *inuse) {
 	kasp = dns_zone_getkasp(zone);
 	keydir = dns_zone_getkeydirectory(zone);
 	keystores = dns_zone_getkeystores(zone);
+
+	if (kasp == NULL) {
+		return ISC_R_SUCCESS;
+	}
 
 	dns_zone_lock_keyfiles(zone);
 	result = dns_dnssec_findmatchingkeys(dns_zone_getorigin(zone), kasp,
@@ -17025,18 +17048,49 @@ receive_secure_serial(void *arg) {
 
 	LOCK_ZONE(zone);
 
-	/*
-	 * The receive_secure_serial() is loop-serialized for the zone.  Make
-	 * sure there's no processing currently running.
-	 */
+	if (DNS_ZONE_FLAG(zone, DNS_ZONEFLG_EXITING) || !inline_secure(zone)) {
+		/*
+		 * If this is a callback for a new secure serial that was
+		 * never processed and the zone is shutting down, then just
+		 * free 'rss_next' and return.
+		 */
+		if (rss == zone->rss_next) {
+			isc_mem_put(zone->mctx, rss, sizeof(*rss));
+			zone->rss_next = NULL;
+			UNLOCK_ZONE(zone);
+			dns_zone_idetach(&zone);
+			return;
+		}
 
-	INSIST(zone->rss == NULL || zone->rss == rss);
-
-	if (zone->rss != NULL) {
-		INSIST(zone->rss == rss);
+		/* Otherwise, this is an ongoing processing, do the cleanup. */
 		UNLOCK_ZONE(zone);
+		CHECK(ISC_R_SHUTTINGDOWN);
+	}
+
+	/*
+	 * The receive_secure_serial() is loop-serialized for the zone, but it
+	 * is possible for new serial to arrive before the old processing is
+	 * completed, because the old call could have been rescheduled if
+	 * dns_update_signaturesinc() below returned DNS_R_CONTINUE.
+	 */
+	if (zone->rss != NULL) {
+		/* There is an existing processing */
+		UNLOCK_ZONE(zone);
+		if (zone->rss != rss) {
+			/*
+			 * A new 'rss' is sandwiched between a previous call
+			 * with the old 'zone->rss' and a future scheduled
+			 * call with the old 'zone->rss'. Reschedule the new
+			 * 'rss' so the old one can be completed first.
+			 */
+			isc_async_run(zone->loop, receive_secure_serial, rss);
+			return;
+		}
 	} else {
-		zone->rss = rss;
+		/* New arrival */
+		INSIST(rss == zone->rss_next);
+		zone->rss = MOVE_OWNERSHIP(zone->rss_next);
+
 		dns_diff_init(zone->mctx, &zone->rss_diff);
 
 		/*
@@ -17152,6 +17206,7 @@ receive_secure_serial(void *arg) {
 		&log, zone, zone->rss_db, zone->rss_oldver, zone->rss_newver,
 		&zone->rss_diff, zone->sigvalidityinterval, &zone->rss_state);
 	if (result == DNS_R_CONTINUE) {
+		/* Signing quantum reached, reschedule the next chunk. */
 		if (rjournal != NULL) {
 			dns_journal_destroy(&rjournal);
 		}
@@ -17213,7 +17268,7 @@ cleanup:
 	if (zone->rss_raw != NULL) {
 		dns_zone_detach(&zone->rss_raw);
 	}
-	if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS && result != ISC_R_SHUTTINGDOWN) {
 		LOCK_ZONE(zone);
 		set_resigntime(zone);
 		timenow = isc_time_now();
@@ -17256,15 +17311,24 @@ static isc_result_t
 zone_send_secureserial(dns_zone_t *zone, uint32_t serial) {
 	struct rss *rss = NULL;
 
-	rss = isc_mem_get(zone->secure->mctx, sizeof(*rss));
-	*rss = (struct rss){
-		.serial = serial,
-		.link = ISC_LINK_INITIALIZER,
-	};
-
 	INSIST(LOCKED_ZONE(zone->secure));
-	zone_iattach(zone->secure, &rss->zone);
-	isc_async_run(zone->secure->loop, receive_secure_serial, rss);
+
+	if (zone->secure->rss_next != NULL) {
+		/*
+		 * New version came earlier than the previous one had a
+		 * chance to be processed, just update the serial.
+		 */
+		zone->secure->rss_next->serial = serial;
+	} else {
+		rss = isc_mem_get(zone->secure->mctx, sizeof(*rss));
+		*rss = (struct rss){
+			.serial = serial,
+		};
+		zone_iattach(zone->secure, &rss->zone);
+
+		zone->secure->rss_next = rss;
+		isc_async_run(zone->secure->loop, receive_secure_serial, rss);
+	}
 
 	DNS_ZONE_CLRFLAG(zone, DNS_ZONEFLG_SENDSECURE);
 	return ISC_R_SUCCESS;
@@ -17724,7 +17788,7 @@ zone_send_securedb(dns_zone_t *zone, dns_db_t *db) {
 	struct rss *rss = NULL;
 
 	rss = isc_mem_get(zone->secure->mctx, sizeof(*rss));
-	*rss = (struct rss){ .link = ISC_LINK_INITIALIZER };
+	*rss = (struct rss){ 0 };
 
 	INSIST(LOCKED_ZONE(zone->secure));
 	zone_iattach(zone->secure, &rss->zone);
@@ -22014,7 +22078,6 @@ static void
 do_nsfetch(void *arg) {
 	dns_nsfetch_t *nsfetch = (dns_nsfetch_t *)arg;
 	isc_result_t result;
-	unsigned int nlabels = 1;
 	dns_resolver_t *resolver = NULL;
 	dns_zone_t *zone = nsfetch->zone;
 	unsigned int options = DNS_FETCHOPT_UNSHARED | DNS_FETCHOPT_NOCACHED;
@@ -22036,9 +22099,13 @@ do_nsfetch(void *arg) {
 			   "Create fetch for '%s' NS request", namebuf);
 	}
 
-	/* Derive parent domain. XXXWMM: Check for root domain */
+	/* Derive parent domain. Check for root domain. */
+	if (dns_name_countlabels(&nsfetch->pname) <= 1U) {
+		result = ISC_R_NOTFOUND;
+		goto cleanup;
+	}
 	dns_name_split(&nsfetch->pname,
-		       dns_name_countlabels(&nsfetch->pname) - nlabels, NULL,
+		       dns_name_countlabels(&nsfetch->pname) - 1U, NULL,
 		       &nsfetch->pname);
 
 	/*
@@ -22063,10 +22130,20 @@ cleanup:
 		dns_name_t *zname = dns_fixedname_name(&nsfetch->name);
 		bool free_needed;
 		char namebuf[DNS_NAME_FORMATSIZE];
-		dns_name_format(&nsfetch->pname, namebuf, sizeof(namebuf));
-		dnssec_log(zone, ISC_LOG_WARNING,
-			   "Failed to create fetch for '%s' NS request",
-			   namebuf);
+
+		if (DNS_NAME_VALID(&nsfetch->pname)) {
+			dns_name_format(&nsfetch->pname, namebuf,
+					sizeof(namebuf));
+			dnssec_log(zone, ISC_LOG_WARNING,
+				   "Failed to create fetch for '%s' NS request",
+				   namebuf);
+		} else {
+			dns_zone_nameonly(zone, namebuf, sizeof(namebuf));
+			dnssec_log(zone, ISC_LOG_WARNING,
+				   "Failed to create fetch for '%s' NS request",
+				   namebuf);
+		}
+
 		LOCK_ZONE(zone);
 		zone->nsfetchcount--;
 		isc_refcount_decrement(&zone->irefs);
@@ -22765,7 +22842,7 @@ zone_rekey(dns_zone_t *zone) {
 		result = dns_dnssec_syncupdate(&dnskeys, &rmkeys, &cdsset,
 					       &cdnskeyset, now, &digests,
 					       cdnskeypub, ttl, &diff, mctx);
-		if (result != ISC_R_SUCCESS) {
+		if (result != ISC_R_SUCCESS && result != DNS_R_UNCHANGED) {
 			dnssec_log(zone, ISC_LOG_ERROR,
 				   "zone_rekey:couldn't update CDS/CDNSKEY: %s",
 				   isc_result_totext(result));
@@ -22803,7 +22880,7 @@ zone_rekey(dns_zone_t *zone) {
 		result = dns_dnssec_syncdelete(
 			&cdsset, &cdnskeyset, &zone->origin, zone->rdclass, ttl,
 			&diff, mctx, cdsdel, cdnskeydel);
-		if (result != ISC_R_SUCCESS) {
+		if (result != ISC_R_SUCCESS && result != DNS_R_UNCHANGED) {
 			dnssec_log(zone, ISC_LOG_ERROR,
 				   "zone_rekey:couldn't update CDS/CDNSKEY "
 				   "DELETE records: %s",

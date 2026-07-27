@@ -156,6 +156,15 @@ dns_dispatchmgr_setavailports(dns_dispatchmgr_t *mgr, isc_portset_t *v4portset,
  */
 
 void
+dns_dispatchmgr_setreusetimeout(dns_dispatchmgr_t *mgr, unsigned int timeout);
+/*%<
+ * Sets the idle timeout (in milliseconds) for a reused outgoing TCP connection.
+ * While a dispatch has no outstanding responses we keep a read pending so a
+ * peer-initiated close is noticed promptly; this bounds how long such an idle
+ * connection is kept open for reuse.
+ */
+
+void
 dns_dispatchmgr_setstats(dns_dispatchmgr_t *mgr, isc_stats_t *stats);
 /*%<
  * Sets statistics counter for the dispatchmgr.  This function is expected to
@@ -197,7 +206,7 @@ dns_dispatch_createtcp(dns_dispatchmgr_t *mgr, const isc_sockaddr_t *localaddr,
  *
  * Note: a NULL transport is different from a non-NULL transport of type
  *	 DNS_TRANSPORT_TCP, though currently their behavior is the same.
- *	 This allows for different types of transactions to be seperated
+ *	 This allows for different types of transactions to be separated
  *	 in the future if needed.
  *
  * Requires:

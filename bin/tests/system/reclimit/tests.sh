@@ -285,7 +285,8 @@ echo_i "checking that priority names under the max-types-per-name limit get cach
 for rrtype in AAAA MX NS; do
   check_manytypes 1 manytypes.big "${rrtype}" NOERROR big SOA 120 || ret=1
 done
-# Wait at least 1 second
+# Wait at least 1 second for the TTL to decrement
+sleep 1
 for rrtype in AAAA MX NS; do
   check_manytypes 2 manytypes.big "${rrtype}" NOERROR big SOA "" 120 || ret=1
 done
@@ -340,13 +341,13 @@ echo_i "checking that NXDOMAIN names over the max-types-per-name limit don't get
 
 # Query for 10 NXDOMAIN types
 for ntype in $(seq 65270 65279); do
-  check_manytypes 1 manytypes.big "TYPE${ntype}" NOERROR big SOA 0 || ret=1
+  check_manytypes 1 manytypes.big "TYPE${ntype}" NOERROR big SOA 120 || ret=1
 done
 # Wait at least 1 second
 sleep 1
 # Query for 10 NXDOMAIN types again - these should not be cached
 for ntype in $(seq 65270 65279); do
-  check_manytypes 2 manytypes.big "TYPE${ntype}" NOERROR big SOA 0 || ret=1
+  check_manytypes 2 manytypes.big "TYPE${ntype}" NOERROR big SOA 120 || ret=1
 done
 
 if [ $ret -ne 0 ]; then echo_i "failed"; fi
@@ -361,7 +362,8 @@ echo_i "checking that priority NXDOMAIN names over the max-types-per-name limit 
 for rrtype in AAAA MX NS; do
   check_manytypes 1 manytypes.big "${rrtype}" NOERROR big SOA 120 || ret=1
 done
-# Wait at least 1 second
+# Wait at least 1 second for the TTL to decrement
+sleep 1
 for rrtype in AAAA MX NS; do
   check_manytypes 2 manytypes.big "${rrtype}" NOERROR big SOA "" 120 || ret=1
 done

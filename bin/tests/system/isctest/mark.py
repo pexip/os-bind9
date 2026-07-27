@@ -58,6 +58,12 @@ def with_algorithm(name: str):
     return pytest.mark.skipif(os.getenv(key) != "1", reason=f"{name} is not supported")
 
 
+with_developer = pytest.mark.skipif(
+    os.getenv("FEATURE_DEVELOPER") != "1",
+    reason="developer mode disabled in the build",
+)
+
+
 with_dnstap = pytest.mark.skipif(
     os.getenv("FEATURE_DNSTAP") != "1", reason="DNSTAP support disabled in the build"
 )
@@ -105,3 +111,15 @@ def have_ipv6():
 
 
 with_ipv6 = pytest.mark.skipif(not have_ipv6(), reason="IPv6 not available")
+
+ecdsa_deterministic = False
+try:
+    from cryptography.hazmat.backends import default_backend
+
+    ecdsa_deterministic = default_backend().ecdsa_deterministic_supported()
+except Exception:  # pylint: disable=broad-except
+    pass
+
+with_ecdsa_deterministic = pytest.mark.skipif(
+    not ecdsa_deterministic, reason="ECDSA deterministic signing is not supported"
+)

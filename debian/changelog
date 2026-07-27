@@ -1,3 +1,23 @@
+bind9 (1:9.20.26-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.26
+   + [CVE-2026-10723]: Correct verification of NSEC3 signer name.
+   + [CVE-2026-10822]: Malformed DNSKEY records could trigger an
+     assertion.
+   + [CVE-2026-11331]: Fix handling of RPZ CNAME expansion that returns
+     too-long name.
+   + [CVE-2026-11605]: Prevent excessive validation work from crafted
+     negative responses.
+   + [CVE-2026-11622]: Prevent cache exhaustion under sustained attack.
+   + [CVE-2026-11721]: Stop accepting invalid signed wildcard records.
+   + [CVE-2026-12617]: Do not assert for some specific CNAME and DNAME
+     queries.
+   + [CVE-2026-13204]: Prevent crash from malformed NSEC/NSEC3 response.
+   + [CVE-2026-13321]: Fix DNSSEC validation bypass via out-of-zone NSEC
+     Next Field.
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 21 Jul 2026 15:09:54 +0200
+
 bind9 (1:9.20.23-1~pexip25u1+deb13u1) pexip-trixie; urgency=medium
 
   * New upstream release with security updates

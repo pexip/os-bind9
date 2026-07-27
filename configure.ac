@@ -16,7 +16,7 @@
 #
 m4_define([bind_VERSION_MAJOR], 9)dnl
 m4_define([bind_VERSION_MINOR], 20)dnl
-m4_define([bind_VERSION_PATCH], 23)dnl
+m4_define([bind_VERSION_PATCH], 26)dnl
 m4_define([bind_VERSION_EXTRA], )dnl
 m4_define([bind_DESCRIPTION], [(Stable Release)])dnl
 m4_define([bind_SRCID], [m4_esyscmd_s([git rev-parse --short HEAD | cut -b1-7])])dnl
@@ -174,7 +174,7 @@ AC_ARG_ENABLE([developer],
 
 AS_IF([test "$enable_developer" = "yes"],
       [DEVELOPER_MODE=yes
-       STD_CPPFLAGS="$STD_CPPFLAGS -DISC_MEM_DEFAULTFILL=1 -DISC_MEM_TRACKLINES=1 -DISC_LIST_CHECKINIT=1 -DISC_STATS_CHECKUNDERFLOW=1 -DDNS_RBTDB_STRONG_RWLOCK_CHECK=1 -DISC_MUTEX_ERROR_CHECK=1"
+       STD_CPPFLAGS="$STD_CPPFLAGS -DDEVELOPER_MODE=1 -DISC_MEM_DEFAULTFILL=1 -DISC_MEM_TRACKLINES=1 -DISC_LIST_CHECKINIT=1 -DISC_STATS_CHECKUNDERFLOW=1 -DDNS_RBTDB_STRONG_RWLOCK_CHECK=1 -DISC_MUTEX_ERROR_CHECK=1"
        test "${enable_fixed_rrset+set}" = set || enable_fixed_rrset=yes
        test "${enable_querytrace+set}" = set || enable_querytrace=yes
        test "${with_cmocka+set}" = set || with_cmocka=yes
@@ -249,6 +249,8 @@ AC_DEFINE_UNQUOTED([RCU_VERSION], ["$RCU_VERSION"], [Compile-time Userspace-RCU 
 
 CFLAGS="$CFLAGS $LIBURCU_CFLAGS"
 LIBS="$LIBS $LIBURCU_LIBS"
+
+AC_CHECK_HEADERS([urcu/assert.h urcu/uatomic.h urcu/pointer.h])
 
 #
 # Userspace-RCU inlining doesn't work for rcu_deference() with some combination
@@ -490,6 +492,11 @@ AC_COMPILE_IFELSE(
 # check for GCC returns_nonnull attribute
 #
 AX_GCC_FUNC_ATTRIBUTE([returns_nonnull])
+
+#
+# check for GCC returns_nonnull attribute
+#
+AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 
 #
 # how to link math functions?

@@ -308,7 +308,7 @@ signwithkey(dns_name_t *name, dns_rdataset_t *rdataset, dst_key_t *key,
 
 	if (tryverify) {
 		result = dns_dnssec_verify(name, rdataset, key, true, 0, mctx,
-					   &trdata, NULL);
+					   &trdata, NULL, NULL);
 		if (result == ISC_R_SUCCESS || result == DNS_R_FROMWILDCARD) {
 			vbprintf(3, "\tsignature verified\n");
 			INCSTAT(nverified);
@@ -469,7 +469,8 @@ static bool
 setverifies(dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	    dns_rdata_t *rrsig) {
 	isc_result_t result;
-	result = dns_dnssec_verify(name, set, key, false, 0, mctx, rrsig, NULL);
+	result = dns_dnssec_verify(name, set, key, false, 0, mctx, rrsig, NULL,
+				   NULL);
 	if (result == ISC_R_SUCCESS || result == DNS_R_FROMWILDCARD) {
 		INCSTAT(nverified);
 		return true;
@@ -1619,6 +1620,11 @@ assignwork(void *arg) {
 		 * The origin was handled by signapex().
 		 */
 		if (dns_name_equal(name, gorigin)) {
+			dns_db_detachnode(gdb, &node);
+			goto next;
+		}
+		if (!dns_name_issubdomain(name, gorigin)) {
+			dumpnode(name, node);
 			dns_db_detachnode(gdb, &node);
 			goto next;
 		}
@@ -2882,7 +2888,7 @@ findkeys:
 	dns_diff_init(mctx, &diff);
 
 	/*
-	 * Update keylist with information from from the key repository.
+	 * Update keylist with information from the key repository.
 	 */
 	dns_dnssec_updatekeys(&keylist, &matchkeys, NULL, gorigin, keyttl,
 			      &diff, mctx, report);

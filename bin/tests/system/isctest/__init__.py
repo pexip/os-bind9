@@ -10,6 +10,7 @@
 # information regarding copyright ownership.
 
 from . import (  # pylint: disable=redefined-builtin
+    algorithms,
     check,
     hypothesis,
     instance,
@@ -18,7 +19,9 @@ from . import (  # pylint: disable=redefined-builtin
     query,
     run,
     template,
+    transfer,
     vars,
+    zone,
 )
 
 # isctest.mark module is intentionally NOT imported, because it relies on
@@ -27,6 +30,7 @@ from . import (  # pylint: disable=redefined-builtin
 # instead.
 
 __all__ = [
+    "algorithms",
     "check",
     "hypothesis",
     "instance",
@@ -35,5 +39,7 @@ __all__ = [
     "query",
     "run",
     "template",
+    "transfer",
     "vars",
+    "zone",
 ]

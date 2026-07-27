@@ -175,7 +175,7 @@ struct qpznode {
 	 * and the database have both released the object) the object
 	 * is freed.
 	 *
-	 * Whenever 'erefs' is incremented from zero, we also aquire a
+	 * Whenever 'erefs' is incremented from zero, we also acquire a
 	 * node use reference (see 'qpzonedb->references' below), and
 	 * release it when 'erefs' goes back to zero. This prevents the
 	 * database from being shut down until every caller has released
@@ -917,6 +917,8 @@ bindrdataset(qpzonedb_t *qpdb, qpznode_t *node, dns_slabheader_t *header,
 	if (rdataset == NULL) {
 		return;
 	}
+
+	isc_refcount_increment0(&header->references);
 
 	qpznode_acquire(qpdb, node DNS__DB_FLARG_PASS);
 
@@ -4050,6 +4052,11 @@ rdatasetiter_destroy(dns_rdatasetiter_t **iteratorp DNS__DB_FLARG) {
 
 	qrditer = (qpdb_rdatasetiter_t *)(*iteratorp);
 
+	if (qrditer->current != NULL) {
+		isc_refcount_decrement(&qrditer->current->references);
+		qrditer->current = NULL;
+	}
+
 	if (qrditer->common.version != NULL) {
 		closeversion(qrditer->common.db, &qrditer->common.version,
 			     false DNS__DB_FLARG_PASS);
@@ -4092,7 +4099,16 @@ rdatasetiter_first(dns_rdatasetiter_t *iterator DNS__DB_FLARG) {
 		}
 	}
 
+	if (header != NULL) {
+		isc_refcount_increment0(&header->references);
+	}
+
 	NODE_UNLOCK(nlock, &nlocktype);
+
+	if (qrditer->current != NULL) {
+		isc_refcount_decrement(&qrditer->current->references);
+		qrditer->current = NULL;
+	}
 
 	qrditer->current = header;
 
@@ -4164,7 +4180,16 @@ rdatasetiter_next(dns_rdatasetiter_t *iterator DNS__DB_FLARG) {
 		}
 	}
 
+	if (header != NULL) {
+		isc_refcount_increment0(&header->references);
+	}
+
 	NODE_UNLOCK(nlock, &nlocktype);
+
+	if (qrditer->current != NULL) {
+		isc_refcount_decrement(&qrditer->current->references);
+		qrditer->current = NULL;
+	}
 
 	qrditer->current = header;
 

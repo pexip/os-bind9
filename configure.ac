@@ -16,7 +16,7 @@
 #
 m4_define([bind_VERSION_MAJOR], 9)dnl
 m4_define([bind_VERSION_MINOR], 20)dnl
-m4_define([bind_VERSION_PATCH], 26)dnl
+m4_define([bind_VERSION_PATCH], 29)dnl
 m4_define([bind_VERSION_EXTRA], )dnl
 m4_define([bind_DESCRIPTION], [(Stable Release)])dnl
 m4_define([bind_SRCID], [m4_esyscmd_s([git rev-parse --short HEAD | cut -b1-7])])dnl
@@ -662,7 +662,7 @@ AS_IF([test "$enable_pthread_rwlock" = "yes"],
       ])
 AM_CONDITIONAL([USE_ISC_RWLOCK], [test "$enable_pthread_rwlock" != "yes"])
 
-CRYPTO=OpenSSL
+AC_CHECK_FUNCS_ONCE([arc4random])
 
 #
 # OpenSSL/LibreSSL is mandatory
@@ -1592,6 +1592,17 @@ AS_CASE([$with_cachedb],
 	[AC_MSG_ERROR([Unknown cache database type])]
        )
 AC_DEFINE_UNQUOTED([CACHEDB_DEFAULT], ["$cachedb"], [Default cache database type])
+
+#
+# In solaris 10, SMF can manage named service
+#
+LIBSCF_LIBS=
+AC_CHECK_HEADER([libscf.h],
+		[AC_CHECK_LIB([scf], [smf_enable_instance],
+			      [AC_DEFINE([HAVE_LIBSCF], [1],
+					 [Define to 1 if libscf was found])
+			       LIBSCF_LIBS="-lscf"])])
+AC_SUBST([LIBSCF_LIBS])
 
 #
 # Files to configure.  These are listed here because we used to

@@ -85,13 +85,9 @@ typedef struct dns_rdatasetmethods {
 		      dns_rdataset_t *target DNS__DB_FLARG);
 	unsigned int (*count)(dns_rdataset_t *rdataset);
 	isc_result_t (*addnoqname)(dns_rdataset_t   *rdataset,
-				   const dns_name_t *name);
+				   const dns_name_t *name,
+				   dns_rdatatype_t   type);
 	isc_result_t (*getnoqname)(dns_rdataset_t *rdataset, dns_name_t *name,
-				   dns_rdataset_t	 *neg,
-				   dns_rdataset_t *negsig DNS__DB_FLARG);
-	isc_result_t (*addclosest)(dns_rdataset_t   *rdataset,
-				   const dns_name_t *name);
-	isc_result_t (*getclosest)(dns_rdataset_t *rdataset, dns_name_t *name,
 				   dns_rdataset_t	 *neg,
 				   dns_rdataset_t *negsig DNS__DB_FLARG);
 	void (*settrust)(dns_rdataset_t *rdataset, dns_trust_t trust);
@@ -185,8 +181,8 @@ struct dns_rdataset {
 		 * an rbtdb database, 'raw' will generally point to the
 		 * memory immediately following a slabheader. (There
 		 * is an exception in the case of rdatasets returned by
-		 * the `getnoqname` and `getclosest` methods; see
-		 * comments in rbtdb.c for details.)
+		 * the `getnoqname` method; see comments in rbtdb.c
+		 * for details.)
 		 */
 		struct {
 			struct dns_db	       *db;
@@ -194,8 +190,23 @@ struct dns_rdataset {
 			unsigned char	       *raw;
 			unsigned char	       *iter_pos;
 			unsigned int		iter_count;
-			dns_slabheader_proof_t *noqname, *closest;
+			dns_slabheader_proof_t *noqname;
 		} slab;
+
+		/*
+		 * A proof rdataset is a view into a slabheader's noqname or
+		 * closest-encloser proof.  The header reference keeps the
+		 * proof memory alive for as long as the view is associated.
+		 * Keep the fields shared with 'slab' at the same offsets.
+		 */
+		struct {
+			struct dns_db	 *db;
+			dns_dbnode_t	 *node;
+			unsigned char	 *raw;
+			unsigned char	 *iter_pos;
+			unsigned int	  iter_count;
+			dns_slabheader_t *header;
+		} proof;
 
 		/*
 		 * A simple rdatalist, plus an optional dbnode used by
@@ -206,10 +217,12 @@ struct dns_rdataset {
 			struct dns_rdata     *iter;
 
 			/*
-			 * These refer to names passed in by the caller of
-			 * dns_rdataset_addnoqname() and _addclosest()
+			 * Refers to the name passed in by the caller of
+			 * dns_rdataset_addnoqname(), and the denial type
+			 * (NSEC or NSEC3) of the proof selected there.
 			 */
-			const struct dns_name *noqname, *closest;
+			const struct dns_name *noqname;
+			dns_rdatatype_t	       noqnametype;
 			dns_dbnode_t	      *node;
 		} rdlist;
 
@@ -266,7 +279,7 @@ struct dns_rdataset {
 #define DNS_RDATASETATTR_REQUIREDGLUE DNS_RDATASETATTR_REQUIRED
 #define DNS_RDATASETATTR_LOADORDER    0x00020000
 #define DNS_RDATASETATTR_RESIGN	      0x00040000
-#define DNS_RDATASETATTR_CLOSEST      0x00080000
+/* #define DNS_RDATASETATTR_CLOSEST      0x00080000 - Obsolete */
 #define DNS_RDATASETATTR_OPTOUT	      0x00100000 /*%< OPTOUT proof */
 #define DNS_RDATASETATTR_NEGATIVE     0x00200000
 #define DNS_RDATASETATTR_PREFETCH     0x00400000
@@ -583,45 +596,26 @@ dns__rdataset_getnoqname(dns_rdataset_t *rdataset, dns_name_t *name,
  */
 
 isc_result_t
-dns_rdataset_addnoqname(dns_rdataset_t *rdataset, dns_name_t *name);
+dns_rdataset_addnoqname(dns_rdataset_t *rdataset, dns_name_t *name,
+			dns_rdatatype_t type);
 /*%<
- * Associate a noqname proof with this record.
+ * Associate a noqname proof with this record: the rdataset of 'type'
+ * (NSEC or NSEC3) at 'name' together with the RRSIG rdataset covering it.
  * Sets #DNS_RDATASETATTR_NOQNAME if successful.
  * Adjusts the 'rdataset->ttl' to minimum of the 'rdataset->ttl' and
  * the 'nsec'/'nsec3' and 'rrsig(nsec)'/'rrsig(nsec3)' ttl.
  *
  * Requires:
- *\li	'rdataset' to be valid and #DNS_RDATASETATTR_NOQNAME to be set.
- *\li	'name' to be valid and have NSEC or NSEC3 and associated RRSIG
- *	 rdatasets.
- */
-
-#define dns_rdataset_getclosest(rdataset, name, nsec, nsecsig) \
-	dns__rdataset_getclosest(rdataset, name, nsec, nsecsig DNS__DB_FILELINE)
-isc_result_t
-dns__rdataset_getclosest(dns_rdataset_t *rdataset, dns_name_t *name,
-			 dns_rdataset_t		*nsec,
-			 dns_rdataset_t *nsecsig DNS__DB_FLARG);
-/*%<
- * Return the closest encloser for this record.
- *
- * Requires:
- *\li	'rdataset' to be valid and #DNS_RDATASETATTR_CLOSEST to be set.
+ *\li	'rdataset' to be valid.
  *\li	'name' to be valid.
- *\li	'nsec' and 'nsecsig' to be valid and not associated.
- */
-
-isc_result_t
-dns_rdataset_addclosest(dns_rdataset_t *rdataset, const dns_name_t *name);
-/*%<
- * Associate a closest encloset proof with this record.
- * Sets #DNS_RDATASETATTR_CLOSEST if successful.
- * Adjusts the 'rdataset->ttl' to minimum of the 'rdataset->ttl' and
- * the 'nsec' and 'rrsig(nsec)' ttl.
+ *\li	'type' to be dns_rdatatype_nsec or dns_rdatatype_nsec3.
  *
- * Requires:
- *\li	'rdataset' to be valid and #DNS_RDATASETATTR_CLOSEST to be set.
- *\li	'name' to be valid and have NSEC3 and RRSIG(NSEC3) rdatasets.
+ * Returns:
+ *\li	#ISC_R_SUCCESS
+ *\li	#ISC_R_NOTFOUND if 'name' has no rdataset of 'type' or no RRSIG
+ *	 rdataset covering it.
+ *\li	#ISC_R_NOTIMPLEMENTED if the rdataset implementation does not
+ *	 support noqname proofs.
  */
 
 void

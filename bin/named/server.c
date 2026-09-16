@@ -9474,23 +9474,20 @@ load_configuration(const char *filename, named_server_t *server,
 	cachelist = tmpcachelist;
 
 	/* Load the TKEY information from the configuration. */
-	if (options != NULL) {
-		dns_tkeyctx_t *tkeyctx = NULL;
+	dns_tkeyctx_t *tkeyctx = NULL;
 
-		result = named_tkeyctx_fromconfig(options, named_g_mctx,
-						  &tkeyctx);
-		if (result != ISC_R_SUCCESS) {
-			isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-				      NAMED_LOGMODULE_SERVER, ISC_LOG_ERROR,
-				      "configuring TKEY: %s",
-				      isc_result_totext(result));
-			goto cleanup_cachelist;
-		}
-		if (server->sctx->tkeyctx != NULL) {
-			dns_tkeyctx_destroy(&server->sctx->tkeyctx);
-		}
-		server->sctx->tkeyctx = tkeyctx;
+	result = named_tkeyctx_fromconfig(options, named_g_mctx, &tkeyctx);
+	if (result != ISC_R_SUCCESS) {
+		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+			      NAMED_LOGMODULE_SERVER, ISC_LOG_ERROR,
+			      "configuring TKEY: %s",
+			      isc_result_totext(result));
+		goto cleanup_cachelist;
 	}
+	if (server->sctx->tkeyctx != NULL) {
+		dns_tkeyctx_destroy(&server->sctx->tkeyctx);
+	}
+	server->sctx->tkeyctx = tkeyctx;
 
 #ifdef HAVE_LMDB
 	/*
@@ -12573,7 +12570,11 @@ named_server_flushnode(named_server_t *server, isc_lex_t *lex, bool tree) {
 		 * if some of the views share a single cache.  But since the
 		 * operation is lightweight we prefer simplicity here.
 		 */
-		result = dns_view_flushnode(view, name, tree);
+		if (dns_name_equal(name, dns_rootname)) {
+			result = dns_view_flushcache(view, false);
+		} else {
+			result = dns_view_flushnode(view, name, tree);
+		}
 		if (result != ISC_R_SUCCESS) {
 			flushed = false;
 			isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
@@ -13093,9 +13094,16 @@ named_server_freeze(named_server_t *server, bool freeze, isc_lex_t *lex,
  */
 isc_result_t
 named_smf_add_message(isc_buffer_t **text) {
+	isc_result_t result;
+
 	REQUIRE(text != NULL);
 
-	return putstr(text, "use svcadm(1M) to manage named");
+	CHECK(putstr(text, "use svcadm(1M) to manage named"));
+	CHECK(putnull(text));
+
+	return ISC_R_SUCCESS;
+cleanup:
+	return result;
 }
 #endif /* HAVE_LIBSCF */
 

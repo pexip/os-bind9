@@ -1298,6 +1298,14 @@ check_options(const cfg_obj_t *options, const cfg_obj_t *config,
 						"dns64-server", "dns64-contact",
 						NULL };
 
+#ifndef IOV_MAX
+/*
+ * FSTRM_IOTHR_INPUT_QUEUE_SIZE_MAX is defined as IOV_MAX, but IOV_MAX can be
+ * undefined.
+ */
+#define IOV_MAX 1024
+#endif /* ifndef IOV_MAX */
+
 #ifdef HAVE_DNSTAP
 	static fstrmtable fstrm[] = {
 		{ "fstrm-set-buffer-hint", FSTRM_IOTHR_BUFFER_HINT_MIN,
@@ -1456,8 +1464,8 @@ check_options(const cfg_obj_t *options, const cfg_obj_t *config,
 						    DNS_KEYSTORE_KEYDIRECTORY);
 					if (result == ISC_R_SUCCESS) {
 						result = ISC_R_FAILURE;
-						continue;
 					}
+					continue;
 				}
 
 				kopt = cfg_tuple_get(kconfig, "options");
@@ -2307,11 +2315,13 @@ check_httpserver(const cfg_obj_t *http, isc_log_t *logctx,
 	/* Check endpoints are valid */
 	tresult = cfg_map_get(http, "endpoints", &eps);
 	if (tresult == ISC_R_SUCCESS) {
+		bool empty = true;
 		for (elt = cfg_list_first(eps); elt != NULL;
 		     elt = cfg_list_next(elt))
 		{
 			const cfg_obj_t *ep = cfg_listelt_value(elt);
 			const char *path = cfg_obj_asstring(ep);
+			empty = false;
 			if (!isc_nm_http_path_isvalid(path)) {
 				cfg_obj_log(eps, logctx, ISC_LOG_ERROR,
 					    "endpoint '%s' is not a "
@@ -2320,6 +2330,13 @@ check_httpserver(const cfg_obj_t *http, isc_log_t *logctx,
 				if (result == ISC_R_SUCCESS) {
 					result = ISC_R_FAILURE;
 				}
+			}
+		}
+		if (empty) {
+			cfg_obj_log(eps, logctx, ISC_LOG_ERROR,
+				    "empty 'endpoints' entry");
+			if (result == ISC_R_SUCCESS) {
+				result = ISC_R_FAILURE;
 			}
 		}
 	}
@@ -2638,9 +2655,8 @@ validate_remotes_key(const cfg_obj_t *voptions, const cfg_obj_t *config,
 		if (result != ISC_R_SUCCESS) {
 			cfg_obj_log(key, logctx, ISC_LOG_ERROR,
 				    "'%s' is not a valid name", str);
-		}
-
-		if (!lookup_key(voptions, nm)) {
+			result = ISC_R_FAILURE;
+		} else if (!lookup_key(voptions, nm)) {
 			if (!lookup_key(config, nm)) {
 				cfg_obj_log(key, logctx, ISC_LOG_ERROR,
 					    "key '%s' is not defined",

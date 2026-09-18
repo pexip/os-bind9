@@ -27,6 +27,9 @@
 /* define if you want TCP_FASTOPEN enabled if available */
 #undef ENABLE_TCP_FASTOPEN
 
+/* Define to 1 if you have the 'arc4random' function. */
+#undef HAVE_ARC4RANDOM
+
 /* define if the ARM yield instruction is available */
 #undef HAVE_ARM_YIELD
 
@@ -251,6 +254,9 @@
 
 /* Build with DNS-over-HTTPS support */
 #undef HAVE_LIBNGHTTP2
+
+/* Define to 1 if libscf was found */
+#undef HAVE_LIBSCF
 
 /* Use libxml2 library */
 #undef HAVE_LIBXML2

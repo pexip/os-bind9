@@ -364,12 +364,12 @@ mock_assert(const int result, const char *const expression,
 #define FATAL_ERROR(...) \
 	isc_error_fatal(__FILE__, __LINE__, __func__, __VA_ARGS__)
 
-#define REPORT_SYSERROR(report, err, fmt, ...)                        \
-	{                                                             \
-		char strerr[ISC_STRERRORSIZE];                        \
-		strerror_r(err, strerr, sizeof(strerr));              \
-		report(__FILE__, __LINE__, __func__, fmt ": %s (%d)", \
-		       ##__VA_ARGS__, strerr, err);                   \
+#define REPORT_SYSERROR(report, err, fmt, ...)                       \
+	{                                                            \
+		char strerr[ISC_STRERRORSIZE];                       \
+		strerror_r(err, strerr, sizeof(strerr));             \
+		report(__FILE__, __LINE__, __func__,                 \
+		       fmt ": %s (%d)", ##__VA_ARGS__, strerr, err); \
 	}
 
 #define UNEXPECTED_SYSERROR(err, ...) \
@@ -402,6 +402,15 @@ mock_assert(const int result, const char *const expression,
 		if (result != ISC_R_SUCCESS) \
 			goto cleanup;        \
 	} while (0)
+
+/*
+ * Unconditionally jump to the cleanup tag with 'result' set to 'r'.
+ */
+#define CLEANUP(r)            \
+	{                     \
+		result = (r); \
+		goto cleanup; \
+	}
 
 /*
  * Check for ISC_R_SUCCESS and continue if found. For any other

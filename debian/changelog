@@ -1,3 +1,35 @@
+bind9 (1:9.20.29-1~deb13u1+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release with security updates
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Fri, 18 Sep 2026 11:11:34 +0100
+
+bind9 (1:9.20.29-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.29
+   - [CVE-2026-19668] Prevent excessive CPU use validating crafted DNSSEC responses.
+   - [CVE-2026-19033] Require a TSIG on every message of incoming zone
+     transfers.
+   - [CVE-2026-77119] Prevent a DNSSEC downgrade of secure delegations via
+     unrelated NSEC3 records.
+   - [CVE-2026-19666] DNS64 with `break-dnssec` could cause an assertion
+     failure.
+   - [CVE-2026-19667] Reject oversized negative cache records.
+   - [CVE-2026-19662] Prevent resolver crash with cached DNSSEC proofs.
+   - [CVE-2026-75029] Discard repeated SOA, CNAME, and DNAME records when
+     parsing DNS messages.
+   - [CVE-2026-77692] Fix an unauthenticated crash on HTTPS using SIG(0).
+   - [CVE-2026-81736] Cached HTTPS/SVCB aliases could exhaust resolver
+     CPU.
+   - [CVE-2026-76163] Prevent TKEY queries from terminating `named`
+     without global options.
+   - [CVE-2026-80274] Fix crash on wildcard answers carrying both NSEC and
+     NSEC3 proofs.
+   - [CVE-2026-81563] Following HTTPS/SVCB aliases could leak resolver
+     cache memory.
+
+ -- Ondřej Surý <ondrej@debian.org>  Wed, 16 Sep 2026 15:42:29 +0200
+
 bind9 (1:9.20.26-1~deb13u1+pexip25u1) pexip-trixie; urgency=medium
 
   * New upstream release with security updates

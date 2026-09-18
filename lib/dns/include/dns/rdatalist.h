@@ -131,18 +131,11 @@ unsigned int
 dns_rdatalist_count(dns_rdataset_t *rdataset);
 
 isc_result_t
-dns_rdatalist_addnoqname(dns_rdataset_t *rdataset, const dns_name_t *name);
+dns_rdatalist_addnoqname(dns_rdataset_t *rdataset, const dns_name_t *name,
+			 dns_rdatatype_t type);
 
 isc_result_t
 dns_rdatalist_getnoqname(dns_rdataset_t *rdataset, dns_name_t *name,
-			 dns_rdataset_t	       *neg,
-			 dns_rdataset_t *negsig DNS__DB_FLARG);
-
-isc_result_t
-dns_rdatalist_addclosest(dns_rdataset_t *rdataset, const dns_name_t *name);
-
-isc_result_t
-dns_rdatalist_getclosest(dns_rdataset_t *rdataset, dns_name_t *name,
 			 dns_rdataset_t	       *neg,
 			 dns_rdataset_t *negsig DNS__DB_FLARG);
 

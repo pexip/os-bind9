@@ -3323,19 +3323,6 @@ n=$((n + 1))
 test "$ret" -eq 0 || echo_i "failed"
 status=$((status + ret))
 
-echo_i "check dig's +nocrypto flag ($n)"
-ret=0
-dig_with_opts +norec +nocrypto DNSKEY . \
-  @10.53.0.1 >dig.out.dnskey.ns1.test$n || ret=1
-grep -E "256 [0-9]+ $DEFAULT_ALGORITHM_NUMBER \\[key id = [1-9][0-9]*]" dig.out.dnskey.ns1.test$n >/dev/null || ret=1
-grep -E "RRSIG.* \\[omitted]" dig.out.dnskey.ns1.test$n >/dev/null || ret=1
-dig_with_opts +norec +nocrypto DS example \
-  @10.53.0.1 >dig.out.ds.ns1.test$n || ret=1
-grep -E "DS.* [0-9]+ [12] \[omitted]" dig.out.ds.ns1.test$n >/dev/null || ret=1
-n=$((n + 1))
-test "$ret" -eq 0 || echo_i "failed"
-status=$((status + ret))
-
 echo_i "check that increasing the signatures-validity resigning triggers re-signing ($n)"
 ret=0
 before=$($DIG axfr siginterval.example -p "$PORT" @10.53.0.3 | grep RRSIG.SOA)
@@ -4649,6 +4636,25 @@ ret=0
 zone=settagrange
 ksk=$("$KEYGEN" -f KSK -q -a $DEFAULT_ALGORITHM -n zone -M 0:32767 "$zone")
 zsk=$("$KEYGEN" -q -a $DEFAULT_ALGORITHM -n zone -M 32768:65535 "$zone")
+kid=$(keyfile_to_key_id "$ksk")
+zid=$(keyfile_to_key_id "$zsk")
+[ $kid -ge 0 -a $kid -le 32767 ] || ret=1
+[ $zid -ge 32768 -a $zid -le 65535 ] || ret=1
+rksk=$($REVOKE -R $ksk)
+rzsk=$($REVOKE -R $zsk)
+krid=$(keyfile_to_key_id "$rksk")
+zrid=$(keyfile_to_key_id "$rzsk")
+[ $krid -ge 0 -a $krid -le 32767 ] || ret=1
+[ $zrid -ge 32768 -a $zrid -le 65535 ] || ret=1
+n=$((n + 1))
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+echo_i "check that dnssec-keygen honours key tag ranges from dnssec-policy ($n)"
+ret=0
+zone=settagrangepolicy
+ksk=$("$KEYGEN" -f KSK -k tagged-keys -l kasp.conf "$zone")
+zsk=$("$KEYGEN" -f ZSK -k tagged-keys -l kasp.conf "$zone")
 kid=$(keyfile_to_key_id "$ksk")
 zid=$(keyfile_to_key_id "$zsk")
 [ $kid -ge 0 -a $kid -le 32767 ] || ret=1

@@ -296,6 +296,31 @@ def wait_for_zones_loaded(request, servers):
             watcher.wait_for_line("all zones loaded")
 
 
+@pytest.fixture(autouse=True)
+def named_log_test_markers(request, servers):
+    """Send `rndc null` message with a test ID to each named instance."""
+
+    def mark(event):
+        for server in servers.values():
+            if not isinstance(server, isctest.instance.NamedInstance):
+                continue
+            try:
+                with server.rndc_client(timeout=2) as c:
+                    c.call(f"null ------ {event} {request.node.nodeid} ------")
+            except (
+                OSError,
+                isctest.rndc.RNDCException,
+                isctest.rndc.RNDCProtocolError,
+            ):
+                # best-effort: the instance may be stopped or use a
+                # non-standard control channel
+                pass
+
+    mark("BEGIN")
+    yield
+    mark("END")
+
+
 @pytest.fixture(scope="module", autouse=True)
 def configure_algorithm_set(request):
     """Configure the algorithm set to use in tests."""
@@ -546,14 +571,6 @@ def system_test(
             isctest.log.error("testsock.pl: exited with code %d", exc.returncode)
             pytest.skip("Network interface aliases not set up.")
 
-    def check_prerequisites():
-        try:
-            isctest.run.shell(f"{system_test_dir}/prereq.sh")
-        except FileNotFoundError:
-            pass  # prereq.sh is optional
-        except subprocess.CalledProcessError:
-            pytest.skip("Prerequisites missing.")
-
     def setup_test():
         template_data = None
         bootstrap_fn = getattr(request.module, "bootstrap", None)
@@ -613,7 +630,6 @@ def system_test(
 
     # Perform checks which may skip this test.
     check_net_interfaces()
-    check_prerequisites()
 
     # Store the fact that this fixture hasn't successfully finished yet.
     # This is checked before temporary directory teardown to decide whether

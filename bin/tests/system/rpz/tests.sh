@@ -581,8 +581,8 @@ ckstats $ns5 test1 ns5 0
 ckstats $ns6 test1 ns6 0
 
 start_group "IP rewrites" test2
-msg='rpz IP address "128.2.0.0.0.0.3.2.2001" is not the canonical "128.2.zz.3.2.2001"'
-grep "$msg" ns3/named.run >/dev/null || setret "expected 'is not the canonical' message not logged"
+msg='invalid rpz IP address "128.2.0.0.0.0.3.2.2001.rpz-ip.bl" is not in canonical form 128.2.zz.3.2.2001.rpz-nsdname.bl'
+grep "$msg" ns3/named.run >/dev/null || setret "expected 'not in canonical form' message not logged"
 nodata a3-1.tld2                    # 1 NODATA
 nochange a3-2.tld2                  # 2 no policy record so no change
 nochange a4-1.tld2                  # 3 obsolete PASSTHRU record style
@@ -752,12 +752,15 @@ if test -z "$HAVE_CORE"; then
   test -z "$HAVE_CORE" || setret "found $HAVE_CORE; memory leak?"
 fi
 
-# look for complaints from lib/dns/rpz.c and bin/name/query.c
+# look for complaints from lib/dns/rpz.c and bin/name/query.c, except the
+# one the outofzone.tld2 policy zone is there to provoke
+EXPECTED='invalid rpz owner name "com"'
 for runfile in ns*/named.run; do
-  EMSGS=$(nextpart $runfile | grep -E -l 'invalid rpz|rpz.*failed' || true)
+  EMSGS=$(nextpart $runfile | grep -Fv "$EXPECTED" \
+    | grep -E -l 'invalid rpz|rpz.*failed' || true)
   if test -n "$EMSGS"; then
     setret "error messages in $runfile starting with:"
-    grep -E 'invalid rpz|rpz.*failed' ns*/named.run \
+    grep -E 'invalid rpz|rpz.*failed' ns*/named.run | grep -Fv "$EXPECTED" \
       | sed -e '10,$d' -e 's/^//' | cat_i
   fi
 done

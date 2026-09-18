@@ -229,9 +229,6 @@ ported to python; do not add them to new tests:
 - `setup.sh`: Legacy shell test setup.  New tests use templates and a
   `bootstrap()` function instead.
 
-- `prereq.sh`: Legacy prerequisite check; when it exits non-zero, the test is
-  skipped.  New tests use pytest marks (see `isctest/mark.py`).
-
 ### Module Scope
 
 A module is a python file which contains test functions. Every system
@@ -275,15 +272,8 @@ Inside a template, all the runner's environment variables are available with
 
 ```jinja
 options {
-    port @PORT@;
-    listen-on { 10.53.0.1; };
-};
-key rndc_key {
-    secret "1234abcd8765";
-    algorithm @DEFAULT_HMAC@;
-};
-controls {
-    inet 10.53.0.1 port @CONTROLPORT@ allow { any; } keys { rndc_key; };
+	{% include_indented "_common/options.conf.j2" %}
+	tls-port @TLSPORT@;
 };
 ```
 

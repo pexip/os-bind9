@@ -115,6 +115,10 @@ struct dns_validator {
 	 */
 	dns_name_t *proofs[4];
 	/*
+	 * The denial type (NSEC or NSEC3) of the NOQNAME proof.
+	 */
+	dns_rdatatype_t noqnametype;
+	/*
 	 * Optout proof seen.
 	 */
 	bool optout;
@@ -127,7 +131,7 @@ struct dns_validator {
 	atomic_bool	   canceling;
 	unsigned int	   attributes;
 	isc_work_t	  *offloaded_work;
-	isc_job_cb	   offloaded_cb;
+	isc_work_cb	   offloaded_cb;
 	dns_fetch_t	  *fetch;
 	dns_validator_t	  *subvalidator;
 	dns_validator_t	  *parent;
@@ -144,20 +148,21 @@ struct dns_validator {
 	dns_fixedname_t	   fname;
 	dns_fixedname_t	   wild;
 	dns_fixedname_t	   wildsigner;
+	dns_fixedname_t	   nseczone;
 	dns_fixedname_t	   closest;
 	ISC_LINK(dns_validator_t) link;
-	bool	      mustbesecure;
-	unsigned int  depth;
-	unsigned int  authcount;
-	unsigned int  authfail;
-	isc_stdtime_t start;
-
+	bool	       mustbesecure;
+	unsigned int   depth;
+	unsigned int   authcount;
+	unsigned int   authfail;
+	isc_stdtime_t  start;
+	bool	       resume;
 	bool	       digest_sha1;
 	uint8_t	       unsupported_algorithm;
 	uint8_t	       unsupported_digest;
-	uint8_t	       validation_attempts;
+	uint16_t       matchds_attempts;
+	uint16_t       validation_attempts;
 	dns_rdata_t    rdata;
-	bool	       resume;
 	isc_counter_t *nvalidations;
 	isc_counter_t *nfails;
 	isc_counter_t *qc;

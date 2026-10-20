@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -112,7 +112,7 @@ class ZoneAnalyzer:
             if name in reachable_delegations:
                 reachable_delegations.remove(name)
 
-        # sanity check, should be impossible with dnspython 2.7.0 zone reader
+        # sanity check, should be impossible with the dnspython zone reader
         for name in reachable:
             relation, _, _ = name.fullcompare(self.zone.origin)
             if relation in (

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -16,14 +16,14 @@ import dns.rdatatype
 from isctest.asyncserver import (
     AsyncDnsServer,
     DnsProtocol,
-    DnsResponseSend,
-    QnameQtypeHandler,
     QueryContext,
-    ResponseAction,
+    ResponseHandler,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Protocol, Qname, Qtype
 
 
-class MismatchedIdOnUdpHandler(QnameQtypeHandler):
+class MismatchedIdOnUdpHandler(ResponseHandler):
     """
     Simulate Kaminsky-style off-path spoofing: answer every UDP query for
     trigger.example./A with the correct response prepared from zone data,
@@ -33,15 +33,13 @@ class MismatchedIdOnUdpHandler(QnameQtypeHandler):
     the correct answer.
     """
 
-    qnames = ["trigger.example."]
-    qtypes = [dns.rdatatype.A]
-
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.protocol == DnsProtocol.UDP and super().match(qctx)
+    matcher = (
+        Qname("trigger.example.") & Qtype(dns.rdatatype.A) & Protocol(DnsProtocol.UDP)
+    )
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         qctx.response.id = qctx.query.id ^ 0xFFFF
         yield DnsResponseSend(qctx.response)
 

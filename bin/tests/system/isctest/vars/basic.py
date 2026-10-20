@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -47,7 +47,6 @@ BASIC_VARS = {
     "BIGKEY": f"{AC_VARS['TOP_BUILDDIR']}/bin/tests/system/rsabigexponent/bigkey",
     "GENCHECK": f"{AC_VARS['TOP_BUILDDIR']}/bin/tests/system/rndc/gencheck",
     "MAKEJOURNAL": f"{AC_VARS['TOP_BUILDDIR']}/bin/tests/system/makejournal",
-    "PIPEQUERIES": f"{AC_VARS['TOP_BUILDDIR']}/bin/tests/system/pipelined/pipequeries",
     "TMPDIR": os.getenv("TMPDIR", "/tmp"),
     "KRB5_CONFIG": "/dev/null",  # we don't want a KRB5_CONFIG setting breaking the tests
     "KRB5_KTNAME": "dns.keytab",  # use local keytab instead of default /etc/krb5.keytab

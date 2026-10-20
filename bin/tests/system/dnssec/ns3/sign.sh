@@ -195,8 +195,8 @@ cat "$infile" "$keyname.key" >"$zonefile"
 # to point to a provably nonexistent DNSKEY record.
 zonefiletmp=$(mktemp "$zonefile.XXXXXX") || exit 1
 mv "$zonefile.signed" "$zonefiletmp"
-"$PERL" <"$zonefiletmp" -p -e 's/ keyless.example/ b.keyless.example/
-    if /^a.b.keyless.example/../A RRSIG NSEC/;' >"$zonefile.signed"
+sed '/^a.b.keyless.example/,/A RRSIG NSEC/s/ keyless.example/ b.keyless.example/' \
+  <"$zonefiletmp" >"$zonefile.signed"
 rm -f "$zonefiletmp"
 
 #
@@ -344,6 +344,25 @@ cat "$infile" "$keyname.key" >"$zonefile"
 "$SIGNER" -z -3 - -o "$zone" -O full -f ${zonefile}.tmp "$zonefile" >/dev/null
 
 awk '$4 == "DNSKEY" { $7 = 100 } $4 == "RRSIG" { $6 = 100 } { print }' ${zonefile}.tmp >${zonefile}.signed
+
+DSFILE="dsset-${zone}."
+$DSFROMKEY -A -f ${zonefile}.signed "$zone" >"$DSFILE"
+
+#
+# A zone that is signed with an unknown DNSKEY algorithm.
+# Algorithm 7 is replaced by 163 (HMAC-SHA256 code point) in the zone and dsset.
+#
+zone=dnskey-163-unknown.example
+infile=template.db.in
+zonefile=dnskey-163-unknown.example.db
+
+keyname=$("$KEYGEN" -q -a "$DEFAULT_ALGORITHM" -b "$DEFAULT_BITS" "$zone")
+
+cat "$infile" "$keyname.key" >"$zonefile"
+
+"$SIGNER" -z -3 - -o "$zone" -O full -f ${zonefile}.tmp "$zonefile" >/dev/null
+
+awk '$4 == "DNSKEY" { $7 = 163 } $4 == "RRSIG" { $6 = 163 } { print }' ${zonefile}.tmp >${zonefile}.signed
 
 DSFILE="dsset-${zone}."
 $DSFROMKEY -A -f ${zonefile}.signed "$zone" >"$DSFILE"

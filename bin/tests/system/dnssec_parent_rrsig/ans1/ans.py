@@ -1,8 +1,13 @@
-#!/usr/bin/python3
-
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
 # SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -22,12 +27,9 @@ import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 
-from isctest.asyncserver import (
-    AsyncDnsServer,
-    DnsResponseSend,
-    QueryContext,
-    ResponseHandler,
-)
+from isctest.asyncserver import AsyncDnsServer, QueryContext, ResponseHandler
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 
 TTL = 300
 PARENT = "f044.test."
@@ -123,12 +125,10 @@ class AncestorAdditionalHandler(ResponseHandler):
     def __init__(self, keys: dict[str, Key]) -> None:
         self.keys = keys
         self.parent = name(PARENT)
+        self.matcher = Domain(self.parent)
         self.child = name(CHILD)
         self.query = name(QUERY)
         self.service = name(SERVICE)
-
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qname.is_subdomain(self.parent)
 
     async def get_responses(
         self, qctx: QueryContext

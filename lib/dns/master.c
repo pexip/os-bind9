@@ -245,7 +245,8 @@ loadctx_destroy(dns_loadctx_t *lctx);
 				goto log_and_cleanup;                        \
 		}                                                            \
 		if ((token)->type == isc_tokentype_special ||                \
-		    (token)->type == isc_tokentype_unknown)                  \
+		    (token)->type == isc_tokentype_unknown ||                \
+		    isc_token_hasnul(token))                                 \
 		{                                                            \
 			result = DNS_R_SYNTAX;                               \
 			if (MANYERRS(lctx, result)) {                        \
@@ -1367,7 +1368,8 @@ load_text(dns_loadctx_t *lctx) {
 				}
 				EXPECTEOL;
 				continue;
-			} else if (strncasecmp(DNS_AS_STR(token), "$", 1) == 0)
+			} else if (isc_string_casehasprefix(DNS_AS_STR(token),
+							    "$"))
 			{
 				(callbacks->error)(callbacks,
 						   "%s: %s:%lu: "
@@ -2347,10 +2349,8 @@ load_raw(dns_loadctx_t *lctx) {
 	int target_size = TSIZ;
 	isc_buffer_t target, buf;
 	unsigned char *target_mem = NULL;
-	dns_decompress_t dctx;
 
 	callbacks = lctx->callbacks;
-	dctx = DNS_DECOMPRESS_NEVER;
 
 	if (lctx->first) {
 		result = load_header(lctx);
@@ -2485,7 +2485,7 @@ load_raw(dns_loadctx_t *lctx) {
 		}
 
 		isc_buffer_setactive(&target, (unsigned int)namelen);
-		result = dns_name_fromwire(name, &target, dctx, NULL);
+		result = dns_name_fromwire(name, &target, NULL, NULL);
 		if (result != ISC_R_SUCCESS) {
 			goto cleanup;
 		}
@@ -2523,7 +2523,8 @@ load_raw(dns_loadctx_t *lctx) {
 			dns_rdata_init(&rdata[i]);
 
 			if (sequential_read &&
-			    isc_buffer_availablelength(&target) < MINTSIZ)
+			    isc_buffer_availablelength(&target) <
+				    sizeof(uint16_t) + MINTSIZ)
 			{
 				unsigned int j;
 
@@ -2558,6 +2559,9 @@ load_raw(dns_loadctx_t *lctx) {
 				goto cleanup;
 			}
 			rdlen = isc_buffer_getuint16(&target);
+			if (rdlen > MINTSIZ) {
+				CLEANUP(ISC_R_RANGE);
+			}
 
 			/* rdata */
 			result = read_and_check(sequential_read, &target, rdlen,
@@ -2569,14 +2573,14 @@ load_raw(dns_loadctx_t *lctx) {
 			/*
 			 * It is safe to have the source active region and
 			 * the target available region be the same if
-			 * decompression is disabled (see dctx above) and we
+			 * decompression is disabled (NULL context) and we
 			 * are not downcasing names (options == 0).
 			 */
 			isc_buffer_init(&buf, isc_buffer_current(&target),
 					(unsigned int)rdlen);
 			result = dns_rdata_fromwire(
 				&rdata[i], rdatalist.rdclass, rdatalist.type,
-				&target, dctx, &buf);
+				&target, NULL, &buf);
 			if (result != ISC_R_SUCCESS) {
 				goto cleanup;
 			}

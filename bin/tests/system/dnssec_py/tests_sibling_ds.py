@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -21,14 +21,12 @@ name and treat the response as a form error.
 from re import compile as Re
 
 from dnssec_py.common import DNSSEC_PY_MARK
-from isctest.template import NS2, Nameserver, zones
+from isctest.template import ANS4, NS2, zones
 from isctest.zone import Zone, configure_root
 
 import isctest
 
 pytestmark = DNSSEC_PY_MARK
-
-ANS4 = Nameserver("ans4")
 
 
 def bootstrap():
@@ -42,9 +40,8 @@ def bootstrap():
     sibling = Zone("sibling.sibling-ds", NS2)
     sibling.configure()
 
-    # Parent zone rendered into ans4/ (subdir=None puts the .db file
-    # directly in the ans4 directory where AsyncDnsServer loads it).
-    parent = Zone("sibling-ds", ANS4, subdir=None)
+    # Parent zone rendered into ans4/.
+    parent = Zone("sibling-ds", ANS4)
     parent.delegations = [child, sibling]
     parent.configure()
 
@@ -58,7 +55,9 @@ def bootstrap():
 
 
 def test_sibling_ds_rejected(ns9):
-    """Resolver must reject a referral that contains DS for a sibling zone."""
+    """
+    Resolver must reject a referral that contains DS for a sibling zone.
+    """
     log_ds_mismatch = Re(r"DS doesn't match the delegation owner name")
 
     msg = isctest.query.create("a.child.sibling-ds.", "A")

@@ -1,11 +1,9 @@
-#!/usr/bin/python3
-
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -23,7 +21,9 @@ import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 
-from isctest.asyncserver import DnsResponseSend, DomainHandler, QueryContext
+from isctest.asyncserver import QueryContext, ResponseHandler
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 from nsec_synthesis.ans1.common import (
     Key,
     add_signed,
@@ -77,8 +77,8 @@ def garbage_rrsig(covered: dns.rrset.RRset, signer: Key) -> dns.rrset.RRset:
     return dns.rrset.from_rdata(covered.name, covered.ttl, rdata)
 
 
-class F004Handler(DomainHandler):
-    domains = [F004_ZONE]
+class F004Handler(ResponseHandler):
+    matcher = Domain(F004_ZONE)
 
     def __init__(self, keys: dict[str, Key]) -> None:
         super().__init__()

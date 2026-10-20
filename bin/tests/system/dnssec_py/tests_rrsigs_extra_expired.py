@@ -3,13 +3,12 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-from pathlib import Path
 from re import compile as Re
 
 import time
@@ -34,7 +33,7 @@ def bootstrap():
     zone.add_keys()
     zone.render()
 
-    signed_path = Path(zone.ns.name) / zone.filepath_signed
+    signed_path = str(zone.path_signed)
 
     # create valid but expired signatures
     expired_rdata = set()
@@ -43,19 +42,19 @@ def bootstrap():
     end = now - 10000
     for i in range(2):
         zone.sign(f"-s {start - i} -e {end - i}")
-        expired = dns.zone.from_file(str(signed_path), origin="rrsigs-extra-expired.")
+        expired = dns.zone.from_file(signed_path, origin="rrsigs-extra-expired.")
         rdataset = expired.get_rdataset("a", "RRSIG", "A")
         expired_rdata.add(rdataset.pop())
 
     # sign zone with valid sigs
     zone.sign()
-    valid = dns.zone.from_file(str(signed_path), origin="rrsigs-extra-expired.")
+    valid = dns.zone.from_file(signed_path, origin="rrsigs-extra-expired.")
     rdataset = valid.find_rdataset("a", "RRSIG", "A")
 
     # add the expired RRSIGs for a.rrsigs-extra-expired
     for rd in expired_rdata:
         rdataset.add(rd)
-    valid.to_file(str(signed_path))
+    valid.to_file(signed_path)
 
     root = configure_root([zone])
     return {

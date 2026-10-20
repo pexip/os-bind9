@@ -3,16 +3,13 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator, Collection
-from typing import final
-
-import abc
 
 import dns.message
 import dns.name
@@ -23,15 +20,16 @@ import dns.rrset
 import dns.tsig
 
 from isctest.asyncserver import (
-    AxfrHandler,
     ControllableAsyncDnsServer,
     DnsProtocol,
-    DnsResponseSend,
     QueryContext,
     ResponseAction,
     ResponseHandler,
-    SwitchControlCommand,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.commands import SwitchControlCommand
+from isctest.asyncserver.handlers import AxfrHandler, ResponseHandlerWrapper
+from isctest.asyncserver.matchers import Edns, Qtype
 from isctest.vars.algorithms import ALG_VARS
 
 GOOD_KEY_DATA = "LSAnCU+Z"
@@ -41,35 +39,6 @@ UNUSED_KEY = dns.tsig.Key("unused_key", GOOD_KEY_DATA, ALG_VARS["DEFAULT_HMAC"])
 KEYRING = {key.name: key for key in (DEFAULT_KEY, BAD_KEY, UNUSED_KEY)}
 
 KEY_WITH_BAD_DATA = dns.tsig.Key("tsig_key", "abcd1234ffff", ALG_VARS["DEFAULT_HMAC"])
-
-
-class ResponseHandlerWrapper(ResponseHandler, abc.ABC):
-    def __init__(self, inner: ResponseHandler) -> None:
-        self._inner = inner
-
-    def match(self, qctx: QueryContext) -> bool:
-        return self._inner.match(qctx)
-
-    def _on_query_received(self, qctx: QueryContext) -> None:
-        pass
-
-    @abc.abstractmethod
-    def _modify_response(
-        self, qctx: QueryContext, response_action: ResponseAction
-    ) -> None:
-        raise NotImplementedError
-
-    @final
-    async def get_responses(
-        self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
-        self._on_query_received(qctx)
-        async for response_action in self._inner.get_responses(qctx):
-            self._modify_response(qctx, response_action)
-            yield response_action
-
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self._inner})"
 
 
 class SignResponses(ResponseHandlerWrapper):
@@ -115,7 +84,9 @@ class SignResponses(ResponseHandlerWrapper):
 
 
 class SignFirstAndLastResponses(ResponseHandlerWrapper):
-    """Sign the first and last of the three responses yielded by AxfrHandler."""
+    """
+    Sign the first and last of the three responses yielded by AxfrHandler.
+    """
 
     def __init__(self, inner: ResponseHandler, key: dns.tsig.Key = DEFAULT_KEY) -> None:
         super().__init__(inner)
@@ -214,8 +185,7 @@ class SoaHandler(ResponseHandler):
     def __init__(self, serial: int = 1) -> None:
         self._serial = serial
 
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.SOA
+    matcher = Qtype(dns.rdatatype.SOA)
 
     async def get_responses(
         self, qctx: QueryContext
@@ -309,8 +279,7 @@ class WrongQnameInFinalSoa(ResponseHandlerWrapper):
 
 
 class IxfrNotimpHandler(ResponseHandler):
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.IXFR
+    matcher = Qtype(dns.rdatatype.IXFR)
 
     async def get_responses(
         self, qctx: QueryContext
@@ -323,8 +292,7 @@ class AxfrEdnsRcodeHandler(ResponseHandler):
     def __init__(self, rcode: dns.rcode.Rcode) -> None:
         self._rcode = rcode
 
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.AXFR and qctx.query.edns > -1
+    matcher = Qtype(dns.rdatatype.AXFR) & Edns()
 
     async def get_responses(
         self, qctx: QueryContext

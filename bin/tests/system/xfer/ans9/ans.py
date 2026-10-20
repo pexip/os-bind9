@@ -1,15 +1,13 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator, Collection
 
@@ -20,14 +18,14 @@ import dns.rdatatype
 import dns.rrset
 
 from isctest.asyncserver import (
-    AxfrHandler,
     ControllableAsyncDnsServer,
-    DnsResponseSend,
     QueryContext,
-    ResponseAction,
     ResponseHandler,
-    ToggleResponsesCommand,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.commands import ToggleResponsesCommand
+from isctest.asyncserver.handlers import AxfrHandler
+from isctest.asyncserver.matchers import Qname, Qtype
 
 TTL = 300
 
@@ -81,8 +79,7 @@ class SerialCounted(ResponseHandler):
 
 
 class SoaHandler(SerialCounted):
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.SOA
+    matcher = Qtype(dns.rdatatype.SOA)
 
     async def get_responses(
         self, qctx: QueryContext
@@ -100,12 +97,13 @@ class ZoneAxfrHandler(AxfrHandler, SerialCounted):
 
     zone: str
 
-    def match(self, qctx: QueryContext) -> bool:
-        return super().match(qctx) and qctx.qname == dns.name.from_text(self.zone)
+    def __init__(self, serials: SerialCounter) -> None:
+        super().__init__(serials)
+        self.matcher = Qtype(dns.rdatatype.AXFR) & Qname(self.zone)
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         async for action in super().get_responses(qctx):
             yield action
         self._serials.serial += 1
@@ -131,7 +129,9 @@ class ReconfigAxfrHandler(ZoneAxfrHandler):
 
 
 class OverrunAxfrHandler(ZoneAxfrHandler):
-    """Serve the malformed PRIVATEDNS DNSKEY overrun; see OVERRUN_DNSKEY."""
+    """
+    Serve the malformed PRIVATEDNS DNSKEY overrun; see OVERRUN_DNSKEY.
+    """
 
     zone = OVERRUN_ZONE
 

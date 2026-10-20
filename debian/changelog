@@ -1,3 +1,17 @@
+bind9 (1:9.20.30-1~deb13u1) trixie-security; urgency=high
+
+  * New upstream version 9.20.30
+   + [CVE-2026-19630]: Prevent exhaustion of CPU while parsing crafted DNS
+     messages.
+   + [CVE-2026-94300]: Prevent concurrent GSS-TSIG traffic from
+     terminating named.
+   + [CVE-2026-96888]: Fix a crash with redirect zones and strict QNAME
+     minimization.
+   + [CVE-2026-97313]: Fix a crash when resuming from a query initiated by
+     RPZ.
+
+ -- Ondřej Surý <ondrej@debian.org>  Tue, 20 Oct 2026 17:22:56 +0200
+
 bind9 (1:9.20.29-1~deb13u1) trixie-security; urgency=high
 
   * New upstream version 9.20.29

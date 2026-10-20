@@ -129,13 +129,48 @@ dns_dnssec_keyfromrdata(const dns_name_t *name, const dns_rdata_t *rdata,
 	isc_buffer_t b;
 	isc_region_t r;
 
-	INSIST(DNS_NAME_VALID(name));
-	INSIST(rdata != NULL);
-	INSIST(mctx != NULL);
-	INSIST(key != NULL);
-	INSIST(*key == NULL);
+	REQUIRE(DNS_NAME_VALID(name));
+	REQUIRE(rdata != NULL);
+	REQUIRE(mctx != NULL);
+	REQUIRE(key != NULL);
+	REQUIRE(*key == NULL);
 	REQUIRE(rdata->type == dns_rdatatype_key ||
 		rdata->type == dns_rdatatype_dnskey);
+
+	/*
+	 * Extract the algorithm from the raw data to perform validation before
+	 * actually converting it to a key. Expecting at least 4 bytes: flags
+	 * (2b), protocol (1b), algorithm (1b).
+	 */
+	if (rdata->length < 4) {
+		return DST_R_INVALIDPUBLICKEY;
+	}
+	const unsigned int alg = rdata->data[3];
+
+	switch (rdata->type) {
+	case dns_rdatatype_dnskey:
+		/*
+		 * Reject non DNSSEC code points (includes appropriated
+		 * code points).
+		 */
+		if (!dst_dnssec_algorithm(alg)) {
+			return DST_R_UNSUPPORTEDALG;
+		}
+		break;
+	case dns_rdatatype_key:
+		/*
+		 * Reject non SIG(0) code points (includes appropriated
+		 * code points).
+		 */
+		if (alg == DST_ALG_DH ||
+		    (alg >= DST_ALG_HMAC_FIRST && alg <= DST_ALG_HMAC_LAST))
+		{
+			return DST_R_UNSUPPORTEDALG;
+		}
+		break;
+	default:
+		UNREACHABLE();
+	}
 
 	dns_rdata_toregion(rdata, &r);
 	isc_buffer_init(&b, r.base, r.length);
@@ -1580,6 +1615,15 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 			rdata.type == dns_rdatatype_dnskey);
 		REQUIRE(rdata.length > 3);
 
+		/*
+		 *
+		 * Reject non DNSSEC code points (includes appropriated code
+		 * points).
+		 */
+		if (!dst_dnssec_algorithm(rdata.data[3])) {
+			goto skip;
+		}
+
 		/* Skip unsupported algorithms */
 		if (!dst_algorithm_supported(rdata.data[3])) {
 			goto skip;
@@ -1656,7 +1700,7 @@ dns_dnssec_keylistfromrdataset(const dns_name_t *origin, dns_kasp_t *kasp,
 			isc_result_t result2;
 			isc_buffer_t buf;
 
-			isc_buffer_init(&buf, filename, NAME_MAX);
+			isc_buffer_init(&buf, filename, sizeof(filename));
 			result2 = dst_key_getfilename(
 				dst_key_name(dnskey), dst_key_id(dnskey),
 				dst_key_alg(dnskey),

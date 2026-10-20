@@ -335,7 +335,6 @@ struct dns_journal {
 		uint32_t current_serial; /*%< Current SOA serial */
 		isc_buffer_t source;	 /*%< Data from disk */
 		isc_buffer_t target;	 /*%< Data from _fromwire check */
-		dns_decompress_t dctx;	 /*%< Dummy decompression ctx */
 		dns_name_t name;	 /*%< Current domain name */
 		dns_rdata_t rdata;	 /*%< Current rdata */
 		uint32_t ttl;		 /*%< Current TTL */
@@ -719,7 +718,6 @@ journal_open(isc_mem_t *mctx, const char *filename, bool writable, bool create,
 	 */
 	isc_buffer_init(&j->it.source, NULL, 0);
 	isc_buffer_init(&j->it.target, NULL, 0);
-	j->it.dctx = DNS_DECOMPRESS_NEVER;
 
 	j->state = writable ? JOURNAL_STATE_WRITE : JOURNAL_STATE_READ;
 
@@ -1616,6 +1614,7 @@ dns_journal_print(isc_mem_t *mctx, uint32_t flags, const char *filename,
 	unsigned int n_soa = 0;
 	unsigned int n_put = 0;
 	bool printxhdr = ((flags & DNS_JOURNAL_PRINTXHDR) != 0);
+	uint32_t i;
 
 	REQUIRE(filename != NULL);
 
@@ -1636,7 +1635,7 @@ dns_journal_print(isc_mem_t *mctx, uint32_t flags, const char *filename,
 		fprintf(file, "Start serial = %u\n", j->header.begin.serial);
 		fprintf(file, "End serial = %u\n", j->header.end.serial);
 		fprintf(file, "Index (size = %u):\n", j->header.index_size);
-		for (uint32_t i = 0; i < j->header.index_size; i++) {
+		for (i = 0; i < j->header.index_size; i++) {
 			if (j->index[i].offset == 0) {
 				fputc('\n', file);
 				break;
@@ -1663,13 +1662,13 @@ dns_journal_print(isc_mem_t *mctx, uint32_t flags, const char *filename,
 
 	CHECK(dns_journal_iter_init(j, start_serial, end_serial, NULL));
 
+	i = 0;
 	for (result = dns_journal_first_rr(j); result == ISC_R_SUCCESS;
 	     result = dns_journal_next_rr(j))
 	{
 		dns_name_t *name = NULL;
 		dns_rdata_t *rdata = NULL;
 		dns_difftuple_t *tuple = NULL;
-		static uint32_t i = 0;
 		bool print = false;
 		uint32_t ttl;
 
@@ -1699,13 +1698,17 @@ dns_journal_print(isc_mem_t *mctx, uint32_t flags, const char *filename,
 				j->xhdr_version, (long long)j->it.cpos.offset,
 				j->curxhdr.size, j->curxhdr.count,
 				j->curxhdr.serial0, j->curxhdr.serial1);
-			if (j->it.cpos.offset > j->index[i].offset) {
-				fprintf(file,
-					"ERROR: Offset mismatch, "
-					"expected %lld\n",
-					(long long)j->index[i].offset);
-			} else if (j->it.cpos.offset == j->index[i].offset) {
-				i++;
+			if (j->index != NULL && i < j->header.index_size) {
+				if (j->it.cpos.offset > j->index[i].offset) {
+					fprintf(file,
+						"ERROR: Offset mismatch, "
+						"expected %lld\n",
+						(long long)j->index[i].offset);
+				} else if (j->it.cpos.offset ==
+					   j->index[i].offset)
+				{
+					i++;
+				}
 			}
 		}
 		CHECK(dns_difftuple_create(
@@ -2017,7 +2020,7 @@ read_one_rr(dns_journal_t *j) {
 	 */
 	isc_buffer_setactive(&j->it.source,
 			     j->it.source.used - j->it.source.current);
-	CHECK(dns_name_fromwire(&j->it.name, &j->it.source, j->it.dctx,
+	CHECK(dns_name_fromwire(&j->it.name, &j->it.source, NULL,
 				&j->it.target));
 
 	/*
@@ -2049,7 +2052,7 @@ read_one_rr(dns_journal_t *j) {
 	isc_buffer_setactive(&j->it.source, rdlen);
 	dns_rdata_reset(&j->it.rdata);
 	CHECK(dns_rdata_fromwire(&j->it.rdata, rdclass, rdtype, &j->it.source,
-				 j->it.dctx, &j->it.target));
+				 NULL, &j->it.target));
 	j->it.ttl = ttl;
 
 	j->it.xpos += sizeof(journal_rawrrhdr_t) + rrhdr.size;
@@ -2180,7 +2183,7 @@ rdata_order(const void *av, const void *bv) {
 static isc_result_t
 dns_diff_subtract(dns_diff_t diff[2], dns_diff_t *r) {
 	isc_result_t result;
-	dns_difftuple_t *p[2];
+	dns_difftuple_t *p[2], *tuple, *next;
 	int i, t;
 	bool append;
 	dns_difftuplelist_t add, del;
@@ -2200,19 +2203,19 @@ dns_diff_subtract(dns_diff_t diff[2], dns_diff_t *r) {
 		for (i = 0; i < 2; i++) {
 			if (p[!i] == NULL) {
 				dns_difftuplelist_t *l = (i == 0) ? &add : &del;
-				ISC_LIST_UNLINK(diff[i].tuples, p[i], link);
+				dns_diff_unlink(&diff[i], p[i]);
 				ISC_LIST_APPEND(*l, p[i], link);
 				goto next;
 			}
 		}
 		t = rdata_order(&p[0], &p[1]);
 		if (t < 0) {
-			ISC_LIST_UNLINK(diff[0].tuples, p[0], link);
+			dns_diff_unlink(&diff[0], p[0]);
 			ISC_LIST_APPEND(add, p[0], link);
 			goto next;
 		}
 		if (t > 0) {
-			ISC_LIST_UNLINK(diff[1].tuples, p[1], link);
+			dns_diff_unlink(&diff[1], p[1]);
 			ISC_LIST_APPEND(del, p[1], link);
 			goto next;
 		}
@@ -2223,7 +2226,7 @@ dns_diff_subtract(dns_diff_t diff[2], dns_diff_t *r) {
 		 */
 		append = (p[0]->ttl != p[1]->ttl);
 		for (i = 0; i < 2; i++) {
-			ISC_LIST_UNLINK(diff[i].tuples, p[i], link);
+			dns_diff_unlink(&diff[i], p[i]);
 			if (append) {
 				dns_difftuplelist_t *l = (i == 0) ? &add : &del;
 				ISC_LIST_APPEND(*l, p[i], link);
@@ -2233,8 +2236,14 @@ dns_diff_subtract(dns_diff_t diff[2], dns_diff_t *r) {
 		}
 	next:;
 	}
-	ISC_LIST_APPENDLIST(r->tuples, del, link);
-	ISC_LIST_APPENDLIST(r->tuples, add, link);
+	ISC_LIST_FOREACH_SAFE(del, tuple, link, next) {
+		ISC_LIST_UNLINK(del, tuple, link);
+		dns_diff_append(r, &tuple);
+	}
+	ISC_LIST_FOREACH_SAFE(add, tuple, link, next) {
+		ISC_LIST_UNLINK(add, tuple, link);
+		dns_diff_append(r, &tuple);
+	}
 	result = ISC_R_SUCCESS;
 cleanup:
 	return result;
@@ -2296,9 +2305,7 @@ diff_namespace(dns_db_t *dba, dns_dbversion_t *dbvera, dns_db_t *dbb,
 
 		for (i = 0; i < 2; i++) {
 			if (!have[!i]) {
-				ISC_LIST_APPENDLIST(resultdiff->tuples,
-						    diff[i].tuples, link);
-				INSIST(ISC_LIST_EMPTY(diff[i].tuples));
+				dns_diff_appendlist(resultdiff, &diff[i]);
 				have[i] = false;
 				goto next;
 			}
@@ -2307,16 +2314,12 @@ diff_namespace(dns_db_t *dba, dns_dbversion_t *dbvera, dns_db_t *dbb,
 		t = dns_name_compare(dns_fixedname_name(&fixname[0]),
 				     dns_fixedname_name(&fixname[1]));
 		if (t < 0) {
-			ISC_LIST_APPENDLIST(resultdiff->tuples, diff[0].tuples,
-					    link);
-			INSIST(ISC_LIST_EMPTY(diff[0].tuples));
+			dns_diff_appendlist(resultdiff, &diff[0]);
 			have[0] = false;
 			continue;
 		}
 		if (t > 0) {
-			ISC_LIST_APPENDLIST(resultdiff->tuples, diff[1].tuples,
-					    link);
-			INSIST(ISC_LIST_EMPTY(diff[1].tuples));
+			dns_diff_appendlist(resultdiff, &diff[1]);
 			have[1] = false;
 			continue;
 		}

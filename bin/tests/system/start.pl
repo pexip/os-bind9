@@ -100,6 +100,14 @@ my $DIG = $ENV{'DIG'};
 my $PERL = $ENV{'PERL'};
 my $PYTHON = $ENV{'PYTHON'};
 
+# Make the isctest package importable, for the standalone helper tools
+# ($PYTHON -m isctest.tools.<name>).
+if (defined $ENV{'PYTHONPATH'}) {
+	$ENV{'PYTHONPATH'} = "$builddir:$ENV{'PYTHONPATH'}";
+} else {
+	$ENV{'PYTHONPATH'} = $builddir;
+}
+
 # Start the server(s)
 
 my @ns;
@@ -173,7 +181,7 @@ sub check_ns_port {
 	my $tries = 0;
 
 	while (1) {
-		my $return = system("$PERL $srcdir/testsock.pl -p $port $options");
+		my $return = system("$PYTHON -m isctest.tools.testsock -p $port $options");
 
 		if ($return == 0) {
 			last;
@@ -254,7 +262,7 @@ sub construct_ns_command {
 
 			$line =~ s/#.*$//;
 
-			$command .= $line;
+			$command .= $line." ";
 
 			last;
 		}
@@ -264,8 +272,8 @@ sub construct_ns_command {
 
 		foreach my $t_option(
 			"dropedns", "ednsformerr", "ednsnotimp", "ednsrefused",
-			"cookiealwaysvalid", "noaa", "noedns", "nosoa",
-			"maxudp512", "maxudp1460",
+			"cookiealwaysvalid", "noaa", "noedns", "nonearest",
+			"nosoa", "maxudp512", "maxudp1460", "tat=1", "tat=3"
 		    ) {
 			if (-e "$testdir/$server/named.$t_option") {
 				$command .= "-T $t_option "
@@ -287,6 +295,26 @@ sub construct_ns_command {
 
 	# get the shell to report the pid of the server ($!)
 	$command .= " echo \$!";
+
+	my $env_file = $testdir . "/" . $server . "/" . "named.env";
+	if (-e $env_file) {
+		my $env = "env ";
+
+		open(my $fh, "<", $env_file) or die "unable to read env_file \"$env_file\" ($OS_ERROR)\n";
+
+		while(my $line=<$fh>) {
+			next if ($line =~ /^\s*$/); #discard blank lines
+			next if ($line =~ /^\s*#/); #discard comment lines
+
+			chomp $line;
+
+			$env .= $line." ";
+
+			last;
+		}
+
+		$command = $env . $command
+	}
 
 	return $command;
 }

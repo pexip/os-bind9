@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -221,7 +221,13 @@ def check_keys(
         if retired is None or between(now, published, retired):
             goal = "omnipresent"
             pubdelay = published + pubtime
-            signdelay = active + sign_delay(config)
+            sigdelay = (
+                active
+                + sign_delay(config)
+                + config["max-zone-ttl"]
+                + config["zone-propagation-delay"]
+                + config["retire-safety"]
+            )
 
             if between(now, published, pubdelay):
                 state_dnskey = "rumoured"
@@ -233,7 +239,7 @@ def check_keys(
             if key.is_ksk():
                 state_ds = "hidden"
             else:
-                if between(now, active, signdelay):
+                if between(now, active, sigdelay):
                     state_zrrsig = "rumoured"
                 else:
                     state_zrrsig = "omnipresent"
@@ -1441,8 +1447,8 @@ def test_ksr_fast(ns1):
     isctest.kasp.check_dnssec_verify(ns1, zone)
 
     # - check keys
-    # named updates the state file asynchronously, so retry the state check
-    # until the rumoured -> omnipresent transition catches up.
+    # named writes the key states asynchronously after the SKR import, so
+    # retry until they appear in the state file.
     def check_keys_state():
         check_keys(zsks, lifetime, FASTCONFIG, with_state=True)
         return True

@@ -1430,6 +1430,14 @@ n=$((n + 1))
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
+echo_i "checking 'dig ch +dns64prefix' forces class 'in' ($n)"
+$DIG $DIGOPTS ch +dns64prefix @10.53.0.1 >dig.out.ns1.test$n || ret=1
+grep '^2001:bbbb::/96$' dig.out.ns1.test$n >/dev/null || ret=1
+test $(wc -l <dig.out.ns1.test$n) -eq 1 || ret=1
+n=$((n + 1))
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
 cp ns1/named2.conf ns1/named.conf
 rndc_reload ns1 10.53.0.1
 
@@ -1471,7 +1479,7 @@ n=$((n + 1))
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
-if $PERL ../testsock6.pl fd92:7065:b8e:fffe::10.53.0.4 2>/dev/null; then
+if testsock6 fd92:7065:b8e:fffe::10.53.0.4 2>/dev/null; then
   echo_i "checking resolver-use-dns64 ($n)"
   ret=0
   $DIG $DIGOPTS @10.53.0.3 no-aaaa aaaa >dig.out.ns3.test$n || ret=1

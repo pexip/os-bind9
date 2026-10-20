@@ -734,7 +734,7 @@ ret=0
 # convert the hexadecimal key from the TAT query into decimal and
 # compare against the known key.
 tathex=$(grep "query '_ta-[0-9a-f][0-9a-f]*/NULL/IN' approved" ns1/named.run | awk '{print $6; exit 0}' | sed -e 's/(_ta-\([0-9a-f][0-9a-f]*\)):/\1/') || true
-tatkey=$($PERL -e 'printf("%d\n", hex(@ARGV[0]));' "$tathex")
+tatkey=$($PYTHON -c 'import sys; print(int("0" + sys.argv[1], 16))' "$tathex")
 realkey=$(rndccmd 10.53.0.2 secroots - | sed -n "s#.*${DEFAULT_ALGORITHM}/\([0-9][0-9]*\) ; .*managed.*#\1#p")
 [ "$tatkey" -eq "$realkey" ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
@@ -879,7 +879,7 @@ count=$(grep -c "keyid: " rndc.out.$n) || true
 count=$(grep -c "trust" rndc.out.$n) || true
 [ "$count" -eq 2 ] || ret=1
 # log when an unsupported algorithm is encountered during rollover
-wait_for_log 20 "Cannot compute tag for key in zone .: algorithm is unsupported" ns6/named.run || ret=1
+wait_for_log 20 "Managed keys for '.' skipping unsupported algorithm 255" ns6/named.run || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 

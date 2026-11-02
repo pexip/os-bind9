@@ -3,13 +3,12 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-from pathlib import Path
 from re import compile as Re
 
 import os
@@ -28,7 +27,7 @@ import dns.rdatatype
 import dns.zone
 import pytest
 
-from isctest.template import NO_NS, zones
+from isctest.template import zones
 from isctest.zone import Zone
 
 import isctest
@@ -73,15 +72,13 @@ def bootstrap():
         return ksk_private_key, ksk_dnskey
 
     def gen_and_sign(name, nsec3=False):
-        zone = Zone(name, NO_NS, signed=True)
+        zone = Zone(name, signed=True)
         ksk_private_key, ksk_dnskey = generate_keys()
         keys = [(ksk_private_key, ksk_dnskey)]
         zone.render()
 
         # read the rendered zone
-        unsigned_path = str(Path(zone.ns.name) / zone.filepath_unsigned)
-        signed_path = str(Path(zone.ns.name) / zone.filepath_signed)
-        zoneobj = dns.zone.from_file(unsigned_path, origin=f"{name}.")
+        zoneobj = dns.zone.from_file(str(zone.path_unsigned), origin=f"{name}.")
         lifetime = 30 * 86400
 
         # sign the zone
@@ -133,7 +130,7 @@ def bootstrap():
             nsec3_rrsig.ttl = 300
             nsec3_rrsig.add(nsec3_sigdata)
 
-        zoneobj.to_file(signed_path)
+        zoneobj.to_file(str(zone.path_signed))
 
         return zone
 

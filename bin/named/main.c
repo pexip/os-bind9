@@ -126,7 +126,7 @@ extern size_t dns_dispatch_tcppipelining;
 extern size_t dns_adb_addrslimit;
 
 static bool want_stats = false;
-static char program_name[NAME_MAX] = "named";
+static char program_name[NAME_MAX + 1] = "named";
 static char absolute_conffile[PATH_MAX];
 static char saved_command_line[4096] = { 0 };
 static char ellipsis[5] = { 0 };
@@ -372,8 +372,9 @@ save_command_line(int argc, char *argv[]) {
 					continue;
 				} else {
 					char tmp[5];
-					int c = snprintf(tmp, sizeof(tmp),
-							 "\\%03o", *src++);
+					int c = snprintf(
+						tmp, sizeof(tmp), "\\%03o",
+						(unsigned char)(*src++));
 					if (dst + c >= eob) {
 						goto add_ellipsis;
 					}
@@ -400,7 +401,7 @@ add_ellipsis:
 }
 
 static int
-parse_int(char *arg, const char *desc) {
+parse_int(const char *arg, const char *desc) {
 	char *endp;
 	int tmp;
 	long int ltmp;
@@ -696,20 +697,31 @@ printversion(bool verbose) {
 
 static void
 parse_fuzz_arg(void) {
-	if (!strncmp(isc_commandline_argument, "client:", 7)) {
-		named_g_fuzz_addr = isc_commandline_argument + 7;
+	const char *tail;
+	if ((tail = isc_string_stripprefix(isc_commandline_argument,
+					   "client:")) != NULL)
+	{
+		named_g_fuzz_addr = tail;
 		named_g_fuzz_type = isc_fuzz_client;
-	} else if (!strncmp(isc_commandline_argument, "tcp:", 4)) {
-		named_g_fuzz_addr = isc_commandline_argument + 4;
+	} else if ((tail = isc_string_stripprefix(isc_commandline_argument,
+						  "tcp:")) != NULL)
+	{
+		named_g_fuzz_addr = tail;
 		named_g_fuzz_type = isc_fuzz_tcpclient;
-	} else if (!strncmp(isc_commandline_argument, "resolver:", 9)) {
-		named_g_fuzz_addr = isc_commandline_argument + 9;
+	} else if ((tail = isc_string_stripprefix(isc_commandline_argument,
+						  "resolver:")) != NULL)
+	{
+		named_g_fuzz_addr = tail;
 		named_g_fuzz_type = isc_fuzz_resolver;
-	} else if (!strncmp(isc_commandline_argument, "http:", 5)) {
-		named_g_fuzz_addr = isc_commandline_argument + 5;
+	} else if ((tail = isc_string_stripprefix(isc_commandline_argument,
+						  "http:")) != NULL)
+	{
+		named_g_fuzz_addr = tail;
 		named_g_fuzz_type = isc_fuzz_http;
-	} else if (!strncmp(isc_commandline_argument, "rndc:", 5)) {
-		named_g_fuzz_addr = isc_commandline_argument + 5;
+	} else if ((tail = isc_string_stripprefix(isc_commandline_argument,
+						  "rndc:")) != NULL)
+	{
+		named_g_fuzz_addr = tail;
 		named_g_fuzz_type = isc_fuzz_rndc;
 	} else {
 		named_main_earlyfatal("unknown fuzzing type '%s'",
@@ -751,14 +763,16 @@ parse_T_opt(char *option) {
 		named_g_nosyslog = true;
 	} else if (!strcmp(option, "notcp")) {
 		notcp = true;
-	} else if (!strncmp(option, "maxcachesize=", 13)) {
-		named_g_maxcachesize = atoi(option + 13);
+	} else if ((p = isc_string_stripprefix(option, "maxcachesize=")) !=
+		   NULL)
+	{
+		named_g_maxcachesize = atoi(p);
 	} else if (!strcmp(option, "maxudp512")) {
 		maxudp = 512;
 	} else if (!strcmp(option, "maxudp1460")) {
 		maxudp = 1460;
-	} else if (!strncmp(option, "maxudp=", 7)) {
-		maxudp = atoi(option + 7);
+	} else if ((p = isc_string_stripprefix(option, "maxudp=")) != NULL) {
+		maxudp = atoi(p);
 		if (maxudp <= 0) {
 			named_main_earlyfatal("bad maxudp");
 		}
@@ -805,14 +819,19 @@ parse_T_opt(char *option) {
 		transferslowly = true;
 	} else if (!strcmp(option, "transferstuck")) {
 		transferstuck = true;
-	} else if (!strncmp(option, "tat=", 4)) {
-		named_g_tat_interval = atoi(option + 4);
-	} else if (!strncmp(option, "adbentrywindow=", 15)) {
-		dns_adb_entrywindow = atoi(option + 15);
-	} else if (!strncmp(option, "adbcachemin=", 12)) {
-		dns_adb_cachemin = atoi(option + 12);
-	} else if (!strncmp(option, "tcppipelining=", 14)) {
-		size_t pipelining = atoi(option + 14);
+	} else if ((p = isc_string_stripprefix(option, "tat=")) != NULL) {
+		named_g_tat_interval = atoi(p);
+	} else if ((p = isc_string_stripprefix(option, "adbentrywindow"
+						       "=")) != NULL)
+	{
+		dns_adb_entrywindow = atoi(p);
+	} else if ((p = isc_string_stripprefix(option, "adbcachemin=")) != NULL)
+	{
+		dns_adb_cachemin = atoi(p);
+	} else if ((p = isc_string_stripprefix(option, "tcppipelining"
+						       "=")) != NULL)
+	{
+		size_t pipelining = atoi(p);
 		if (pipelining < 1) {
 			named_main_earlyfatal("tcppipelining must be at "
 					      "least 1");
@@ -833,19 +852,20 @@ parse_T_opt(char *option) {
 static void
 parse_port(char *arg) {
 	enum { DNSPORT, TLSPORT, HTTPSPORT, HTTPPORT } ptype = DNSPORT;
-	char *value = arg;
+	const char *value = arg;
+	const char *tail = NULL;
 	int port;
 
-	if (strncmp(arg, "dns=", 4) == 0) {
-		value = arg + 4;
-	} else if (strncmp(arg, "tls=", 4) == 0) {
-		value = arg + 4;
+	if ((tail = isc_string_stripprefix(arg, "dns=")) != NULL) {
+		value = tail;
+	} else if ((tail = isc_string_stripprefix(arg, "tls=")) != NULL) {
+		value = tail;
 		ptype = TLSPORT;
-	} else if (strncmp(arg, "https=", 6) == 0) {
-		value = arg + 6;
+	} else if ((tail = isc_string_stripprefix(arg, "https=")) != NULL) {
+		value = tail;
 		ptype = HTTPSPORT;
-	} else if (strncmp(arg, "http=", 5) == 0) {
-		value = arg + 5;
+	} else if ((tail = isc_string_stripprefix(arg, "http=")) != NULL) {
+		value = tail;
 		ptype = HTTPPORT;
 	}
 

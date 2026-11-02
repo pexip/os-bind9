@@ -1,15 +1,13 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import Callable, Sequence
 
@@ -19,7 +17,9 @@ import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 
-from isctest.asyncserver import QueryContext, ResponseHandler, StaticResponseHandler
+from isctest.asyncserver import ResponseHandler
+from isctest.asyncserver.handlers import StaticResponseHandler
+from isctest.asyncserver.matchers import Always, Qname, Qtype
 
 
 def rrset(
@@ -83,19 +83,14 @@ class StaticHandler(StaticResponseHandler):
         self._qnames = (
             None if qnames is None else [dns.name.from_text(q) for q in qnames]
         )
-        self._qtypes = qtypes
+        self.matcher = (Qname(*self._qnames) if self._qnames else Always()) & (
+            Qtype(*qtypes) if qtypes else Always()
+        )
         self._answer = list(answer)
         self._authority = list(authority)
         self._additional = list(additional)
         self._rcode = rcode
         self._delay = delay
-
-    def match(self, qctx: QueryContext) -> bool:
-        if self._qnames is not None and qctx.qname not in self._qnames:
-            return False
-        if self._qtypes is not None and qctx.qtype not in self._qtypes:
-            return False
-        return True
 
     @property
     def answer(self) -> Sequence[dns.rrset.RRset]:

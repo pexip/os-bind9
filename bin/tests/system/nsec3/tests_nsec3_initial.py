@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -12,6 +12,7 @@
 import os
 
 import dns.rcode
+import dns.rdatatype
 import dns.update
 import pytest
 
@@ -35,6 +36,7 @@ ZONES = {
     "nsec3-dynamic-update-inline.kasp",
     "nsec3.kasp",
     "nsec3-dynamic.kasp",
+    "nsec3-private-type-delete.kasp",
     "nsec3-change.kasp",
     "nsec3-dynamic-change.kasp",
     "nsec3-dynamic-to-inline.kasp",
@@ -68,6 +70,56 @@ def after_servers_start(ns3):
     for zone in ZONES:
         isctest.kasp.wait_keymgr_done(ns3, zone)
         wait_for_nsec3param(ns3, zone, NSEC3_SALTLEN[zone].initial)
+
+
+def test_update_delete_private_type_rrset(ns3):
+    zone = "nsec3-private-type-delete.kasp"
+    fqdn = f"{zone}."
+
+    update_msg = dns.update.UpdateMessage(zone)
+    update_msg.add(fqdn, 0, dns.rdatatype.NSEC3PARAM, "1 0 5 ab")
+    response = isctest.query.tcp(
+        update_msg,
+        ns3.ip,
+        attempts=1,
+        expected_rcode=dns.rcode.NOERROR,
+    )
+    isctest.check.noerror(response)
+
+    update_msg = dns.update.UpdateMessage(zone)
+    update_msg.delete(fqdn, dns.rdatatype.from_text("TYPE65534"))
+    response = isctest.query.tcp(
+        update_msg,
+        ns3.ip,
+        attempts=1,
+        expected_rcode=dns.rcode.NOERROR,
+    )
+    isctest.check.noerror(response)
+
+
+def test_update_delete_all_apex_rrsets_with_private_type(ns3):
+    zone = "nsec3-private-type-delete.kasp"
+    fqdn = f"{zone}."
+
+    update_msg = dns.update.UpdateMessage(zone)
+    update_msg.add(fqdn, 0, dns.rdatatype.NSEC3PARAM, "1 0 5 ab")
+    response = isctest.query.tcp(
+        update_msg,
+        ns3.ip,
+        attempts=1,
+        expected_rcode=dns.rcode.NOERROR,
+    )
+    isctest.check.noerror(response)
+
+    update_msg = dns.update.UpdateMessage(zone)
+    update_msg.delete(fqdn)
+    response = isctest.query.tcp(
+        update_msg,
+        ns3.ip,
+        attempts=1,
+        expected_rcode=dns.rcode.NOERROR,
+    )
+    isctest.check.noerror(response)
 
 
 @pytest.mark.parametrize(

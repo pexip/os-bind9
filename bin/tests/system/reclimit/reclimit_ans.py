@@ -1,15 +1,13 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator
 from typing import final
@@ -27,21 +25,20 @@ import dns.rrset
 from isctest.asyncserver import (
     ControlCommand,
     ControllableAsyncDnsServer,
-    DnsResponseSend,
-    QnameHandler,
     QueryContext,
-    ResponseAction,
     ResponseHandler,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Matcher, Qname, Qtype
 
 
-class ReclimitStateHandler(QnameHandler):
+class ReclimitStateHandler(ResponseHandler):
     """
     Handler for the "count." and "reset." queries that also holds the state
     shared by all the handlers in one server.
     """
 
-    qnames = ["count.", "reset."]
+    matcher = Qname("count.", "reset.")
 
     def __init__(self, indirect_send_response_default: bool = True) -> None:
         self._indirect_send_response_default = indirect_send_response_default
@@ -85,7 +82,7 @@ class ReclimitHandler(ResponseHandler):
     @final
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         self._state.count += 1
         async for response in self._get_counted_responses(qctx):
             yield response
@@ -93,7 +90,7 @@ class ReclimitHandler(ResponseHandler):
     @abc.abstractmethod
     async def _get_counted_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         yield DnsResponseSend(qctx.response)
 
 
@@ -131,8 +128,8 @@ def ns(owner: str | dns.name.Name, target: str | dns.name.Name) -> dns.rrset.RRs
     )
 
 
-class DirectExampleHandler(ReclimitHandler, QnameHandler):
-    qnames = ["direct.example.org", "direct.example.net"]
+class DirectExampleHandler(ReclimitHandler):
+    matcher = Qname("direct.example.org", "direct.example.net")
 
     def __init__(
         self, state_handler: ReclimitStateHandler, local_ns_number: int
@@ -148,8 +145,8 @@ class DirectExampleHandler(ReclimitHandler, QnameHandler):
         yield DnsResponseSend(qctx.response)
 
 
-class IndirectExampleOrgHandler(ReclimitHandler, QnameHandler):
-    qnames = [f"indirect{i}.example.org" for i in range(1, 9)]
+class IndirectExampleOrgHandler(ReclimitHandler):
+    matcher = Qname(*[f"indirect{i}.example.org" for i in range(1, 9)])
 
     def __init__(
         self, state_handler: ReclimitStateHandler, local_ns_number: int
@@ -168,15 +165,26 @@ class IndirectExampleOrgHandler(ReclimitHandler, QnameHandler):
         yield DnsResponseSend(qctx.response)
 
 
-def is_ns1_example(qname: dns.name.Name, tld: str) -> bool:
-    labels = qname.labels
-    return (
-        len(labels) == 5
-        and labels[3] == tld.encode()
-        and labels[2] == b"example"
-        and labels[1].isdigit()
-        and labels[0] == b"ns1"
-    )
+class Ns1Example(Matcher):
+    """
+    Match queries for ns1.<n>.example.<tld>.
+    """
+
+    def __init__(self, tld: str) -> None:
+        self.tld = tld.encode()
+
+    def match(self, qctx: QueryContext) -> bool:
+        labels = qctx.qname.labels
+        return (
+            len(labels) == 5
+            and labels[3] == self.tld
+            and labels[2] == b"example"
+            and labels[1].isdigit()
+            and labels[0] == b"ns1"
+        )
+
+    def __str__(self) -> str:
+        return f"QNAME is ns1.<n>.example.{self.tld.decode()}"
 
 
 class Ns1ExampleOrgHandler(ReclimitHandler):
@@ -184,15 +192,11 @@ class Ns1ExampleOrgHandler(ReclimitHandler):
         self._second_query_events: dict[dns.name.Name, asyncio.Event] = {}
         super().__init__(state_handler)
 
-    def match(self, qctx: QueryContext) -> bool:
-        return is_ns1_example(qctx.qname, "org") and qctx.qtype in (
-            dns.rdatatype.A,
-            dns.rdatatype.AAAA,
-        )
+    matcher = Ns1Example("org") & Qtype(dns.rdatatype.A, dns.rdatatype.AAAA)
 
     async def _get_counted_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         ns_number = int(qctx.qname.labels[1])
         next_ns_number = ns_number + 1
         if not self._state.limit or (

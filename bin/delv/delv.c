@@ -1107,7 +1107,8 @@ parse_uint(uint32_t *uip, const char *value, uint32_t max, const char *desc) {
 static void
 plus_option(char *option) {
 	isc_result_t result;
-	char *cmd, *value, *last = NULL;
+	const char *cmd, *tail;
+	char *value, *last = NULL;
 	bool state = true;
 
 	INSIST(option != NULL);
@@ -1117,8 +1118,9 @@ plus_option(char *option) {
 		printf(";; Invalid option %s\n", option);
 		return;
 	}
-	if (strncasecmp(cmd, "no", 2) == 0) {
-		cmd += 2;
+	tail = isc_string_casestripprefix(cmd, "no");
+	if (tail != NULL) {
+		cmd = tail;
 		state = false;
 	}
 
@@ -2167,7 +2169,6 @@ sendquery(void *arg) {
 	CHECK(dns_requestmgr_create(mctx, loopmgr, dispatchmgr, NULL, NULL,
 				    &requestmgr));
 
-	dns_view_attach(view, &(dns_view_t *){ NULL });
 	CHECK(dns_request_create(requestmgr, message, NULL, &peer, NULL, NULL,
 				 DNS_REQUESTOPT_TCP, NULL, 1, 0, 0, isc_loop(),
 				 recvresponse, message, &request));
@@ -2197,7 +2198,7 @@ matchview(isc_netaddr_t *srcaddr, isc_netaddr_t *destaddr,
 	UNUSED(cbarg);
 	UNUSED(sigresultp);
 
-	*viewp = view;
+	dns_view_attach(view, viewp);
 	*viewpatchresultp = ISC_R_SUCCESS;
 	return ISC_R_SUCCESS;
 }

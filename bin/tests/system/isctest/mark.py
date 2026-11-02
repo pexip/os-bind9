@@ -1,11 +1,9 @@
-#!/usr/bin/python3
-
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -28,6 +26,21 @@ long_test = pytest.mark.skipif(
 live_internet_test = pytest.mark.skipif(
     not os.environ.get("CI_ENABLE_LIVE_INTERNET_TESTS"),
     reason="CI_ENABLE_LIVE_INTERNET_TESTS not set",
+)
+
+
+rsasha1 = pytest.mark.skipif(
+    os.getenv("FEATURE_RSASHA1") != "1", reason="RSASHA1 disabled"
+)
+
+
+# FEATURE_EXTENDED_DS_DIGEST is never set on this branch (the feature and its
+# feature-test probe only exist on newer branches), so this marker degrades to
+# an unconditional skip; it is defined here so that gated tests can be
+# backported without breaking test collection.
+extended_ds_digest = pytest.mark.skipif(
+    os.getenv("FEATURE_EXTENDED_DS_DIGEST") != "1",
+    reason="extended DS digest algorithms disabled",
 )
 
 
@@ -61,16 +74,6 @@ def _perl_module_available(module: str) -> bool:
 requires_net_dns = pytest.mark.skipif(
     not _perl_module_available("Net::DNS"),
     reason="Perl Net::DNS module is required",
-)
-
-requires_net_dns_nameserver = pytest.mark.skipif(
-    not _perl_module_available("Net::DNS::Nameserver"),
-    reason="Perl Net::DNS::Nameserver module is required",
-)
-
-requires_time_hires = pytest.mark.skipif(
-    not _perl_module_available("Time::HiRes"),
-    reason="Perl Time::HiRes module is required",
 )
 
 
@@ -148,6 +151,10 @@ with_cpu_affinity = pytest.mark.skipif(
     reason="cpuset, numactl, or taskset is required",
 )
 
+with_curl = pytest.mark.skipif(
+    not shutil.which(os.getenv("CURL", "")), reason="curl is required"
+)
+
 with_openssl_cipher_suites = pytest.mark.skipif(
     os.getenv("FEATURE_OPENSSL_CIPHER_SUITES") != "1",
     reason="SSL_CTX_set_ciphersuites() is required",
@@ -156,7 +163,6 @@ with_openssl_cipher_suites = pytest.mark.skipif(
 dnsrps_enabled = pytest.mark.skipif(
     not is_dnsrps_available(), reason="dnsrps disabled in the build"
 )
-
 
 softhsm2_environment = pytest.mark.skipif(
     not (

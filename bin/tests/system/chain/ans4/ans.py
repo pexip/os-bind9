@@ -1,15 +1,13 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -28,11 +26,11 @@ import dns.rrset
 from isctest.asyncserver import (
     ControlCommand,
     ControllableAsyncDnsServer,
-    DnsResponseSend,
-    DomainHandler,
     QueryContext,
-    ResponseAction,
+    ResponseHandler,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 
 
 class ChainNameGenerator:
@@ -408,7 +406,7 @@ class ChainSetupCommand(ControlCommand):
         return rrsets
 
 
-class ChainResponseHandler(DomainHandler):
+class ChainResponseHandler(ResponseHandler):
     """
     For trigger queries (`test.domain.nil`), return a chained response
     previously prepared by `ChainSetupCommand`.
@@ -416,7 +414,7 @@ class ChainResponseHandler(DomainHandler):
     For any other query, return a non-chained response (a single A RRset).
     """
 
-    domains = ["domain.nil."]
+    matcher = Domain("domain.nil.")
 
     def __init__(self, answer_rrsets: list[dns.rrset.RRset]):
         super().__init__()
@@ -424,7 +422,7 @@ class ChainResponseHandler(DomainHandler):
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         trigger_qname = dns.name.from_text("test.domain.nil.")
         if qctx.qname == trigger_qname:
             answer_rrsets = self._answer_rrsets

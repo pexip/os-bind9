@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-"""Handler for the attack.delegationtrap. zone (DelegationTrap reproducer).
+"""
+Handler for the attack.delegationtrap. zone (DelegationTrap reproducer).
 
 This is a Python port of the DelegationTrap vector from the ReTrap PoC
 (gitlab.isc.org/bind-team/nankai-cve-reproducers).  It reproduces the
@@ -53,12 +54,9 @@ import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 
-from isctest.asyncserver import (
-    DnsResponseSend,
-    DomainHandler,
-    QueryContext,
-    ResponseAction,
-)
+from isctest.asyncserver import QueryContext, ResponseHandler
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 
 ZONE_NAME = "attack.delegationtrap."
 SERVER_IP = "10.53.0.4"
@@ -66,10 +64,12 @@ TTL = 300
 PEM_PATH = Path("attack_delegationtrap.pem")
 
 
-class DelegationTrapHandler(DomainHandler):
-    """Serve every label under attack.delegationtrap. as a secure zone cut."""
+class DelegationTrapHandler(ResponseHandler):
+    """
+    Serve every label under attack.delegationtrap. as a secure zone cut.
+    """
 
-    domains = [ZONE_NAME]
+    matcher = Domain(ZONE_NAME)
 
     def __init__(self) -> None:
         super().__init__()
@@ -89,7 +89,9 @@ class DelegationTrapHandler(DomainHandler):
         self._expiration = now + 14 * 86400
 
     def _sign(self, rrset: dns.rrset.RRset, signer: dns.name.Name) -> dns.rrset.RRset:
-        """Return an RRSIG RRset covering `rrset`, signed as zone `signer`."""
+        """
+        Return an RRSIG RRset covering `rrset`, signed as zone `signer`.
+        """
         rrsig = dns.dnssec.sign(
             rrset,
             self._priv,
@@ -128,7 +130,7 @@ class DelegationTrapHandler(DomainHandler):
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         qname = qctx.qname
         qtype = qctx.qtype
         response = qctx.prepare_new_response(with_zone_data=False)

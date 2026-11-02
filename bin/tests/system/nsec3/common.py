@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -37,7 +37,6 @@ NSEC3_MARK = pytest.mark.extra_artifacts(
         "ns*/*.signed",
         "ns*/keygen.out.*",
         "ns3/named-*.conf",
-        "ans*/ans.run",
     ]
 )
 
@@ -55,6 +54,7 @@ NSEC3_SALTLEN = {
     "nsec3-dynamic-update-inline.kasp": NSEC3Saltlen(initial=None, reconfig=None),
     "nsec3.kasp": NSEC3Saltlen(initial=0, reconfig=0),
     "nsec3-dynamic.kasp": NSEC3Saltlen(initial=0, reconfig=0),
+    "nsec3-private-type-delete.kasp": NSEC3Saltlen(initial=0, reconfig=0),
     "nsec3-change.kasp": NSEC3Saltlen(initial=0, reconfig=8),
     "nsec3-dynamic-change.kasp": NSEC3Saltlen(initial=0, reconfig=8),
     "nsec3-dynamic-to-inline.kasp": NSEC3Saltlen(initial=0, reconfig=0),

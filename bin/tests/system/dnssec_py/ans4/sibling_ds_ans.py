@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-"""Handler for the sibling-ds. zone.
+"""
+Handler for the sibling-ds. zone.
 
 When returning a referral for child.sibling-ds, this server injects a DS
 record for sibling.sibling-ds into the authority section.  The resolver
@@ -22,22 +23,21 @@ from collections.abc import AsyncGenerator
 import dns.rdatatype
 import dns.rrset
 
-from isctest.asyncserver import (
-    DnsResponseSend,
-    DomainHandler,
-    QueryContext,
-    ResponseAction,
-)
+from isctest.asyncserver import QueryContext, ResponseHandler
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 
 
-class SiblingDsInjectionHandler(DomainHandler):
-    """Inject a DS record for sibling.sibling-ds into child.sibling-ds referrals."""
+class SiblingDsInjectionHandler(ResponseHandler):
+    """
+    Inject a DS record for sibling.sibling-ds into child.sibling-ds referrals.
+    """
 
-    domains = ["child.sibling-ds."]
+    matcher = Domain("child.sibling-ds.")
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         # The default zone-data response already has the NS delegation for
         # child.sibling-ds. and glue.  Add a DS record for the *sibling* zone
         # (wrong name for this referral).

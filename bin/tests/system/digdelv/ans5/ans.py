@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -18,14 +18,12 @@ import dns.rdatatype
 import dns.rrset
 
 from isctest.asyncserver import (
-    CloseConnection,
     ControlCommand,
     ControllableAsyncDnsServer,
-    DnsResponseSend,
     QueryContext,
-    ResponseAction,
     ResponseHandler,
 )
+from isctest.asyncserver.actions import CloseConnection, DnsResponseSend
 
 
 class ErraticAxfrHandler(ResponseHandler):
@@ -39,7 +37,7 @@ class ErraticAxfrHandler(ResponseHandler):
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[CloseConnection | DnsResponseSend, None]:
         action = self.actions[self.counter % len(self.actions)]
         self.counter += 1
 

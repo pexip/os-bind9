@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-"""Tests for RRSIG Labels vs signer name label count validation.
+"""
+Tests for RRSIG Labels vs signer name label count validation.
 
 Zone hierarchy used by this module:
   .                              (ns1)  signed
@@ -20,7 +21,7 @@ Zone hierarchy used by this module:
 """
 
 from dnssec_py.common import DNSSEC_PY_MARK
-from isctest.template import NS2, Nameserver, zones
+from isctest.template import ANS4, NS2, zones
 from isctest.zone import PythonZoneKey, Zone, configure_root
 
 import isctest
@@ -29,11 +30,10 @@ import isctest.query
 
 pytestmark = DNSSEC_PY_MARK
 
-ANS4 = Nameserver("ans4")
-
 
 def bootstrap():
-    """Set up the four-zone hierarchy and generate attacker key material.
+    """
+    Set up the four-zone hierarchy and generate attacker key material.
 
     Writes attacker_rrsig_labels_signer.pem to ans4/ so the custom server can read it
     at startup.  Attaches a PythonZoneKey to the attacker Zone so that
@@ -60,7 +60,8 @@ def bootstrap():
 
 
 def test_rrsig_labels_underflow_rejected(ns9):
-    """Fixed BIND rejects RRSIG where Labels < signer_labels - 1.
+    """
+    Fixed BIND rejects RRSIG where Labels < signer_labels - 1.
 
     Q1: www.attacker.rrsig-labels-signer./A DO
     The attacker returns A 192.0.2.1 + RRSIG(Labels=1, signer=attacker.rrsig-labels-signer.)
@@ -75,7 +76,8 @@ def test_rrsig_labels_underflow_rejected(ns9):
 
 
 def test_rrsig_labels_no_wildcard_cache_poison(ns9):
-    """Labels underflow must not enable synth-from-dnssec cache poisoning.
+    """
+    Labels underflow must not enable synth-from-dnssec cache poisoning.
 
     The labels-underflow bug lets an attacker who controls
     attacker.rrsig-labels-signer. cache a wildcard *.rrsig-labels-signer.

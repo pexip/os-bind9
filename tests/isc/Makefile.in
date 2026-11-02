@@ -113,10 +113,10 @@ check_PROGRAMS = ascii_test$(EXEEXT) async_test$(EXEEXT) \
 	result_test$(EXEEXT) rwlock_test$(EXEEXT) safe_test$(EXEEXT) \
 	siphash_test$(EXEEXT) sockaddr_test$(EXEEXT) \
 	spinlock_test$(EXEEXT) stats_test$(EXEEXT) \
-	symtab_test$(EXEEXT) tcp_test$(EXEEXT) tcpdns_test$(EXEEXT) \
-	time_test$(EXEEXT) timer_test$(EXEEXT) tls_test$(EXEEXT) \
-	tlsdns_test$(EXEEXT) udp_test$(EXEEXT) url_test$(EXEEXT) \
-	work_test$(EXEEXT) $(am__EXEEXT_1)
+	string_test$(EXEEXT) symtab_test$(EXEEXT) tcp_test$(EXEEXT) \
+	tcpdns_test$(EXEEXT) time_test$(EXEEXT) timer_test$(EXEEXT) \
+	tls_test$(EXEEXT) tlsdns_test$(EXEEXT) udp_test$(EXEEXT) \
+	url_test$(EXEEXT) work_test$(EXEEXT) $(am__EXEEXT_1)
 @HAVE_LIBNGHTTP2_TRUE@am__append_2 = \
 @HAVE_LIBNGHTTP2_TRUE@	doh_test
 
@@ -378,6 +378,12 @@ stats_test_LDADD = $(LDADD)
 stats_test_DEPENDENCIES = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(top_builddir)/tests/libtest/libtest.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_3)
+string_test_SOURCES = string_test.c
+string_test_OBJECTS = string_test.$(OBJEXT)
+string_test_LDADD = $(LDADD)
+string_test_DEPENDENCIES = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(top_builddir)/tests/libtest/libtest.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_3)
 symtab_test_SOURCES = symtab_test.c
 symtab_test_OBJECTS = symtab_test.$(OBJEXT)
 symtab_test_LDADD = $(LDADD)
@@ -469,7 +475,8 @@ am__depfiles_remade = ./$(DEPDIR)/ascii_test.Po \
 	./$(DEPDIR)/result_test.Po ./$(DEPDIR)/rwlock_test.Po \
 	./$(DEPDIR)/safe_test.Po ./$(DEPDIR)/siphash_test.Po \
 	./$(DEPDIR)/sockaddr_test.Po ./$(DEPDIR)/spinlock_test.Po \
-	./$(DEPDIR)/stats_test.Po ./$(DEPDIR)/symtab_test.Po \
+	./$(DEPDIR)/stats_test.Po ./$(DEPDIR)/string_test.Po \
+	./$(DEPDIR)/symtab_test.Po \
 	./$(DEPDIR)/tcp_test-netmgr_common.Po \
 	./$(DEPDIR)/tcp_test-stream_shutdown.Po \
 	./$(DEPDIR)/tcp_test-tcp_test.Po \
@@ -513,7 +520,7 @@ SOURCES = ascii_test.c async_test.c buffer_test.c counter_test.c \
 	$(proxyudp_test_SOURCES) quota_test.c radix_test.c \
 	ratelimiter_test.c regex_test.c result_test.c rwlock_test.c \
 	safe_test.c siphash_test.c sockaddr_test.c spinlock_test.c \
-	stats_test.c symtab_test.c $(tcp_test_SOURCES) \
+	stats_test.c string_test.c symtab_test.c $(tcp_test_SOURCES) \
 	$(tcpdns_test_SOURCES) time_test.c timer_test.c \
 	$(tls_test_SOURCES) $(tlsdns_test_SOURCES) $(udp_test_SOURCES) \
 	url_test.c work_test.c
@@ -527,7 +534,7 @@ DIST_SOURCES = ascii_test.c async_test.c buffer_test.c counter_test.c \
 	$(proxyudp_test_SOURCES) quota_test.c radix_test.c \
 	ratelimiter_test.c regex_test.c result_test.c rwlock_test.c \
 	safe_test.c siphash_test.c sockaddr_test.c spinlock_test.c \
-	stats_test.c symtab_test.c $(tcp_test_SOURCES) \
+	stats_test.c string_test.c symtab_test.c $(tcp_test_SOURCES) \
 	$(tcpdns_test_SOURCES) time_test.c timer_test.c \
 	$(tls_test_SOURCES) $(tlsdns_test_SOURCES) $(udp_test_SOURCES) \
 	url_test.c work_test.c
@@ -1380,6 +1387,10 @@ stats_test$(EXEEXT): $(stats_test_OBJECTS) $(stats_test_DEPENDENCIES) $(EXTRA_st
 	@rm -f stats_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(stats_test_OBJECTS) $(stats_test_LDADD) $(LIBS)
 
+string_test$(EXEEXT): $(string_test_OBJECTS) $(string_test_DEPENDENCIES) $(EXTRA_string_test_DEPENDENCIES) 
+	@rm -f string_test$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(string_test_OBJECTS) $(string_test_LDADD) $(LIBS)
+
 symtab_test$(EXEEXT): $(symtab_test_OBJECTS) $(symtab_test_DEPENDENCIES) $(EXTRA_symtab_test_DEPENDENCIES) 
 	@rm -f symtab_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(symtab_test_OBJECTS) $(symtab_test_LDADD) $(LIBS)
@@ -1466,6 +1477,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sockaddr_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spinlock_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stats_test.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/string_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/symtab_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcp_test-netmgr_common.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcp_test-stream_shutdown.Po@am__quote@ # am--include-marker
@@ -2301,6 +2313,13 @@ stats_test.log: stats_test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+string_test.log: string_test$(EXEEXT)
+	@p='string_test$(EXEEXT)'; \
+	b='string_test'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 symtab_test.log: symtab_test$(EXEEXT)
 	@p='symtab_test$(EXEEXT)'; \
 	b='symtab_test'; \
@@ -2515,6 +2534,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sockaddr_test.Po
 	-rm -f ./$(DEPDIR)/spinlock_test.Po
 	-rm -f ./$(DEPDIR)/stats_test.Po
+	-rm -f ./$(DEPDIR)/string_test.Po
 	-rm -f ./$(DEPDIR)/symtab_test.Po
 	-rm -f ./$(DEPDIR)/tcp_test-netmgr_common.Po
 	-rm -f ./$(DEPDIR)/tcp_test-stream_shutdown.Po
@@ -2621,6 +2641,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sockaddr_test.Po
 	-rm -f ./$(DEPDIR)/spinlock_test.Po
 	-rm -f ./$(DEPDIR)/stats_test.Po
+	-rm -f ./$(DEPDIR)/string_test.Po
 	-rm -f ./$(DEPDIR)/symtab_test.Po
 	-rm -f ./$(DEPDIR)/tcp_test-netmgr_common.Po
 	-rm -f ./$(DEPDIR)/tcp_test-stream_shutdown.Po

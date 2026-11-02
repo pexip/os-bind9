@@ -1,15 +1,13 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 from collections.abc import AsyncGenerator, Collection
 
@@ -21,13 +19,14 @@ import dns.rdatatype
 import dns.rrset
 
 from isctest.asyncserver import (
-    AxfrHandler,
     ControllableAsyncDnsServer,
-    DnsResponseSend,
     QueryContext,
     ResponseHandler,
-    SwitchControlCommand,
 )
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.commands import SwitchControlCommand
+from isctest.asyncserver.handlers import AxfrHandler
+from isctest.asyncserver.matchers import Qtype
 
 
 def rrset(owner: str, rdtype: dns.rdatatype.RdataType, rdata: str) -> dns.rrset.RRset:
@@ -76,8 +75,7 @@ class SoaHandler(ResponseHandler):
     def __init__(self, serial: int):
         self._serial = serial
 
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.SOA
+    matcher = Qtype(dns.rdatatype.SOA)
 
     async def get_responses(
         self, qctx: QueryContext
@@ -96,8 +94,7 @@ class IxfrHandler(ResponseHandler):
         """
         raise NotImplementedError
 
-    def match(self, qctx: QueryContext) -> bool:
-        return qctx.qtype == dns.rdatatype.IXFR
+    matcher = Qtype(dns.rdatatype.IXFR)
 
     async def get_responses(
         self, qctx: QueryContext

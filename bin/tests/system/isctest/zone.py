@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -221,7 +221,7 @@ class FileZoneKey(ZoneKey):
         Zone.copy_dssets enforces this.
         """
         assert self.zone is not None, "write_dsset requires a zone-attached key"
-        src = Path(self.zone.ns.name) / f"dsset-{self.zone.name}."
+        src = self.zone.directory / f"dsset-{self.zone.name}."
         dst = Path(target_dir) / src.name
         if src.resolve() == dst.resolve():
             debug(f"{self.zone.name}: dsset already in {target_dir}")
@@ -238,19 +238,19 @@ class FileZoneKey(ZoneKey):
         """
         Generate a DNSSEC key via dnssec-keygen for zone and return it.
 
-        Runs dnssec-keygen in zone.ns.name/keys/, stores the key there, and
+        Runs dnssec-keygen in zone.directory/keys/, stores the key there, and
         returns the resulting FileZoneKey.  Pass params="-f KSK" to generate a
         Key Signing Key; omit it (or pass "") for a Zone Signing Key.
         """
         debug(f"{zone.name}: generating key using dnssec-keygen")
-        keydir = Path(zone.ns.name) / KEYDIR
+        keydir = zone.directory / KEYDIR
         keydir.mkdir(exist_ok=True)
         if alg is None:
             alg = Algorithm.default()
         keygen = EnvCmd(
             "KEYGEN", f"-q -a {alg.number} -b {alg.bits} -K {KEYDIR} -L {DNSKEY_TTL}"
         )
-        key_name = keygen(f"{params} {zone.name}", cwd=zone.ns.name).out.strip()
+        key_name = keygen(f"{params} {zone.name}", cwd=zone.directory).out.strip()
         return FileZoneKey(key_name, keydir=keydir, zone=zone)
 
 
@@ -317,7 +317,9 @@ class PythonZoneKey(ZoneKey):
             f.write(text)
 
     def write_private_key_pem(self, path: Path | str) -> None:
-        """Write the private key to path in PKCS8 PEM format (no encryption)."""
+        """
+        Write the private key to path in PKCS8 PEM format (no encryption).
+        """
         Path(path).write_bytes(
             self.private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -399,7 +401,7 @@ class Zone:
     def __init__(
         self,
         name: str | dns.name.Name,
-        ns: Nameserver,
+        ns: Nameserver | None = None,
         signed: bool = False,
         subdir: str | None = "zones",
         filepath_unsigned: Path | str | None = None,
@@ -431,18 +433,45 @@ class Zone:
 
     @property
     def filepath(self) -> Path:
-        """Actual zone file — filepath_signed if signed, filepath_unsigned otherwise."""
+        """
+        Actual zone file — filepath_signed if signed, filepath_unsigned otherwise.
+        """
         return self.filepath_signed if self.signed else self.filepath_unsigned
 
+    @property
+    def directory(self) -> Path:
+        """
+        Directory the zone's files are rooted in, relative to the test directory.
+        """
+        return Path(self.ns.name) if self.ns else Path(".")
+
+    @property
+    def path_unsigned(self) -> Path:
+        """
+        Path of the unsigned zone file, relative to the test directory.
+        """
+        return self.directory / self.filepath_unsigned
+
+    @property
+    def path_signed(self) -> Path:
+        """
+        Path of the signed zone file, relative to the test directory.
+        """
+        return self.directory / self.filepath_signed
+
     def add_keys(self, ksk: bool = True, zsk: bool = True) -> None:
-        """Generate KSK and/or ZSK via dnssec-keygen and append to self.keys."""
+        """
+        Generate KSK and/or ZSK via dnssec-keygen and append to self.keys.
+        """
         if ksk:
             self.keys.append(FileZoneKey.generate(self, "-f KSK"))
         if zsk:
             self.keys.append(FileZoneKey.generate(self))
 
     def copy_dssets(self) -> None:
-        """Write dsset-* files for each signed delegation into self.ns dir."""
+        """
+        Write dsset-* files for each signed delegation into self.directory.
+        """
         for zone in self.delegations:
             ksks = [k for k in zone.keys if k.is_ksk()]
             has_file = any(isinstance(k, FileZoneKey) for k in ksks)
@@ -455,15 +484,17 @@ class Zone:
                 )
             if ksks:
                 for key in ksks:
-                    key.write_dsset(Path(self.ns.name))
+                    key.write_dsset(self.directory)
             else:
                 debug(f"{zone.name}: delegation is insecure (no KSK)")
 
     def render(self, template: str | None = None) -> None:
-        """Render the unsigned zone file from a jinja2 template."""
+        """
+        Render the unsigned zone file from a jinja2 template.
+        """
         debug(f"{self.name}: rendering zone file")
         templates = TemplateEngine(".")
-        output = Path(self.ns.name) / self.filepath_unsigned
+        output = self.path_unsigned
         output.parent.mkdir(exist_ok=True)
 
         if template is None:
@@ -498,12 +529,21 @@ class Zone:
         signer(
             f"-P -x -O full -o {self.name}"
             f" -f {self.filepath_signed} {self.filepath_unsigned}",
-            cwd=self.ns.name,
+            cwd=self.directory,
         )
 
-    def configure(self, template: str | None = None, sign_params: str = "") -> None:
+    def configure(
+        self,
+        template: str | None = None,
+        sign_params: str = "",
+        csk: bool = False,
+    ) -> None:
         """
         Perform full zone setup: copy DS sets, generate keys, render, sign.
+
+        With csk=True, a single SEP-flagged key is generated instead of the
+        KSK+ZSK pair and the zone is signed with dnssec-signzone -z, making
+        that key a CSK signing everything.
 
         This is the standard single-call entrypoint and may be called only once
         per Zone. Use the individual step methods directly only when a test
@@ -511,16 +551,23 @@ class Zone:
         same Zone (see the class docstring).
         """
         assert not self._configured, f"{self.name}: configure() already called"
+        assert (
+            self.signed or not csk
+        ), f"{self.name}: refusing to generate a CSK for an unsigned zone"
         self._configured = True
         self.copy_dssets()
         if self.signed:
-            self.add_keys()
+            self.add_keys(ksk=True, zsk=not csk)
         self.render(template)
         if self.signed:
+            if csk:
+                sign_params = f"-z {sign_params}".strip()
             self.sign(sign_params)
 
     def trust_anchors(self, ta_type: str = "static-ds") -> list[TrustAnchor]:
-        """Return a trust-anchor stanza for every KSK in zone.keys."""
+        """
+        Return a trust-anchor stanza for every KSK in zone.keys.
+        """
         ksks = [k for k in self.keys if k.is_ksk()]
         assert ksks, f"{self.name}: no KSK in zone.keys"
         return [k.into_ta(ta_type) for k in ksks]

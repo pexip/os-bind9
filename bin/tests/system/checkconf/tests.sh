@@ -28,6 +28,22 @@ if [ $ret -ne 0 ]; then echo_i "failed"; fi
 status=$((status + ret))
 
 n=$((n + 1))
+echo_i "checking that named-checkconf returns an error on a bad commandline ($n)"
+ret=0
+$CHECKCONF "-?" good.conf >checkconf.out$n 2>&1 && ret=1
+grep "usage: named-checkconf" checkconf.out$n >/dev/null || ret=1
+if [ $ret -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+n=$((n + 1))
+echo_i "checking that named-checkconf -h doesn't error ($n)"
+ret=0
+$CHECKCONF "-h" >checkconf.out$n 2>&1 || ret=1
+grep "usage: named-checkconf" checkconf.out$n >/dev/null || ret=1
+if [ $ret -ne 0 ]; then echo_i "failed"; fi
+status=$((status + ret))
+
+n=$((n + 1))
 echo_i "checking that named-checkconf prints a known good config ($n)"
 ret=0
 awk 'BEGIN { ok = 0; } /cut here/ { ok = 1; getline } ok == 1 { print }' good.conf >good.conf.raw
@@ -61,6 +77,10 @@ for bad in bad-*.conf; do
   if [ $rc -ne 1 ]; then ret=1; fi
   grep "^$bad:[0-9]*: " <checkconf.out$n >/dev/null || ret=1
   case $bad in
+    bad-embedded-null-02.conf)
+      pat="string contains embedded NUL"
+      grep "$pat" <checkconf.out$n >/dev/null || ret=1
+      ;;
     bad-update-policy[123].conf)
       pat="identity and name fields are not the same"
       grep "$pat" <checkconf.out$n >/dev/null || ret=1
@@ -558,7 +578,7 @@ fi
 status=$((status + ret))
 
 n=$((n + 1))
-echo_i "check that the 2010 ICANN ROOT KSK without the 2017 ICANN ROOT KSK generates a warning ($n)"
+echo_i "check that the 2010 ICANN ROOT KSK without the 2026 ICANN ROOT KSK generates a warning ($n)"
 ret=0
 $CHECKCONF check-root-ksk-2010.conf >checkconf.out$n 2>/dev/null || ret=1
 [ -s checkconf.out$n ] || ret=1
@@ -570,10 +590,11 @@ fi
 status=$((status + ret))
 
 n=$((n + 1))
-echo_i "check that the 2010 ICANN ROOT KSK with the 2017 ICANN ROOT KSK does not generate a warning ($n)"
+echo_i "check that the 2017 ICANN ROOT KSK without the 2026 ICANN ROOT KSK generates a warning ($n)"
 ret=0
-$CHECKCONF check-root-ksk-both.conf >checkconf.out$n 2>/dev/null || ret=1
-[ -s checkconf.out$n ] && ret=1
+$CHECKCONF check-root-ksk-2017.conf >checkconf.out$n 2>/dev/null || ret=1
+[ -s checkconf.out$n ] || ret=1
+grep "key without the updated" <checkconf.out$n >/dev/null || ret=1
 if [ $ret -ne 0 ]; then
   echo_i "failed"
   ret=1
@@ -581,15 +602,42 @@ fi
 status=$((status + ret))
 
 n=$((n + 1))
-echo_i "check that the 2017 ICANN ROOT KSK alone does not generate a warning ($n)"
+echo_i "check that the 2010 ICANN ROOT KSK with the 2017 ICANN ROOT KSK generates a warning ($n)"
 ret=0
-$CHECKCONF check-root-ksk-2017.conf >checkconf.out$n 2>/dev/null || ret=1
-[ -s checkconf.out$n ] && ret=1
+$CHECKCONF check-root-ksk-both.conf >checkconf.out$n 2>/dev/null || ret=1
+[ -s checkconf.out$n ] || ret=1
 if [ $ret -ne 0 ]; then
   echo_i "failed"
   ret=1
 fi
 status=$((status + ret))
+
+# By 23:59 11 October 2026 the IANA root zone should be being signed with the
+# 2026 trust anchor.  Prior to that check that we are warning that we are
+# missing the 2017 trust anchor.
+if test $(date +%s) -lt 1791676800; then
+  n=$((n + 1))
+  echo_i "check that the 2026 ICANN ROOT KSK alone generates a warning ($n)"
+  ret=0
+  $CHECKCONF check-root-ksk-2026.conf >checkconf.out$n 2>/dev/null || ret=1
+  [ -s checkconf.out$n ] || ret=1
+  if [ $ret -ne 0 ]; then
+    echo_i "failed"
+    ret=1
+  fi
+  status=$((status + ret))
+else
+  n=$((n + 1))
+  echo_i "check that the 2026 ICANN ROOT KSK alone does not generate a warning ($n)"
+  ret=0
+  $CHECKCONF check-root-ksk-2026.conf >checkconf.out$n 2>/dev/null || ret=1
+  [ -s checkconf.out$n ] && ret=1
+  if [ $ret -ne 0 ]; then
+    echo_i "failed"
+    ret=1
+  fi
+  status=$((status + ret))
+fi
 
 n=$((n + 1))
 echo_i "check that a static root key generates a warning ($n)"

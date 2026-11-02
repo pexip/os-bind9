@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -80,7 +80,9 @@ ns2 A 10.53.0.2
 
 
 def _serve(ns2, system_test_dir, variant):
-    """Make ns2 serve the 'full' or 'empty' (a.example-less) signed zone."""
+    """
+    Make ns2 serve the 'full' or 'empty' (a.example-less) signed zone.
+    """
     src = system_test_dir / "ns2" / f"example-{variant}.db.signed"
     dst = system_test_dir / "ns2" / "example.db.signed"
     # Ensure that the modification time of 'dst' increases on
@@ -96,11 +98,15 @@ def _serve(ns2, system_test_dir, variant):
         st2 = os.stat(dst)
         if int(st2.st_mtime) <= int(st.st_mtime):
             os.utime(dst, (st2.st_atime, st.st_mtime + 1))
-    ns2.reload()
+    with ns2.watch_log_from_here() as watcher:
+        ns2.rndc("reload")
+        watcher.wait_for_line("zone example/IN: loaded serial")
 
 
 def _prime_secure_a(ns1):
-    """Cache a.example/A at trust=secure and confirm it validated (AD=1)."""
+    """
+    Cache a.example/A at trust=secure and confirm it validated (AD=1).
+    """
     ns1.rndc("flush")
     res = isctest.query.tcp(isctest.query.create("a.example", "A"), RESOLVER)
     isctest.check.noerror(res)

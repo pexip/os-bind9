@@ -1,27 +1,21 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 import dns.rcode
 import dns.rdatatype
 
-from isctest.asyncserver import (
-    ControllableAsyncDnsServer,
-    QnameHandler,
-    QnameQtypeHandler,
-    ResponseHandler,
-    StaticResponseHandler,
-    ToggleResponsesCommand,
-)
+from isctest.asyncserver import ControllableAsyncDnsServer, ResponseHandler
+from isctest.asyncserver.commands import ToggleResponsesCommand
+from isctest.asyncserver.handlers import StaticResponseHandler
+from isctest.asyncserver.matchers import Qname, Qtype
 
 from ..serve_stale_ans import (
     a_handler,
@@ -37,8 +31,8 @@ from ..serve_stale_ans import (
 )
 
 
-class NxdomainExampleHandler(QnameHandler, StaticResponseHandler):
-    qnames = ["nxdomain.example."]
+class NxdomainExampleHandler(StaticResponseHandler):
+    matcher = Qname("nxdomain.example.")
     rcode = dns.rcode.NXDOMAIN
     authority = [soa("example.", ttl=2)]
 
@@ -46,20 +40,19 @@ class NxdomainExampleHandler(QnameHandler, StaticResponseHandler):
 # A negative answer that stays fresh for the whole run of a test, so that a
 # resolver refreshing it can only be doing so because it wrongly considers
 # the cached entry stale.
-class LongttlNodataExampleHandler(QnameHandler, StaticResponseHandler):
-    qnames = ["longttl-nodata.example."]
+class LongttlNodataExampleHandler(StaticResponseHandler):
+    matcher = Qname("longttl-nodata.example.")
     authority = [soa("example.", ttl=600, minimum=600)]
 
 
-class LongttlNxdomainExampleHandler(QnameHandler, StaticResponseHandler):
-    qnames = ["longttl-nxdomain.example."]
+class LongttlNxdomainExampleHandler(StaticResponseHandler):
+    matcher = Qname("longttl-nxdomain.example.")
     rcode = dns.rcode.NXDOMAIN
     authority = [soa("example.", ttl=600, minimum=600)]
 
 
-class OthertypeExampleCaaHandler(QnameQtypeHandler, StaticResponseHandler):
-    qnames = ["othertype.example."]
-    qtypes = [dns.rdatatype.CAA]
+class OthertypeExampleCaaHandler(StaticResponseHandler):
+    matcher = Qname("othertype.example.") & Qtype(dns.rdatatype.CAA)
     answer = [
         rrset(
             "othertype.example.",
@@ -70,8 +63,8 @@ class OthertypeExampleCaaHandler(QnameQtypeHandler, StaticResponseHandler):
     ]
 
 
-class SourceStaleFallbackHandler(QnameHandler, StaticResponseHandler):
-    qnames = ["source.stale."]
+class SourceStaleFallbackHandler(StaticResponseHandler):
+    matcher = Qname("source.stale.")
 
 
 def handlers() -> list[ResponseHandler]:

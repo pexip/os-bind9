@@ -1,25 +1,20 @@
-"""
-Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-SPDX-License-Identifier: MPL-2.0
-
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0.  If a copy of the MPL was not distributed with this
-file, you can obtain one at https://mozilla.org/MPL/2.0/.
-
-See the COPYRIGHT file distributed with this work for additional
-information regarding copyright ownership.
-"""
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
 
 import dns.rcode
 
-from isctest.asyncserver import (
-    ControllableAsyncDnsServer,
-    QnameHandler,
-    ResponseHandler,
-    StaticResponseHandler,
-    SwitchControlCommand,
-)
+from isctest.asyncserver import ControllableAsyncDnsServer, ResponseHandler
+from isctest.asyncserver.commands import SwitchControlCommand
+from isctest.asyncserver.handlers import StaticResponseHandler
+from isctest.asyncserver.matchers import Qname
 
 from ..serve_stale_ans import (
     a_handler,
@@ -32,8 +27,8 @@ from ..serve_stale_ans import (
 ANS8_ADDR = "10.53.0.8"
 
 
-class TargetStaleFallbackHandler(QnameHandler, StaticResponseHandler):
-    qnames = ["target.stale."]
+class TargetStaleFallbackHandler(StaticResponseHandler):
+    matcher = Qname("target.stale.")
 
 
 def handlers(www_address: str) -> list[ResponseHandler]:

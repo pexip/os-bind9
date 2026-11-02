@@ -3,13 +3,12 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-from pathlib import Path
 from re import compile as Re
 
 import base64
@@ -86,9 +85,7 @@ def bootstrap():
     zone.render()
 
     # read the rendered zone
-    unsigned_path = str(Path(zone.ns.name) / zone.filepath_unsigned)
-    signed_path = str(Path(zone.ns.name) / zone.filepath_signed)
-    zoneobj = dns.zone.from_file(unsigned_path, origin="dnskey-malformed.")
+    zoneobj = dns.zone.from_file(str(zone.path_unsigned), origin="dnskey-malformed.")
 
     # sign the zone (including the malformed ZSKs) with KSK
     with zoneobj.writer() as txn:
@@ -115,7 +112,7 @@ def bootstrap():
         multiple_rrset.add(create_malformed_rr(rr, i))
     multiple_rrset.add(rr)
 
-    zoneobj.to_file(signed_path)
+    zoneobj.to_file(str(zone.path_signed))
 
     root = configure_root([zone])
     ksk_key_b64 = base64.b64encode(ksk_dnskey.key).decode()

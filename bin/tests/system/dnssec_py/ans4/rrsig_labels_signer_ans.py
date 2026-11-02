@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-"""Handler for the attacker.rrsig-labels-signer. zone.
+"""
+Handler for the attacker.rrsig-labels-signer. zone.
 
 Serves crafted DNSSEC responses that exercise the RRSIG Labels underflow
 check: an A query for any name under attacker.rrsig-labels-signer. returns:
@@ -52,12 +53,9 @@ import dns.rdatatype
 import dns.rdtypes.ANY.NSEC3
 import dns.rrset
 
-from isctest.asyncserver import (
-    DnsResponseSend,
-    DomainHandler,
-    QueryContext,
-    ResponseAction,
-)
+from isctest.asyncserver import QueryContext, ResponseHandler
+from isctest.asyncserver.actions import DnsResponseSend
+from isctest.asyncserver.matchers import Domain
 
 ZONE_NAME = "attacker.rrsig-labels-signer."
 PARENT_ZONE_NAME = "rrsig-labels-signer."
@@ -67,12 +65,16 @@ PEM_PATH = Path("attacker_rrsig_labels_signer.pem")
 
 
 def _to_b32hex_lower(data: bytes) -> str:
-    """Base32hex-encode bytes, lowercase, no padding (NSEC3 owner-name form)."""
+    """
+    Base32hex-encode bytes, lowercase, no padding (NSEC3 owner-name form).
+    """
     return base64.b32hexencode(data).decode().rstrip("=").lower()
 
 
 def _nsec3_sha1(name: str) -> bytes:
-    """SHA-1 NSEC3 hash of name (0 iterations, empty salt)."""
+    """
+    SHA-1 NSEC3 hash of name (0 iterations, empty salt).
+    """
     wire = dns.name.from_text(name).canonicalize().to_wire()
     return hashlib.sha1(wire).digest()
 
@@ -97,7 +99,9 @@ def _dec_bytes(b: bytes) -> bytes:
 
 
 def _type_bitmap(*types: int) -> bytes:
-    """Build NSEC / NSEC3 type bitmap bytes (window 0, types 0–255)."""
+    """
+    Build NSEC / NSEC3 type bitmap bytes (window 0, types 0–255).
+    """
     size = (max(types) >> 3) + 1
     bm = bytearray(size)
     for t in types:
@@ -105,10 +109,12 @@ def _type_bitmap(*types: int) -> bytes:
     return bytes(bm)
 
 
-class AttackerZoneHandler(DomainHandler):
-    """Serve attacker.rrsig-labels-signer. with crafted wildcard RRSIG."""
+class AttackerZoneHandler(ResponseHandler):
+    """
+    Serve attacker.rrsig-labels-signer. with crafted wildcard RRSIG.
+    """
 
-    domains = [ZONE_NAME]
+    matcher = Domain(ZONE_NAME)
 
     def __init__(self) -> None:
         super().__init__()
@@ -212,7 +218,7 @@ class AttackerZoneHandler(DomainHandler):
 
     async def get_responses(
         self, qctx: QueryContext
-    ) -> AsyncGenerator[ResponseAction, None]:
+    ) -> AsyncGenerator[DnsResponseSend, None]:
         qtype = qctx.qtype
         qname = qctx.qname
         response = qctx.prepare_new_response(with_zone_data=False)
